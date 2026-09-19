@@ -722,10 +722,7 @@ def _create_dynamic_unique_item(player_data: dict, recipe: dict) -> dict:
     final_rarity = _roll_rarity(player_data, recipe)
     base_id = recipe["result_base_id"]
 
-    SOCKETS_MAP = {
-        "comum": 0, "bom": 0, 
-        "raro": 1, "epico": 2, "lendario": 3
-    }
+    from modules.game_data.rune_rules import SOCKETS_BY_RARITY as SOCKETS_MAP
     num_sockets = SOCKETS_MAP.get(final_rarity, 0)
     initial_sockets = [None] * num_sockets
 

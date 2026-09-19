@@ -1275,7 +1275,9 @@ function animarAcoesDaRodada(turnoInfo, tipoAcao, skillId, skillNome) {
             }
             
             if (acao.golpe) {
-                logPlayerVisual = `<span style="color:#fff;">${ehCritico ? '💥 Crítico! ' : ''}Ataque ${Number(acao.golpe)}: <b style="color:#f87171;">${danoCausado} de dano</b> · <b style="color:#4ade80;">roubou ${Number(acao.roubo_vida || 0)} de vida</b></span>`;
+                const textoRoubo = acao.mostrar_roubo_vida && Number(acao.roubo_vida) > 0
+                    ? ` · <b style="color:#4ade80;">roubou ${Number(acao.roubo_vida)} de vida</b>` : '';
+                logPlayerVisual = `<span style="color:#fff;">${ehCritico ? '💥 Crítico! ' : ''}Ataque ${Number(acao.golpe)}: <b style="color:#f87171;">${danoCausado} de dano</b>${textoRoubo}</span>`;
             }
             elemLog1.innerHTML = logPlayerVisual; // Mostra na tela na hora da animação
             elemLog2.innerText = "";

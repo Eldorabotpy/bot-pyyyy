@@ -101,3 +101,5 @@ def get_rune_info(rune_id: str) -> dict:
 
 def get_runes_by_tier(tier: int) -> list:
     return [rid for rid, data in RUNES_DB.items() if data.get("tier") == tier]
+from modules.game_data.rune_rules import complete_catalog
+complete_catalog(RUNES_DB)

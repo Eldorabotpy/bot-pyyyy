@@ -132,3 +132,8 @@ RUNE_ITEMS_DATA = {
         "media_key": "item_runa_ancestral"
     },
 }
+# Mesmo catálogo para identificação, inventário e evolução.
+from modules.game_data.runes_data import RUNES_DB
+for _rid, _rune in RUNES_DB.items():
+    RUNE_ITEMS_DATA.setdefault(_rid, {"display_name": _rune["name"], "type": "runa", "category": "socketable", "stackable": True, "rarity": {1:"raro",2:"epico",3:"lendario"}[_rune["tier"]]})
+    RUNE_ITEMS_DATA[_rid]["description"] = _rune["desc"]

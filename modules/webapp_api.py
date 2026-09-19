@@ -7206,3 +7206,33 @@ def api_guild_cla_resgatar_missao():
             ),
         }), 500
 
+# --- Oficina de runas ---
+from modules.rune_workshop import item_view as _rune_item_view
+
+@webapp_bp.route('/api/runas/<user_id>', methods=['GET'])
+def api_runas_estado(user_id):
+    from modules.rune_workshop import state_view
+    player = users_collection.find_one({'_id': _forja_parse_user_id(user_id)})
+    if not player:
+        return jsonify({'success':False,'error':'Herói não encontrado.'}),404
+    return jsonify({'success':True, **state_view(player,items_data.ITEMS_DATA)})
+
+@webapp_bp.route('/api/runas/operar', methods=['POST'])
+def api_runas_operar():
+    from modules.rune_workshop import save_operation, state_view
+    from modules.combat import group_combat_manager as gcm
+    from modules import player_manager
+    data=request.get_json(silent=True) or {}
+    try:
+        uid=_forja_parse_user_id(data.get('user_id'))
+        player=users_collection.find_one({'_id':uid})
+        if not player: return jsonify({'success':False,'error':'Herói não encontrado.'}),404
+        room=gcm.obter_sala_do_jogador(str(uid))
+        if player.get('rune_hunt_active') or (room and room.get('estado') in ('aguardando','em_andamento')):
+            raise ValueError('Volte ao mapa antes de alterar runas.')
+        save_operation(users_collection,player,data,items_data.ITEMS_DATA)
+        _run_async(player_manager.clear_player_cache(str(uid)))
+        updated=users_collection.find_one({'_id':uid})
+        return jsonify({'success':True, **state_view(updated,items_data.ITEMS_DATA)})
+    except (ValueError,TypeError) as error:
+        return jsonify({'success':False,'error':str(error)}),409

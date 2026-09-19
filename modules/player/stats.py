@@ -543,6 +543,7 @@ async def get_player_total_stats(player_data: dict, ally_user_ids: list = None) 
                 if ally_data: _apply_party_aura_bonuses(ally_data, total)
         
         rune_bonuses = player_manager.get_rune_bonuses(player_data)
+        total["runa_roubo_vida_ativa"] = float(rune_bonuses.get("lifesteal", 0) or 0) > 0
         for stat, value in rune_bonuses.items():
             k_rune = _map_stat_name(stat) or stat
             if k_rune == "crit_damage_mult":
@@ -987,13 +988,16 @@ def _aplicar_golpes_combate(resultado, stats, hp, mp, mob_hp):
         mob_hp -= dano
         cura = hp - hp_antes
         numero = hit["hit_number"]
-        mensagem = f"Ataque {numero}: {dano} de dano. Roubou {cura} de vida."
+        mostrar_roubo = bool(stats.get("runa_roubo_vida_ativa")) and cura > 0
+        mensagem = f"Ataque {numero}: {dano} de dano."
+        if mostrar_roubo:
+            mensagem += f" Roubou {cura} de vida."
         if hit.get("critical"):
             mensagem = f"Crítico! {mensagem}"
         logs.append({
             "autor": "player", "texto": mensagem, "dano": dano,
             "golpe": numero, "critico": bool(hit.get("critical")),
-            "roubo_vida": cura, "player_hp_apos_golpe": hp,
+            "roubo_vida": cura, "mostrar_roubo_vida": mostrar_roubo, "player_hp_apos_golpe": hp,
             "mob_hp_apos_golpe": mob_hp,
             "anim_effect": resultado.get("anim_effect", ""),
             "tipo_skill": resultado.get("tipo_skill", ""),

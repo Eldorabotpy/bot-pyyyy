@@ -31,6 +31,19 @@ class PerHitTests(unittest.TestCase):
         hp,_,_,logs=apply_hits(self.result([30,50]), {'max_hp':100,'lifesteal':10},99,0,100)
         self.assertEqual([x['roubo_vida'] for x in logs],[1,0])
         self.assertEqual(hp,100)
+    def test_lifesteal_label_requires_equipped_rune_and_healing(self):
+        for stats, expected in [
+            ({'max_hp':100}, False),
+            ({'max_hp':100,'lifesteal_flat':.1}, False),
+            ({'max_hp':100,'lifesteal':10,'runa_roubo_vida_ativa':True}, True),
+        ]:
+            _,_,_,logs=apply_hits(self.result([30]),stats,50,0,100)
+            self.assertEqual(logs[0]['mostrar_roubo_vida'],expected)
+            self.assertEqual('Roubou' in logs[0]['texto'],expected)
+        _,_,_,logs=apply_hits(self.result([30]),{'max_hp':100,'lifesteal':10,'runa_roubo_vida_ativa':True},100,0,100)
+        self.assertFalse(logs[0]['mostrar_roubo_vida'])
+        self.assertNotIn('Roubou',logs[0]['texto'])
+
     def test_engine_emits_each_hit_with_matching_log(self):
         tree=ast.parse((root/'modules/combat/combat_engine.py').read_text(encoding='utf-8'))
         node=next(n for n in tree.body if isinstance(n,ast.AsyncFunctionDef) and n.name=='processar_acao_combate')
