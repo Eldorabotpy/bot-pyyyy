@@ -952,14 +952,81 @@ def obter_perfil(user_id):
                     "tradable": info_item.get("tradable", True) and obj_item.get("tradable", True),
                     "tipo": info_item.get("type", obj_item.get("type", "material")),
                     "desc": info_item.get("description", "Um item de Eldora."),
-                    "raridade": obj_item.get("rarity", info_item.get("rarity", "comum")),
-                    "refino": obj_item.get("upgrade_level", 0),
-                    "stats": _formatar_stats_item_para_front(obj_item),
-                    "attributes": obj_item.get("attributes", {}),
-                    "enchantments": obj_item.get("enchantments", {}),
-                    "damage": obj_item.get("damage", {}),
-                    "durability": obj_item.get("durability"),
-                    **_rune_item_view(obj_item, info_item)
+                    "raridade": obj_item.get(
+                        "rarity",
+                        info_item.get(
+                            "rarity",
+                            "comum"
+                        )
+                    ),
+
+                    "refino": obj_item.get(
+                        "upgrade_level",
+                        obj_item.get(
+                            "refino",
+                            0
+                        )
+                    ),
+
+                    "upgrade_level": obj_item.get(
+                        "upgrade_level",
+                        obj_item.get(
+                            "refino",
+                            0
+                        )
+                    ),
+
+                    "tool_type": obj_item.get(
+                        "tool_type",
+                        info_item.get(
+                            "tool_type"
+                        )
+                    ),
+
+                    "tier": obj_item.get(
+                        "tier",
+                        info_item.get(
+                            "tier"
+                        )
+                    ),
+
+                    "tool_tier": obj_item.get(
+                        "tool_tier",
+                        obj_item.get(
+                            "tier",
+                            info_item.get(
+                                "tier"
+                            )
+                        )
+                    ),
+
+                    "stats": _formatar_stats_item_para_front(
+                        obj_item
+                    ),
+
+                    "attributes": obj_item.get(
+                        "attributes",
+                        {}
+                    ),
+
+                    "enchantments": obj_item.get(
+                        "enchantments",
+                        {}
+                    ),
+
+                    "damage": obj_item.get(
+                        "damage",
+                        {}
+                    ),
+
+                    "durability": obj_item.get(
+                        "durability"
+                    ),
+
+                    **_rune_item_view(
+                        obj_item,
+                        info_item
+                    )
                 })
         inventario_formatado.sort(key=lambda x: x["qtd"], reverse=True)
 

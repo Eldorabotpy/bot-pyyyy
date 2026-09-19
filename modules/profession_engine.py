@@ -396,7 +396,7 @@ def calculate_crafting_quality_bonus(
         prof_key
     )
 
-    tool_uid, tool_inst, _ = (
+    tool_uid, tool_inst, tool_info = (
         get_equipped_tool_for_speed(
             player_data,
             prof_key
@@ -418,6 +418,72 @@ def calculate_crafting_quality_bonus(
         prof_level * 0.20
     )
 
+    # ================================================
+    # ⭐ RARIDADE DA FERRAMENTA
+    # ================================================
+
+    tool_rarity = "comum"
+
+    if isinstance(tool_inst, dict):
+        tool_rarity = str(
+            tool_inst.get(
+                "rarity",
+                "comum"
+            )
+            or "comum"
+        ).strip().lower()
+
+    tool_rarity = (
+        tool_rarity
+        .replace("é", "e")
+        .replace("á", "a")
+    )
+
+    # Compatibilidade com ferramentas antigas.
+    if tool_rarity == "incomum":
+        tool_rarity = "bom"
+
+    rarity_quality_bonus = {
+        "comum": 0.0,
+        "bom": 0.5,
+        "raro": 1.0,
+        "epico": 1.5,
+        "lendario": 2.0,
+    }.get(
+        tool_rarity,
+        0.0
+    )
+
+    # ================================================
+    # 🔨 REFINO DA FERRAMENTA
+    # +0.10 ponto por nível, máximo +2
+    # ================================================
+
+    tool_upgrade = 0
+
+    if isinstance(tool_inst, dict):
+        try:
+            tool_upgrade = max(
+                0,
+                int(
+                    tool_inst.get(
+                        "upgrade_level",
+                        tool_inst.get(
+                            "refino",
+                            0
+                        )
+                    )
+                    or 0
+                )
+            )
+        except Exception:
+            tool_upgrade = 0
+
+    upgrade_quality_bonus = min(
+        2.0,
+        tool_upgrade * 0.10
+    )
+
     bonus_sorte = min(
         5.0,
         sorte_pontos * 0.25
@@ -431,6 +497,8 @@ def calculate_crafting_quality_bonus(
     bonus_total = min(
         15.0,
         bonus_profissao
+        + rarity_quality_bonus
+        + upgrade_quality_bonus
         + bonus_sorte
         + bonus_maestria
     )
@@ -439,6 +507,19 @@ def calculate_crafting_quality_bonus(
         "profession_key": prof_key,
         "profession_level": prof_level,
         "tool_uid": tool_uid,
+
+        "tool_rarity": tool_rarity,
+        "tool_upgrade": tool_upgrade,
+
+        "rarity_quality_bonus": round(
+            rarity_quality_bonus,
+            3
+        ),
+
+        "upgrade_quality_bonus": round(
+            upgrade_quality_bonus,
+            3
+        ),
 
         "sorte_oficio": sorte_pontos,
         "maestria": maestria_pontos,
@@ -690,6 +771,117 @@ def _recipe_required_tool_tier(recipe: dict) -> int:
                 return 1
 
     return 1
+
+
+def check_profession_tool_for_recipe(
+    player_data: dict,
+    recipe: dict,
+    action_name: str = "forjar"
+) -> dict:
+    """
+    Apenas verifica a ferramenta necessária.
+
+    IMPORTANTE:
+    - não consome durabilidade;
+    - pode ser usado em previews e menus;
+    - usa as mesmas regras da fabricação real.
+    """
+
+    required_tool_type = _recipe_required_tool_type(
+        recipe,
+        "ferreiro"
+    )
+
+    min_tier = _recipe_required_tool_tier(
+        recipe
+    )
+
+    uid, tool_inst, tool_info = _get_equipped_tool(
+        player_data,
+        required_tool_type
+    )
+
+    if not tool_inst or not tool_info:
+        return {
+            "ok": False,
+            "error": (
+                f"Você precisa equipar uma ferramenta "
+                f"de {required_tool_type} para {action_name}."
+            ),
+            "tool_type": required_tool_type,
+            "required_tier": min_tier,
+        }
+
+    tool_type = _norm_tool_key(
+        tool_info.get("tool_type")
+        or tool_inst.get("tool_type")
+    )
+
+    if tool_type != required_tool_type:
+        return {
+            "ok": False,
+            "error": (
+                f"Ferramenta incompatível. "
+                f"Requer {required_tool_type}, "
+                f"mas você equipou "
+                f"{tool_type or 'desconhecida'}."
+            ),
+            "tool_type": required_tool_type,
+            "required_tier": min_tier,
+        }
+
+    try:
+        tool_tier = int(
+            tool_info.get(
+                "tier",
+                tool_inst.get(
+                    "tier",
+                    1
+                )
+            )
+            or 1
+        )
+    except Exception:
+        tool_tier = 1
+
+    if tool_tier < min_tier:
+        return {
+            "ok": False,
+            "error": (
+                f"Ferramenta fraca demais. "
+                f"Requer tier {min_tier}."
+            ),
+            "tool_uid": uid,
+            "tool_type": required_tool_type,
+            "tool_tier": tool_tier,
+            "required_tier": min_tier,
+        }
+
+    cur, mx = _dur_tuple(
+        tool_inst.get(
+            "durability"
+        )
+    )
+
+    if cur <= 0:
+        return {
+            "ok": False,
+            "error": "Sua ferramenta está quebrada.",
+            "tool_uid": uid,
+            "tool_type": required_tool_type,
+            "tool_tier": tool_tier,
+            "required_tier": min_tier,
+            "durability": [cur, mx],
+        }
+
+    return {
+        "ok": True,
+        "tool_uid": uid,
+        "tool_type": required_tool_type,
+        "tool_tier": tool_tier,
+        "required_tier": min_tier,
+        "durability": [cur, mx],
+    }
 
 
 def validate_and_consume_profession_tool(

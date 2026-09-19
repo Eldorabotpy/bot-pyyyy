@@ -212,20 +212,44 @@ function gerarHtmlBonusTempoFerramentaPerfil(itemData) {
 
     const profNivel = getNivelProfissaoPerfil(profKey);
 
-    const tier = getTierFerramentaPerfil(itemData);
-    const upgrade = getNivelRefinoPerfilItem(itemData);
+    const tier = getTierFerramentaPerfil(
+        itemData
+    );
+
+    const upgrade = getNivelRefinoPerfilItem(
+        itemData
+    );
+
+    const velocidadePontos =
+        getTotalAtributoFerramentaPerfil(
+            itemData,
+            "velocidade_trabalho"
+        );
 
     // Igual ao backend:
     // T1 0%, T2 5%, T3 10%, T4 15%, T5 20%
     const bonusTier = Math.min(20, Math.max(0, tier - 1) * 5);
 
     // +1% por melhoria, máximo 10%
-    const bonusUpgrade = Math.min(10, upgrade);
+    const bonusUpgrade = Math.min(
+        10,
+        upgrade
+    );
+
+    // ⚡ Velocidade de Trabalho:
+    // 0.5% por ponto, máximo 10%
+    const bonusVelocidade = Math.min(
+        10,
+        velocidadePontos * 0.5
+    );
 
     // Profissão: 0.5% por nível, máximo 25%
     const bonusProf = Math.min(25, profNivel * 0.5);
 
-    const bonusFerramenta = bonusTier + bonusUpgrade;
+    const bonusFerramenta =
+        bonusTier
+        + bonusUpgrade
+        + bonusVelocidade;
 
     // Total final máximo: 50%
     const totalAplicado = Math.min(50, bonusProf + bonusFerramenta);
@@ -284,6 +308,14 @@ function gerarHtmlBonusTempoFerramentaPerfil(itemData) {
                     <b style="color:#fff;">+${upgrade} / -${bonusUpgrade.toFixed(1)}%</b>
                 </div>
 
+                <div style="display:flex; justify-content:space-between; gap:8px;">
+                    <span>⚡ Velocidade de Trabalho</span>
+                    <b style="color:#67e8f9;">
+                        +${velocidadePontos}
+                        / -${bonusVelocidade.toFixed(1)}%
+                    </b>
+                </div>
+
                 <div style="
                     margin-top:6px;
                     padding-top:7px;
@@ -301,6 +333,82 @@ function gerarHtmlBonusTempoFerramentaPerfil(itemData) {
     `;
 }
 
+function getTotalAtributoFerramentaPerfil(
+    itemData,
+    statProcurado
+) {
+    if (!itemData) return 0;
+
+    const alvo = normalizarProfissaoPerfil(
+        statProcurado
+    );
+
+    const blocos = [
+        itemData.enchantments,
+        itemData.attributes,
+        itemData.stats
+    ];
+
+    const bloco = blocos.find(
+        b =>
+            b &&
+            typeof b === "object" &&
+            Object.keys(b).length > 0
+    ) || {};
+
+    let total = 0;
+
+    for (
+        const [chave, entrada]
+        of Object.entries(bloco)
+    ) {
+
+        let statReal = chave;
+
+        if (
+            entrada &&
+            typeof entrada === "object" &&
+            entrada.stat
+        ) {
+            statReal = entrada.stat;
+        } else {
+            statReal = String(chave)
+                .replace(/_\d+$/, "");
+        }
+
+        statReal = normalizarProfissaoPerfil(
+            statReal
+        );
+
+        if (statReal !== alvo) {
+            continue;
+        }
+
+        let valor = entrada;
+
+        if (
+            entrada &&
+            typeof entrada === "object"
+        ) {
+            valor =
+                entrada.value ??
+                entrada.valor ??
+                0;
+        }
+
+        const numero = Number(
+            valor || 0
+        );
+
+        if (
+            Number.isFinite(numero)
+        ) {
+            total += numero;
+        }
+    }
+
+    return total;
+}
 // ==========================================
 // FUNÇÃO PRINCIPAL DE CARREGAMENTO DO PERFIL
 // ==========================================
@@ -1214,7 +1322,11 @@ window.abrirModalItem = function(idAlvo, origem) {
         'dmg':'⚔️',
         'damage':'⚔️',
         'attack':'⚔️',
-        'ataque':'⚔️'
+        'ataque':'⚔️',
+        'velocidade_trabalho':'⚡',
+        'sorte_oficio':'🍀',
+        'maestria':'🔨',
+        'resistencia_ferramenta':'🛡️',
     };
 
     function nomeBonitoStat(chave) {
@@ -1246,7 +1358,11 @@ window.abrirModalItem = function(idAlvo, origem) {
             dmg: 'DANO',
             damage: 'DANO',
             attack: 'ATAQUE',
-            ataque: 'ATAQUE'
+            ataque: 'ATAQUE',
+            velocidade_trabalho: 'VELOCIDADE DE TRABALHO',
+            sorte_oficio: 'SORTE DE OFÍCIO',
+            maestria: 'MAESTRIA',
+            resistencia_ferramenta: 'RESISTÊNCIA DA FERRAMENTA',
         };
 
         const k = String(chave || '').toLowerCase();
@@ -1268,11 +1384,38 @@ window.abrirModalItem = function(idAlvo, origem) {
 
             const kLower = key.toLowerCase();
 
-            // Se tiver vários atributos, esconde o dmg espelhado para não poluir.
-            if (kLower === 'dmg' && Object.keys(statsDoItem).length > 1) continue;
+            const statReal = String(
+                (
+                    valObj &&
+                    typeof valObj === "object" &&
+                    valObj.stat
+                )
+                    ? valObj.stat
+                    : kLower.replace(
+                        /_\d+$/,
+                        ""
+                    )
+            ).toLowerCase();
 
-            const emoji = mapEmojis[kLower] || '✨';
-            const nomeStat = nomeBonitoStat(key);
+            // Se tiver vários atributos,
+            // esconde o dmg espelhado.
+            if (
+                statReal === 'dmg' &&
+                Object.keys(
+                    statsDoItem
+                ).length > 1
+            ) {
+                continue;
+            }
+
+            const emoji =
+                mapEmojis[statReal]
+                || '✨';
+
+            const nomeStat =
+                nomeBonitoStat(
+                    statReal
+                );
 
             const prefixo = String(val).includes('-') ? '' : '+';
 
@@ -1286,6 +1429,45 @@ window.abrirModalItem = function(idAlvo, origem) {
         statsHtml = `<span style="color: #64748b; font-size: 0.8em;">Sem atributos base</span>`;
     }
 
+    if (
+        isFerramentaPerfil(
+            itemData
+        )
+    ) {
+        const tierTool =
+            getTierFerramentaPerfil(
+                itemData
+            );
+
+        const profTool =
+            normalizarProfissaoPerfil(
+                itemData.tool_type ||
+                itemData.slot_profissao ||
+                ""
+            );
+
+        const profNome = profTool
+            ? profTool
+                .charAt(0)
+                .toUpperCase()
+                + profTool.slice(1)
+            : "Profissão";
+
+        statsHtml =
+            `
+            <span style="
+                background:#020617;
+                padding:4px 8px;
+                border-radius:6px;
+                font-size:.8em;
+                color:#facc15;
+                border:1px solid #854d0e;
+            ">
+                🛠️ T${tierTool} • ${profNome}
+            </span>
+            `
+            + statsHtml;
+    }
     const bonusFerramentaHtml = gerarHtmlBonusTempoFerramentaPerfil(itemData);
 
     if (bonusFerramentaHtml) {

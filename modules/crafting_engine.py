@@ -4,7 +4,6 @@ from __future__ import annotations
 from datetime import datetime, timezone, timedelta
 import uuid
 import random
-from typing import Any, Dict, Tuple, List
 REPEAT_ATTR_CHANCE = 0.10
 from typing import Any, Dict, Tuple, List, Union
 # Módulos do projeto (Removemos game_data daqui de cima para evitar o ciclo)
@@ -229,49 +228,230 @@ def _recipe_is_unlocked(
 # Preview / Start
 # =========================
 
-async def preview_craft(recipe_id: str, player_data: dict) -> dict | None:
-    rec = get_recipe(recipe_id)
+async def preview_craft(
+    recipe_id: str,
+    player_data: dict
+) -> dict | None:
+
+    rec = get_recipe(
+        recipe_id
+    )
 
     if not rec:
         return None
 
+    rec = dict(
+        rec
+    )
 
-    rec = dict(rec)
+    # ========================================================
+    # 🔒 DESBLOQUEIO DA RECEITA
+    # ========================================================
 
+    unlock_id = _recipe_unlock_id(
+        rec
+    )
 
-    unlock_id = (
-        _recipe_unlock_id(
-            rec
+    desbloqueada = _recipe_is_unlocked(
+        player_data,
+        rec
+    )
+
+    # ========================================================
+    # 👷 PROFISSÃO
+    # Mesma regra usada em start_craft()
+    # ========================================================
+
+    req_prof = (
+        rec.get("profession")
+        or rec.get("profession_req")
+        or rec.get("required_tool_type")
+    )
+
+    req_lvl = int(
+        rec.get(
+            "level_req",
+            1
         )
     )
 
-
-    desbloqueada = (
-        _recipe_is_unlocked(
-            player_data,
-            rec,
+    learned = (
+        player_data.get(
+            "learned_professions",
+            {}
         )
+        or {}
     )
 
+    my_lvl = 0
+
+    if (
+        isinstance(learned, dict)
+        and req_prof in learned
+    ):
+
+        prof_data = learned.get(
+            req_prof
+        )
+
+        if isinstance(prof_data, dict):
+            my_lvl = int(
+                prof_data.get(
+                    "level",
+                    1
+                )
+            )
+
+    if my_lvl <= 0:
+
+        legacy = _as_dict(
+            player_data.get(
+                "profession"
+            )
+        )
+
+        if (
+            legacy.get("type") == req_prof
+            or legacy.get("key") == req_prof
+        ):
+
+            my_lvl = int(
+                legacy.get(
+                    "level",
+                    1
+                )
+            )
+
+    ok_prof = (
+        my_lvl >= req_lvl
+    )
+
+    # ========================================================
+    # 📦 MATERIAIS
+    # Compatível com todos os formatos de receita.
+    # ========================================================
 
     inputs = _as_dict(
         rec.get("inputs")
+        or rec.get("materials")
+        or rec.get("ingredients")
     )
-    prof = _as_dict(player_data.get("profession"))
-    ok_prof = (prof.get("type") == rec.get("profession")) and \
-              (int(prof.get("level", 1)) >= int(rec.get("level_req", 1)))
-    duration = await _seconds_with_perks(player_data, int(rec.get("time_seconds", 60)))
+
+    ok_materials = _has_materials(
+        player_data,
+        inputs
+    )
+
+    # ========================================================
+    # 🔨 FERRAMENTA
+    # Apenas verifica. NÃO consome durabilidade.
+    # ========================================================
+
+    try:
+        from modules import profession_engine
+
+        tool_check = (
+            profession_engine
+            .check_profession_tool_for_recipe(
+                player_data=player_data,
+                recipe=rec,
+                action_name="forjar"
+            )
+        )
+
+    except Exception as e:
+
+        tool_check = {
+            "ok": False,
+            "error": (
+                "Erro ao verificar ferramenta: "
+                f"{str(e)}"
+            )
+        }
+
+    ok_tool = bool(
+        tool_check.get(
+            "ok"
+        )
+    )
+
+    # ========================================================
+    # ⏱️ TEMPO REAL
+    # Profissão + Tier + Refino + Velocidade da ferramenta.
+    # ========================================================
+
+    base_time = int(
+        rec.get(
+            "time_seconds",
+            60
+        )
+    )
+
+    try:
+
+        tempo_calc = (
+            profession_engine
+            .calculate_profession_work_duration(
+                player_data=player_data,
+                base_seconds=base_time,
+                profession_key=req_prof,
+                apply_perks=True
+            )
+        )
+
+        duration = int(
+            tempo_calc.get(
+                "duration_seconds",
+                base_time
+            )
+        )
+
+    except Exception:
+
+        duration = await _seconds_with_perks(
+            player_data,
+            base_time
+        )
+
+        tempo_calc = {
+            "duration_seconds":
+                duration,
+            "base_seconds":
+                base_time,
+        }
+
+    # ========================================================
+    # 🍀 QUALIDADE PREVISTA
+    # Não sorteia a raridade.
+    # Apenas mostra os bônus atuais.
+    # ========================================================
+
+    try:
+
+        quality_calc = (
+            profession_engine
+            .calculate_crafting_quality_bonus(
+                player_data=player_data,
+                profession_key=req_prof
+            )
+        )
+
+    except Exception:
+
+        quality_calc = {
+            "quality_bonus_points": 0.0
+        }
+
+    # ========================================================
+    # 📤 RESULTADO
+    # ========================================================
 
     return {
         "can_craft": bool(
             desbloqueada
-            and
-            ok_prof
-            and
-            _has_materials(
-                player_data,
-                inputs,
-            )
+            and ok_prof
+            and ok_materials
+            and ok_tool
         ),
 
         "requer_desbloqueio":
@@ -286,11 +466,58 @@ async def preview_craft(recipe_id: str, player_data: dict) -> dict | None:
 
         "unlock_id":
             unlock_id,
-        "duration_seconds": duration,
-        "inputs": dict(inputs),
-        "result_base_id": rec.get("result_base_id"),
-        "display_name": rec.get("display_name", recipe_id),
-        "emoji": rec.get("emoji", ""),
+
+        "profession":
+            req_prof,
+
+        "profession_level":
+            my_lvl,
+
+        "required_profession_level":
+            req_lvl,
+
+        "profession_ok":
+            ok_prof,
+
+        "materials_ok":
+            ok_materials,
+
+        "tool_ok":
+            ok_tool,
+
+        "tool":
+            tool_check,
+
+        "duration_seconds":
+            duration,
+
+        "work_speed":
+            tempo_calc,
+
+        "craft_quality":
+            quality_calc,
+
+        "inputs":
+            dict(
+                inputs
+            ),
+
+        "result_base_id":
+            rec.get(
+                "result_base_id"
+            ),
+
+        "display_name":
+            rec.get(
+                "display_name",
+                recipe_id
+            ),
+
+        "emoji":
+            rec.get(
+                "emoji",
+                ""
+            ),
     }
 
 async def start_craft(user_id: str, recipe_id: str):
@@ -312,6 +539,77 @@ async def start_craft(user_id: str, recipe_id: str):
     rec = dict(
         rec
     )
+
+    # ========================================================
+    # 🔒 IMPEDE DUAS FORJAS AO MESMO TEMPO
+    # ========================================================
+
+    current_state = _as_dict(
+        pdata.get(
+            "player_state"
+        )
+    )
+
+    if current_state.get("action") == "crafting":
+
+        finish_raw = current_state.get(
+            "finish_time"
+        )
+
+        if finish_raw:
+
+            try:
+
+                finish_dt = datetime.fromisoformat(
+                    str(finish_raw).replace(
+                        "Z",
+                        "+00:00"
+                    )
+                )
+
+                if finish_dt.tzinfo is None:
+                    finish_dt = finish_dt.replace(
+                        tzinfo=timezone.utc
+                    )
+
+                agora = datetime.now(
+                    timezone.utc
+                )
+
+                if agora < finish_dt:
+
+                    restante = max(
+                        1,
+                        int(
+                            (
+                                finish_dt
+                                - agora
+                            ).total_seconds()
+                            + 0.999
+                        )
+                    )
+
+                    return (
+                        "Você já possui uma forja em andamento. "
+                        f"Aguarde {restante}s."
+                    )
+
+                return (
+                    "Sua forja anterior já terminou. "
+                    "Conclua a fabricação antes de iniciar outra."
+                )
+
+            except Exception:
+
+                return (
+                    "Já existe uma forja pendente. "
+                    "Conclua-a antes de iniciar outra."
+                )
+
+        return (
+            "Já existe uma forja pendente. "
+            "Conclua-a antes de iniciar outra."
+        )
 
 
     # ========================================================
@@ -392,8 +690,27 @@ async def start_craft(user_id: str, recipe_id: str):
         apply_perks=True
     )
 
-    duration = int(tempo_calc.get("duration_seconds", base_time))
-    _consume_materials(pdata, inputs)
+    duration = int(
+        tempo_calc.get(
+            "duration_seconds",
+            base_time
+        )
+    )
+
+    # Congela os bônus no momento em que a fabricação começa.
+    # Assim não adianta trocar de ferramenta durante a produção.
+    quality_calc = (
+        profession_engine
+        .calculate_crafting_quality_bonus(
+            player_data=pdata,
+            profession_key=req_prof
+        )
+    )
+
+    _consume_materials(
+        pdata,
+        inputs
+    )
     
     finish = datetime.now(timezone.utc) + timedelta(seconds=duration)
     pdata["player_state"] = {
@@ -403,6 +720,7 @@ async def start_craft(user_id: str, recipe_id: str):
             "recipe_id": recipe_id,
             "prof_used": req_prof,
             "work_speed": tempo_calc,
+            "craft_quality": quality_calc,
             "tool_uid": tool_result.get("tool_uid"),
             "tool_type": tool_result.get("tool_type"),
             "tool_broke": tool_result.get("tool_broke", False)
@@ -414,6 +732,7 @@ async def start_craft(user_id: str, recipe_id: str):
         "duration_seconds": duration,
         "finish_time": finish.isoformat(),
         "work_speed": tempo_calc,
+        "craft_quality": quality_calc,
         "tool_broke": tool_result.get("tool_broke", False),
         "tool_message": tool_result.get("message", "")
     }
@@ -682,30 +1001,171 @@ def _pick_attribute_keys_for_item(rarity: str, primary_key: str, recipe: dict, p
 # Raridade / meta de dano
 # =========================
 
-def _roll_rarity(player_data: dict, recipe: dict) -> str:
-    # Apenas pega as chances originais e brutas da receita, sem importar o nível do jogador!
-    base_chances = dict(recipe.get("rarity_chances", {"comum": 1.0}))
-    
-    total = sum(base_chances.values()) or 1.0
-    norm = {k: float(v) / total for k, v in base_chances.items()}
+def _quality_adjusted_rarity_chances(
+    recipe: dict,
+    quality_bonus_points: float = 0.0
+) -> dict:
+    """
+    Aplica o bônus de qualidade nas chances da receita.
 
-    order = ["lendario", "epico", "raro", "bom", "comum"]
+    Exemplo:
+        quality_bonus_points = 7.2
+        retira 7.2 pontos percentuais de Comum.
+
+    Distribuição:
+        55% -> Bom
+        30% -> Raro
+        10% -> Épico
+         5% -> Lendário
+
+    Máximo absoluto: +15 pontos percentuais.
+    """
+
+    base_chances = dict(
+        recipe.get(
+            "rarity_chances",
+            {"comum": 1.0}
+        )
+    )
+
+    rarities = [
+        "comum",
+        "bom",
+        "raro",
+        "epico",
+        "lendario",
+    ]
+
+    cleaned = {}
+
+    for rarity in rarities:
+        try:
+            cleaned[rarity] = max(
+                0.0,
+                float(
+                    base_chances.get(
+                        rarity,
+                        0.0
+                    )
+                    or 0.0
+                )
+            )
+        except Exception:
+            cleaned[rarity] = 0.0
+
+    total = sum(cleaned.values())
+
+    if total <= 0:
+        cleaned = {
+            "comum": 1.0,
+            "bom": 0.0,
+            "raro": 0.0,
+            "epico": 0.0,
+            "lendario": 0.0,
+        }
+        total = 1.0
+
+    norm = {
+        rarity: value / total
+        for rarity, value
+        in cleaned.items()
+    }
+
+    try:
+        bonus_fraction = float(
+            quality_bonus_points or 0.0
+        ) / 100.0
+    except Exception:
+        bonus_fraction = 0.0
+
+    bonus_fraction = min(
+        0.15,
+        max(
+            0.0,
+            bonus_fraction
+        )
+    )
+
+    shifted = min(
+        norm.get(
+            "comum",
+            0.0
+        ),
+        bonus_fraction
+    )
+
+    norm["comum"] = max(
+        0.0,
+        norm.get(
+            "comum",
+            0.0
+        ) - shifted
+    )
+
+    redistribution = {
+        "bom": 0.55,
+        "raro": 0.30,
+        "epico": 0.10,
+        "lendario": 0.05,
+    }
+
+    for rarity, weight in redistribution.items():
+        norm[rarity] = (
+            norm.get(
+                rarity,
+                0.0
+            )
+            + shifted * weight
+        )
+
+    final_total = sum(
+        norm.values()
+    ) or 1.0
+
+    return {
+        rarity: value / final_total
+        for rarity, value
+        in norm.items()
+    }
+
+
+def _roll_rarity(
+    player_data: dict,
+    recipe: dict,
+    quality_bonus_points: float = 0.0
+) -> str:
+
+    norm = _quality_adjusted_rarity_chances(
+        recipe=recipe,
+        quality_bonus_points=quality_bonus_points
+    )
+
+    order = [
+        "lendario",
+        "epico",
+        "raro",
+        "bom",
+        "comum",
+    ]
+
     roll = random.random()
     acc = 0.0
-    
-    for r in order:
-        acc += norm.get(r, 0.0)
+
+    for rarity in order:
+
+        acc += norm.get(
+            rarity,
+            0.0
+        )
+
         if roll < acc:
-            return r
-            
+            return rarity
+
     return "comum"
 
 # =========================
 # Aplicação de atributos (= upgrade_level)
 # =========================
-
-REPEAT_ATTR_CHANCE = 0.10  # 10% de chance do atributo extra repetir um atributo já sorteado
-
 
 def _next_enchantment_key(ench: dict, stat_key: str) -> str:
     """
@@ -813,8 +1273,17 @@ def sync_enchantments_to_upgrade_level(item: dict) -> dict:
 # Criação do item
 # =========================
 
-def _create_dynamic_unique_item(player_data: dict, recipe: dict) -> dict:
-    final_rarity = _roll_rarity(player_data, recipe)
+def _create_dynamic_unique_item(
+    player_data: dict,
+    recipe: dict,
+    quality_bonus_points: float = 0.0
+) -> dict:
+
+    final_rarity = _roll_rarity(
+        player_data=player_data,
+        recipe=recipe,
+        quality_bonus_points=quality_bonus_points
+    )
     base_id = recipe["result_base_id"]
 
     from modules.game_data.rune_rules import SOCKETS_BY_RARITY as SOCKETS_MAP
@@ -1004,12 +1473,113 @@ def _create_dynamic_unique_item(player_data: dict, recipe: dict) -> dict:
 # =========================
 
 async def finish_craft(user_id: str):
-    pdata = await player_manager.get_player_data(user_id)
-    pstate = _as_dict(pdata.get("player_state")) if pdata else {}
-    if not pdata or pstate.get("action") != "crafting": return "Nenhuma forja em andamento."
 
-    rid = _as_dict(pstate.get("details")).get("recipe_id")
-    prof_used = _as_dict(pstate.get("details")).get("prof_used")
+    pdata = await player_manager.get_player_data(
+        user_id
+    )
+
+    pstate = (
+        _as_dict(
+            pdata.get("player_state")
+        )
+        if pdata
+        else {}
+    )
+
+    if (
+        not pdata
+        or pstate.get("action") != "crafting"
+    ):
+        return "Nenhuma forja em andamento."
+
+    # ========================================================
+    # ⏳ SEGURANÇA — NÃO FINALIZA ANTES DO TEMPO
+    # ========================================================
+
+    finish_raw = pstate.get(
+        "finish_time"
+    )
+
+    if not finish_raw:
+        return (
+            "Tempo de conclusão da forja "
+            "não foi encontrado."
+        )
+
+    try:
+
+        finish_dt = datetime.fromisoformat(
+            str(finish_raw).replace(
+                "Z",
+                "+00:00"
+            )
+        )
+
+        if finish_dt.tzinfo is None:
+            finish_dt = finish_dt.replace(
+                tzinfo=timezone.utc
+            )
+
+    except Exception:
+
+        return (
+            "Tempo de conclusão da forja "
+            "é inválido."
+        )
+
+    agora = datetime.now(
+        timezone.utc
+    )
+
+    if agora < finish_dt:
+
+        restante = max(
+            1,
+            int(
+                (
+                    finish_dt
+                    - agora
+                ).total_seconds()
+                + 0.999
+            )
+        )
+
+        return (
+            "Forja ainda em andamento. "
+            f"Aguarde {restante}s."
+        )
+
+    details = _as_dict(
+        pstate.get(
+            "details"
+        )
+    )
+
+    rid = details.get(
+        "recipe_id"
+    )
+
+    prof_used = details.get(
+        "prof_used"
+    )
+
+    quality_snapshot = _as_dict(
+        details.get(
+            "craft_quality"
+        )
+    )
+
+    try:
+        quality_bonus_points = float(
+            quality_snapshot.get(
+                "quality_bonus_points",
+                0.0
+            )
+            or 0.0
+        )
+    except Exception:
+        quality_bonus_points = 0.0
+
     rec = get_recipe(rid)
     
     if not rec:
@@ -1018,7 +1588,12 @@ async def finish_craft(user_id: str):
         return "Receita não encontrada ao concluir."
 
     rec = dict(rec)
-    novo_item_criado = _create_dynamic_unique_item(pdata, rec)
+
+    novo_item_criado = _create_dynamic_unique_item(
+        player_data=pdata,
+        recipe=rec,
+        quality_bonus_points=quality_bonus_points
+    )
     player_manager.add_unique_item(pdata, novo_item_criado)
 
     # 4. Distribuição de XP Inteligente
