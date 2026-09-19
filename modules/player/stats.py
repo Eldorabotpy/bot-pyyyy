@@ -974,7 +974,13 @@ def _aplicar_golpes_combate(resultado, stats, hp, mp, mob_hp):
     """Aplica dano e roubo de vida por golpe, na ordem apresentada ao jogador."""
     logs = []
     hits = resultado.get("hits", [])
-    por_log = {hit["log_index"]: hit for hit in hits}
+
+    eh_multi_hit = len(hits) > 1
+
+    por_log = {
+        hit["log_index"]: hit
+        for hit in hits
+    }
     for index, texto in enumerate(resultado.get("log_messages", [])):
         hit = por_log.get(index)
         if hit is None:
@@ -987,16 +993,46 @@ def _aplicar_golpes_combate(resultado, stats, hp, mp, mob_hp):
         hp, mp = _recuperar_recursos_combate(stats, hp, mp, dano)
         mob_hp -= dano
         cura = hp - hp_antes
-        numero = hit["hit_number"]
-        mostrar_roubo = bool(stats.get("runa_roubo_vida_ativa")) and cura > 0
-        mensagem = f"Ataque {numero}: {dano} de dano."
+        numero = int(
+            hit.get(
+                "hit_number",
+                1
+            )
+            or 1
+        )
+
+        mostrar_roubo = (
+            bool(
+                stats.get(
+                    "runa_roubo_vida_ativa"
+                )
+            )
+            and cura > 0
+        )
+
+        if eh_multi_hit:
+            mensagem = (
+                f"Ataque {numero}: "
+                f"{dano} de dano."
+            )
+        else:
+            mensagem = (
+                f"{dano} de dano."
+            )
         if mostrar_roubo:
             mensagem += f" Roubou {cura} de vida."
         if hit.get("critical"):
             mensagem = f"Crítico! {mensagem}"
         logs.append({
             "autor": "player", "texto": mensagem, "dano": dano,
-            "golpe": numero, "critico": bool(hit.get("critical")),
+            "golpe": (
+                numero
+                if eh_multi_hit
+                else None
+            ),
+            "critico": bool(
+                hit.get("critical")
+            ),
             "roubo_vida": cura, "mostrar_roubo_vida": mostrar_roubo, "player_hp_apos_golpe": hp,
             "mob_hp_apos_golpe": mob_hp,
             "anim_effect": resultado.get("anim_effect", ""),
