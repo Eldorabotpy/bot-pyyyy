@@ -894,6 +894,8 @@ window.executarAcaoTurno = async function(tipoAcao, skillId = null, skillNome = 
     }
 
     if (window.bloqueioDeTurno) return;
+    const combateDaAcao = window.dadosCombateAtual;
+    combateDaAcao.rodadaVisualPendente = true;
     window.bloqueioDeTurno = true;
 
     document.getElementById('menu-botoes').style.display = 'none';
@@ -943,9 +945,11 @@ window.executarAcaoTurno = async function(tipoAcao, skillId = null, skillNome = 
         if (!res.ok) throw new Error(`Crash no Servidor (Status ${res.status})`);
 
         const turno = await res.json();
+        if (window.dadosCombateAtual !== combateDaAcao || combateDaAcao.rodadaVisualCancelada) return;
         if (salaDaAcao && (String(window.salaCombateGrupoAtual) !== String(salaDaAcao) || salasGrupoDevolvidas.has(String(salaDaAcao)))) return;
 
         if (turno.erro) {
+            combateDaAcao.rodadaVisualPendente = false;
             window.bloqueioDeTurno = false;
 
             if (turno.sala) {
@@ -963,6 +967,7 @@ window.executarAcaoTurno = async function(tipoAcao, skillId = null, skillNome = 
         }
 
         if (turno.fugiu) {
+            combateDaAcao.rodadaVisualPendente = false;
             document.getElementById('log-texto-1').innerHTML = `💨 ${turno.log[0].texto.toUpperCase()}`;
 
             setTimeout(() => {
@@ -976,6 +981,7 @@ window.executarAcaoTurno = async function(tipoAcao, skillId = null, skillNome = 
         animarAcoesDaRodada(turno, tipoAcao, skillId, skillNome);
 
     } catch(e) {
+        combateDaAcao.rodadaVisualPendente = false;
         window.bloqueioDeTurno = false;
         console.error(e);
         if (salaDaAcao && String(window.salaCombateGrupoAtual) !== String(salaDaAcao)) return;
@@ -1114,10 +1120,13 @@ function animarAcoesDaRodada(turnoInfo, tipoAcao, skillId, skillNome) {
     }
 
     const salaDaAnimacao = window.salaCombateGrupoAtual;
-    function lerProximoLog() {
+    db.rodadaVisualPendente = true;
+    window.bloqueioDeTurno = true;
+    async function lerProximoLog() {
+        if (window.dadosCombateAtual !== db || db.rodadaVisualCancelada) return;
         if (salaDaAnimacao && (String(window.salaCombateGrupoAtual) !== String(salaDaAnimacao) || salasGrupoDevolvidas.has(String(salaDaAnimacao)))) return;
         if (indexAcao >= turnoInfo.log.length) {
-            window.bloqueioDeTurno = false;
+            window.bloqueioDeTurno = !!(turnoInfo.vitoria || turnoInfo.derrota);
 
             if (turnoInfo.mob_hp_atual !== undefined) {
                 db.mobHpAtual = Math.max(0, turnoInfo.mob_hp_atual);
@@ -1136,9 +1145,12 @@ function animarAcoesDaRodada(turnoInfo, tipoAcao, skillId, skillNome) {
                 } else {
                     elemSpritePlayer.style.opacity = "0";
                 }
-                setTimeout(() => finalizarAnimacaoCombate(turnoInfo), 1000);
+                setTimeout(() => {
+                    if (window.dadosCombateAtual === db && !db.rodadaVisualCancelada) finalizarAnimacaoCombate(turnoInfo);
+                }, 1000);
 
             } else {
+                db.rodadaVisualPendente = false;
                 document.getElementById('menu-botoes').style.display = 'grid';
                 elemLog1.innerHTML = `<span style="color:#e74c3c; font-family: 'Cinzel', serif;">O QUE VOCÊ VAI FAZER?</span>`;
                 if (turnoInfo.sala) {
@@ -1165,6 +1177,10 @@ function animarAcoesDaRodada(turnoInfo, tipoAcao, skillId, skillNome) {
                 } else {
                     elemLog2.innerText = "";
                 }
+
+                const pendente = db.estadoGrupoAposAnimacao;
+                delete db.estadoGrupoAposAnimacao;
+                if (pendente) aplicarEstadoCombateGrupo(pendente.dados, pendente.origem);
 
                 // 🤖 AUTO COMBATE
                 // Quando a animação do turno termina e o menu volta,
@@ -1285,14 +1301,7 @@ function animarAcoesDaRodada(turnoInfo, tipoAcao, skillId, skillNome) {
                     ], { duration: 300 });
                 }
             } else {
-                db.mobHpAtual = Math.max(0, db.mobHpAtual - danoCausado);
-                atualizarVisualBarra('bar-hp-mob', db.mobHpAtual, db.mobHpMax);
                 window.animarInvestidaSprite('sprite-player');
-                
-                if (danoCausado > 0) {
-                    mostrarNumeroDano('sprite-mob', `-${danoCausado}`, ehCritico);
-                    setTimeout(() => window.animarDanoSprite('sprite-mob'), 100);
-                }
                 
                 if (window.AudioManager) AudioManager.tocarSFX(ehCritico ? 'som_critico' : 'som_espada');
 
@@ -1309,9 +1318,16 @@ function animarAcoesDaRodada(turnoInfo, tipoAcao, skillId, skillNome) {
 
                     let isSuporte = acao.tipo_skill === 'support';
                     let alvoDaAnimacao = isSuporte ? 'sprite-player' : 'sprite-mob';
-                    window.animarMagiaSpriteGrid(alvoDaAnimacao, nomeSprite);
+                    await window.animarMagiaSpriteGrid(alvoDaAnimacao, nomeSprite);
+                    if (window.dadosCombateAtual !== db || db.rodadaVisualCancelada) return;
                 } else {
                     animarEfeitoVisual('sprite-mob', tipoVisual, corEfeito);
+                }
+                db.mobHpAtual = Math.max(0, db.mobHpAtual - danoCausado);
+                atualizarVisualBarra('bar-hp-mob', db.mobHpAtual, db.mobHpMax);
+                if (danoCausado > 0) {
+                    mostrarNumeroDano('sprite-mob', `-${danoCausado}`, ehCritico);
+                    window.animarDanoSprite('sprite-mob');
                 }
             }
          
@@ -1397,6 +1413,10 @@ function rodarAnimacaoLevelUp(novoNivel) {
 }
 
 function finalizarAnimacaoCombate(dados) {
+    if (window.dadosCombateAtual) {
+        window.dadosCombateAtual.rodadaVisualPendente = false;
+        delete window.dadosCombateAtual.estadoGrupoAposAnimacao;
+    }
     if (window.salaCombateGrupoAtual && window.estadoCombateGrupoAtual) {
         window.estadoCombateGrupoAtual.estado = dados.vitoria ? 'vitoria' : 'derrota';
     }
@@ -1534,6 +1554,7 @@ function sairDaArena(retornoConfirmado = false) {
     const btnMute = document.getElementById('btn-mute-global');
     if (btnMute) btnMute.style.display = 'block';
     
+    if (window.dadosCombateAtual) window.dadosCombateAtual.rodadaVisualCancelada = true;
     document.getElementById('tela-combate-global').style.display = 'none';
 
     // Restaura menu, passe, chat, online e HUD depois da luta
@@ -2156,82 +2177,59 @@ window.abrirMenuMagias = function() {
 // MOTOR DE ANIMAÇÃO DE MAGIAS (COM PRELOAD)
 // ==========================================
 window.animarMagiaSpriteGrid = function(alvoId, nomeEfeito) {
-    const alvo = document.getElementById(alvoId);
-    if (!alvo) return;
-
-    // Se a magia não tiver nome no banco de dados, tenta usar o corte perfurante por padrão
-    if (!nomeEfeito || nomeEfeito === 'efeito_impacto_padrao') {
-        nomeEfeito = 'corte_perfurante_anim'; 
-    }
-
-    const LINK_BASE = "https://raw.githubusercontent.com/Eldorabotpy/static-img/refs/heads/main/assets/efeitos/";
-    const urlImagem = `${LINK_BASE}${nomeEfeito}.png`;
-
-    // 1. PRELOAD MÁGICO: Baixa a imagem antes de rodar a animação!
-    const imgPreload = new Image();
-    imgPreload.src = urlImagem;
-
-    imgPreload.onload = () => {
-        // Só entra aqui quando o download do GitHub estiver 100% completo
-        const colunas = 3;
-        const totalFrames = 12;
-        const fps = 12; // Velocidade do efeito
-        const tempoPorFrame = 1000 / fps;
-        
-        const larguraFrame = 128; 
-        const alturaFrame = 128;
-
-        const anim = document.createElement('div');
-        anim.style.position = 'absolute';
-        anim.style.width = `${larguraFrame}px`;
-        anim.style.height = `${alturaFrame}px`;
-        
-        anim.style.backgroundImage = `url('${urlImagem}')`;
-        anim.style.backgroundRepeat = 'no-repeat';
-        
-        // 🛠️ SEGREDO DO CSS: Força o tamanho real da grade (3x128=384, 4x128=512)
-        anim.style.backgroundSize = `${larguraFrame * colunas}px ${alturaFrame * 4}px`;
-        
-        anim.style.pointerEvents = 'none';
-        anim.style.zIndex = '10000';
-
-        // Alinha ao centro do mob/player
-        const offsetX = alvo.offsetLeft + (alvo.offsetWidth / 2) - (larguraFrame / 2);
-        const offsetY = alvo.offsetTop + (alvo.offsetHeight / 2) - (alturaFrame / 2);
-        anim.style.left = `${offsetX}px`;
-        anim.style.top = `${offsetY}px`;
-
-        alvo.parentElement.appendChild(anim);
-
-        let frameAtual = 0;
-        
-        const intervalo = setInterval(() => {
-            if (frameAtual >= totalFrames) {
-                clearInterval(intervalo);
-                anim.remove(); 
-                return;
-            }
-            const eixoX = (frameAtual % colunas) * larguraFrame;
-            const eixoY = Math.floor(frameAtual / colunas) * alturaFrame;
-            
-            anim.style.backgroundPosition = `-${eixoX}px -${eixoY}px`;
-            frameAtual++;
-        }, tempoPorFrame);
-    };
-
-    imgPreload.onerror = () => {
-        // Em vez de console.error (F12), ele joga um alerta na tela do Telegram!
-        const msgErro = `A imagem "${nomeEfeito}.png" não foi encontrada na pasta efeitos do GitHub!`;
-        
-        if (window.alertaEldora) {
-            window.alertaEldora("Erro de Magia", msgErro, "erro");
-        } else {
-            alert(msgErro);
-        }
-
-        // Roda o flash de luz antigo para a luta não ficar parada
-        animarEfeitoVisual(alvoId, 'corte', '#facc15');
-    };
+    return new Promise(resolve => {
+        const alvo = document.getElementById(alvoId);
+        if (!alvo) { resolve(false); return; }
+        const combate = window.dadosCombateAtual;
+        if (!nomeEfeito || nomeEfeito === 'efeito_impacto_padrao') nomeEfeito = 'corte_perfurante_anim';
+        const urlImagem = `https://raw.githubusercontent.com/Eldorabotpy/static-img/refs/heads/main/assets/efeitos/${nomeEfeito}.png`;
+        const img = new Image();
+        let encerrado = false, anim = null, intervalo = null;
+        const alvoValido = () => alvo.isConnected && window.dadosCombateAtual === combate && !combate?.rodadaVisualCancelada;
+        const terminar = resultado => {
+            if (encerrado) return;
+            encerrado = true;
+            clearTimeout(limiteCarga);
+            clearInterval(intervalo);
+            img.onload = img.onerror = null;
+            if (anim) anim.remove();
+            resolve(resultado);
+        };
+        const fallback = () => {
+            if (encerrado) return;
+            clearTimeout(limiteCarga);
+            img.onload = img.onerror = null;
+            if (!alvoValido()) { terminar(false); return; }
+            animarEfeitoVisual(alvoId, 'corte', '#facc15');
+            setTimeout(() => terminar(alvoValido()), 600);
+        };
+        const limiteCarga = setTimeout(fallback, 2500);
+        img.onerror = fallback;
+        img.onload = () => {
+            if (encerrado) return;
+            clearTimeout(limiteCarga);
+            if (!alvoValido()) { terminar(false); return; }
+            anim = document.createElement('div');
+            Object.assign(anim.style, {
+                position: 'absolute', width: '128px', height: '128px',
+                backgroundImage: `url('${urlImagem}')`, backgroundRepeat: 'no-repeat',
+                backgroundSize: '384px 512px', backgroundPosition: '0px 0px',
+                pointerEvents: 'none', zIndex: '10000',
+                left: `${alvo.offsetLeft + alvo.offsetWidth / 2 - 64}px`,
+                top: `${alvo.offsetTop + alvo.offsetHeight / 2 - 64}px`
+            });
+            alvo.parentElement.appendChild(anim);
+            let frame = 0;
+            intervalo = setInterval(() => {
+                if (!alvoValido()) { terminar(false); return; }
+                frame++;
+                if (frame >= 12) { terminar(true); return; }
+                anim.style.backgroundPosition = `-${(frame % 3) * 128}px -${Math.floor(frame / 3) * 128}px`;
+            }, 1000 / 12);
+        };
+        // Instala os callbacks antes de iniciar a carga, inclusive quando há cache.
+        img.src = urlImagem;
+    });
 };
 
 function atualizarControleTurnoGrupo(sala) {
@@ -2524,6 +2522,13 @@ function aplicarEstadoCombateGrupo(dados, origem = "socket") {
         });
 
         return false;
+    }
+
+    // O resultado do socket pode chegar antes da resposta HTTP da ação.
+    // A rodada local apresenta o golpe antes de aplicar o estado final.
+    if (window.dadosCombateAtual?.rodadaVisualPendente) {
+        window.dadosCombateAtual.estadoGrupoAposAnimacao = { dados, origem };
+        return true;
     }
 
     window.salaCombateGrupoAtual = salaIdPayload;
