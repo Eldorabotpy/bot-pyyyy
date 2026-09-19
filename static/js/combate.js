@@ -310,11 +310,62 @@ window.iniciarCacadaApp = async function(spawnId, opcoesGrupo = {}) {
     // 🛡️ TRAVA ANTI-CLIQUE FANTASMA 🛡️
     // ==========================================
     const telaGlobal = document.getElementById('tela-combate-global');
-    if (telaGlobal && telaGlobal.style.display === 'flex') {
-        console.warn("⛔ Clique fantasma bloqueado! A arena já está em uso.");
-        return; 
+
+    if (
+        telaGlobal &&
+        telaGlobal.style.display === 'flex'
+    ) {
+        console.warn(
+            "⛔ Clique fantasma bloqueado! " +
+            "A arena já está em uso."
+        );
+
+        return;
     }
-    
+
+
+    // =====================================================
+    // ⚔️ NOVA BATALHA SOLO = ESTADO DE TURNO LIMPO
+    // =====================================================
+
+    const ehCombateGrupo =
+        opcoesGrupo.modoGrupo === true ||
+        !!opcoesGrupo.salaId;
+
+    if (!ehCombateGrupo) {
+
+        window.bloqueioDeTurno = false;
+
+        // Segurança contra qualquer resíduo de uma sala anterior.
+        window.salaCombateGrupoAtual = null;
+        window.estadoCombateGrupoAtual = null;
+
+
+        // Segurança visual:
+        // caso algum botão tenha sido desativado anteriormente.
+        const menuBotoes =
+            document.getElementById(
+                'menu-botoes'
+            );
+
+        if (menuBotoes) {
+
+            menuBotoes
+                .querySelectorAll('button')
+                .forEach(btn => {
+
+                    btn.disabled = false;
+
+                    btn.style.pointerEvents =
+                        'auto';
+
+                    btn.style.opacity =
+                        '1';
+                });
+        }
+    }
+
+
     try {
         if (musicaDeFundoAtual) {
             musicaDeFundoAtual.pause(); 
@@ -1535,6 +1586,20 @@ function tremerArena() {
 }
 
 function sairDaArena(retornoConfirmado = false) {
+
+    // =====================================================
+    // 🔓 LIBERA A TRAVA DO TURNO AO ENCERRAR A BATALHA
+    // =====================================================
+    //
+    // Vitória/derrota deixa bloqueioDeTurno = true para
+    // impedir novas ações enquanto a tela final está aberta.
+    //
+    // Ao voltar para o mapa essa trava precisa ser zerada,
+    // senão a próxima batalha abre mas nenhum botão responde.
+    // =====================================================
+
+    window.bloqueioDeTurno = false;
+
     const sala = window.estadoCombateGrupoAtual;
     if (!retornoConfirmado && window.salaCombateGrupoAtual && sala?.tipo === 'cacada') {
         if (String(sala.lider_id) !== String(localStorage.getItem('jogadorEldoraID')) || retornoGrupoPendente) return;
