@@ -1552,6 +1552,420 @@ function getTituloRaridadeForjaPopup(raridade) {
     return nomes[r] || String(raridade || "COMUM").toUpperCase();
 }
 
+function gerarHtmlAtributosForjaPopup(item) {
+    if (!item || typeof item !== "object") {
+        return "";
+    }
+
+    /*
+     * Junta todos os locais possíveis de atributos.
+     *
+     * Não usamos "um OU outro", porque equipamentos podem possuir:
+     * - attributes
+     * - enchantments
+     * - stats
+     * - damage separado
+     *
+     * Se a mesma chave existir em mais de um bloco,
+     * ela aparece apenas uma vez.
+     *
+     * Atributos realmente repetidos com chaves diferentes
+     * (ex.: sorte_oficio_2) continuam preservados.
+     */
+    const atributos = {};
+
+    const blocos = [
+        item.attributes,
+        item.enchantments,
+        item.stats
+    ];
+
+    blocos.forEach(bloco => {
+        if (!bloco || typeof bloco !== "object" || Array.isArray(bloco)) {
+            return;
+        }
+
+        Object.entries(bloco).forEach(([chave, valor]) => {
+            if (!chave) return;
+
+            atributos[chave] = valor;
+        });
+    });
+
+
+    /*
+     * DANO DA ARMA
+     *
+     * Alguns equipamentos salvam dano fora de stats:
+     *
+     * damage: {
+     *     min: 10,
+     *     max: 15
+     * }
+     *
+     * Também protegemos outros formatos antigos.
+     */
+    if (
+        item.damage !== undefined &&
+        item.damage !== null &&
+        atributos.dmg === undefined &&
+        atributos.damage === undefined
+    ) {
+        const damage = item.damage;
+
+        if (
+            damage &&
+            typeof damage === "object" &&
+            !Array.isArray(damage)
+        ) {
+            const minimo =
+                damage.min ??
+                damage.min_damage ??
+                damage.minimum ??
+                null;
+
+            const maximo =
+                damage.max ??
+                damage.max_damage ??
+                damage.maximum ??
+                null;
+
+            if (minimo !== null && maximo !== null) {
+                atributos.dmg = {
+                    stat: "dmg",
+                    value: `${minimo}-${maximo}`,
+                    source: "damage"
+                };
+            }
+            else if (damage.value !== undefined) {
+                atributos.dmg = {
+                    stat: "dmg",
+                    value: damage.value,
+                    source: "damage"
+                };
+            }
+        }
+        else if (
+            Array.isArray(damage) &&
+            damage.length >= 2
+        ) {
+            atributos.dmg = {
+                stat: "dmg",
+                value: `${damage[0]}-${damage[1]}`,
+                source: "damage"
+            };
+        }
+        else if (
+            typeof damage === "number" ||
+            typeof damage === "string"
+        ) {
+            atributos.dmg = {
+                stat: "dmg",
+                value: damage,
+                source: "damage"
+            };
+        }
+    }
+
+
+    if (Object.keys(atributos).length === 0) {
+        return "";
+    }
+
+
+    const nomes = {
+
+        // =========================
+        // FERRAMENTAS / PROFISSÕES
+        // =========================
+        velocidade_trabalho: "Velocidade de Trabalho",
+        sorte_oficio: "Sorte de Ofício",
+        maestria: "Maestria",
+        resistencia_ferramenta: "Resistência da Ferramenta",
+
+        // =========================
+        // COMBATE
+        // =========================
+        attack: "Ataque",
+        ataque: "Ataque",
+
+        defense: "Defesa",
+        defesa: "Defesa",
+
+        dmg: "Dano",
+        damage: "Dano",
+
+        hp: "Vida",
+        vida: "Vida",
+        health: "Vida",
+
+        mp: "Mana",
+        mana: "Mana",
+
+        initiative: "Iniciativa",
+        iniciativa: "Iniciativa",
+
+        luck: "Sorte",
+        sorte: "Sorte",
+
+        crit_chance: "Chance Crítica",
+        critical_chance: "Chance Crítica",
+        crit_chance_flat: "Chance Crítica",
+
+        crit_damage: "Dano Crítico",
+        critical_damage: "Dano Crítico",
+
+        dodge: "Esquiva",
+        esquiva: "Esquiva",
+
+        accuracy: "Precisão",
+        precisao: "Precisão",
+
+        strength: "Força",
+        forca: "Força",
+
+        agility: "Agilidade",
+        agilidade: "Agilidade",
+
+        intelligence: "Inteligência",
+        inteligencia: "Inteligência",
+
+        vitality: "Vitalidade",
+        vitalidade: "Vitalidade",
+
+        resistance: "Resistência",
+        resistencia: "Resistência"
+    };
+
+
+    const emojis = {
+
+        // Ferramentas
+        velocidade_trabalho: "⚡",
+        sorte_oficio: "🍀",
+        maestria: "🔨",
+        resistencia_ferramenta: "🛡️",
+
+        // Combate
+        attack: "⚔️",
+        ataque: "⚔️",
+
+        defense: "🛡️",
+        defesa: "🛡️",
+
+        dmg: "🗡️",
+        damage: "🗡️",
+
+        hp: "❤️",
+        vida: "❤️",
+        health: "❤️",
+
+        mp: "💧",
+        mana: "💧",
+
+        initiative: "🏃",
+        iniciativa: "🏃",
+
+        luck: "🍀",
+        sorte: "🍀",
+
+        crit_chance: "💥",
+        critical_chance: "💥",
+        crit_chance_flat: "💥",
+
+        crit_damage: "🔥",
+        critical_damage: "🔥",
+
+        dodge: "💨",
+        esquiva: "💨",
+
+        accuracy: "🎯",
+        precisao: "🎯",
+
+        strength: "💪",
+        forca: "💪",
+
+        agility: "🪽",
+        agilidade: "🪽",
+
+        intelligence: "🧠",
+        inteligencia: "🧠",
+
+        vitality: "❤️",
+        vitalidade: "❤️",
+
+        resistance: "🛡️",
+        resistencia: "🛡️"
+    };
+
+
+    const linhas = [];
+
+    for (const [chaveOriginal, entrada] of Object.entries(atributos)) {
+
+        /*
+         * Exemplo:
+         *
+         * velocidade_trabalho_2
+         *
+         * pode carregar:
+         * {
+         *     stat: "velocidade_trabalho",
+         *     value: 10
+         * }
+         */
+        let statReal = chaveOriginal;
+
+        if (
+            entrada &&
+            typeof entrada === "object" &&
+            !Array.isArray(entrada) &&
+            entrada.stat
+        ) {
+            statReal = entrada.stat;
+        }
+        else {
+            statReal = String(chaveOriginal).replace(
+                /_\d+$/,
+                ""
+            );
+        }
+
+        statReal = String(statReal || "")
+            .trim()
+            .toLowerCase();
+
+
+        let valor = entrada;
+
+        if (
+            entrada &&
+            typeof entrada === "object" &&
+            !Array.isArray(entrada)
+        ) {
+            valor =
+                entrada.value ??
+                entrada.valor ??
+                entrada.amount ??
+                0;
+        }
+
+
+        if (
+            valor === undefined ||
+            valor === null ||
+            valor === ""
+        ) {
+            continue;
+        }
+
+
+        const nome =
+            nomes[statReal] ||
+            statReal
+                .replace(/_/g, " ")
+                .replace(
+                    /\b\w/g,
+                    letra => letra.toUpperCase()
+                );
+
+
+        const emoji =
+            emojis[statReal] ||
+            "✨";
+
+
+        /*
+         * Intervalos como "15-22" não recebem "+".
+         *
+         * Valores numéricos:
+         * 10  -> +10
+         * -2  -> -2
+         */
+        const numero = Number(valor);
+
+        let valorTxt;
+
+        if (
+            typeof valor === "string" &&
+            valor.includes("-") &&
+            !Number.isFinite(numero)
+        ) {
+            valorTxt = valor;
+        }
+        else if (Number.isFinite(numero)) {
+            valorTxt =
+                `${numero >= 0 ? "+" : ""}${numero}`;
+        }
+        else {
+            valorTxt = String(valor);
+        }
+
+
+        linhas.push(`
+            <div style="
+                display:flex;
+                align-items:center;
+                justify-content:space-between;
+                gap:10px;
+                padding:6px 8px;
+                background:rgba(2,6,23,.45);
+                border:1px solid rgba(71,85,105,.45);
+                border-radius:8px;
+            ">
+                <span style="
+                    min-width:0;
+                    color:#cbd5e1;
+                    font-size:.82em;
+                    text-align:left;
+                ">
+                    ${emoji} ${nome}
+                </span>
+
+                <b style="
+                    color:#86efac;
+                    font-size:.84em;
+                    flex-shrink:0;
+                ">
+                    ${valorTxt}
+                </b>
+            </div>
+        `);
+    }
+
+
+    if (linhas.length === 0) {
+        return "";
+    }
+
+
+    return `
+        <div style="
+            margin-top:10px;
+            padding-top:10px;
+            border-top:1px solid rgba(255,255,255,.08);
+        ">
+            <div style="
+                margin-bottom:7px;
+                color:#facc15;
+                font-size:.72em;
+                font-weight:900;
+                text-transform:uppercase;
+                letter-spacing:.5px;
+            ">
+                ✨ Atributos
+            </div>
+
+            <div style="
+                display:grid;
+                gap:6px;
+            ">
+                ${linhas.join("")}
+            </div>
+        </div>
+    `;
+}
+
 function normalizarListaRecompensasForja(rewards) {
     const lista = [];
     if (!rewards) return lista;
@@ -1641,7 +2055,14 @@ window.mostrarPopupResultadoForja = function({
         padding: 16px;
     `;
 
-    const semMateriais = !materiais || materiais.length === 0;
+    const semMateriais =
+        !materiais ||
+        materiais.length === 0;
+
+    const atributosHtml =
+        gerarHtmlAtributosForjaPopup(
+            itemPrincipal
+        );
 
     overlay.innerHTML = `
         <div style="
@@ -1725,12 +2146,30 @@ window.mostrarPopupResultadoForja = function({
                                 ${itemPrincipal?.nome || itemPrincipal?.display_name || itemPrincipal?.name || itemPrincipal?.item_name || "Resultado"}
                             </div>
                             ${
-                                itemPrincipal?.raridade || itemPrincipal?.rarity
-                                ? `<div style="margin-top:4px; font-size:.85em; color:#cbd5e1;">Raridade: <b>${String(itemPrincipal.raridade || itemPrincipal.rarity).toUpperCase()}</b></div>`
+                                itemPrincipal?.raridade ||
+                                itemPrincipal?.rarity
+
+                                ? `
+                                    <div style="
+                                        margin-top:4px;
+                                        font-size:.85em;
+                                        color:#cbd5e1;
+                                    ">
+                                        Raridade:
+                                        <b>
+                                            ${String(
+                                                itemPrincipal.raridade ||
+                                                itemPrincipal.rarity
+                                            ).toUpperCase()}
+                                        </b>
+                                    </div>
+                                `
                                 : ``
                             }
                         </div>
                     </div>
+
+                    ${atributosHtml}
 
                     ${infoExtra ? `
                         <div style="
