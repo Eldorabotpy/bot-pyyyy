@@ -54,7 +54,33 @@ function getNivelRefinoItem(item) {
     ) || 0;
 }
 
+function getLimiteRefinoPorRaridade(item) {
+    const raridade = String(
+        item?.raridade ??
+        item?.rarity ??
+        "comum"
+    )
+        .trim()
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "");
+
+    const limites = {
+        comum: 20,
+        bom: 25,
+        incomum: 25,
+        raro: 30,
+        epico: 35,
+        lendario: 40,
+        unico: 50,
+        mitico: 60
+    };
+
+    return limites[raridade] ?? 20;
+}
+
 const UPGRADE_STONE_ITEM_ID = "pedra_de_aprimoramento";
+
 const UPGRADE_PROTECTION_ITEM_ID = "sigilo_de_protecao";
 
 const UPGRADE_SKIP_RECIPE_MATERIALS = new Set([
@@ -817,7 +843,10 @@ const ForjaEngine = {
                 'tool', 'ferramenta'
             ].includes(t);
 
-            return isEquip && getNivelRefinoItem(i) < 10;
+            const nivelAtual = getNivelRefinoItem(i);
+            const limite = getLimiteRefinoPorRaridade(i);
+
+            return isEquip && nivelAtual < limite;
         });
     },
 
@@ -2234,13 +2263,24 @@ window.mostrarPopupResultadoForja = function({
     overlay.innerHTML = `
         <div style="
             width: min(92vw, 420px);
+            max-height: calc(100dvh - 24px);
+
             background: linear-gradient(180deg, #0b1220 0%, #111827 100%);
             border: 2px solid ${cor};
             border-radius: 18px;
-            box-shadow: 0 0 28px rgba(0,0,0,.65), 0 0 20px ${cor}44;
+
+            box-shadow:
+                0 0 28px rgba(0,0,0,.65),
+                0 0 20px ${cor}44;
+
             overflow: hidden;
             position: relative;
+
+            display: flex;
+            flex-direction: column;
+
             color: #e5e7eb;
+
             animation: surgirResultadoForja .18s ease-out;
         ">
             <button id="fechar-popup-resultado-forja" style="
@@ -2257,8 +2297,16 @@ window.mostrarPopupResultadoForja = function({
                 cursor:pointer;
             ">×</button>
 
-            <div style="padding: 22px 18px 12px; text-align:center;">
-                <div style="font-size: 42px; line-height: 1; margin-bottom: 10px;">${icone}</div>
+            <div style="
+                padding: 14px 18px 8px;
+                text-align:center;
+                flex-shrink:0;
+            ">
+                <div style="
+                    font-size: 32px;
+                    line-height: 1;
+                    margin-bottom: 6px;
+                ">${icone}</div>
                 <div style="
                     font-family: 'Cinzel', serif;
                     font-weight: 900;
@@ -2270,7 +2318,15 @@ window.mostrarPopupResultadoForja = function({
                 ${subtitulo ? `<div style="margin-top:10px; color:#d1d5db; font-size:.98em;">${subtitulo}</div>` : ""}
             </div>
 
-            <div style="padding: 0 18px 16px;">
+            <div style="
+                padding: 0 14px 12px;
+
+                overflow-y: auto;
+                min-height: 0;
+                flex: 1;
+
+                scrollbar-width: thin;
+            ">
                 <div style="
                     background: rgba(255,255,255,0.04);
                     border: 1px solid rgba(255,255,255,0.08);
@@ -2284,8 +2340,8 @@ window.mostrarPopupResultadoForja = function({
                         margin-bottom:${infoExtra ? "10px" : "0"};
                     ">
                         <div style="
-                            width:72px;
-                            height:72px;
+                            width:58px;
+                            height:58px;
                             border-radius:14px;
                             border:2px solid ${cor};
                             background: rgba(255,255,255,.04);
@@ -2409,8 +2465,31 @@ window.mostrarPopupResultadoForja = function({
                 }
 
                 <button id="btn-confirmar-popup-resultado-forja" style="
-                    margin-top:16px;
+                    position: sticky;
+                    bottom: 0;
+                    z-index: 5;
+
+                    margin-top:12px;
+
                     width:100%;
+
+                    border:none;
+                    border-radius:10px;
+
+                    padding:11px 14px;
+
+                    background: linear-gradient(180deg, #334155, #1e293b);
+
+                    color:#fff;
+
+                    font-weight:800;
+
+                    cursor:pointer;
+
+                    box-shadow:
+                        0 -8px 18px rgba(11,18,32,.92),
+                        inset 0 1px 0 rgba(255,255,255,0.08);
+                ">ENTENDIDO</button>
                     border:none;
                     border-radius:10px;
                     padding:12px 14px;
