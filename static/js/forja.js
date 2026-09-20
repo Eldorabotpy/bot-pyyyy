@@ -877,6 +877,8 @@ const ForjaUI = {
         const detailsView = document.querySelector('.forja-details-view');
         
         if (sidebar && detailsView) {
+            sidebar.classList.remove('forja-sidebar-compacta');
+
             detailsView.style.display = 'none'; 
             sidebar.style.cssText = 'width: 100% !important; max-width: 100% !important; height: 100% !important; border: none !important; flex: 1 !important;';
         }
@@ -1106,6 +1108,10 @@ const ForjaUI = {
         if (sidebar && detailsView) {
             detailsView.style.display = 'flex';
             sidebar.style.cssText = '';
+
+            if (window.innerWidth <= 768) {
+                sidebar.classList.add('forja-sidebar-compacta');
+            }
         }
 
         const nivelAtual = getNivelRefinoItem(item);
@@ -1264,7 +1270,11 @@ const ForjaUI = {
         const detailsView = document.querySelector('.forja-details-view');
         if (sidebar && detailsView) {
             detailsView.style.display = 'flex'; 
-            sidebar.style.cssText = ''; 
+            sidebar.style.cssText = '';
+
+            if (window.innerWidth <= 768) {
+                sidebar.classList.add('forja-sidebar-compacta');
+            }
         }
         
         document.getElementById('detalhe-vazio').style.display = 'none';
@@ -1370,7 +1380,14 @@ const ForjaUI = {
     atualizarDetalhesDesmontar(item, corRaridade) {
         const sidebar = document.querySelector('.forja-sidebar');
         const detailsView = document.querySelector('.forja-details-view');
-        if (sidebar && detailsView) { detailsView.style.display = 'flex'; sidebar.style.cssText = ''; }
+        if (sidebar && detailsView) {
+            detailsView.style.display = 'flex';
+            sidebar.style.cssText = '';
+
+            if (window.innerWidth <= 768) {
+                sidebar.classList.add('forja-sidebar-compacta');
+            }
+        }
         
         document.getElementById('detalhe-vazio').style.display = 'none';
         document.getElementById('detalhe-receita').style.display = 'flex';

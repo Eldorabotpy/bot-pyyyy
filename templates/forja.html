@@ -1077,6 +1077,15 @@
         border-bottom: 1px solid rgba(51, 65, 85, .58);
     }
 
+    .forja-sidebar.forja-sidebar-compacta {
+        height: 22%;
+        min-height: 90px;
+    }
+
+    .forja-sidebar.forja-sidebar-compacta + .forja-details-view {
+        height: 78%;
+    }
+
     .recipe-scroll-list {
         padding: 7px;
     }
@@ -1101,7 +1110,9 @@
     .forja-details-view {
         height: 66%;
 
-        padding: 9px;
+        padding: 9px 9px 70px 9px;
+
+        scroll-padding-bottom: 70px;
     }
 
     .item-header-display {
@@ -1187,11 +1198,17 @@
     }
 
     .btn-forge-action {
+        position: static;
+
         min-height: 44px;
+
+        margin-top: 8px;
 
         padding: 10px 12px;
 
         font-size: .8rem;
+
+        flex-shrink: 0;
     }
 }
 
