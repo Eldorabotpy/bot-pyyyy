@@ -2490,15 +2490,6 @@ window.mostrarPopupResultadoForja = function({
                         0 -8px 18px rgba(11,18,32,.92),
                         inset 0 1px 0 rgba(255,255,255,0.08);
                 ">ENTENDIDO</button>
-                    border:none;
-                    border-radius:10px;
-                    padding:12px 14px;
-                    background: linear-gradient(180deg, #334155, #1e293b);
-                    color:#fff;
-                    font-weight:800;
-                    cursor:pointer;
-                    box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
-                ">ENTENDIDO</button>
             </div>
         </div>
     `;
