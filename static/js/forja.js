@@ -181,6 +181,91 @@ function getTierFerramentaForja(tool) {
     return 1;
 }
 
+function getTotalAtributoFerramentaForja(tool, statProcurado) {
+    if (!tool || typeof tool !== "object") {
+        return 0;
+    }
+
+    const procurado = String(statProcurado || "")
+        .trim()
+        .toLowerCase();
+
+    if (!procurado) {
+        return 0;
+    }
+
+    for (const campo of ["enchantments", "attributes", "stats"]) {
+        const bloco = tool[campo];
+
+        if (
+            !bloco ||
+            typeof bloco !== "object" ||
+            Array.isArray(bloco)
+        ) {
+            continue;
+        }
+
+        let total = 0;
+
+        for (const [chaveEntrada, dadosEntrada] of Object.entries(bloco)) {
+            let chaveReal = String(chaveEntrada || "")
+                .trim()
+                .toLowerCase();
+
+            let valor = dadosEntrada;
+
+            if (
+                dadosEntrada &&
+                typeof dadosEntrada === "object" &&
+                !Array.isArray(dadosEntrada)
+            ) {
+                chaveReal = String(
+                    dadosEntrada.stat ||
+                    chaveEntrada ||
+                    ""
+                )
+                    .trim()
+                    .toLowerCase();
+
+                valor =
+                    dadosEntrada.value ??
+                    dadosEntrada.valor ??
+                    0;
+            }
+
+            const repetido = chaveReal.match(
+                /^(.*)_\d+$/
+            );
+
+            if (repetido) {
+                chaveReal = repetido[1];
+            }
+
+            if (chaveReal !== procurado) {
+                continue;
+            }
+
+            const numero = Number(valor);
+
+            if (Number.isFinite(numero)) {
+                total += Math.trunc(numero);
+            }
+        }
+
+        /*
+         * Mesma regra do backend:
+         * encontrou o atributo em um bloco válido,
+         * usa esse total e não soma novamente stats/enchantments
+         * duplicados pela API.
+         */
+        if (total > 0) {
+            return total;
+        }
+    }
+
+    return 0;
+}
+
 function calcularTempoTrabalhoForjaLocal(baseSeconds, profKey) {
     const base = Math.max(1, parseInt(baseSeconds || 1) || 1);
     const key = normalizarProfissaoForja(profKey || "ferreiro");
@@ -188,23 +273,88 @@ function calcularTempoTrabalhoForjaLocal(baseSeconds, profKey) {
     const nivelProf = getNivelProfissaoForja(key);
     const ferramenta = getFerramentaEquipadaForja(key);
 
-    const bonusProf = Math.min(0.25, nivelProf * 0.005);
+    // Profissão:
+    // 0,5% por nível, máximo 25%.
+    const bonusProf = Math.min(
+        0.25,
+        nivelProf * 0.005
+    );
 
+    // Tier:
+    // T1 0%
+    // T2 5%
+    // T3 10%
+    // T4 15%
+    // T5 20%
     const tier = getTierFerramentaForja(ferramenta);
-    const bonusTier = Math.min(0.20, Math.max(0, tier - 1) * 0.05);
 
-    const upgradeFerramenta = getNivelRefinoItem(ferramenta);
-    const bonusUpgrade = Math.min(0.10, upgradeFerramenta * 0.01);
+    const bonusTier = Math.min(
+        0.20,
+        Math.max(0, tier - 1) * 0.05
+    );
 
-    const reducaoTotal = Math.min(0.50, bonusProf + bonusTier + bonusUpgrade);
+    // Refino:
+    // 1% por nível, máximo 10%.
+    const upgradeFerramenta =
+        getNivelRefinoItem(ferramenta);
+
+    const bonusUpgrade = Math.min(
+        0.10,
+        upgradeFerramenta * 0.01
+    );
+
+    // Velocidade de Trabalho:
+    // 0,5% por ponto, máximo 10%.
+    //
+    // A função também soma atributos repetidos:
+    // velocidade_trabalho
+    // velocidade_trabalho_2
+    // velocidade_trabalho_3...
+    const velocidadePontos =
+        getTotalAtributoFerramentaForja(
+            ferramenta,
+            "velocidade_trabalho"
+        );
+
+    const bonusVelocidade = Math.min(
+        0.10,
+        velocidadePontos * 0.005
+    );
+
+    // Mesma trava do backend:
+    // redução combinada máxima de 50%.
+    const reducaoTotal = Math.min(
+        0.50,
+        bonusProf +
+        bonusTier +
+        bonusUpgrade +
+        bonusVelocidade
+    );
 
     return {
-        duration_seconds: Math.max(1, Math.floor(base * (1.0 - reducaoTotal))),
+        duration_seconds: Math.max(
+            1,
+            Math.floor(
+                base *
+                (1.0 - reducaoTotal)
+            )
+        ),
+
         base_seconds: base,
+
         profession_key: key,
         profession_level: nivelProf,
+
         tool_tier: tier,
         tool_upgrade: upgradeFerramenta,
+
+        velocidade_pontos: velocidadePontos,
+        velocidade_bonus: bonusVelocidade,
+
+        profession_bonus: bonusProf,
+        tier_bonus: bonusTier,
+        upgrade_bonus: bonusUpgrade,
+
         total_reduction: reducaoTotal
     };
 }
