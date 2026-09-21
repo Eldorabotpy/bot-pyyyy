@@ -310,26 +310,30 @@ class MapaScene extends Phaser.Scene {
 
         });
         
-        // 👇 1. ADICIONADO A CAMADA 'grama' AQUI PARA A FLORESTA APARECER 👇
+        // ==========================================
+        // 🗺️ CAMADAS BAIXAS DOS MAPAS
+        // ==========================================
         const camadasBaixas = [
-            // 1º FUNDO E CHÃO
+            // DUNGEON
             'fundo',
+            'chao',
+            'detalhes_chao',
+            'paredes',
+            'objetos',
+
+            // MAPAS EXISTENTES
             'Chao Capital',
             'Ruas Capital',
             'Chao Catedral',
             'Piso',
-            'chao',
             'grama',
 
-            // 2º ESTRUTURAS E PAREDES
             'Casas',
             'Paredes',
-            'paredes',
             'Muralha',
             'Decoracao',
             'casas',
 
-            // 3º ELEMENTOS DO MAPA
             'arvores',
             'arvores1',
             'arvores2',
@@ -337,7 +341,7 @@ class MapaScene extends Phaser.Scene {
             'pedras1',
             'pedras2'
         ];
-        
+
         camadasBaixas.forEach(l => {
 
             if (!map.getLayer(l)) {
@@ -347,9 +351,28 @@ class MapaScene extends Phaser.Scene {
             let profundidade = 0;
 
             // ==========================================
-            // 🏠 CASAS ACIMA DO MERLIN
+            // 🏰 PROFUNDIDADES DA DUNGEON
             // ==========================================
-            if (
+            if (l === 'fundo') {
+                profundidade = 0;
+            }
+            else if (l === 'chao') {
+                profundidade = 1;
+            }
+            else if (l === 'detalhes_chao') {
+                profundidade = 2;
+            }
+            else if (l === 'paredes') {
+                profundidade = 5;
+            }
+            else if (l === 'objetos') {
+                profundidade = 10;
+            }
+
+            // ==========================================
+            // 🏠 CASAS DOS MAPAS EXISTENTES
+            // ==========================================
+            else if (
                 l === 'Casas' ||
                 l === 'casas'
             ) {
@@ -1389,8 +1412,37 @@ class MapaScene extends Phaser.Scene {
             fontSize: '12px', color: '#f1c40f', fontFamily: 'Cinzel, Arial', stroke: '#000', strokeThickness: 3
         }).setOrigin(0.5, 1).setDepth(30);
         
-        const camadasAltas = ['Acima do Jogador'];
-        camadasAltas.forEach(l => { if (map.getLayer(l)) map.createLayer(l, todosTilesets, 0, 0).setDepth(20); });
+        // ==========================================
+        // 🏰 CAMADAS ACIMA DO JOGADOR
+        // ==========================================
+        const camadasAltas = [
+            {
+                nome: 'Acima do Jogador',
+                profundidade: 20
+            },
+            {
+                nome: 'acima do jogador',
+                profundidade: 20
+            },
+            {
+                nome: 'efeitos_superiores',
+                profundidade: 21
+            }
+        ];
+
+        camadasAltas.forEach(camada => {
+
+            if (!map.getLayer(camada.nome)) {
+                return;
+            }
+
+            map.createLayer(
+                camada.nome,
+                todosTilesets,
+                0,
+                0
+            ).setDepth(camada.profundidade);
+        });
     
         if (map.getLayer('Camada de Colisoes')) {
 
