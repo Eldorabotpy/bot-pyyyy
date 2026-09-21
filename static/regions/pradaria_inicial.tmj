@@ -513,6 +513,34 @@
                  "width":92,
                  "x":1458,
                  "y":1866
+                }, 
+                {
+                 "height":35.3333333333333,
+                 "id":11,
+                 "name":"",
+                 "opacity":1,
+                 "properties":[
+                        {
+                         "name":"destino",
+                         "type":"string",
+                         "value":"dungeon_01"
+                        }, 
+                        {
+                         "name":"nasce_x",
+                         "type":"int",
+                         "value":8
+                        }, 
+                        {
+                         "name":"nasce_y",
+                         "type":"int",
+                         "value":7
+                        }],
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":36,
+                 "x":1852,
+                 "y":254
                 }],
          "opacity":1,
          "type":"objectgroup",
@@ -592,7 +620,7 @@
          "y":0
         }],
  "nextlayerid":10,
- "nextobjectid":11,
+ "nextobjectid":12,
  "orientation":"orthogonal",
  "renderorder":"right-down",
  "tiledversion":"1.12.2",
