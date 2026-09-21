@@ -72,6 +72,24 @@ class MapaScene extends Phaser.Scene {
         this.load.image('tiles_casas', '/static/images/tilesets/casas.png'); 
         this.load.image('tiles_hpg', '/static/images/tilesets/HPGLobbyTileset.png');
         this.load.image('tiles_arvores', '/static/images/tilesets/arvores.png');
+
+        // ==========================================
+        // 🏰 TILESETS DA DUNGEON 01
+        // ==========================================
+        this.load.image(
+            'tiles_dungeon_base',
+            '/static/images/tilesets/dungeon1.png'
+        );
+
+        this.load.image(
+            'tiles_dungeon_paredes',
+            '/static/images/tilesets/dungeon_1_paredes.png'
+        );
+
+        this.load.image(
+            'tiles_dungeon_chao',
+            '/static/images/tilesets/dungeon_1_chao.png'
+        );
         let genero = localStorage.getItem("generoEscolhido") || "masculino";
         if (genero !== "masculino" && genero !== "feminino") {
             genero = "masculino";
@@ -214,10 +232,61 @@ class MapaScene extends Phaser.Scene {
         const map = this.make.tilemap({ key: this.regiaoAtual });
         
         let todosTilesets = [];
-        if (map.tilesets.some(t => t.name === 'grama reino')) todosTilesets.push(map.addTilesetImage('grama reino', 'tiles_grama'));
-        if (map.tilesets.some(t => t.name === 'casas')) todosTilesets.push(map.addTilesetImage('casas', 'tiles_casas'));
-        if (map.tilesets.some(t => t.name === 'HPGLobbyTileset')) todosTilesets.push(map.addTilesetImage('HPGLobbyTileset', 'tiles_hpg')); 
-        if (map.tilesets.some(t => t.name === 'arvores')) todosTilesets.push(map.addTilesetImage('arvores', 'tiles_arvores'));
+
+        if (map.tilesets.some(t => t.name === 'grama reino')) {
+            todosTilesets.push(
+                map.addTilesetImage('grama reino', 'tiles_grama')
+            );
+        }
+
+        if (map.tilesets.some(t => t.name === 'casas')) {
+            todosTilesets.push(
+                map.addTilesetImage('casas', 'tiles_casas')
+            );
+        }
+
+        if (map.tilesets.some(t => t.name === 'HPGLobbyTileset')) {
+            todosTilesets.push(
+                map.addTilesetImage('HPGLobbyTileset', 'tiles_hpg')
+            );
+        }
+
+        if (map.tilesets.some(t => t.name === 'arvores')) {
+            todosTilesets.push(
+                map.addTilesetImage('arvores', 'tiles_arvores')
+            );
+        }
+
+        // ==========================================
+        // 🏰 TILESETS DA DUNGEON
+        // ==========================================
+
+        if (map.tilesets.some(t => t.name === 'dungeons')) {
+            todosTilesets.push(
+                map.addTilesetImage(
+                    'dungeons',
+                    'tiles_dungeon_base'
+                )
+            );
+        }
+
+        if (map.tilesets.some(t => t.name === 'dungeon_1_paredes')) {
+            todosTilesets.push(
+                map.addTilesetImage(
+                    'dungeon_1_paredes',
+                    'tiles_dungeon_paredes'
+                )
+            );
+        }
+
+        if (map.tilesets.some(t => t.name === 'dungeon_1_chao')) {
+            todosTilesets.push(
+                map.addTilesetImage(
+                    'dungeon_1_chao',
+                    'tiles_dungeon_chao'
+                )
+            );
+        }
         
         // ==========================================
         // 📱 CORREÇÃO DE LINHAS ENTRE TILES
@@ -243,14 +312,30 @@ class MapaScene extends Phaser.Scene {
         
         // 👇 1. ADICIONADO A CAMADA 'grama' AQUI PARA A FLORESTA APARECER 👇
         const camadasBaixas = [
-            // 1º TUDO QUE É CHÃO (A Base do mapa)
-            'Chao Capital', 'Ruas Capital', 'Chao Catedral', 'Piso', 'chao', 'grama',
-            
-            // 2º ESTRUTURAS E DECORAÇÕES (Ficam em cima do chão)
-            'Casas', 'Paredes', 'Muralha', 'Decoracao', 'casas',
-            
-            // 3º AS ÁRVORES (O Phaser desenha elas por último, cobrindo a grama)
-            'arvores', 'arvores1', 'arvores2', 'pedras', 'pedras1', 'pedras2'
+            // 1º FUNDO E CHÃO
+            'fundo',
+            'Chao Capital',
+            'Ruas Capital',
+            'Chao Catedral',
+            'Piso',
+            'chao',
+            'grama',
+
+            // 2º ESTRUTURAS E PAREDES
+            'Casas',
+            'Paredes',
+            'paredes',
+            'Muralha',
+            'Decoracao',
+            'casas',
+
+            // 3º ELEMENTOS DO MAPA
+            'arvores',
+            'arvores1',
+            'arvores2',
+            'pedras',
+            'pedras1',
+            'pedras2'
         ];
         
         camadasBaixas.forEach(l => {
@@ -1318,9 +1403,65 @@ class MapaScene extends Phaser.Scene {
 
             layerCol
                 .setCollisionByExclusion([-1])
-                .setVisible(false)
+                .setVisible(false);
 
-            this.physics.add.collider(this.player, layerCol);
+            this.physics.add.collider(
+                this.player,
+                layerCol
+            );
+        }
+
+        // ==========================================
+        // 🏰 COLISÕES POR OBJETOS — DUNGEONS
+        // ==========================================
+        const camadaColisaoObjetos =
+            map.getObjectLayer('colisao');
+
+        if (
+            camadaColisaoObjetos &&
+            Array.isArray(camadaColisaoObjetos.objects)
+        ) {
+
+            camadaColisaoObjetos.objects.forEach(obj => {
+
+                if (
+                    !obj ||
+                    Number(obj.width || 0) <= 0 ||
+                    Number(obj.height || 0) <= 0
+                ) {
+                    return;
+                }
+
+                const largura =
+                    Number(obj.width);
+
+                const altura =
+                    Number(obj.height);
+
+                const centroX =
+                    Number(obj.x) + (largura / 2);
+
+                const centroY =
+                    Number(obj.y) + (altura / 2);
+
+                const hitbox =
+                    this.add.zone(
+                        centroX,
+                        centroY,
+                        largura,
+                        altura
+                    );
+
+                this.physics.add.existing(
+                    hitbox,
+                    true
+                );
+
+                this.physics.add.collider(
+                    this.player,
+                    hitbox
+                );
+            });
         }
 
         this.target = new Phaser.Math.Vector2();
