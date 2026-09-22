@@ -1033,11 +1033,59 @@ def interagir_luz(
             )
 
         # ====================================================
+        # CLICOU NOVAMENTE EM UMA PEDRA ACESA
+        # ====================================================
+        #
+        # Funciona como interruptor:
+        #
+        # OFF → ON
+        # ON  → OFF
+        # ====================================================
+
+        if indice in progress:
+
+            progress.remove(
+                indice
+            )
+
+            state[
+                "progress"
+            ] = progress
+
+            _save_state(
+                user_id,
+                dungeon_id,
+                puzzle_id,
+                state
+            )
+
+            state[
+                "revision"
+            ] += 1
+
+            return {
+
+                "success":
+                    True,
+
+                "acao":
+                    "luz_desativada",
+
+                "mensagem":
+                    "A pedra voltou a ficar apagada.",
+
+                "estado":
+                    _public_state(
+                        state
+                    ),
+            }
+
+        # ====================================================
         # AS 3 PEDRAS JÁ FORAM ESCOLHIDAS
         # ====================================================
         #
-        # NÃO verifica aqui.
-        # O jogador precisa voltar ao baú.
+        # Se tentar acender uma QUARTA pedra,
+        # precisa primeiro apagar uma das três.
         # ====================================================
 
         if (
@@ -1055,8 +1103,8 @@ def interagir_luz(
 
                 "mensagem":
                     (
-                        "As três runas já foram escolhidas. "
-                        "Volte ao baú para testar a combinação."
+                        "Três runas já estão acesas. "
+                        "Apague uma delas ou volte ao baú."
                     ),
 
                 "estado":
@@ -1064,30 +1112,6 @@ def interagir_luz(
                         state
                     ),
             }
-
-        # ====================================================
-        # NÃO REPETIR PEDRA
-        # ====================================================
-
-        if indice in progress:
-
-            return {
-
-                "success":
-                    True,
-
-                "acao":
-                    "luz_ja_ativa",
-
-                "mensagem":
-                    "Essa pedra já está acesa.",
-
-                "estado":
-                    _public_state(
-                        state
-                    ),
-            }
-
         # ====================================================
         # ACENDE A PEDRA
         # ====================================================

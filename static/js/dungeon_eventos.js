@@ -31,6 +31,43 @@
 
     };
 
+    // ========================================================
+    // 🔮 SÍMBOLOS DAS RUNAS
+    // ========================================================
+
+    const RUNE_INFO = {
+
+        1: {
+            emoji: "🌙",
+            nome: "Lua",
+        },
+
+        2: {
+            emoji: "🌊",
+            nome: "Mar",
+        },
+
+        3: {
+            emoji: "❄️",
+            nome: "Gelo",
+        },
+
+        4: {
+            emoji: "☀️",
+            nome: "Sol",
+        },
+
+        5: {
+            emoji: "👑",
+            nome: "Ouro",
+        },
+
+        6: {
+            emoji: "🔥",
+            nome: "Chama",
+        },
+
+    };
 
     // ========================================================
     // 📦 PROPRIEDADES DO TILED
@@ -453,6 +490,82 @@
                             8
                         );
 
+                // ============================================
+                // 🔮 SÍMBOLO DA RUNA ACIMA DA PEDRA
+                // ============================================
+
+                const runeInfo =
+                    RUNE_INFO[
+                        indice
+                    ]
+                    || null;
+
+
+                let runeLabel =
+                    null;
+
+
+                if (
+                    runeInfo
+                ) {
+
+                    runeLabel =
+                        this.scene.add
+                            .text(
+
+                                Number(
+                                    obj.x
+                                    || 0
+                                )
+                                +
+                                Number(
+                                    obj.width
+                                    || 48
+                                )
+                                / 2,
+
+                                Number(
+                                    obj.y
+                                    || 0
+                                )
+                                -
+                                Number(
+                                    obj.height
+                                    || 61
+                                )
+                                -
+                                4,
+
+                                runeInfo.emoji,
+
+                                {
+
+                                    fontSize:
+                                        "18px",
+
+                                    fontFamily:
+                                        "Arial",
+
+                                    stroke:
+                                        "#000000",
+
+                                    strokeThickness:
+                                        3,
+
+                                }
+
+                            )
+
+                            .setOrigin(
+                                0.5,
+                                1
+                            )
+
+                            .setDepth(
+                                100
+                            );
+
+                }
 
                 this.visuais.set(
 
@@ -475,6 +588,8 @@
                             ),
 
                         sprite,
+
+                        runeLabel,
 
                         offTexture:
                             TEXTURES[
@@ -1188,6 +1303,145 @@
 
         }
 
+        // ====================================================
+        // 💡 TEXTO FLUTUANTE DA PEDRA
+        // ====================================================
+
+        _mostrarStatusLuz(
+            indice,
+            ligada
+        ) {
+
+            indice =
+                Number(
+                    indice
+                    || 0
+                );
+
+
+            let alvo =
+                null;
+
+
+            for (
+                const data
+                of this.logicos.values()
+            ) {
+
+                if (
+                    Number(
+                        data.indice
+                    )
+                    === indice
+                ) {
+
+                    alvo =
+                        data;
+
+                    break;
+                }
+
+            }
+
+
+            if (
+                !alvo
+            ) {
+                return;
+            }
+
+
+            const runeInfo =
+                RUNE_INFO[
+                    indice
+                ]
+                || {
+                    emoji: "🔹",
+                    nome: "Runa",
+                };
+
+
+            const texto =
+                `${runeInfo.emoji} Luz ${indice} ${ligada ? "ON" : "OFF"}`;
+
+
+            const txt =
+                this.scene.add
+                    .text(
+
+                        alvo.x,
+
+                        alvo.y - 30,
+
+                        texto,
+
+                        {
+
+                            fontSize:
+                                "13px",
+
+                            fontFamily:
+                                "Arial",
+
+                            fontStyle:
+                                "bold",
+
+                            color:
+                                "#ffffff",
+
+                            stroke:
+                                "#000000",
+
+                            strokeThickness:
+                                4,
+
+                        }
+
+                    )
+
+                    .setOrigin(
+                        0.5
+                    )
+
+                    .setDepth(
+                        99999
+                    );
+
+
+            this.scene.tweens.add({
+
+                targets:
+                    txt,
+
+                y:
+                    txt.y - 35,
+
+                alpha:
+                    0,
+
+                duration:
+                    900,
+
+                ease:
+                    "Power2",
+
+                onComplete:
+                    () => {
+
+                        if (
+                            txt
+                            && txt.active
+                        ) {
+
+                            txt.destroy();
+
+                        }
+
+                    },
+
+            });
+
+        }
 
         // ====================================================
         // 💡 TROCAR OFF / ON
@@ -1608,7 +1862,11 @@
 
                     result,
 
-                    data.puzzle
+                    data.puzzle,
+
+                    null,
+
+                    data.indice
 
                 );
 
@@ -1873,8 +2131,23 @@
             if (
                 !chest
             ) {
+
+                console.error(
+                    "[DUNGEON EVENT] Baú não encontrado para animação:",
+                    chestId
+                );
+
+                await new Promise(
+                    resolve =>
+                        setTimeout(
+                            resolve,
+                            1200
+                        )
+                );
+
                 return;
             }
+
 
             const textureKey =
                 "dungeon_mimico_01_evento";
@@ -1882,18 +2155,48 @@
             const animKey =
                 "dungeon_mimico_01_transformar";
 
+
             if (
                 !this.scene.textures.exists(
                     textureKey
                 )
             ) {
 
-                console.warn(
-                    "[DUNGEON EVENT] Spritesheet do Mímico não carregado."
+                console.error(
+                    "[DUNGEON EVENT] Textura do Mímico não foi carregada:",
+                    textureKey
+                );
+
+                await new Promise(
+                    resolve =>
+                        setTimeout(
+                            resolve,
+                            1200
+                        )
                 );
 
                 return;
             }
+
+
+            // ================================================
+            // 🔒 BLOQUEIA MOVIMENTO DURANTE A TRANSFORMAÇÃO
+            // ================================================
+
+            try {
+
+                this.scene.player
+                    ?.body
+                    ?.stop();
+
+            } catch (
+                e
+            ) {}
+
+
+            // ================================================
+            // 🎞️ CRIA A ANIMAÇÃO
+            // ================================================
 
             if (
                 !this.scene.anims.exists(
@@ -1920,7 +2223,7 @@
                             ),
 
                     frameRate:
-                        8,
+                        7,
 
                     repeat:
                         0,
@@ -1928,6 +2231,11 @@
                 });
 
             }
+
+
+            // ================================================
+            // 👹 COLOCA O MÍMICO SOBRE O BAÚ
+            // ================================================
 
             const mimic =
                 this.scene.add.sprite(
@@ -1944,26 +2252,76 @@
 
                     .setOrigin(
                         0.5,
-                        0.5
+                        0.65
                     )
 
                     .setDepth(
-                        2000
+                        99999
                     );
+
+
+            // Ajusta para o tamanho visual da dungeon.
+            mimic.setDisplaySize(
+                96,
+                96
+            );
+
+
+            // Pequeno aparecimento.
+            mimic.setAlpha(
+                0
+            );
+
+            this.scene.tweens.add({
+
+                targets:
+                    mimic,
+
+                alpha:
+                    1,
+
+                duration:
+                    180,
+
+            });
+
+
+            // ================================================
+            // 📸 CÂMERA DÁ FOCO NA TRANSFORMAÇÃO
+            // ================================================
 
             try {
 
-                this.scene.player?.body?.stop();
+                this.scene.cameras.main
+                    .shake(
+                        120,
+                        0.002
+                    );
 
             } catch (
                 e
             ) {}
+
+
+            // ================================================
+            // ▶️ TOCA A ANIMAÇÃO
+            // ================================================
+
+            mimic.play(
+                animKey
+            );
+
+
+            // ================================================
+            // ⏱️ ESPERA A ANIMAÇÃO TERMINAR
+            // ================================================
 
             await new Promise(
                 resolve => {
 
                     let terminou =
                         false;
+
 
                     const finalizar =
                         () => {
@@ -1977,19 +2335,33 @@
                             terminou =
                                 true;
 
-                            if (
-                                mimic
-                                &&
-                                mimic.active
-                            ) {
 
-                                mimic.destroy();
+                            // Mantém o último frame
+                            // por um instante para o jogador ver.
+                            this.scene.time.delayedCall(
 
-                            }
+                                450,
 
-                            resolve();
+                                () => {
+
+                                    if (
+                                        mimic
+                                        &&
+                                        mimic.active
+                                    ) {
+
+                                        mimic.destroy();
+
+                                    }
+
+                                    resolve();
+
+                                }
+
+                            );
 
                         };
+
 
                     mimic.once(
 
@@ -2002,8 +2374,8 @@
 
                                 this.scene.cameras.main
                                     .shake(
-                                        180,
-                                        0.004
+                                        250,
+                                        0.008
                                     );
 
                             } catch (
@@ -2016,14 +2388,14 @@
 
                     );
 
-                    mimic.play(
-                        animKey
-                    );
 
-                    // Segurança caso algum frame falhe.
+                    // Segurança.
+                    //
+                    // Mesmo se Phaser não disparar
+                    // ANIMATION_COMPLETE, o combate continua.
                     this.scene.time.delayedCall(
 
-                        2200,
+                        2600,
 
                         finalizar
 
@@ -2041,7 +2413,8 @@
         async _processarResultado(
             result,
             puzzleId,
-            chestId = null
+            chestId = null,
+            lightIndex = null
         ) {
 
             if (
@@ -2067,19 +2440,31 @@
                 || acao === "luz_correta"
             ) {
 
-                const quantidade =
-                    Number(
-                        result.estado?.luzes_ativas?.length
-                        || 0
-                    );
+                this._mostrarStatusLuz(
 
-                this._aviso(
+                    lightIndex,
 
-                    "Pedra Rúnica",
+                    true
 
-                    `Pedra ativada (${quantidade}/3).`,
+                );
 
-                    "sucesso"
+                return;
+            }
+
+                        // ================================================
+            // 💡 PEDRA DESATIVADA
+            // ================================================
+
+            if (
+                acao
+                === "luz_desativada"
+            ) {
+
+                this._mostrarStatusLuz(
+
+                    lightIndex,
+
+                    false
 
                 );
 
@@ -2095,21 +2480,39 @@
                 === "sequencia_pronta"
             ) {
 
-                this._aviso(
+                const ativa =
+                    (
+                        result.estado
+                            ?.luzes_ativas
+                        || []
+                    )
+                        .map(
+                            Number
+                        )
+                        .includes(
+                            Number(
+                                lightIndex
+                            )
+                        );
 
-                    "Runas Ativadas",
 
-                    result.mensagem
-                    ||
-                    "As três runas foram escolhidas. Volte ao baú.",
+                if (
+                    ativa
+                ) {
 
-                    "aviso"
+                    this._mostrarStatusLuz(
 
-                );
+                        lightIndex,
+
+                        true
+
+                    );
+
+                }
 
                 return;
             }
-            
+
             // ================================================
             // 💡 PEDRA JÁ ACESA
             // ================================================
@@ -2155,14 +2558,23 @@
                     === "function"
                 ) {
 
+                    const textoLimpo =
+                        texto
+                            .replace(
+                                /\n+/g,
+                                " "
+                            )
+                            .replace(
+                                /\s+/g,
+                                " "
+                            )
+                            .trim();
+
                     window.mostrarDialogoRPG(
 
                         "🧰 Baú Ancestral",
 
-                        texto.replace(
-                            /\n/g,
-                            "<br>"
-                        )
+                        textoLimpo
 
                     );
 
@@ -2383,19 +2795,6 @@
                 result.spawn_id
 
             ) {
-
-                this._aviso(
-
-                    "Mímico!",
-
-                    result.mensagem
-                    ||
-                    "O baú revelou sua verdadeira forma!",
-
-                    "erro"
-
-                );
-
 
                 // Para auto caça.
                 try {
