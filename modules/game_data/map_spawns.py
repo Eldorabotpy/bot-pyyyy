@@ -367,4 +367,18 @@ MAP_SPAWNS = {
         ("basilisco_jovem", 52, 42), 
         ("basilisco_jovem", 15, 35),
     ]),
+
+    # ==========================================
+    # 🏰 DUNGEON 01
+    # ==========================================
+    "dungeon_01": gerar_spawns("dungeon01", [
+
+        # Os mobs normais da dungeon serão
+        # adicionados aqui depois.
+
+        # IMPORTANTE:
+        # mimico_dungeon_01 NÃO entra aqui.
+        # Ele só nasce através do puzzle do baú.
+
+    ]),
 }

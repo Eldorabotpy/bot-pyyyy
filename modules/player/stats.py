@@ -1352,8 +1352,14 @@ async def processar_turno_combate(
     from bson import ObjectId
     from modules.game_data.items_consumables import CONSUMABLES_DATA
     from modules.cooldowns import iniciar_turno
+    from modules.dungeon_event_service import (
+        finalizar_combate_mimico,
+        is_dungeon_event_mob,
+        validate_event_mob_owner,
+    )
 
     await player_manager.clear_player_cache(ObjectId(user_id))
+
     player = users_collection.find_one({"_id": ObjectId(user_id)})
     if not player:
         return {"erro": "Herói não encontrado!"}
@@ -1369,6 +1375,24 @@ async def processar_turno_combate(
 
     if not mob_vivo:
         return {"erro": "O monstro sumiu!"}
+
+    # =============================================================
+    # 🏰 EVENTO ESPECIAL DE DUNGEON
+    # =============================================================
+    eh_evento_dungeon = is_dungeon_event_mob(
+        mob_vivo
+    )
+
+    if (
+        eh_evento_dungeon
+        and not validate_event_mob_owner(
+            mob_vivo,
+            user_id
+        )
+    ):
+        return {
+            "erro": "Esse encontro pertence a outro jogador."
+        }
 
     mob_hp = int(mob_vivo.get("hp_atual", mob_vivo.get("hp", 0)) or 0)
 
@@ -1720,29 +1744,83 @@ async def processar_turno_combate(
 
         if player_hp <= 0:
             is_derrota = True
-            xp_perdido = int(mob_status_luta.get("xp_reward", 0)) * 2
-            ouro_perdido = int(mob_status_luta.get("gold_drop", 0)) * 2
 
-            player["xp"] = max(0, player.get("xp", 0) - xp_perdido)
-            player["gold"] = max(0, player.get("gold", 0) - ouro_perdido)
+            if eh_evento_dungeon:
+                # O Mímico pertence ao puzzle.
+                # A derrota encerra somente este encontro especial
+                # e libera o jogador para tentar o enigma novamente.
+                xp_perdido = 0
+                ouro_perdido = 0
+
+                finalizar_combate_mimico(
+                    user_id=str(user_id),
+                    spawn_id=str(spawn_id),
+                    sistema_cacada=sistema_cacada,
+                    resultado="derrota",
+                )
+
+            else:
+                xp_perdido = int(mob_status_luta.get("xp_reward", 0)) * 2
+                ouro_perdido = int(mob_status_luta.get("gold_drop", 0)) * 2
+
+                player["xp"] = max(0, player.get("xp", 0) - xp_perdido)
+                player["gold"] = max(0, player.get("gold", 0) - ouro_perdido)
 
     elif mob_hp <= 0:
-        sistema_cacada.processar_morte(regiao_atual, spawn_id)
+        if eh_evento_dungeon:
+            finalizar_combate_mimico(
+                user_id=str(user_id),
+                spawn_id=str(spawn_id),
+                sistema_cacada=sistema_cacada,
+                resultado="vitoria",
+            )
 
-        if monster_id_real:
+            log_turno.append({
+                "autor": "sistema",
+                "texto": "👹 O Mímico foi derrotado. As pedras do enigma foram reiniciadas.",
+                "dano": 0,
+                "tipo": "dungeon_event",
+            })
+
+        else:
+            sistema_cacada.processar_morte(
+                regiao_atual,
+                spawn_id
+            )
+
+        if monster_id_real and not eh_evento_dungeon:
             bestiario[monster_id_real] = bestiario.get(monster_id_real, 0) + 1
 
-        xp_ganho_base = int(mob_status_luta.get("xp_reward", 0))
-        ouro_ganho_base = int(mob_status_luta.get("gold_drop", 0))
+        xp_ganho_base = (
+            0
+            if eh_evento_dungeon
+            else int(mob_status_luta.get("xp_reward", 0))
+        )
+
+        ouro_ganho_base = (
+            0
+            if eh_evento_dungeon
+            else int(mob_status_luta.get("gold_drop", 0))
+        )
 
         from modules.combat.party_engine import dividir_recompensas_grupo
         from modules.game_data.season_pass import adicionar_xp_passe
 
-        em_grupo, xp_final, ouro_final, membros_ids = dividir_recompensas_grupo(
-            str(user_id),
-            xp_ganho_base,
-            ouro_ganho_base,
-        )
+        # =============================================================
+        # 👹 EVENTO DE DUNGEON NÃO USA RECOMPENSA DE PARTY
+        # =============================================================
+        if eh_evento_dungeon:
+            em_grupo = False
+            xp_final = 0
+            ouro_final = 0
+            membros_ids = []
+
+        else:
+            em_grupo, xp_final, ouro_final, membros_ids = dividir_recompensas_grupo(
+                str(user_id),
+                xp_ganho_base,
+                ouro_ganho_base,
+            )
 
         # =============================================================
         # 📜 MISSÕES DA GUILDA - REGISTRA ABATE REAL
@@ -1752,7 +1830,7 @@ async def processar_turno_combate(
                 registrar_abate
             )
 
-            if monster_id_real:
+            if monster_id_real and not eh_evento_dungeon:
 
                 # =====================================================
                 # 👥 DESCOBRE O TIPO REAL DO COMBATE
@@ -1918,7 +1996,7 @@ async def processar_turno_combate(
                 registrar_abate_cla
             )
 
-            if monster_id_real:
+            if monster_id_real and not eh_evento_dungeon:
 
                 herois_sala_cla = {}
 
@@ -2079,7 +2157,11 @@ async def processar_turno_combate(
 
             log_turno.append({"autor": "sistema", "texto": "🤝 Recompensa dividida com o grupo!", "dano": 0})
 
-        loot_table = mob_status_luta.get("loot_table", [])
+        loot_table = (
+            []
+            if eh_evento_dungeon
+            else mob_status_luta.get("loot_table", [])
+        )
         for loot in loot_table:
             chance = float(loot.get("drop_chance", 0))
             if random.uniform(0, 100) <= chance:

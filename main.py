@@ -54,6 +54,15 @@ from modules.cooldowns import iniciar_turno, aplicar_cooldown
 from modules.combat.combat_engine import processar_acao_combate
 from modules.game_data.items_consumables import CONSUMABLES_DATA
 from modules.player.combat_stats import get_combat_stats_sync, aplicar_combat_stats_no_player
+
+# ==============================================================================
+# 🏰 EVENTOS DE DUNGEON
+# ==============================================================================
+from modules.dungeon_event_service import (
+    is_dungeon_event_mob,
+    validate_event_mob_owner,
+)
+
 # ==============================================================================
 # 1. INICIALIZAÇÃO DO MOTOR E REGISTRO DE ROTAS
 # ==============================================================================
@@ -99,11 +108,13 @@ from rotas.passe import passe_bp
 from rotas.character import character_bp
 from rotas.loja_reino import registrar_loja_reino
 from rotas.npc import npc_bp
+from rotas.dungeon_events import dungeon_events_bp
 
 app.register_blueprint(admin_bp)
 app.register_blueprint(passe_bp)
 app.register_blueprint(character_bp)
 app.register_blueprint(npc_bp)
+app.register_blueprint(dungeon_events_bp)
 
 # --- INICIALIZAÇÃO SOCKET E MONGO ---
 socketio = SocketIO(
@@ -475,6 +486,26 @@ def iniciar_combate():
         if regiao_atual in sistema_cacada.mobs_vivos and spawn_id in sistema_cacada.mobs_vivos[regiao_atual]:
             mob_vivo = sistema_cacada.mobs_vivos[regiao_atual][spawn_id]
             monster_id_real = mob_vivo.get("monster_id", "slime_verde")
+
+        # ==========================================
+        # 🏰 MOB ESPECIAL DE EVENTO DA DUNGEON
+        # ==========================================
+        eh_evento_dungeon = is_dungeon_event_mob(
+            mob_vivo
+        )
+
+        # O Mímico criado pelo puzzle pertence somente
+        # ao jogador que despertou aquele encontro.
+        if (
+            eh_evento_dungeon
+            and not validate_event_mob_owner(
+                mob_vivo,
+                user_id
+            )
+        ):
+            return jsonify({
+                "erro": "Esse encontro pertence a outro jogador."
+            }), 403
             
         mob_data = None
         for categoria, mobs in MONSTERS_DATA.items():
@@ -523,10 +554,25 @@ def iniciar_combate():
                 # Salva o HP no banco imediatamente
                 users_collection.update_one({"_id": player["_id"]}, {"$set": {"current_hp": player_hp}})
         
-        # Lógica do Bestiário
+        # ==========================================
+        # 📖 LÓGICA DO BESTIÁRIO
+        # ==========================================
         bestiario = player.get("bestiario", {})
         abates = bestiario.get(monster_id_real, 0)
-        nivel_conhecimento = 3 if abates >= 50 else 2 if abates >= 10 else 1 if abates >= 1 else 0
+
+        # O Mímico já se revelou fisicamente no evento.
+        # Portanto nome, nível e status podem aparecer
+        # independentemente do Bestiário.
+        if eh_evento_dungeon:
+            nivel_conhecimento = 3
+
+        else:
+            nivel_conhecimento = (
+                3 if abates >= 50
+                else 2 if abates >= 10
+                else 1 if abates >= 1
+                else 0
+            )
 
         nome_mob_tela = mob_data.get('name', 'Monstro') if nivel_conhecimento > 0 else "Criatura Desconhecida"
         lvl_mob_tela = mob_level_final if nivel_conhecimento > 0 else "??"
@@ -539,6 +585,12 @@ def iniciar_combate():
         estado = {
             "regiao": regiao_atual,
             "spawn_id": spawn_id,
+
+            # ==========================================
+            # 🏰 EVENTO ESPECIAL DE DUNGEON
+            # ==========================================
+            "evento_dungeon": eh_evento_dungeon,
+
             "mob_nome": nome_mob_tela,
             "mob_img": link_imagem_monstro,
             "monster_level": lvl_mob_tela, 
@@ -578,7 +630,25 @@ def iniciar_combate():
                 "sala": gcm.pacote_estado_sala(sala_id_recebida) if sala_existente else None
             })
 
-        grupo = obter_grupo_do_jogador(str(user_id))
+        # ==========================================
+        # 👹 MÍMICO DA DUNGEON = COMBATE SOLO
+        # ==========================================
+        #
+        # Mesmo que o jogador esteja em uma party,
+        # o Mímico pertence ao evento individual
+        # daquele jogador.
+        #
+        # Os outros combates continuam funcionando
+        # normalmente em grupo.
+        # ==========================================
+
+        grupo = (
+            None
+            if eh_evento_dungeon
+            else obter_grupo_do_jogador(
+                str(user_id)
+            )
+        )
 
         if grupo and mob_vivo:
             lider_id = str(grupo.get("lider"))

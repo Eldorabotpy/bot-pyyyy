@@ -8,6 +8,11 @@ class MapaScene extends Phaser.Scene {
         this.target = new Phaser.Math.Vector2();
         this.isMoving = false;
         this.objetosInterativos = [];
+
+        // ==========================================
+        // 🏰 EVENTOS DE DUNGEON
+        // ==========================================
+        this.dungeonEventManager = null;
     }
 
     init(data) {
@@ -90,6 +95,17 @@ class MapaScene extends Phaser.Scene {
             'tiles_dungeon_chao',
             '/static/images/tilesets/dungeon_1_chao.png'
         );
+
+        // ==========================================
+        // 💡 EVENTOS VISUAIS DA DUNGEON 01
+        // ==========================================
+        if (
+            this.regiaoAtual === 'dungeon_01' &&
+            typeof DungeonEventManager !== 'undefined'
+        ) {
+            DungeonEventManager.preload(this);
+        }
+
         let genero = localStorage.getItem("generoEscolhido") || "masculino";
         if (genero !== "masculino" && genero !== "feminino") {
             genero = "masculino";
@@ -1529,6 +1545,28 @@ class MapaScene extends Phaser.Scene {
                 if (typeof MotorCacada !== 'undefined') {
                     this.motorCacada = new MotorCacada(this, socket);
                 }
+            }
+
+            // ==========================================
+            // 🏰 SISTEMA DE EVENTOS DA DUNGEON 01
+            // ==========================================
+            if (
+                this.regiaoAtual === 'dungeon_01' &&
+                typeof DungeonEventManager !== 'undefined'
+            ) {
+                this.dungeonEventManager = new DungeonEventManager(
+                    this,
+                    map
+                );
+
+                this.dungeonEventManager
+                    .iniciar()
+                    .catch(erro => {
+                        console.error(
+                            "❌ [DUNGEON EVENT] Erro ao iniciar:",
+                            erro
+                        );
+                    });
             }
 
             // Inicialização dos NPCs

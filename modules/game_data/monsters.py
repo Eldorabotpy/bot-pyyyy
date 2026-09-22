@@ -1444,6 +1444,42 @@ MONSTERS_DATA = {
             ],
             "media_key": "farao_maldito_media"
         }
+    ],
+
+    # ==========================================
+    # 🏰 DUNGEON 01
+    # ==========================================
+    "dungeon_01": [
+        {
+            "id": "mimico_dungeon_01",
+            "name": "Mimico",
+            "min_level": 5,
+            "max_level": 8,
+            "skills": [
+                "mordida_feroz",
+                "golpe_sujo"
+            ],
+            "hp": 120,
+            "attack": 12,
+            "defense": 6,
+            "initiative": 8,
+            "luck": 8,
+
+            # O Mimico pode ser enfrentado várias vezes
+            # enquanto o jogador tenta resolver o puzzle.
+            # Por isso ele NÃO dá recompensa própria.
+            "xp_reward": 0,
+            "gold_drop": 0,
+            "loot_table": [],
+
+            "ambush_chance": 0.0,
+
+            # Identifica que não é um mob normal de caça.
+            "event_only": True,
+            "event_id": "bau_01",
+
+            "media_key": "mimico_dungeon_01_media"
+        }
     ]
 }
 
