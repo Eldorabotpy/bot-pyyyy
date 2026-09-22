@@ -1880,17 +1880,9 @@
                     this.estado
                 );
 
-
-                this._aviso(
-
-                    "Pedra Rúnica",
-
-                    err.message
-                    ||
-                    "Não foi possível ativar a pedra.",
-
-                    "erro"
-
+                console.error(
+                    "[DUNGEON EVENT] Erro ao interagir com pedra:",
+                    err
                 );
 
             }
@@ -2518,21 +2510,11 @@
             // ================================================
 
             if (
-                acao
-                === "luz_ja_ativa"
+                !this._estaPerto(
+                    data.x,
+                    data.y
+                )
             ) {
-
-                this._aviso(
-
-                    "Pedra Rúnica",
-
-                    result.mensagem
-                    ||
-                    "Essa pedra já está acesa.",
-
-                    "aviso"
-
-                );
 
                 return;
             }
