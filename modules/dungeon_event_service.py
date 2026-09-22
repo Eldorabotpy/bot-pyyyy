@@ -37,7 +37,68 @@ _EVENT_LOCK = threading.RLock()
 # ============================================================
 
 STATE_ROOT = "dungeon_events"
+# ==============================================================================
+# 🔮 IDENTIDADE DAS PEDRAS DO ENIGMA
+# ==============================================================================
 
+DUNGEON_RUNE_NAMES = {
+    1: {
+        "nome": "Lua",
+        "emoji": "🌙",
+    },
+    2: {
+        "nome": "Mar",
+        "emoji": "🌊",
+    },
+    3: {
+        "nome": "Gelo",
+        "emoji": "❄️",
+    },
+    4: {
+        "nome": "Sol",
+        "emoji": "☀️",
+    },
+    5: {
+        "nome": "Ouro",
+        "emoji": "👑",
+    },
+    6: {
+        "nome": "Chama",
+        "emoji": "🔥",
+    },
+}
+
+
+def _gerar_charada_sequencia(
+    sequence: list[int],
+) -> str:
+    nomes = []
+
+    for indice in sequence:
+        dados = DUNGEON_RUNE_NAMES.get(
+            int(indice),
+            {
+                "nome": "Runa Desconhecida",
+                "emoji": "🔹",
+            }
+        )
+
+        nomes.append(
+            f"{dados['emoji']} {dados['nome']} "
+            f"(Pedra {int(indice)})"
+        )
+
+    if len(nomes) < 3:
+        return (
+            "As runas permanecem silenciosas..."
+        )
+
+    return (
+        "O baú sussurra entre as pedras:\n\n"
+        f"“Primeiro, desperte {nomes[0]}.\n"
+        f"Depois, faça responder {nomes[1]}.\n"
+        f"Por fim, invoque {nomes[2]}.”"
+    )
 
 # ============================================================
 # ❌ ERRO DO SISTEMA
@@ -865,7 +926,7 @@ def interagir_luz(
             )
 
         # ====================================================
-        # BAÚ JÁ ABERTO
+        # EVENTO JÁ CONCLUÍDO
         # ====================================================
 
         if state.get(
@@ -904,7 +965,7 @@ def interagir_luz(
                     "puzzle_ja_resolvido",
 
                 "mensagem":
-                    "As pedras já revelaram o segredo do baú.",
+                    "A combinação já foi descoberta.",
 
                 "estado":
                     _public_state(
@@ -913,72 +974,25 @@ def interagir_luz(
             }
 
         # ====================================================
-        # MÍMICO JÁ ATIVO
+        # MÍMICO ATIVO
         # ====================================================
 
         if state.get(
             "mimic_active"
         ):
 
-            spawn_id = (
-                _create_mimic_spawn(
-
-                    user_id=user_id,
-
-                    dungeon_id=
-                        dungeon_id,
-
-                    puzzle_id=
-                        puzzle_id,
-
-                    config=
-                        config,
-
-                    state=
-                        state,
-
-                    sistema_cacada=
-                        sistema_cacada,
-                )
-            )
-
-            _save_state(
-                user_id,
-                dungeon_id,
-                puzzle_id,
-                state
-            )
-
-            state["revision"] = (
-                int(
-                    state.get(
-                        "revision",
-                        0
-                    )
-                )
-                + 1
-            )
-
             return {
 
                 "success": True,
 
                 "acao":
-                    "mimico_ativo",
+                    "mimico_em_andamento",
 
                 "invocar_mimico":
-                    True,
-
-                "spawn_id":
-                    spawn_id,
-
-                "monster_id":
-                    config[
-                        "monster_id"
-                    ],
+                    False,
 
                 "mensagem":
-                    "O Mímico ainda está à espreita!",
+                    "O Mímico já despertou.",
 
                 "estado":
                     _public_state(
@@ -1012,107 +1026,24 @@ def interagir_luz(
 
         ]
 
+        if not sequence:
+
+            raise DungeonEventError(
+                "Sequência do puzzle inválida."
+            )
+
+        # ====================================================
+        # AS 3 PEDRAS JÁ FORAM ESCOLHIDAS
+        # ====================================================
+        #
+        # NÃO verifica aqui.
+        # O jogador precisa voltar ao baú.
+        # ====================================================
+
         if (
             len(progress)
             >= len(sequence)
         ):
-
-            state[
-                "resolved"
-            ] = True
-
-            _save_state(
-                user_id,
-                dungeon_id,
-                puzzle_id,
-                state
-            )
-
-            state["revision"] += 1
-
-            return {
-
-                "success": True,
-
-                "acao":
-                    "puzzle_resolvido",
-
-                "mensagem":
-                    "As três pedras responderam. O baú foi destravado!",
-
-                "estado":
-                    _public_state(
-                        state
-                    ),
-            }
-
-        expected = sequence[
-            len(progress)
-        ]
-
-        # ====================================================
-        # ✅ ACERTO
-        # ====================================================
-
-        if indice == expected:
-
-            progress.append(
-                indice
-            )
-
-            state[
-                "progress"
-            ] = progress
-
-            # Última pedra.
-
-            if (
-                len(progress)
-                == len(sequence)
-            ):
-
-                state[
-                    "resolved"
-                ] = True
-
-                _save_state(
-                    user_id,
-                    dungeon_id,
-                    puzzle_id,
-                    state
-                )
-
-                state[
-                    "revision"
-                ] += 1
-
-                return {
-
-                    "success":
-                        True,
-
-                    "acao":
-                        "puzzle_resolvido",
-
-                    "mensagem":
-                        "As três pedras responderam. O baú foi destravado!",
-
-                    "estado":
-                        _public_state(
-                            state
-                        ),
-                }
-
-            _save_state(
-                user_id,
-                dungeon_id,
-                puzzle_id,
-                state
-            )
-
-            state[
-                "revision"
-            ] += 1
 
             return {
 
@@ -1120,10 +1051,13 @@ def interagir_luz(
                     True,
 
                 "acao":
-                    "luz_correta",
+                    "sequencia_pronta",
 
                 "mensagem":
-                    "A pedra começou a brilhar.",
+                    (
+                        "As três runas já foram escolhidas. "
+                        "Volte ao baú para testar a combinação."
+                    ),
 
                 "estado":
                     _public_state(
@@ -1132,55 +1066,39 @@ def interagir_luz(
             }
 
         # ====================================================
-        # ❌ ERROU
+        # NÃO REPETIR PEDRA
         # ====================================================
 
-        state[
-            "attempts"
-        ] = (
-            int(
-                state.get(
-                    "attempts",
-                    0
-                )
-            )
-            + 1
+        if indice in progress:
+
+            return {
+
+                "success":
+                    True,
+
+                "acao":
+                    "luz_ja_ativa",
+
+                "mensagem":
+                    "Essa pedra já está acesa.",
+
+                "estado":
+                    _public_state(
+                        state
+                    ),
+            }
+
+        # ====================================================
+        # ACENDE A PEDRA
+        # ====================================================
+
+        progress.append(
+            indice
         )
 
-        # Apaga todas as pedras.
         state[
             "progress"
-        ] = []
-
-        spawn_id = None
-
-        if config.get(
-            "trigger_mimic_on_wrong",
-            True
-        ):
-
-            spawn_id = (
-                _create_mimic_spawn(
-
-                    user_id=
-                        user_id,
-
-                    dungeon_id=
-                        dungeon_id,
-
-                    puzzle_id=
-                        puzzle_id,
-
-                    config=
-                        config,
-
-                    state=
-                        state,
-
-                    sistema_cacada=
-                        sistema_cacada,
-                )
-            )
+        ] = progress
 
         _save_state(
             user_id,
@@ -1193,41 +1111,63 @@ def interagir_luz(
             "revision"
         ] += 1
 
+        # ====================================================
+        # TERCEIRA PEDRA
+        # ====================================================
+        #
+        # Continua acesa.
+        # Ainda NÃO verifica se está certa.
+        # ====================================================
+
+        if (
+            len(progress)
+            == len(sequence)
+        ):
+
+            return {
+
+                "success":
+                    True,
+
+                "acao":
+                    "sequencia_pronta",
+
+                "mensagem":
+                    (
+                        "As três runas foram escolhidas. "
+                        "Agora volte ao baú."
+                    ),
+
+                "estado":
+                    _public_state(
+                        state
+                    ),
+            }
+
+        # ====================================================
+        # PRIMEIRA / SEGUNDA PEDRA
+        # ====================================================
+
         return {
 
             "success":
                 True,
 
             "acao":
-                "sequencia_errada",
-
-            "invocar_mimico":
-                bool(
-                    spawn_id
-                ),
-
-            "spawn_id":
-                spawn_id,
-
-            "monster_id":
-                (
-                    config.get(
-                        "monster_id"
-                    )
-                    if spawn_id
-                    else None
-                ),
+                "luz_selecionada",
 
             "mensagem":
-                "A sequência falhou... o baú revelou sua verdadeira natureza!",
+                (
+                    f"Pedra ativada "
+                    f"({len(progress)}/"
+                    f"{len(sequence)})."
+                ),
 
             "estado":
                 _public_state(
                     state
                 ),
         }
-
-
 # ============================================================
 # 🎁 ENTREGAR RECOMPENSA
 # ============================================================
@@ -1466,46 +1406,12 @@ def interagir_bau(
             }
 
         # ====================================================
-        # MÍMICO JÁ ACORDADO
+        # MÍMICO JÁ ATIVO
         # ====================================================
 
         if state.get(
             "mimic_active"
         ):
-
-            spawn_id = (
-                _create_mimic_spawn(
-
-                    user_id=
-                        user_id,
-
-                    dungeon_id=
-                        dungeon_id,
-
-                    puzzle_id=
-                        puzzle_id,
-
-                    config=
-                        config,
-
-                    state=
-                        state,
-
-                    sistema_cacada=
-                        sistema_cacada,
-                )
-            )
-
-            _save_state(
-                user_id,
-                dungeon_id,
-                puzzle_id,
-                state
-            )
-
-            state[
-                "revision"
-            ] += 1
 
             return {
 
@@ -1513,21 +1419,86 @@ def interagir_bau(
                     True,
 
                 "acao":
-                    "mimico_ativo",
+                    "mimico_em_andamento",
 
                 "invocar_mimico":
-                    True,
-
-                "spawn_id":
-                    spawn_id,
-
-                "monster_id":
-                    config[
-                        "monster_id"
-                    ],
+                    False,
 
                 "mensagem":
-                    "O baú se contorce e mostra os dentes!",
+                    "O Mímico já despertou.",
+
+                "estado":
+                    _public_state(
+                        state
+                    ),
+            }
+
+        sequence = [
+
+            int(x)
+
+            for x in state.get(
+                "sequence",
+                []
+            )
+
+        ]
+
+        progress = [
+
+            int(x)
+
+            for x in state.get(
+                "progress",
+                []
+            )
+
+        ]
+
+        if not sequence:
+
+            raise DungeonEventError(
+                "Sequência do puzzle inválida."
+            )
+
+        # ====================================================
+        # AINDA NÃO ESCOLHEU AS 3 PEDRAS
+        # ====================================================
+        #
+        # O BAÚ REVELA A CHARADA.
+        # ====================================================
+
+        if (
+            not state.get("resolved")
+            and
+            len(progress)
+            < len(sequence)
+        ):
+
+            charada = (
+                _gerar_charada_sequencia(
+                    sequence
+                )
+            )
+
+            return {
+
+                "success":
+                    True,
+
+                "acao":
+                    "bau_charada",
+
+                "invocar_mimico":
+                    False,
+
+                "mensagem":
+                    (
+                        "Runas antigas brilham sobre o baú..."
+                    ),
+
+                "charada":
+                    charada,
 
                 "estado":
                     _public_state(
@@ -1536,23 +1507,61 @@ def interagir_bau(
             }
 
         # ====================================================
-        # TENTOU ABRIR ANTES DE RESOLVER
+        # JOGADOR ESCOLHEU AS 3
+        # ====================================================
+        #
+        # SOMENTE AO CLICAR NO BAÚ
+        # verificamos a combinação.
         # ====================================================
 
         if not state.get(
             "resolved"
         ):
 
-            state[
-                "progress"
-            ] = []
+            # ================================================
+            # ✅ COMBINAÇÃO CORRETA
+            # ================================================
 
-            spawn_id = None
+            if progress == sequence:
 
-            if config.get(
-                "trigger_mimic_on_early_chest",
-                True
-            ):
+                state[
+                    "resolved"
+                ] = True
+
+                _save_state(
+                    user_id,
+                    dungeon_id,
+                    puzzle_id,
+                    state
+                )
+
+                state[
+                    "revision"
+                ] += 1
+
+            # ================================================
+            # ❌ COMBINAÇÃO ERRADA
+            # ================================================
+
+            else:
+
+                state[
+                    "attempts"
+                ] = (
+                    int(
+                        state.get(
+                            "attempts",
+                            0
+                        )
+                    )
+                    + 1
+                )
+
+                # As pedras apagam
+                # quando o baú vira Mímico.
+                state[
+                    "progress"
+                ] = []
 
                 spawn_id = (
                     _create_mimic_spawn(
@@ -1577,53 +1586,50 @@ def interagir_bau(
                     )
                 )
 
-            _save_state(
-                user_id,
-                dungeon_id,
-                puzzle_id,
-                state
-            )
+                _save_state(
+                    user_id,
+                    dungeon_id,
+                    puzzle_id,
+                    state
+                )
 
-            state[
-                "revision"
-            ] += 1
+                state[
+                    "revision"
+                ] += 1
 
-            return {
+                return {
 
-                "success":
-                    True,
+                    "success":
+                        True,
 
-                "acao":
-                    "bau_armadilha",
+                    "acao":
+                        "sequencia_errada",
 
-                "invocar_mimico":
-                    bool(
-                        spawn_id
-                    ),
+                    "invocar_mimico":
+                        True,
 
-                "spawn_id":
-                    spawn_id,
+                    "spawn_id":
+                        spawn_id,
 
-                "monster_id":
-                    (
+                    "monster_id":
                         config.get(
                             "monster_id"
-                        )
-                        if spawn_id
-                        else None
-                    ),
+                        ),
 
-                "mensagem":
-                    "O baú era uma armadilha. Um Mímico desperta!",
+                    "mensagem":
+                        (
+                            "As runas rejeitam a combinação... "
+                            "algo se move dentro do baú!"
+                        ),
 
-                "estado":
-                    _public_state(
-                        state
-                    ),
-            }
+                    "estado":
+                        _public_state(
+                            state
+                        ),
+                }
 
         # ====================================================
-        # PUZZLE RESOLVIDO
+        # ✅ CORRETO — ABRIR O BAÚ
         # ====================================================
 
         loot_id = str(
@@ -1688,7 +1694,10 @@ def interagir_bau(
                 "bau_aberto",
 
             "mensagem":
-                "O selo se rompeu. Você recebeu o tesouro!",
+                (
+                    "O selo se rompeu. "
+                    "Você recebeu o tesouro!"
+                ),
 
             "loot_id":
                 loot_id,
@@ -1701,8 +1710,7 @@ def interagir_bau(
                     state
                 ),
         }
-
-
+    
 # ============================================================
 # ⚔️ FINALIZAR COMBATE DO MÍMICO
 # ============================================================

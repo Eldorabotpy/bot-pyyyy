@@ -168,6 +168,30 @@
                 );
 
             }
+            // ================================================
+            // 👹 MÍMICO — ANIMAÇÃO DO BAÚ
+            // ================================================
+
+            if (
+                !scene.textures.exists(
+                    "dungeon_mimico_01_evento"
+                )
+            ) {
+
+                scene.load.spritesheet(
+
+                    "dungeon_mimico_01_evento",
+
+                    "https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/mob/mapa/dungeon_01/mimico_dungeon_01_spritesheet.png",
+
+                    {
+                        frameWidth: 128,
+                        frameHeight: 128,
+                    }
+
+                );
+
+            }            
 
         }
 
@@ -1722,7 +1746,9 @@
 
                     result,
 
-                    chest.puzzle
+                    chest.puzzle,
+
+                    chestId
 
                 );
 
@@ -1828,6 +1854,185 @@
             return data;
         }
 
+        // ====================================================
+        // 👹 ANIMAÇÃO: BAÚ → MÍMICO
+        // ====================================================
+
+        async _animarMimicoNoBau(
+            chestId
+        ) {
+
+            const chest =
+                this.chests.get(
+                    String(
+                        chestId
+                        || ""
+                    )
+                );
+
+            if (
+                !chest
+            ) {
+                return;
+            }
+
+            const textureKey =
+                "dungeon_mimico_01_evento";
+
+            const animKey =
+                "dungeon_mimico_01_transformar";
+
+            if (
+                !this.scene.textures.exists(
+                    textureKey
+                )
+            ) {
+
+                console.warn(
+                    "[DUNGEON EVENT] Spritesheet do Mímico não carregado."
+                );
+
+                return;
+            }
+
+            if (
+                !this.scene.anims.exists(
+                    animKey
+                )
+            ) {
+
+                this.scene.anims.create({
+
+                    key:
+                        animKey,
+
+                    frames:
+                        this.scene.anims
+                            .generateFrameNumbers(
+
+                                textureKey,
+
+                                {
+                                    start: 0,
+                                    end: 11,
+                                }
+
+                            ),
+
+                    frameRate:
+                        8,
+
+                    repeat:
+                        0,
+
+                });
+
+            }
+
+            const mimic =
+                this.scene.add.sprite(
+
+                    chest.x,
+
+                    chest.y,
+
+                    textureKey,
+
+                    0
+
+                )
+
+                    .setOrigin(
+                        0.5,
+                        0.5
+                    )
+
+                    .setDepth(
+                        2000
+                    );
+
+            try {
+
+                this.scene.player?.body?.stop();
+
+            } catch (
+                e
+            ) {}
+
+            await new Promise(
+                resolve => {
+
+                    let terminou =
+                        false;
+
+                    const finalizar =
+                        () => {
+
+                            if (
+                                terminou
+                            ) {
+                                return;
+                            }
+
+                            terminou =
+                                true;
+
+                            if (
+                                mimic
+                                &&
+                                mimic.active
+                            ) {
+
+                                mimic.destroy();
+
+                            }
+
+                            resolve();
+
+                        };
+
+                    mimic.once(
+
+                        Phaser.Animations.Events
+                            .ANIMATION_COMPLETE,
+
+                        () => {
+
+                            try {
+
+                                this.scene.cameras.main
+                                    .shake(
+                                        180,
+                                        0.004
+                                    );
+
+                            } catch (
+                                e
+                            ) {}
+
+                            finalizar();
+
+                        }
+
+                    );
+
+                    mimic.play(
+                        animKey
+                    );
+
+                    // Segurança caso algum frame falhe.
+                    this.scene.time.delayedCall(
+
+                        2200,
+
+                        finalizar
+
+                    );
+
+                }
+            );
+
+        }
 
         // ====================================================
         // 🎮 RESULTADO
@@ -1835,7 +2040,8 @@
 
         async _processarResultado(
             result,
-            puzzleId
+            puzzleId,
+            chestId = null
         ) {
 
             if (
@@ -1853,21 +2059,149 @@
 
 
             // ================================================
-            // ✅ PEDRA CORRETA
+            // 💡 PEDRA SELECIONADA
+            // ================================================
+
+            if (
+                acao === "luz_selecionada"
+                || acao === "luz_correta"
+            ) {
+
+                const quantidade =
+                    Number(
+                        result.estado?.luzes_ativas?.length
+                        || 0
+                    );
+
+                this._aviso(
+
+                    "Pedra Rúnica",
+
+                    `Pedra ativada (${quantidade}/3).`,
+
+                    "sucesso"
+
+                );
+
+                return;
+            }
+
+            // ================================================
+            // 🔮 TRÊS RUNAS ESCOLHIDAS
             // ================================================
 
             if (
                 acao
-                === "luz_correta"
+                === "sequencia_pronta"
+            ) {
+
+                this._aviso(
+
+                    "Runas Ativadas",
+
+                    result.mensagem
+                    ||
+                    "As três runas foram escolhidas. Volte ao baú.",
+
+                    "aviso"
+
+                );
+
+                return;
+            }
+            
+            // ================================================
+            // 💡 PEDRA JÁ ACESA
+            // ================================================
+
+            if (
+                acao
+                === "luz_ja_ativa"
             ) {
 
                 this._aviso(
 
                     "Pedra Rúnica",
 
-                    "A pedra começou a brilhar.",
+                    result.mensagem
+                    ||
+                    "Essa pedra já está acesa.",
 
-                    "sucesso"
+                    "aviso"
+
+                );
+
+                return;
+            }
+
+
+            // ================================================
+            // 📜 CHARADA DO BAÚ
+            // ================================================
+
+            if (
+                acao
+                === "bau_charada"
+            ) {
+
+                const texto =
+                    String(
+                        result.charada
+                        || "As runas permanecem silenciosas..."
+                    );
+
+                if (
+                    typeof window.mostrarDialogoRPG
+                    === "function"
+                ) {
+
+                    window.mostrarDialogoRPG(
+
+                        "🧰 Baú Ancestral",
+
+                        texto.replace(
+                            /\n/g,
+                            "<br>"
+                        )
+
+                    );
+
+                } else {
+
+                    this._aviso(
+
+                        "O Sussurro do Baú",
+
+                        texto,
+
+                        "aviso"
+
+                    );
+
+                }
+
+                return;
+            }
+
+
+            // ================================================
+            // 👹 MÍMICO JÁ ESTÁ EM COMBATE
+            // ================================================
+
+            if (
+                acao
+                === "mimico_em_andamento"
+            ) {
+
+                this._aviso(
+
+                    "Mímico",
+
+                    result.mensagem
+                    ||
+                    "O Mímico já despertou.",
+
+                    "aviso"
 
                 );
 
@@ -1888,9 +2222,37 @@
 
                     "Enigma Resolvido",
 
+                    result.mensagem
+                    ||
                     "As três pedras permanecem acesas. O baú foi destravado!",
 
                     "sucesso"
+
+                );
+
+                return;
+            }
+
+
+            // ================================================
+            // 🔒 PUZZLE JÁ RESOLVIDO / EVENTO CONCLUÍDO
+            // ================================================
+
+            if (
+                acao === "puzzle_ja_resolvido"
+                || acao === "evento_concluido"
+                || acao === "bau_ja_aberto"
+            ) {
+
+                this._aviso(
+
+                    "Baú Ancestral",
+
+                    result.mensagem
+                    ||
+                    "Nada mais acontece.",
+
+                    "aviso"
 
                 );
 
@@ -2093,6 +2455,19 @@
 
                 }
 
+
+                // ============================================
+                // 👹 PRIMEIRO O BAÚ SE TRANSFORMA
+                // ============================================
+
+                await this._animarMimicoNoBau(
+                    chestId
+                );
+
+
+                // ============================================
+                // ⚔️ DEPOIS ABRE A BATALHA
+                // ============================================
 
                 await window.iniciarCacadaApp(
 
