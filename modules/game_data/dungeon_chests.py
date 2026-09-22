@@ -1,53 +1,22 @@
-# modules/game_data/dungeon_events.py
-# Configuração dos eventos interativos das dungeons.
+# modules/game_data/dungeon_chests.py
+# Recompensas dos baús de dungeon.
+#
+# O evento do Mímico já funciona sem recompensa configurada.
+# Enquanto "configured" estiver False, o baú NÃO será marcado como aberto,
+# evitando que o jogador perca a recompensa durante os testes.
 
-DUNGEON_EVENTS = {
-    "dungeon_01": {
-        "bau_01": {
-            "event_type": "mimic_sequence",
-            "monster_id": "mimico_dungeon_01",
-            "loot_id": "bau_dungeon_01",
+DUNGEON_CHEST_REWARDS = {
+    "bau_dungeon_01": {
+        "configured": False,
 
-            # Existem 6 pedras no mapa, mas a senha usa somente 3.
-            "available_lights": [1, 2, 3, 4, 5, 6],
-            "sequence_length": 3,
+        # Preencha quando definirmos o prêmio final:
+        "gold": 0,
 
-            # O servidor sorteia uma sequência sem repetição.
-            # Exemplo:
-            # [2, 6, 4]
-            # [1, 5, 3]
-            # [6, 2, 1]
-            "random_sequence": True,
-
-            # Se errar a sequência, desperta o Mímico.
-            "trigger_mimic_on_wrong": True,
-
-            # Se tentar abrir o baú antes de resolver,
-            # também desperta o Mímico.
-            "trigger_mimic_on_early_chest": True,
-
-            # Versão do estado salvo.
-            "state_version": 1,
-        }
+        # Formato:
+        # "items": {
+        #     "cristal_mana_bruto": 2,
+        #     "elixir_de_experiencia": 1,
+        # }
+        "items": {},
     }
 }
-
-
-def get_dungeon_event_config(
-    dungeon_id: str,
-    puzzle_id: str
-) -> dict | None:
-
-    dungeon = DUNGEON_EVENTS.get(
-        str(dungeon_id),
-        {}
-    )
-
-    config = dungeon.get(
-        str(puzzle_id)
-    )
-
-    if isinstance(config, dict):
-        return dict(config)
-
-    return None
