@@ -1199,12 +1199,16 @@
             tipo = "aviso"
         ) {
 
+            // ================================================
+            // 🏰 ALERTA COMPLETO DO ELDORA
+            // ================================================
+
             if (
-                typeof window.avisoEldora
+                typeof window.alertaEldora
                 === "function"
             ) {
 
-                window.avisoEldora(
+                window.alertaEldora(
 
                     titulo,
 
@@ -1212,6 +1216,23 @@
 
                     tipo
 
+                );
+
+                return;
+            }
+
+
+            // ================================================
+            // ⚠️ FALLBACK ANTIGO
+            // ================================================
+
+            if (
+                typeof window.avisoEldora
+                === "function"
+            ) {
+
+                window.avisoEldora(
+                    `${titulo}: ${mensagem}`
                 );
 
                 return;
@@ -2008,11 +2029,17 @@
                 err
             ) {
 
+                console.error(
+                    "[DUNGEON EVENT] ERRO AO CLICAR NO BAÚ:",
+                    err
+                );
+
+
                 this._aviso(
 
                     "Baú Misterioso",
 
-                    err.message
+                    err?.message
                     ||
                     "Não foi possível interagir com o baú.",
 
