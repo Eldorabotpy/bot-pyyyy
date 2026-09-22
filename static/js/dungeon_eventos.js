@@ -2537,11 +2537,17 @@
             // ================================================
 
             if (
-                !this._estaPerto(
-                    data.x,
-                    data.y
-                )
+                acao
+                === "luz_ja_ativa"
             ) {
+
+                this._mostrarStatusLuz(
+
+                    lightIndex,
+
+                    true
+
+                );
 
                 return;
             }
