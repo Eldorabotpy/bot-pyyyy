@@ -438,10 +438,14 @@ def save_position():
 @character_bp.route('/api/combate/acao', methods=['POST'])
 def acao_combate_migrada():
     import asyncio
-    from flask import current_app # 👈 1. Importa a memória global do Flask
+    from flask import current_app
     from modules.player.stats import processar_turno_combate
     from modules.game_data.monsters import MONSTERS_DATA
     from modules.combat.combat_engine import processar_acao_combate
+    from modules.dungeon_event_service import (
+        finalizar_combate_mimico,
+        is_dungeon_event_mob,
+    )
 
     try:
         data = request.json
@@ -451,10 +455,118 @@ def acao_combate_migrada():
         skill_id = data.get('skill_id')
 
         if acao == 'fugir':
+
             from modules.player.core import users_collection
             from bson import ObjectId
-            users_collection.update_one({'_id':ObjectId(user_id)}, {'$unset':{'rune_hunt_active':''}})
-            return jsonify({"fugiu": True, "log": [{"autor": "player", "texto": "Fugiste da batalha!"}]})
+
+            # Limpa trava normal de caça.
+            users_collection.update_one(
+                {
+                    '_id':
+                        ObjectId(user_id)
+                },
+                {
+                    '$unset': {
+                        'rune_hunt_active':
+                            ''
+                    }
+                }
+            )
+
+            # ==========================================
+            # 👹 VERIFICA SE É MÍMICO DE DUNGEON
+            # ==========================================
+
+            sistema_cacada = (
+                current_app.config.get(
+                    'SISTEMA_CACADA'
+                )
+            )
+
+            mob_evento = None
+
+            if sistema_cacada:
+
+                mobs_vivos = getattr(
+                    sistema_cacada,
+                    "mobs_vivos",
+                    {}
+                )
+
+                for (
+                    _regiao,
+                    mobs
+                ) in mobs_vivos.items():
+
+                    mob = (
+                        mobs
+                        or {}
+                    ).get(
+                        str(
+                            spawn_id
+                        )
+                    )
+
+                    if (
+                        mob
+                        and
+                        is_dungeon_event_mob(
+                            mob
+                        )
+                    ):
+
+                        mob_evento = mob
+                        break
+
+            # ==========================================
+            # 🧹 LIMPA O ESTADO DO MÍMICO
+            # ==========================================
+
+            if mob_evento:
+
+                finalizar_combate_mimico(
+
+                    user_id=
+                        str(
+                            user_id
+                        ),
+
+                    spawn_id=
+                        str(
+                            spawn_id
+                        ),
+
+                    sistema_cacada=
+                        sistema_cacada,
+
+                    resultado=
+                        "fuga",
+
+                )
+
+            return jsonify({
+
+                "fugiu":
+                    True,
+
+                "evento_dungeon":
+                    bool(
+                        mob_evento
+                    ),
+
+                "log": [
+
+                    {
+                        "autor":
+                            "player",
+
+                        "texto":
+                            "Fugiste da batalha!"
+                    }
+
+                ]
+
+            })
 
         try:
             loop = asyncio.get_running_loop()
