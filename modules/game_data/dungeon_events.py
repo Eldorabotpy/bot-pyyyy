@@ -38,7 +38,7 @@ DUNGEON_EVENTS = {
             "trigger_mimic_on_early_chest": True,
 
             # Controle de versão do estado salvo
-            "state_version": 1,
+            "state_version": 2,
         }
     }
 }

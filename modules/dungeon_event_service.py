@@ -72,32 +72,39 @@ DUNGEON_RUNE_NAMES = {
 def _gerar_charada_sequencia(
     sequence: list[int],
 ) -> str:
-    nomes = []
+
+    pistas = {
+        1: "a senhora que reina quando o sol se cala",
+        2: "o caminho que nunca descansa e beija todas as margens",
+        3: "o sopro que aprisiona a água em cristal",
+        4: "o soberano que desperta o mundo a cada manhã",
+        5: "aquilo que reis desejam e homens traem para possuir",
+        6: "a fome que dança, ilumina e devora sem ter boca",
+    }
+
+    enigmas = []
 
     for indice in sequence:
-        dados = DUNGEON_RUNE_NAMES.get(
+
+        pista = pistas.get(
             int(indice),
-            {
-                "nome": "Runa Desconhecida",
-                "emoji": "🔹",
-            }
+            "o símbolo esquecido pelos antigos"
         )
 
-        nomes.append(
-            f"{dados['emoji']} {dados['nome']} "
-            f"(Pedra {int(indice)})"
+        enigmas.append(
+            pista
         )
 
-    if len(nomes) < 3:
+    if len(enigmas) < 3:
         return (
-            "As runas permanecem silenciosas..."
+            "As inscrições permanecem silenciosas..."
         )
 
     return (
-        "O baú sussurra entre as pedras:\n\n"
-        f"“Primeiro, desperte {nomes[0]}.\n"
-        f"Depois, faça responder {nomes[1]}.\n"
-        f"Por fim, invoque {nomes[2]}.”"
+        "As inscrições do baú despertam:\n\n"
+        f"“Meu selo começa com {enigmas[0]}.\n"
+        f"Em seguida, procure {enigmas[1]}.\n"
+        f"Somente então desperte {enigmas[2]}.”"
     )
 
 # ============================================================
@@ -1224,6 +1231,10 @@ def _grant_chest_reward(
             )
         )
 
+    # ========================================================
+    # 📦 INVENTÁRIO
+    # ========================================================
+
     inventory = (
         player.get(
             "inventory",
@@ -1238,42 +1249,75 @@ def _grant_chest_reward(
     ):
         inventory = {}
 
-    gold = max(
-        0,
-        int(
-            reward.get(
-                "gold",
-                0
-            )
-            or 0
-        )
-    )
-
-    items = (
-        reward.get(
-            "items",
-            {}
-        )
-        or {}
-    )
-
     delivered_items = []
 
-    for (
-        item_id,
-        qty
-    ) in items.items():
+    # ========================================================
+    # 🏷️ CATÁLOGO DE ITENS
+    # ========================================================
 
-        qty = max(
+    try:
+
+        from modules.game_data.items import (
+            ITEMS_DATA,
+            get_display_name,
+        )
+
+    except Exception:
+
+        ITEMS_DATA = {}
+
+        def get_display_name(
+            item_id
+        ):
+            return str(
+                item_id
+            ).replace(
+                "_",
+                " "
+            ).title()
+
+    # ========================================================
+    # 📥 ADICIONAR ITEM
+    # ========================================================
+
+    def adicionar_item(
+        item_id,
+        quantidade
+    ):
+
+        item_id = str(
+            item_id
+            or ""
+        )
+
+        quantidade = max(
             0,
             int(
-                qty
+                quantidade
                 or 0
             )
         )
 
-        if qty <= 0:
-            continue
+        if (
+            not item_id
+            or quantidade <= 0
+        ):
+            return
+
+        # Se o catálogo estiver disponível,
+        # não permite ID inexistente.
+        if (
+            ITEMS_DATA
+            and item_id
+            not in ITEMS_DATA
+        ):
+
+            print(
+                "[DUNGEON CHEST] Item inválido ignorado:",
+                item_id
+            )
+
+            return
 
         current = inventory.get(
             item_id
@@ -1298,7 +1342,7 @@ def _grant_chest_reward(
                     )
                     or 0
                 )
-                + qty
+                + quantidade
             )
 
             current.setdefault(
@@ -1319,7 +1363,7 @@ def _grant_chest_reward(
                 item_id
             ] = (
                 current
-                + qty
+                + quantidade
             )
 
         else:
@@ -1332,7 +1376,8 @@ def _grant_chest_reward(
                     item_id,
 
                 "quantity":
-                    qty,
+                    quantidade,
+
             }
 
         delivered_items.append({
@@ -1340,9 +1385,242 @@ def _grant_chest_reward(
             "item_id":
                 item_id,
 
+            "nome":
+                get_display_name(
+                    item_id
+                ),
+
             "quantity":
-                qty,
+                quantidade,
+
         })
+
+    # ========================================================
+    # 💰 SORTEAR OURO
+    # ========================================================
+
+    gold_config = reward.get(
+        "gold",
+        0
+    )
+
+    if isinstance(
+        gold_config,
+        dict
+    ):
+
+        gold_min = max(
+            0,
+            int(
+                gold_config.get(
+                    "min",
+                    0
+                )
+                or 0
+            )
+        )
+
+        gold_max = max(
+            gold_min,
+            int(
+                gold_config.get(
+                    "max",
+                    gold_min
+                )
+                or gold_min
+            )
+        )
+
+        gold = random.randint(
+            gold_min,
+            gold_max
+        )
+
+    else:
+
+        gold = max(
+            0,
+            int(
+                gold_config
+                or 0
+            )
+        )
+
+    # ========================================================
+    # 📦 DROPS NORMAIS
+    # ========================================================
+
+    drops = (
+        reward.get(
+            "drops",
+            []
+        )
+        or []
+    )
+
+    for drop in drops:
+
+        if not isinstance(
+            drop,
+            dict
+        ):
+            continue
+
+        item_id = str(
+            drop.get(
+                "item_id",
+                ""
+            )
+        )
+
+        try:
+
+            chance = float(
+                drop.get(
+                    "chance",
+                    0
+                )
+                or 0
+            )
+
+        except (
+            TypeError,
+            ValueError
+        ):
+
+            chance = 0.0
+
+        chance = max(
+            0.0,
+            min(
+                1.0,
+                chance
+            )
+        )
+
+        if random.random() > chance:
+            continue
+
+        quantidade_min = max(
+            1,
+            int(
+                drop.get(
+                    "min",
+                    1
+                )
+                or 1
+            )
+        )
+
+        quantidade_max = max(
+            quantidade_min,
+            int(
+                drop.get(
+                    "max",
+                    quantidade_min
+                )
+                or quantidade_min
+            )
+        )
+
+        quantidade = random.randint(
+            quantidade_min,
+            quantidade_max
+        )
+
+        adicionar_item(
+            item_id,
+            quantidade
+        )
+
+    # ========================================================
+    # 🔮 ROLL ESPECIAL DE RUNA
+    # ========================================================
+
+    rune_config = (
+        reward.get(
+            "rune_roll",
+            {}
+        )
+        or {}
+    )
+
+    if isinstance(
+        rune_config,
+        dict
+    ):
+
+        pool = [
+
+            str(item_id)
+
+            for item_id
+            in (
+                rune_config.get(
+                    "pool",
+                    []
+                )
+                or []
+            )
+
+            if item_id
+
+        ]
+
+        try:
+
+            rune_chance = float(
+                rune_config.get(
+                    "chance",
+                    0
+                )
+                or 0
+            )
+
+        except (
+            TypeError,
+            ValueError
+        ):
+
+            rune_chance = 0.0
+
+        rune_chance = max(
+            0.0,
+            min(
+                1.0,
+                rune_chance
+            )
+        )
+
+        if (
+            pool
+            and random.random()
+            <= rune_chance
+        ):
+
+            rune_id = random.choice(
+                pool
+            )
+
+            rune_quantity = max(
+                1,
+                int(
+                    rune_config.get(
+                        "quantity",
+                        1
+                    )
+                    or 1
+                )
+            )
+
+            adicionar_item(
+                rune_id,
+                rune_quantity
+            )
+
+    # ========================================================
+    # 💾 SALVAR
+    # ========================================================
 
     users_collection.update_one(
 
@@ -1353,30 +1631,43 @@ def _grant_chest_reward(
 
         {
             "$set": {
+
                 "inventory":
                     inventory
+
             },
 
             "$inc": {
+
                 "gold":
                     gold
+
             }
+
         }
 
     )
 
+    # ========================================================
+    # ✅ RESULTADO
+    # ========================================================
+
     return (
+
         True,
 
         {
+
             "gold":
                 gold,
 
             "items":
                 delivered_items,
+
         },
 
         None
+
     )
 
 

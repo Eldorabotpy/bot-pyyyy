@@ -206,6 +206,48 @@
 
             }
             // ================================================
+            // 📦 BAÚ 01 — FECHADO
+            // ================================================
+
+            if (
+                !scene.textures.exists(
+                    "dungeon_bau_01_fechado"
+                )
+            ) {
+
+                scene.load.image(
+
+                    "dungeon_bau_01_fechado",
+
+                    base
+                    + "bau_dungeon_01_fechado.png"
+
+                );
+
+            }
+
+
+            // ================================================
+            // 💰 BAÚ 01 — ABERTO
+            // ================================================
+
+            if (
+                !scene.textures.exists(
+                    "dungeon_bau_01_aberto"
+                )
+            ) {
+
+                scene.load.image(
+
+                    "dungeon_bau_01_aberto",
+
+                    base
+                    + "bau_dungeon_01_aberto.png"
+
+                );
+
+            }
+            // ================================================
             // 👹 MÍMICO — ANIMAÇÃO DO BAÚ
             // ================================================
 
@@ -266,6 +308,9 @@
                 new Map();
 
             this.chests =
+                new Map();
+
+            this.chestVisuals =
                 new Map();
 
 
@@ -351,6 +396,8 @@
             this.logicos.clear();
 
             this.chests.clear();
+
+            this.chestVisuals.clear();
         }
 
 
@@ -386,19 +433,139 @@
                 of layer.objects
             ) {
 
-                if (
-                    objectClass(obj)
-                    !==
-                    "dungeon_light_visual"
-                ) {
-                    continue;
-                }
+                const classe =
+                    objectClass(
+                        obj
+                    );
 
 
                 const props =
                     propsToObject(
                         obj
                     );
+
+
+                // ============================================
+                // 📦 VISUAL DO BAÚ
+                // ============================================
+
+                if (
+                    classe
+                    ===
+                    "dungeon_chest_visual"
+                ) {
+
+                    const chestId =
+                        String(
+
+                            props.chest_id
+                            || ""
+
+                        );
+
+
+                    const puzzle =
+                        String(
+
+                            props.puzzle
+                            || chestId
+
+                        );
+
+
+                    if (
+                        !chestId
+                    ) {
+
+                        console.warn(
+                            "[DUNGEON EVENT] visual de baú sem chest_id:",
+                            obj
+                        );
+
+                        continue;
+                    }
+
+
+                    const sprite =
+                        this.scene.add
+                            .image(
+
+                                Number(
+                                    obj.x
+                                    || 0
+                                ),
+
+                                Number(
+                                    obj.y
+                                    || 0
+                                ),
+
+                                "dungeon_bau_01_fechado"
+
+                            )
+
+                            .setOrigin(
+                                0,
+                                1
+                            )
+
+                            .setDisplaySize(
+
+                                Number(
+                                    obj.width
+                                    || 52
+                                ),
+
+                                Number(
+                                    obj.height
+                                    || 61
+                                )
+
+                            )
+
+                            .setDepth(
+                                9
+                            );
+
+
+                    this.chestVisuals.set(
+
+                        chestId,
+
+                        {
+
+                            chestId,
+
+                            puzzle,
+
+                            sprite,
+
+                            fechadoTexture:
+                                "dungeon_bau_01_fechado",
+
+                            abertoTexture:
+                                "dungeon_bau_01_aberto",
+
+                        }
+
+                    );
+
+
+                    continue;
+                }
+
+
+                // ============================================
+                // 💡 VISUAL DAS PEDRAS
+                // ============================================
+
+                if (
+                    classe
+                    !==
+                    "dungeon_light_visual"
+                ) {
+                    continue;
+                }
 
 
                 const lightId =
@@ -1545,6 +1712,37 @@
                             visual.indice
                         )
                     )
+
+                );
+
+            }
+            // ================================================
+            // 📦 ESTADO VISUAL DOS BAÚS
+            // ================================================
+
+            const bauAberto =
+                Boolean(
+                    estado.bau_aberto
+                );
+
+
+            for (
+                const visual
+                of this.chestVisuals.values()
+            ) {
+
+                if (
+                    !visual.sprite
+                ) {
+                    continue;
+                }
+
+
+                visual.sprite.setTexture(
+
+                    bauAberto
+                        ? visual.abertoTexture
+                        : visual.fechadoTexture
 
                 );
 
@@ -2733,7 +2931,7 @@
 
                             .map(
                                 i =>
-                                    `📦 ${i.quantity}x ${i.item_id}`
+                                    `📦 ${i.quantity}x ${i.nome || i.item_id}`
                             )
 
                             .join(
