@@ -24,10 +24,15 @@ class MapaScene extends Phaser.Scene {
 
         // Controle da confirmação de saída da dungeon.
         // Controle da confirmação de saída da dungeon.
+        // Controle da confirmação de saída da dungeon.
         this.confirmacaoTransicaoAberta = false;
         this.transicaoRecusadaId = null;
 
         window.__eldoraDungeonExitAberto = false;
+
+        // A nova instância não deve carregar referência
+        // do manager da dungeon anterior.
+        this.dungeonEventManager = null;
         // Configurações de origem e região[cite: 4]
         this.veioDeRespawn = data && data.isRespawn ? true : false;
         this.regiaoAtual = data.regiao || 'capital_eldora';
@@ -2702,21 +2707,55 @@ class MapaScene extends Phaser.Scene {
         }
 
 
-        this.scene.restart({
+        const spawnX =
+            Number(nasceX) * 32;
 
-            regiao:
-                destino,
+        const spawnY =
+            Number(nasceY) * 32;
 
-            skin:
-                this.skinAtiva,
 
-            spawnX:
-                Number(nasceX) * 32,
+        // Salva o destino correto antes de recriar o mapa.
+        localStorage.setItem(
+            "eldora_lastRegiao",
+            destino
+        );
 
-            spawnY:
-                Number(nasceY) * 32
+        localStorage.setItem(
+            "eldora_lastX",
+            String(spawnX)
+        );
 
-        });
+        localStorage.setItem(
+            "eldora_lastY",
+            String(spawnY)
+        );
+
+
+        const skinAtual =
+            this.skinAtiva;
+
+
+        // ================================================
+        // 🗺️ TROCA LIMPA DE REGIÃO
+        // ================================================
+        // Em vez de reiniciar a mesma Scene, recriamos
+        // o mapa inteiro. Isso limpa estados que ficaram
+        // da dungeon anterior.
+        // ================================================
+
+        this.time.delayedCall(
+            100,
+            () => {
+
+                iniciarMapa(
+                    destino,
+                    skinAtual,
+                    spawnX,
+                    spawnY
+                );
+
+            }
+        );
 
     }
 
