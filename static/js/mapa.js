@@ -23,8 +23,6 @@ class MapaScene extends Phaser.Scene {
         this.graficosProntos = false;
 
         // Controle da confirmação de saída da dungeon.
-        // Controle da confirmação de saída da dungeon.
-        // Controle da confirmação de saída da dungeon.
         this.confirmacaoTransicaoAberta = false;
         this.transicaoRecusadaId = null;
 
@@ -2731,31 +2729,44 @@ class MapaScene extends Phaser.Scene {
         );
 
 
-        const skinAtual =
-            this.skinAtiva;
+        // Fecha qualquer estado visual da saída.
+        window.__eldoraDungeonExitAberto =
+            false;
+
+
+        // Garante teclado liberado antes da troca.
+        if (
+            this.input?.keyboard
+        ) {
+
+            this.input.keyboard.enabled =
+                true;
+
+        }
 
 
         // ================================================
-        // 🗺️ TROCA LIMPA DE REGIÃO
+        // 🗺️ TROCA DE MAPA
         // ================================================
-        // Em vez de reiniciar a mesma Scene, recriamos
-        // o mapa inteiro. Isso limpa estados que ficaram
-        // da dungeon anterior.
+        // Reinicia somente a Scene atual.
+        // Não destrói o Phaser.Game inteiro.
         // ================================================
 
-        this.time.delayedCall(
-            100,
-            () => {
+        this.scene.restart({
 
-                iniciarMapa(
-                    destino,
-                    skinAtual,
-                    spawnX,
-                    spawnY
-                );
+            regiao:
+                String(destino),
 
-            }
-        );
+            skin:
+                this.skinAtiva,
+
+            spawnX:
+                spawnX,
+
+            spawnY:
+                spawnY
+
+        });
 
     }
 
