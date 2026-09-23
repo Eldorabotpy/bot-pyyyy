@@ -21,6 +21,10 @@ class MapaScene extends Phaser.Scene {
         this.isMoving = false;
         this.travadoNoPortal = true; // O jogador nasce ignorando portais
         this.graficosProntos = false;
+
+        // Controle da confirmação de saída da dungeon.
+        this.confirmacaoTransicaoAberta = false;
+        this.transicaoRecusadaId = null;
         // Configurações de origem e região[cite: 4]
         this.veioDeRespawn = data && data.isRespawn ? true : false;
         this.regiaoAtual = data.regiao || 'capital_eldora';
@@ -2589,60 +2593,704 @@ class MapaScene extends Phaser.Scene {
         this.verificarTransicoes();
     }
 
-    verificarTransicoes() {
-        // Se o personagem acabou de nascer ou já está mudando de cena, cancela a leitura do portal!
-        if (this.isDead || this.veioDeRespawn || this.travadoNoPortal) return;
+    // ========================================================
+    // 🚪 EXECUTAR TRANSIÇÃO DE MAPA
+    // ========================================================
 
-        const mapaContexto = this.make.tilemap({ key: this.regiaoAtual });
-        const camadaTransicoes = mapaContexto.getObjectLayer('Transicoes');
+    executarTransicaoMapa(
+        destino,
+        nasceX,
+        nasceY
+    ) {
 
-        if (camadaTransicoes && camadaTransicoes.objects) {
-            camadaTransicoes.objects.forEach(obj => {
-                let zona = new Phaser.Geom.Rectangle(obj.x, obj.y, obj.width, obj.height);
-                
-                if (Phaser.Geom.Rectangle.Contains(zona, this.player.x, this.player.y)) {
-                    
-                    let destino = null;
-                    let nasceX = 10; 
-                    let nasceY = 10; 
+        console.log(
+            `Viajando de ${this.regiaoAtual} para ${destino} ` +
+            `(Spawn: X=${nasceX}, Y=${nasceY})`
+        );
 
-                    if (obj.properties && Array.isArray(obj.properties)) {
-                        let propDestino = obj.properties.find(p => p.name === 'destino');
-                        let propX = obj.properties.find(p => p.name === 'nasce_x');
-                        let propY = obj.properties.find(p => p.name === 'nasce_y');
 
-                        if (propDestino) destino = propDestino.value;
-                        if (propX) nasceX = propX.value;
-                        if (propY) nasceY = propY.value;
+        const telaLoad =
+            document.getElementById(
+                'tela-carregamento'
+            );
+
+
+        if (
+            telaLoad
+        ) {
+
+            telaLoad.style.display =
+                'flex';
+
+            telaLoad.style.opacity =
+                '1';
+
+
+            if (
+                typeof window.atualizarCarregamento
+                ===
+                'function'
+            ) {
+
+                window.atualizarCarregamento(
+                    50,
+                    "Viajando para "
+                    + destino
+                    + "..."
+                );
+
+            }
+
+        }
+
+
+        // Trava absoluta para impedir loops.
+        this.travadoNoPortal =
+            true;
+
+        this.isMoving =
+            false;
+
+
+        if (
+            this.player?.body
+        ) {
+            this.player.body.stop();
+        }
+
+
+        this.scene.restart({
+
+            regiao:
+                destino,
+
+            skin:
+                this.skinAtiva,
+
+            spawnX:
+                Number(nasceX) * 32,
+
+            spawnY:
+                Number(nasceY) * 32
+
+        });
+
+    }
+
+
+    // ========================================================
+    // 🏰 CONFIRMAÇÃO PARA SAIR DA DUNGEON
+    // ========================================================
+
+    abrirConfirmacaoSaidaDungeon({
+        nomeDungeon,
+        aoConfirmar,
+        aoCancelar
+    }) {
+
+        const antigo =
+            document.getElementById(
+                'eldora-dungeon-exit-overlay'
+            );
+
+
+        if (
+            antigo
+        ) {
+            antigo.remove();
+        }
+
+
+        const overlay =
+            document.createElement(
+                'div'
+            );
+
+
+        overlay.id =
+            'eldora-dungeon-exit-overlay';
+
+
+        overlay.style.cssText = `
+            position: fixed;
+            inset: 0;
+            z-index: 100000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            box-sizing: border-box;
+            background: rgba(5, 10, 18, 0.78);
+            backdrop-filter: blur(4px);
+        `;
+
+
+        const caixa =
+            document.createElement(
+                'div'
+            );
+
+
+        caixa.style.cssText = `
+            width: min(360px, 92vw);
+            box-sizing: border-box;
+            padding: 24px 18px 18px;
+            border: 1px solid #c9a74f;
+            border-radius: 18px;
+            background:
+                linear-gradient(
+                    180deg,
+                    #1f2b3d 0%,
+                    #111923 100%
+                );
+            box-shadow:
+                0 18px 45px rgba(0, 0, 0, 0.55),
+                inset 0 0 0 1px rgba(255, 220, 120, 0.05);
+            text-align: center;
+            font-family: Arial, sans-serif;
+        `;
+
+
+        const icone =
+            document.createElement(
+                'div'
+            );
+
+
+        icone.textContent =
+            '🚪';
+
+
+        icone.style.cssText = `
+            width: 56px;
+            height: 56px;
+            margin: 0 auto 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid rgba(224, 188, 92, 0.45);
+            border-radius: 16px;
+            background: rgba(224, 188, 92, 0.08);
+            font-size: 27px;
+        `;
+
+
+        const titulo =
+            document.createElement(
+                'div'
+            );
+
+
+        titulo.textContent =
+            'DEIXAR AS CATACUMBAS?';
+
+
+        titulo.style.cssText = `
+            margin-bottom: 12px;
+            color: #f2d99b;
+            font-family: Cinzel, Georgia, serif;
+            font-size: 21px;
+            font-weight: 800;
+            letter-spacing: 0.6px;
+        `;
+
+
+        const mensagem =
+            document.createElement(
+                'div'
+            );
+
+
+        mensagem.textContent =
+            `Deseja realmente deixar ${nomeDungeon} ` +
+            `e retornar à Pradaria Inicial?`;
+
+
+        mensagem.style.cssText = `
+            margin: 0 auto 22px;
+            color: #cbd5e1;
+            font-size: 14px;
+            line-height: 1.55;
+        `;
+
+
+        const btnSair =
+            document.createElement(
+                'button'
+            );
+
+
+        btnSair.type =
+            'button';
+
+
+        btnSair.textContent =
+            '🚪 Sair das Catacumbas';
+
+
+        btnSair.style.cssText = `
+            width: 100%;
+            min-height: 46px;
+            margin-bottom: 10px;
+            border: 1px solid #e0b958;
+            border-radius: 12px;
+            background:
+                linear-gradient(
+                    180deg,
+                    #f2cf75 0%,
+                    #d7a93f 100%
+                );
+            color: #17120a;
+            font-size: 14px;
+            font-weight: 800;
+            cursor: pointer;
+        `;
+
+
+        const btnFicar =
+            document.createElement(
+                'button'
+            );
+
+
+        btnFicar.type =
+            'button';
+
+
+        btnFicar.textContent =
+            'Permanecer';
+
+
+        btnFicar.style.cssText = `
+            width: 100%;
+            min-height: 43px;
+            border: 1px solid #46556a;
+            border-radius: 12px;
+            background: #243145;
+            color: #e2e8f0;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+        `;
+
+
+        caixa.appendChild(
+            icone
+        );
+
+        caixa.appendChild(
+            titulo
+        );
+
+        caixa.appendChild(
+            mensagem
+        );
+
+        caixa.appendChild(
+            btnSair
+        );
+
+        caixa.appendChild(
+            btnFicar
+        );
+
+        overlay.appendChild(
+            caixa
+        );
+
+        document.body.appendChild(
+            overlay
+        );
+
+
+        window.__eldoraDungeonExitAberto =
+            true;
+
+
+        // Impede WASD enquanto a decisão estiver aberta.
+        if (
+            this.input?.keyboard
+        ) {
+
+            this.input.keyboard.enabled =
+                false;
+
+        }
+
+
+        const fechar =
+            confirmado => {
+
+                if (
+                    overlay.isConnected
+                ) {
+                    overlay.remove();
+                }
+
+
+                window.__eldoraDungeonExitAberto =
+                    false;
+
+
+                if (
+                    this.input?.keyboard
+                ) {
+
+                    this.input.keyboard.enabled =
+                        true;
+
+                }
+
+
+                if (
+                    confirmado
+                ) {
+
+                    if (
+                        typeof aoConfirmar
+                        ===
+                        'function'
+                    ) {
+                        aoConfirmar();
                     }
 
-                    if (destino && this.regiaoAtual !== destino) {
-                        console.log(`Viajando de ${this.regiaoAtual} para ${destino} (Spawn: X=${nasceX}, Y=${nasceY})`);
-                        
-                        let telaLoad = document.getElementById('tela-carregamento');
-                        if (telaLoad) {
-                            telaLoad.style.display = 'flex';
-                            telaLoad.style.opacity = '1';
-                            if (typeof window.atualizarCarregamento === 'function') {
-                                window.atualizarCarregamento(50, "Viajando para " + destino + "...");
-                            }
+                }
+
+                else {
+
+                    if (
+                        typeof aoCancelar
+                        ===
+                        'function'
+                    ) {
+                        aoCancelar();
+                    }
+
+                }
+
+            };
+
+
+        btnSair.addEventListener(
+            'click',
+            () => fechar(true)
+        );
+
+
+        btnFicar.addEventListener(
+            'click',
+            () => fechar(false)
+        );
+
+    }
+
+
+    // ========================================================
+    // 🌀 VERIFICAR TRANSIÇÕES
+    // ========================================================
+
+    verificarTransicoes() {
+
+        if (
+            this.isDead
+            ||
+            this.veioDeRespawn
+            ||
+            this.travadoNoPortal
+            ||
+            this.confirmacaoTransicaoAberta
+        ) {
+            return;
+        }
+
+
+        const mapaContexto =
+            this.make.tilemap({
+                key:
+                    this.regiaoAtual
+            });
+
+
+        const camadaTransicoes =
+            mapaContexto.getObjectLayer(
+                'Transicoes'
+            );
+
+
+        if (
+            !camadaTransicoes
+            ||
+            !Array.isArray(
+                camadaTransicoes.objects
+            )
+        ) {
+            return;
+        }
+
+
+        let dentroDeAlgumaTransicao =
+            false;
+
+
+        for (
+            const obj
+            of camadaTransicoes.objects
+        ) {
+
+            const zona =
+                new Phaser.Geom.Rectangle(
+                    obj.x,
+                    obj.y,
+                    obj.width,
+                    obj.height
+                );
+
+
+            const estaDentro =
+                Phaser.Geom.Rectangle.Contains(
+                    zona,
+                    this.player.x,
+                    this.player.y
+                );
+
+
+            if (
+                !estaDentro
+            ) {
+                continue;
+            }
+
+
+            dentroDeAlgumaTransicao =
+                true;
+
+
+            // Se escolheu permanecer, não abre
+            // novamente enquanto continuar na porta.
+            if (
+                this.transicaoRecusadaId
+                ===
+                obj.id
+            ) {
+                continue;
+            }
+
+
+            let destino =
+                null;
+
+            let nasceX =
+                10;
+
+            let nasceY =
+                10;
+
+            let confirmar =
+                false;
+
+            let nomeDungeon =
+                'as Catacumbas';
+
+
+            if (
+                obj.properties
+                &&
+                Array.isArray(
+                    obj.properties
+                )
+            ) {
+
+                const propDestino =
+                    obj.properties.find(
+                        p =>
+                            p.name
+                            ===
+                            'destino'
+                    );
+
+
+                const propX =
+                    obj.properties.find(
+                        p =>
+                            p.name
+                            ===
+                            'nasce_x'
+                    );
+
+
+                const propY =
+                    obj.properties.find(
+                        p =>
+                            p.name
+                            ===
+                            'nasce_y'
+                    );
+
+
+                const propConfirmar =
+                    obj.properties.find(
+                        p =>
+                            p.name
+                            ===
+                            'confirmar'
+                    );
+
+
+                const propNomeDungeon =
+                    obj.properties.find(
+                        p =>
+                            p.name
+                            ===
+                            'nome_dungeon'
+                    );
+
+
+                if (
+                    propDestino
+                ) {
+                    destino =
+                        propDestino.value;
+                }
+
+
+                if (
+                    propX
+                ) {
+                    nasceX =
+                        propX.value;
+                }
+
+
+                if (
+                    propY
+                ) {
+                    nasceY =
+                        propY.value;
+                }
+
+
+                if (
+                    propConfirmar
+                ) {
+
+                    confirmar =
+                        propConfirmar.value
+                        ===
+                        true;
+
+                }
+
+
+                if (
+                    propNomeDungeon
+                ) {
+
+                    nomeDungeon =
+                        String(
+                            propNomeDungeon.value
+                            ||
+                            nomeDungeon
+                        );
+
+                }
+
+            }
+
+
+            if (
+                !destino
+                ||
+                this.regiaoAtual
+                ===
+                destino
+            ) {
+                continue;
+            }
+
+
+            // ================================================
+            // 🚪 SAÍDA DE DUNGEON
+            // ================================================
+
+            if (
+                confirmar
+            ) {
+
+                this.confirmacaoTransicaoAberta =
+                    true;
+
+                this.isMoving =
+                    false;
+
+
+                if (
+                    this.player?.body
+                ) {
+                    this.player.body.stop();
+                }
+
+
+                this.abrirConfirmacaoSaidaDungeon({
+
+                    nomeDungeon,
+
+                    aoConfirmar:
+                        () => {
+
+                            this.confirmacaoTransicaoAberta =
+                                false;
+
+                            this.executarTransicaoMapa(
+                                destino,
+                                nasceX,
+                                nasceY
+                            );
+
+                        },
+
+                    aoCancelar:
+                        () => {
+
+                            this.confirmacaoTransicaoAberta =
+                                false;
+
+                            this.transicaoRecusadaId =
+                                obj.id;
+
                         }
 
-                        // Trava absoluta para impedir loops
-                        this.travadoNoPortal = true;
-                        this.isMoving = false;
-                        this.player.body.stop();
-                        
-                        this.scene.restart({
-                            regiao: destino, 
-                            skin: this.skinAtiva,
-                            spawnX: nasceX * 32, 
-                            spawnY: nasceY * 32
-                        });
-                    }
-                }
-            });
+                });
+
+
+                return;
+            }
+
+
+            // Transições normais continuam
+            // exatamente como funcionavam antes.
+            this.executarTransicaoMapa(
+                destino,
+                nasceX,
+                nasceY
+            );
+
+            return;
+
         }
+
+
+        // Se o jogador escolheu "Permanecer",
+        // precisa sair da área da porta antes
+        // de a pergunta poder aparecer novamente.
+        if (
+            !dentroDeAlgumaTransicao
+        ) {
+
+            this.transicaoRecusadaId =
+                null;
+
+        }
+
     }
 
     pararPersonagem() {
