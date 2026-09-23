@@ -23,8 +23,11 @@ class MapaScene extends Phaser.Scene {
         this.graficosProntos = false;
 
         // Controle da confirmação de saída da dungeon.
+        // Controle da confirmação de saída da dungeon.
         this.confirmacaoTransicaoAberta = false;
         this.transicaoRecusadaId = null;
+
+        window.__eldoraDungeonExitAberto = false;
         // Configurações de origem e região[cite: 4]
         this.veioDeRespawn = data && data.isRespawn ? true : false;
         this.regiaoAtual = data.regiao || 'capital_eldora';
@@ -2436,21 +2439,61 @@ class MapaScene extends Phaser.Scene {
     }
     
     update() {
-        if (window.BruxaPocoes?.aberta || window.__mercadoAberto || window.__guildaAberta || window.combateAbertoBloqueandoMapa || window.__eldoraDialogAberto || window.__oficinaRunasAberta) {
-            this.isMoving = false;
-            this.player?.body?.stop();
-            return;
-        }
+
+        // ==========================================
+        // 🖼️ PRIMEIRO FRAME DO NOVO MAPA
+        // ==========================================
+        // Isso PRECISA acontecer antes das travas
+        // de interface. Caso contrário, qualquer
+        // modal aberto pode prender a tela de loading.
+        // ==========================================
+
         if (!this.graficosProntos) {
-            this.graficosProntos = true; // Garante que isso só rode 1 vez
-            
-            // O jogo JÁ PINTOU o primeiro frame na tela! Agora sim tiramos o loading do HTML.
-            if (typeof window.finalizarCarregamento === 'function') {
+
+            this.graficosProntos = true;
+
+            if (
+                typeof window.finalizarCarregamento
+                === 'function'
+            ) {
+
                 window.finalizarCarregamento();
+
             }
-            
-            // Bônus Épico: O mapa vai clarear suavemente saindo do escuro para disfarçar qualquer piscar de imagem!
-            this.cameras.main.fadeIn(800, 0, 0, 0);
+
+            this.cameras.main.fadeIn(
+                800,
+                0,
+                0,
+                0
+            );
+
+        }
+
+
+        // ==========================================
+        // 🛑 INTERFACES QUE BLOQUEIAM O MAPA
+        // ==========================================
+
+        if (
+            window.BruxaPocoes?.aberta
+            ||
+            window.__mercadoAberto
+            ||
+            window.__guildaAberta
+            ||
+            window.combateAbertoBloqueandoMapa
+            ||
+            window.__eldoraDialogAberto
+            ||
+            window.__oficinaRunasAberta
+        ) {
+
+            this.isMoving = false;
+
+            this.player?.body?.stop();
+
+            return;
         }
 
         if (this.playerNameText) {
