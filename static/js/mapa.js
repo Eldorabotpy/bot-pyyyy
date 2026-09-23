@@ -265,10 +265,53 @@ class MapaScene extends Phaser.Scene {
             );
         }
 
-        if (map.tilesets.some(t => t.name === 'casas')) {
-            todosTilesets.push(
-                map.addTilesetImage('casas', 'tiles_casas')
+        // ==========================================
+        // 🏠 TILESETS CASAS
+        // ==========================================
+        // Alguns mapas possuem mais de um tileset
+        // chamado "casas", com firstgid diferentes.
+        // Precisamos ligar a imagem em TODOS eles.
+        // ==========================================
+
+        const tilesetsCasas =
+            map.tilesets.filter(
+                t => t.name === 'casas'
             );
+
+
+        if (
+            tilesetsCasas.length > 0
+            &&
+            this.textures.exists(
+                'tiles_casas'
+            )
+        ) {
+
+            const texturaCasas =
+                this.textures.get(
+                    'tiles_casas'
+                );
+
+
+            tilesetsCasas.forEach(
+                tileset => {
+
+                    tileset.setImage(
+                        texturaCasas
+                    );
+
+                    todosTilesets.push(
+                        tileset
+                    );
+
+                    console.log(
+                        '🏠 Tileset casas carregado:',
+                        tileset.firstgid
+                    );
+
+                }
+            );
+
         }
 
         if (map.tilesets.some(t => t.name === 'HPGLobbyTileset')) {
