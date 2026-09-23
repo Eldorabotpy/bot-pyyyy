@@ -3655,7 +3655,7 @@ class MapaScene extends Phaser.Scene {
     }
 
 
-     // ========================================================
+    // ========================================================
     // 🌀 VERIFICAR TRANSIÇÕES
     // ========================================================
 
@@ -3735,9 +3735,8 @@ class MapaScene extends Phaser.Scene {
                 true;
 
 
-            // Se escolheu permanecer,
-            // não abre novamente enquanto
-            // continuar dentro da mesma área.
+            // Se escolheu permanecer, não abre
+            // novamente enquanto continuar na porta.
             if (
                 this.transicaoRecusadaId
                 ===
@@ -3746,10 +3745,6 @@ class MapaScene extends Phaser.Scene {
                 continue;
             }
 
-
-            // ================================================
-            // 📦 VALORES PADRÃO
-            // ================================================
 
             let destino =
                 null;
@@ -3764,18 +3759,8 @@ class MapaScene extends Phaser.Scene {
                 false;
 
             let nomeDungeon =
-                'Masmorra';
+                'as Catacumbas';
 
-            let requerChave =
-                false;
-
-            let chaveQtd =
-                1;
-
-
-            // ================================================
-            // 🏷️ LER PROPRIEDADES DO TILED
-            // ================================================
 
             if (
                 obj.properties
@@ -3830,69 +3815,29 @@ class MapaScene extends Phaser.Scene {
                     );
 
 
-                const propRequerChave =
-                    obj.properties.find(
-                        p =>
-                            p.name
-                            ===
-                            'requer_chave'
-                    );
-
-
-                const propChaveQtd =
-                    obj.properties.find(
-                        p =>
-                            p.name
-                            ===
-                            'chave_qtd'
-                    );
-
-
-                // ============================================
-                // DESTINO
-                // ============================================
-
                 if (
                     propDestino
                 ) {
-
                     destino =
                         propDestino.value;
-
                 }
 
-
-                // ============================================
-                // SPAWN X
-                // ============================================
 
                 if (
                     propX
                 ) {
-
                     nasceX =
                         propX.value;
-
                 }
 
-
-                // ============================================
-                // SPAWN Y
-                // ============================================
 
                 if (
                     propY
                 ) {
-
                     nasceY =
                         propY.value;
-
                 }
 
-
-                // ============================================
-                // CONFIRMAÇÃO DE SAÍDA
-                // ============================================
 
                 if (
                     propConfirmar
@@ -3905,10 +3850,6 @@ class MapaScene extends Phaser.Scene {
 
                 }
 
-
-                // ============================================
-                // NOME DA DUNGEON
-                // ============================================
 
                 if (
                     propNomeDungeon
@@ -3923,49 +3864,8 @@ class MapaScene extends Phaser.Scene {
 
                 }
 
-
-                // ============================================
-                // EXIGE CHAVE?
-                // ============================================
-
-                if (
-                    propRequerChave
-                ) {
-
-                    requerChave =
-                        propRequerChave.value
-                        ===
-                        true;
-
-                }
-
-
-                // ============================================
-                // QUANTIDADE DE CHAVES
-                // ============================================
-
-                if (
-                    propChaveQtd
-                ) {
-
-                    chaveQtd =
-                        Math.max(
-                            1,
-                            Number(
-                                propChaveQtd.value
-                                ||
-                                1
-                            )
-                        );
-
-                }
-
             }
 
-
-            // ================================================
-            // 🚫 TRANSIÇÃO INVÁLIDA
-            // ================================================
 
             if (
                 !destino
@@ -3975,86 +3875,6 @@ class MapaScene extends Phaser.Scene {
                 destino
             ) {
                 continue;
-            }
-
-
-            // ================================================
-            // 🗝️ ENTRADA EM DUNGEON
-            // ================================================
-
-            if (
-                requerChave
-            ) {
-
-                this.confirmacaoTransicaoAberta =
-                    true;
-
-                this.isMoving =
-                    false;
-
-
-                if (
-                    this.player?.body
-                ) {
-
-                    this.player.body.stop();
-
-                }
-
-
-                this.abrirConfirmacaoEntradaDungeon({
-
-                    nomeDungeon:
-                        nomeDungeon,
-
-                    dungeonId:
-                        String(
-                            destino
-                        ),
-
-                    chaveQtd:
-                        chaveQtd,
-
-
-                    // ========================================
-                    // ✅ SERVIDOR AUTORIZOU
-                    // ========================================
-
-                    aoAutorizar:
-                        () => {
-
-                            this.confirmacaoTransicaoAberta =
-                                false;
-
-
-                            this.executarTransicaoMapa(
-                                destino,
-                                nasceX,
-                                nasceY
-                            );
-
-                        },
-
-
-                    // ========================================
-                    // 🚶 PERMANECER / SEM CHAVE / ERRO
-                    // ========================================
-
-                    aoCancelar:
-                        () => {
-
-                            this.confirmacaoTransicaoAberta =
-                                false;
-
-                            this.transicaoRecusadaId =
-                                obj.id;
-
-                        }
-
-                });
-
-
-                return;
             }
 
 
@@ -4076,9 +3896,7 @@ class MapaScene extends Phaser.Scene {
                 if (
                     this.player?.body
                 ) {
-
                     this.player.body.stop();
-
                 }
 
 
@@ -4086,13 +3904,11 @@ class MapaScene extends Phaser.Scene {
 
                     nomeDungeon,
 
-
                     aoConfirmar:
                         () => {
 
                             this.confirmacaoTransicaoAberta =
                                 false;
-
 
                             this.executarTransicaoMapa(
                                 destino,
@@ -4101,7 +3917,6 @@ class MapaScene extends Phaser.Scene {
                             );
 
                         },
-
 
                     aoCancelar:
                         () => {
@@ -4121,31 +3936,22 @@ class MapaScene extends Phaser.Scene {
             }
 
 
-            // ================================================
-            // 🗺️ TRANSIÇÃO NORMAL
-            // ================================================
-
+            // Transições normais continuam
+            // exatamente como funcionavam antes.
             this.executarTransicaoMapa(
                 destino,
                 nasceX,
                 nasceY
             );
 
-
             return;
 
         }
 
 
-        // ================================================
-        // 🔄 SAIU DA ÁREA DA TRANSIÇÃO
-        // ================================================
-        //
-        // Se apertou "Permanecer" ou estava sem chave,
-        // precisa sair da área e entrar novamente para
-        // a pergunta aparecer outra vez.
-        // ================================================
-
+        // Se o jogador escolheu "Permanecer",
+        // precisa sair da área da porta antes
+        // de a pergunta poder aparecer novamente.
         if (
             !dentroDeAlgumaTransicao
         ) {
@@ -4155,6 +3961,181 @@ class MapaScene extends Phaser.Scene {
 
         }
 
+    }
+
+    pararPersonagem() {
+        this.player.body.stop();
+        this.isMoving = false;
+        this.player.anims.stop();
+        this.player.setFrame(1);
+
+        localStorage.setItem("eldora_lastX", Math.round(this.player.x));
+        localStorage.setItem("eldora_lastY", Math.round(this.player.y));
+        localStorage.setItem("eldora_lastRegiao", this.regiaoAtual);
+
+        if (typeof socket !== 'undefined' && socket) {
+            socket.emit('mover', { 
+                x: Math.round(this.player.x), 
+                y: Math.round(this.player.y), 
+                skin: this.skinResolvida || this.skinAtiva 
+            });
+        }
+
+        const uid = localStorage.getItem("jogadorEldoraID");
+        if (uid) {
+            fetch('/api/save_position', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    user_id: uid,
+                    position: { x: Math.round(this.player.x), y: Math.round(this.player.y), regiao: this.regiaoAtual }
+                })
+            }).catch(()=>{}); 
+        }
+    }
+
+    gerarAnimacoes(skin) {
+        if (this.anims.exists('down_' + skin)) return;
+        this.anims.create({ key: 'down_' + skin, frames: this.anims.generateFrameNumbers(skin, { start: 0, end: 2 }), frameRate: 10, repeat: -1 });
+        this.anims.create({ key: 'left_' + skin, frames: this.anims.generateFrameNumbers(skin, { start: 3, end: 5 }), frameRate: 10, repeat: -1 });
+        this.anims.create({ key: 'right_' + skin, frames: this.anims.generateFrameNumbers(skin, { start: 6, end: 8 }), frameRate: 10, repeat: -1 });
+        this.anims.create({ key: 'up_' + skin, frames: this.anims.generateFrameNumbers(skin, { start: 9, end: 11 }), frameRate: 10, repeat: -1 });
+    }
+
+    tocarAnimacaoRenascimento() {
+        if (!this.player) return;
+
+        if (typeof window.AudioManager !== 'undefined') {
+            window.AudioManager.tocarSFX('som_spawn');
+        }
+
+        if (!this.anims.exists('anim_respawn')) {
+            this.anims.create({
+                key: 'anim_respawn',
+                frames: this.anims.generateFrameNumbers('circulo_magico', { start: 0, end: 15 }),
+                frameRate: 6,  
+                repeat: 0,     
+                hideOnComplete: true 
+            });
+        }
+
+        let circulo = this.add.sprite(this.player.x, this.player.y + 15, 'circulo_magico').setDepth(this.player.depth - 1);
+        circulo.setScale(2.5);
+        circulo.setBlendMode(Phaser.BlendModes.ADD); 
+        circulo.play('anim_respawn');
+
+        circulo.on('animationcomplete', () => {
+            circulo.destroy();
+        });
+
+        this.cameras.main.flash(1200, 255, 255, 255); 
+
+        let texto = this.add.text(this.player.x, this.player.y - 40, "RESSUSCITADO", {
+            fontFamily: 'Cinzel, Arial', fontSize: '14px', color: '#d946ef', stroke: '#000000', strokeThickness: 5, fontStyle: 'bold'
+        }).setOrigin(0.5).setDepth(this.player.depth + 20);
+
+        this.tweens.add({
+            targets: texto,
+            y: texto.y - 50,
+            alpha: 0,
+            duration: 3500, 
+            ease: 'Power1',
+            onComplete: () => texto.destroy()
+        });
+
+        this.tweens.add({
+            targets: this.player,
+            alpha: 0.3,
+            yoyo: true,
+            repeat: 7, 
+            duration: 350 
+        });
+        // 👇 ADICIONE ESTAS LINHAS AQUI 👇
+        // Isso força a interface a atualizar os anéis de HP/MP e ler a vida cheia do banco de dados
+        setTimeout(() => {
+            if (typeof window.carregarMeuPerfil === 'function') window.carregarMeuPerfil();
+            if (typeof window.atualizarHudCircular === 'function') window.atualizarHudCircular();
+        }, 500);
+    } 
+
+    iniciarFuneralNoLocal() {
+        // 🛡️ TRAVA DE SEGURANÇA: Impede que a função rode se o jogador já estiver morto
+        if (!this.player || this.isDead) return;
+
+        // Coordenadas de Resgate (Catedral de Eldora)
+        const resgateX = 55 * 32;
+        const resgateY = 13 * 32;
+
+        // 🛑 PARADA IMEDIATA DE MOVIMENTO E FÍSICA
+        this.isDead = true; // Ativa a trava de input imediatamente
+        this.isMoving = false; // Reseta o estado de caminhada do update
+        
+        if (this.player.body) {
+            this.player.body.stop(); // Para a inércia atual
+            this.player.body.setEnable(false); // Desativa a física para não ser empurrado por mobs
+        }
+
+        // 📢 MULTIPLAYER: Avisa o servidor para mostrar a lápide aos outros jogadores
+        if (typeof socket !== 'undefined' && socket) {
+            socket.emit('jogador_morreu', { 
+                x: Math.round(this.player.x), 
+                y: Math.round(this.player.y), 
+                nome: localStorage.getItem("jogadorEldoraNome") || "Um herói"
+            });
+        }
+
+        // Configurações visuais locais
+        this.player.setVisible(false);
+        if (this.playerNameText) this.playerNameText.setVisible(false);
+        this.cameras.main.stopFollow(); // Câmera trava no local da morte
+
+        // Cria a lápide localmente para o jogador
+        let tumulo = this.add.sprite(this.player.x, this.player.y, 'img_lapide')
+            .setOrigin(0.5, 1)
+            .setDepth(5) 
+            .setDisplaySize(28, 48);
+        
+        // Texto do cronômetro de ressurreição
+        let tempoRestante = 10;
+        let tempoTxt = this.add.text(this.player.x, this.player.y - 60, tempoRestante + "s", {
+            fontFamily: 'Cinzel, Arial', 
+            fontSize: '18px', 
+            color: '#ef4444', 
+            stroke: '#000', 
+            strokeThickness: 5, 
+            fontStyle: 'bold'
+        }).setOrigin(0.5).setDepth(this.player.depth + 1);
+        
+        // Evento de contagem regressiva
+        this.time.addEvent({
+            delay: 1000,
+            repeat: 9,
+            callback: () => {
+                tempoRestante--;
+                if (tempoRestante > 0) {
+                    tempoTxt.setText(tempoRestante + "s");
+                } else {
+                    // Limpeza de objetos temporários antes do restart
+                    tempoTxt.destroy(); 
+                    tumulo.destroy();
+                    
+                    // Salva a nova posição de respawn na memória local
+                    localStorage.setItem("eldora_lastX", resgateX);
+                    localStorage.setItem("eldora_lastY", resgateY);
+                    localStorage.setItem("eldora_lastRegiao", "capital_eldora");
+
+                    // Reinicia a cena garantindo o reset de todas as variáveis de trava
+                    this.scene.restart({
+                        regiao: 'capital_eldora',
+                        skin: this.skinAtiva,
+                        isRespawn: true, 
+                        spawnX: resgateX,
+                        spawnY: resgateY
+                    });
+                }
+            }
+        });
+        
     }
     // ==========================================
     // 🏷️ CRIADOR DE PLAQUINHAS DE NOME ESTILO RPG
