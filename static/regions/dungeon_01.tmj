@@ -4945,8 +4945,57 @@
          "tilewidth":32
         }, 
         {
+         "columns":0,
          "firstgid":10801,
-         "source":"dungeon_01_eventos.tsx"
+         "grid":
+            {
+             "height":1,
+             "orientation":"orthogonal",
+             "width":1
+            },
+         "margin":0,
+         "name":"dungeon_01_eventos",
+         "spacing":0,
+         "tilecount":6,
+         "tileheight":1254,
+         "tiles":[
+                {
+                 "id":0,
+                 "image":"..\/images\/tilesets\/pedra_amarela_off.png",
+                 "imageheight":741,
+                 "imagewidth":593
+                }, 
+                {
+                 "id":1,
+                 "image":"..\/images\/tilesets\/pedra_amarela_on.png",
+                 "imageheight":741,
+                 "imagewidth":593
+                }, 
+                {
+                 "id":2,
+                 "image":"..\/images\/tilesets\/pedra_azul_off.png",
+                 "imageheight":741,
+                 "imagewidth":593
+                }, 
+                {
+                 "id":3,
+                 "image":"..\/images\/tilesets\/pedra_azul_on.png",
+                 "imageheight":741,
+                 "imagewidth":593
+                }, 
+                {
+                 "id":4,
+                 "image":"..\/images\/tilesets\/bau_dungeon_01_aberto.png",
+                 "imageheight":1254,
+                 "imagewidth":1254
+                }, 
+                {
+                 "id":6,
+                 "image":"..\/images\/tilesets\/bau_dungeon_01_fechado.png",
+                 "imageheight":1254,
+                 "imagewidth":1254
+                }],
+         "tilewidth":1254
         }],
  "tilewidth":32,
  "type":"map",
