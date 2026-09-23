@@ -420,32 +420,47 @@ class MapaScene extends Phaser.Scene {
             let profundidade = 0;
 
             // ==========================================
-            // 🏰 PROFUNDIDADES DA DUNGEON
+            // 🏰 PROFUNDIDADES EXCLUSIVAS DA DUNGEON
             // ==========================================
-            if (l === 'fundo') {
-                profundidade = 0;
-            }
-            else if (l === 'chao') {
-                profundidade = 1;
-            }
-            else if (l === 'detalhes_chao') {
-                profundidade = 2;
-            }
-            else if (l === 'paredes') {
-                profundidade = 5;
-            }
-            else if (l === 'objetos') {
-                profundidade = 10;
+            if (
+                this.regiaoAtual === 'dungeon_01'
+            ) {
+
+                if (l === 'fundo') {
+                    profundidade = 0;
+                }
+                else if (l === 'chao') {
+                    profundidade = 1;
+                }
+                else if (l === 'detalhes_chao') {
+                    profundidade = 2;
+                }
+                else if (l === 'paredes') {
+                    profundidade = 5;
+                }
+                else if (l === 'objetos') {
+                    profundidade = 10;
+                }
+
             }
 
             // ==========================================
-            // 🏠 CASAS DOS MAPAS EXISTENTES
+            // 🌍 MAPAS NORMAIS
             // ==========================================
-            else if (
-                l === 'Casas' ||
-                l === 'casas'
-            ) {
-                profundidade = 10;
+            else {
+
+                // Mantém o comportamento antigo.
+                // Todas as camadas comuns ficam no mesmo
+                // depth e respeitam a ordem do Tiled/array.
+                profundidade = 0;
+
+                if (
+                    l === 'Casas' ||
+                    l === 'casas'
+                ) {
+                    profundidade = 10;
+                }
+
             }
 
             map.createLayer(
