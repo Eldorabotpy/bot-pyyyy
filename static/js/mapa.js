@@ -3761,6 +3761,11 @@ class MapaScene extends Phaser.Scene {
             let nomeDungeon =
                 'as Catacumbas';
 
+            let requerChave =
+                false;
+
+            let chaveQtd =
+                1;
 
             if (
                 obj.properties
@@ -3814,6 +3819,22 @@ class MapaScene extends Phaser.Scene {
                             'nome_dungeon'
                     );
 
+                const propRequerChave =
+                    obj.properties.find(
+                        p =>
+                            p.name
+                            ===
+                            'requer_chave'
+                    );
+
+
+                const propChaveQtd =
+                    obj.properties.find(
+                        p =>
+                            p.name
+                            ===
+                            'chave_qtd'
+                    );
 
                 if (
                     propDestino
@@ -3864,6 +3885,33 @@ class MapaScene extends Phaser.Scene {
 
                 }
 
+                if (
+                    propRequerChave
+                ) {
+
+                    requerChave =
+                        propRequerChave.value
+                        ===
+                        true;
+
+                }
+
+
+                if (
+                    propChaveQtd
+                ) {
+
+                    chaveQtd =
+                        Math.max(
+                            1,
+                            Number(
+                                propChaveQtd.value
+                                ||
+                                1
+                            )
+                        );
+
+                }                
             }
 
 
@@ -3875,6 +3923,76 @@ class MapaScene extends Phaser.Scene {
                 destino
             ) {
                 continue;
+            }
+
+            // ================================================
+            // 🗝️ ENTRADA EM DUNGEON COM CHAVE
+            // ================================================
+
+            if (
+                requerChave
+            ) {
+
+                this.confirmacaoTransicaoAberta =
+                    true;
+
+                this.isMoving =
+                    false;
+
+
+                if (
+                    this.player?.body
+                ) {
+
+                    this.player.body.stop();
+
+                }
+
+
+                this.abrirConfirmacaoEntradaDungeon({
+
+                    nomeDungeon:
+                        nomeDungeon,
+
+                    dungeonId:
+                        String(
+                            destino
+                        ),
+
+                    chaveQtd:
+                        chaveQtd,
+
+
+                    aoAutorizar:
+                        () => {
+
+                            this.confirmacaoTransicaoAberta =
+                                false;
+
+                            this.executarTransicaoMapa(
+                                destino,
+                                nasceX,
+                                nasceY
+                            );
+
+                        },
+
+
+                    aoCancelar:
+                        () => {
+
+                            this.confirmacaoTransicaoAberta =
+                                false;
+
+                            this.transicaoRecusadaId =
+                                obj.id;
+
+                        }
+
+                });
+
+
+                return;
             }
 
 
