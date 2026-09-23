@@ -148,6 +148,28 @@ CONSUMABLES_DATA = {
         "tradable": False,
     },
 
+    # ============================================================
+    # 🗝️ CHAVE UNIVERSAL DE MASMORRAS
+    # ============================================================
+
+    "chave_masmorra": {
+        "display_name": "Chave de Masmorra",
+        "emoji": "🗝️",
+
+        "type": "especial",
+        "category": "dungeon",
+
+        "description": (
+            "Uma chave encantada capaz de romper os selos "
+            "que protegem as masmorras de Eldora. "
+            "Uma unidade é consumida sempre que o aventureiro "
+            "entra em uma masmorra."
+        ),
+
+        "stackable": True,
+        "tradable": False,
+    },
+
     # --- ESPECIAIS / UTILITÁRIOS ---
     "pedra_de_aprimoramento": {
         "display_name": "Pedra de Aprimoramento",

@@ -2828,6 +2828,525 @@ class MapaScene extends Phaser.Scene {
 
     }
 
+    // ========================================================
+    // 🗝️ CONFIRMAÇÃO PARA ENTRAR NA DUNGEON
+    // ========================================================
+
+    abrirConfirmacaoEntradaDungeon({
+        nomeDungeon,
+        dungeonId,
+        chaveQtd = 1,
+        aoAutorizar,
+        aoCancelar
+    }) {
+
+        const antigo =
+            document.getElementById(
+                'eldora-dungeon-entry-overlay'
+            );
+
+
+        if (
+            antigo
+        ) {
+            antigo.remove();
+        }
+
+
+        const overlay =
+            document.createElement(
+                'div'
+            );
+
+
+        overlay.id =
+            'eldora-dungeon-entry-overlay';
+
+
+        overlay.style.cssText = `
+            position: fixed;
+            inset: 0;
+            z-index: 100000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            box-sizing: border-box;
+            background: rgba(5, 10, 18, 0.78);
+            backdrop-filter: blur(4px);
+        `;
+
+
+        const caixa =
+            document.createElement(
+                'div'
+            );
+
+
+        caixa.style.cssText = `
+            width: min(360px, 92vw);
+            box-sizing: border-box;
+            padding: 24px 18px 18px;
+            border: 1px solid #c9a74f;
+            border-radius: 18px;
+            background:
+                linear-gradient(
+                    180deg,
+                    #1f2b3d 0%,
+                    #111923 100%
+                );
+            box-shadow:
+                0 18px 45px rgba(0, 0, 0, 0.55),
+                inset 0 0 0 1px rgba(255, 220, 120, 0.05);
+            text-align: center;
+            font-family: Arial, sans-serif;
+        `;
+
+
+        const icone =
+            document.createElement(
+                'div'
+            );
+
+
+        icone.textContent =
+            '🗝️';
+
+
+        icone.style.cssText = `
+            width: 56px;
+            height: 56px;
+            margin: 0 auto 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid rgba(224, 188, 92, 0.45);
+            border-radius: 16px;
+            background: rgba(224, 188, 92, 0.08);
+            font-size: 27px;
+        `;
+
+
+        const titulo =
+            document.createElement(
+                'div'
+            );
+
+
+        titulo.textContent =
+            String(
+                nomeDungeon
+                || 'Masmorra'
+            ).toUpperCase();
+
+
+        titulo.style.cssText = `
+            margin-bottom: 12px;
+            color: #f2d99b;
+            font-family: Cinzel, Georgia, serif;
+            font-size: 20px;
+            font-weight: 800;
+            letter-spacing: 0.6px;
+        `;
+
+
+        const mensagem =
+            document.createElement(
+                'div'
+            );
+
+
+        mensagem.innerHTML =
+            `
+                Deseja entrar em
+                <strong>${nomeDungeon || 'esta masmorra'}</strong>?
+                <br><br>
+                🗝️ Será consumida
+                <strong>${Number(chaveQtd) || 1}
+                Chave de Masmorra</strong>.
+            `;
+
+
+        mensagem.style.cssText = `
+            margin: 0 auto 22px;
+            color: #cbd5e1;
+            font-size: 14px;
+            line-height: 1.55;
+        `;
+
+
+        const btnEntrar =
+            document.createElement(
+                'button'
+            );
+
+
+        btnEntrar.type =
+            'button';
+
+
+        btnEntrar.textContent =
+            '⚔️ Entrar';
+
+
+        btnEntrar.style.cssText = `
+            width: 100%;
+            min-height: 46px;
+            margin-bottom: 10px;
+            border: 1px solid #e0b958;
+            border-radius: 12px;
+            background:
+                linear-gradient(
+                    180deg,
+                    #f2cf75 0%,
+                    #d7a93f 100%
+                );
+            color: #17120a;
+            font-size: 14px;
+            font-weight: 800;
+            cursor: pointer;
+        `;
+
+
+        const btnFicar =
+            document.createElement(
+                'button'
+            );
+
+
+        btnFicar.type =
+            'button';
+
+
+        btnFicar.textContent =
+            'Permanecer';
+
+
+        btnFicar.style.cssText = `
+            width: 100%;
+            min-height: 43px;
+            border: 1px solid #46556a;
+            border-radius: 12px;
+            background: #243145;
+            color: #e2e8f0;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+        `;
+
+
+        caixa.appendChild(
+            icone
+        );
+
+        caixa.appendChild(
+            titulo
+        );
+
+        caixa.appendChild(
+            mensagem
+        );
+
+        caixa.appendChild(
+            btnEntrar
+        );
+
+        caixa.appendChild(
+            btnFicar
+        );
+
+        overlay.appendChild(
+            caixa
+        );
+
+        document.body.appendChild(
+            overlay
+        );
+
+
+        // ================================================
+        // 🔒 BLOQUEIA MOVIMENTO
+        // ================================================
+
+        if (
+            this.input?.keyboard
+        ) {
+
+            this.input.keyboard.enabled =
+                false;
+
+        }
+
+
+        let processando =
+            false;
+
+
+        const fechar =
+            autorizado => {
+
+                if (
+                    overlay.isConnected
+                ) {
+                    overlay.remove();
+                }
+
+
+                if (
+                    this.input?.keyboard
+                ) {
+
+                    this.input.keyboard.enabled =
+                        true;
+
+                }
+
+
+                if (
+                    autorizado
+                ) {
+
+                    if (
+                        typeof aoAutorizar
+                        ===
+                        'function'
+                    ) {
+                        aoAutorizar();
+                    }
+
+                }
+
+                else {
+
+                    if (
+                        typeof aoCancelar
+                        ===
+                        'function'
+                    ) {
+                        aoCancelar();
+                    }
+
+                }
+
+            };
+
+
+        // ================================================
+        // ⚔️ CONFIRMAR ENTRADA
+        // ================================================
+
+        btnEntrar.addEventListener(
+            'click',
+            async () => {
+
+                // Proteção contra clique duplo.
+                if (
+                    processando
+                ) {
+                    return;
+                }
+
+
+                processando =
+                    true;
+
+
+                btnEntrar.disabled =
+                    true;
+
+                btnFicar.disabled =
+                    true;
+
+
+                btnEntrar.textContent =
+                    '🗝️ Abrindo passagem...';
+
+
+                try {
+
+                    const userId =
+                        localStorage.getItem(
+                            'jogadorEldoraID'
+                        );
+
+
+                    if (
+                        !userId
+                    ) {
+
+                        throw new Error(
+                            'Jogador não identificado.'
+                        );
+
+                    }
+
+
+                    const response =
+                        await fetch(
+                            '/api/dungeon/entrada',
+                            {
+                                method:
+                                    'POST',
+
+                                headers: {
+                                    'Content-Type':
+                                        'application/json'
+                                },
+
+                                body:
+                                    JSON.stringify({
+                                        user_id:
+                                            userId,
+
+                                        dungeon_id:
+                                            dungeonId
+                                    })
+                            }
+                        );
+
+
+                    let data = {};
+
+                    try {
+
+                        data =
+                            await response.json();
+
+                    }
+                    catch (
+                        parseError
+                    ) {
+
+                        throw new Error(
+                            'Resposta inválida do servidor.'
+                        );
+
+                    }
+
+
+                    if (
+                        !response.ok
+                        ||
+                        !data.autorizado
+                    ) {
+
+                        const erro =
+                            data.mensagem
+                            ||
+                            data.error
+                            ||
+                            'Entrada não autorizada.';
+
+
+                        if (
+                            window.alertaEldora
+                        ) {
+
+                            window.alertaEldora(
+                                'Entrada bloqueada',
+                                erro,
+                                'aviso'
+                            );
+
+                        }
+
+                        else {
+
+                            alert(
+                                erro
+                            );
+
+                        }
+
+
+                        fechar(
+                            false
+                        );
+
+                        return;
+                    }
+
+
+                    // ========================================
+                    // ✅ CHAVE JÁ FOI CONSUMIDA NO SERVIDOR
+                    // ========================================
+
+                    fechar(
+                        true
+                    );
+
+                }
+
+                catch (
+                    erro
+                ) {
+
+                    console.error(
+                        'Erro ao entrar na dungeon:',
+                        erro
+                    );
+
+
+                    const mensagemErro =
+                        erro?.message
+                        ||
+                        'Não foi possível entrar na masmorra.';
+
+
+                    if (
+                        window.alertaEldora
+                    ) {
+
+                        window.alertaEldora(
+                            'Entrada da Masmorra',
+                            mensagemErro,
+                            'erro'
+                        );
+
+                    }
+
+                    else {
+
+                        alert(
+                            mensagemErro
+                        );
+
+                    }
+
+
+                    fechar(
+                        false
+                    );
+
+                }
+
+            }
+        );
+
+
+        // ================================================
+        // 🚶 PERMANECER
+        // ================================================
+
+        btnFicar.addEventListener(
+            'click',
+            () => {
+
+                if (
+                    processando
+                ) {
+                    return;
+                }
+
+
+                fechar(
+                    false
+                );
+
+            }
+        );
+
+    }
 
     // ========================================================
     // 🏰 CONFIRMAÇÃO PARA SAIR DA DUNGEON
@@ -3136,7 +3655,7 @@ class MapaScene extends Phaser.Scene {
     }
 
 
-    // ========================================================
+     // ========================================================
     // 🌀 VERIFICAR TRANSIÇÕES
     // ========================================================
 
@@ -3216,8 +3735,9 @@ class MapaScene extends Phaser.Scene {
                 true;
 
 
-            // Se escolheu permanecer, não abre
-            // novamente enquanto continuar na porta.
+            // Se escolheu permanecer,
+            // não abre novamente enquanto
+            // continuar dentro da mesma área.
             if (
                 this.transicaoRecusadaId
                 ===
@@ -3226,6 +3746,10 @@ class MapaScene extends Phaser.Scene {
                 continue;
             }
 
+
+            // ================================================
+            // 📦 VALORES PADRÃO
+            // ================================================
 
             let destino =
                 null;
@@ -3240,8 +3764,18 @@ class MapaScene extends Phaser.Scene {
                 false;
 
             let nomeDungeon =
-                'as Catacumbas';
+                'Masmorra';
 
+            let requerChave =
+                false;
+
+            let chaveQtd =
+                1;
+
+
+            // ================================================
+            // 🏷️ LER PROPRIEDADES DO TILED
+            // ================================================
 
             if (
                 obj.properties
@@ -3296,29 +3830,69 @@ class MapaScene extends Phaser.Scene {
                     );
 
 
+                const propRequerChave =
+                    obj.properties.find(
+                        p =>
+                            p.name
+                            ===
+                            'requer_chave'
+                    );
+
+
+                const propChaveQtd =
+                    obj.properties.find(
+                        p =>
+                            p.name
+                            ===
+                            'chave_qtd'
+                    );
+
+
+                // ============================================
+                // DESTINO
+                // ============================================
+
                 if (
                     propDestino
                 ) {
+
                     destino =
                         propDestino.value;
+
                 }
 
+
+                // ============================================
+                // SPAWN X
+                // ============================================
 
                 if (
                     propX
                 ) {
+
                     nasceX =
                         propX.value;
+
                 }
 
+
+                // ============================================
+                // SPAWN Y
+                // ============================================
 
                 if (
                     propY
                 ) {
+
                     nasceY =
                         propY.value;
+
                 }
 
+
+                // ============================================
+                // CONFIRMAÇÃO DE SAÍDA
+                // ============================================
 
                 if (
                     propConfirmar
@@ -3331,6 +3905,10 @@ class MapaScene extends Phaser.Scene {
 
                 }
 
+
+                // ============================================
+                // NOME DA DUNGEON
+                // ============================================
 
                 if (
                     propNomeDungeon
@@ -3345,8 +3923,49 @@ class MapaScene extends Phaser.Scene {
 
                 }
 
+
+                // ============================================
+                // EXIGE CHAVE?
+                // ============================================
+
+                if (
+                    propRequerChave
+                ) {
+
+                    requerChave =
+                        propRequerChave.value
+                        ===
+                        true;
+
+                }
+
+
+                // ============================================
+                // QUANTIDADE DE CHAVES
+                // ============================================
+
+                if (
+                    propChaveQtd
+                ) {
+
+                    chaveQtd =
+                        Math.max(
+                            1,
+                            Number(
+                                propChaveQtd.value
+                                ||
+                                1
+                            )
+                        );
+
+                }
+
             }
 
+
+            // ================================================
+            // 🚫 TRANSIÇÃO INVÁLIDA
+            // ================================================
 
             if (
                 !destino
@@ -3356,6 +3975,86 @@ class MapaScene extends Phaser.Scene {
                 destino
             ) {
                 continue;
+            }
+
+
+            // ================================================
+            // 🗝️ ENTRADA EM DUNGEON
+            // ================================================
+
+            if (
+                requerChave
+            ) {
+
+                this.confirmacaoTransicaoAberta =
+                    true;
+
+                this.isMoving =
+                    false;
+
+
+                if (
+                    this.player?.body
+                ) {
+
+                    this.player.body.stop();
+
+                }
+
+
+                this.abrirConfirmacaoEntradaDungeon({
+
+                    nomeDungeon:
+                        nomeDungeon,
+
+                    dungeonId:
+                        String(
+                            destino
+                        ),
+
+                    chaveQtd:
+                        chaveQtd,
+
+
+                    // ========================================
+                    // ✅ SERVIDOR AUTORIZOU
+                    // ========================================
+
+                    aoAutorizar:
+                        () => {
+
+                            this.confirmacaoTransicaoAberta =
+                                false;
+
+
+                            this.executarTransicaoMapa(
+                                destino,
+                                nasceX,
+                                nasceY
+                            );
+
+                        },
+
+
+                    // ========================================
+                    // 🚶 PERMANECER / SEM CHAVE / ERRO
+                    // ========================================
+
+                    aoCancelar:
+                        () => {
+
+                            this.confirmacaoTransicaoAberta =
+                                false;
+
+                            this.transicaoRecusadaId =
+                                obj.id;
+
+                        }
+
+                });
+
+
+                return;
             }
 
 
@@ -3377,7 +4076,9 @@ class MapaScene extends Phaser.Scene {
                 if (
                     this.player?.body
                 ) {
+
                     this.player.body.stop();
+
                 }
 
 
@@ -3385,11 +4086,13 @@ class MapaScene extends Phaser.Scene {
 
                     nomeDungeon,
 
+
                     aoConfirmar:
                         () => {
 
                             this.confirmacaoTransicaoAberta =
                                 false;
+
 
                             this.executarTransicaoMapa(
                                 destino,
@@ -3398,6 +4101,7 @@ class MapaScene extends Phaser.Scene {
                             );
 
                         },
+
 
                     aoCancelar:
                         () => {
@@ -3417,22 +4121,31 @@ class MapaScene extends Phaser.Scene {
             }
 
 
-            // Transições normais continuam
-            // exatamente como funcionavam antes.
+            // ================================================
+            // 🗺️ TRANSIÇÃO NORMAL
+            // ================================================
+
             this.executarTransicaoMapa(
                 destino,
                 nasceX,
                 nasceY
             );
 
+
             return;
 
         }
 
 
-        // Se o jogador escolheu "Permanecer",
-        // precisa sair da área da porta antes
-        // de a pergunta poder aparecer novamente.
+        // ================================================
+        // 🔄 SAIU DA ÁREA DA TRANSIÇÃO
+        // ================================================
+        //
+        // Se apertou "Permanecer" ou estava sem chave,
+        // precisa sair da área e entrar novamente para
+        // a pergunta aparecer outra vez.
+        // ================================================
+
         if (
             !dentroDeAlgumaTransicao
         ) {
@@ -3442,181 +4155,6 @@ class MapaScene extends Phaser.Scene {
 
         }
 
-    }
-
-    pararPersonagem() {
-        this.player.body.stop();
-        this.isMoving = false;
-        this.player.anims.stop();
-        this.player.setFrame(1);
-
-        localStorage.setItem("eldora_lastX", Math.round(this.player.x));
-        localStorage.setItem("eldora_lastY", Math.round(this.player.y));
-        localStorage.setItem("eldora_lastRegiao", this.regiaoAtual);
-
-        if (typeof socket !== 'undefined' && socket) {
-            socket.emit('mover', { 
-                x: Math.round(this.player.x), 
-                y: Math.round(this.player.y), 
-                skin: this.skinResolvida || this.skinAtiva 
-            });
-        }
-
-        const uid = localStorage.getItem("jogadorEldoraID");
-        if (uid) {
-            fetch('/api/save_position', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    user_id: uid,
-                    position: { x: Math.round(this.player.x), y: Math.round(this.player.y), regiao: this.regiaoAtual }
-                })
-            }).catch(()=>{}); 
-        }
-    }
-
-    gerarAnimacoes(skin) {
-        if (this.anims.exists('down_' + skin)) return;
-        this.anims.create({ key: 'down_' + skin, frames: this.anims.generateFrameNumbers(skin, { start: 0, end: 2 }), frameRate: 10, repeat: -1 });
-        this.anims.create({ key: 'left_' + skin, frames: this.anims.generateFrameNumbers(skin, { start: 3, end: 5 }), frameRate: 10, repeat: -1 });
-        this.anims.create({ key: 'right_' + skin, frames: this.anims.generateFrameNumbers(skin, { start: 6, end: 8 }), frameRate: 10, repeat: -1 });
-        this.anims.create({ key: 'up_' + skin, frames: this.anims.generateFrameNumbers(skin, { start: 9, end: 11 }), frameRate: 10, repeat: -1 });
-    }
-
-    tocarAnimacaoRenascimento() {
-        if (!this.player) return;
-
-        if (typeof window.AudioManager !== 'undefined') {
-            window.AudioManager.tocarSFX('som_spawn');
-        }
-
-        if (!this.anims.exists('anim_respawn')) {
-            this.anims.create({
-                key: 'anim_respawn',
-                frames: this.anims.generateFrameNumbers('circulo_magico', { start: 0, end: 15 }),
-                frameRate: 6,  
-                repeat: 0,     
-                hideOnComplete: true 
-            });
-        }
-
-        let circulo = this.add.sprite(this.player.x, this.player.y + 15, 'circulo_magico').setDepth(this.player.depth - 1);
-        circulo.setScale(2.5);
-        circulo.setBlendMode(Phaser.BlendModes.ADD); 
-        circulo.play('anim_respawn');
-
-        circulo.on('animationcomplete', () => {
-            circulo.destroy();
-        });
-
-        this.cameras.main.flash(1200, 255, 255, 255); 
-
-        let texto = this.add.text(this.player.x, this.player.y - 40, "RESSUSCITADO", {
-            fontFamily: 'Cinzel, Arial', fontSize: '14px', color: '#d946ef', stroke: '#000000', strokeThickness: 5, fontStyle: 'bold'
-        }).setOrigin(0.5).setDepth(this.player.depth + 20);
-
-        this.tweens.add({
-            targets: texto,
-            y: texto.y - 50,
-            alpha: 0,
-            duration: 3500, 
-            ease: 'Power1',
-            onComplete: () => texto.destroy()
-        });
-
-        this.tweens.add({
-            targets: this.player,
-            alpha: 0.3,
-            yoyo: true,
-            repeat: 7, 
-            duration: 350 
-        });
-        // 👇 ADICIONE ESTAS LINHAS AQUI 👇
-        // Isso força a interface a atualizar os anéis de HP/MP e ler a vida cheia do banco de dados
-        setTimeout(() => {
-            if (typeof window.carregarMeuPerfil === 'function') window.carregarMeuPerfil();
-            if (typeof window.atualizarHudCircular === 'function') window.atualizarHudCircular();
-        }, 500);
-    } 
-
-    iniciarFuneralNoLocal() {
-        // 🛡️ TRAVA DE SEGURANÇA: Impede que a função rode se o jogador já estiver morto
-        if (!this.player || this.isDead) return;
-
-        // Coordenadas de Resgate (Catedral de Eldora)
-        const resgateX = 55 * 32;
-        const resgateY = 13 * 32;
-
-        // 🛑 PARADA IMEDIATA DE MOVIMENTO E FÍSICA
-        this.isDead = true; // Ativa a trava de input imediatamente
-        this.isMoving = false; // Reseta o estado de caminhada do update
-        
-        if (this.player.body) {
-            this.player.body.stop(); // Para a inércia atual
-            this.player.body.setEnable(false); // Desativa a física para não ser empurrado por mobs
-        }
-
-        // 📢 MULTIPLAYER: Avisa o servidor para mostrar a lápide aos outros jogadores
-        if (typeof socket !== 'undefined' && socket) {
-            socket.emit('jogador_morreu', { 
-                x: Math.round(this.player.x), 
-                y: Math.round(this.player.y), 
-                nome: localStorage.getItem("jogadorEldoraNome") || "Um herói"
-            });
-        }
-
-        // Configurações visuais locais
-        this.player.setVisible(false);
-        if (this.playerNameText) this.playerNameText.setVisible(false);
-        this.cameras.main.stopFollow(); // Câmera trava no local da morte
-
-        // Cria a lápide localmente para o jogador
-        let tumulo = this.add.sprite(this.player.x, this.player.y, 'img_lapide')
-            .setOrigin(0.5, 1)
-            .setDepth(5) 
-            .setDisplaySize(28, 48);
-        
-        // Texto do cronômetro de ressurreição
-        let tempoRestante = 10;
-        let tempoTxt = this.add.text(this.player.x, this.player.y - 60, tempoRestante + "s", {
-            fontFamily: 'Cinzel, Arial', 
-            fontSize: '18px', 
-            color: '#ef4444', 
-            stroke: '#000', 
-            strokeThickness: 5, 
-            fontStyle: 'bold'
-        }).setOrigin(0.5).setDepth(this.player.depth + 1);
-        
-        // Evento de contagem regressiva
-        this.time.addEvent({
-            delay: 1000,
-            repeat: 9,
-            callback: () => {
-                tempoRestante--;
-                if (tempoRestante > 0) {
-                    tempoTxt.setText(tempoRestante + "s");
-                } else {
-                    // Limpeza de objetos temporários antes do restart
-                    tempoTxt.destroy(); 
-                    tumulo.destroy();
-                    
-                    // Salva a nova posição de respawn na memória local
-                    localStorage.setItem("eldora_lastX", resgateX);
-                    localStorage.setItem("eldora_lastY", resgateY);
-                    localStorage.setItem("eldora_lastRegiao", "capital_eldora");
-
-                    // Reinicia a cena garantindo o reset de todas as variáveis de trava
-                    this.scene.restart({
-                        regiao: 'capital_eldora',
-                        skin: this.skinAtiva,
-                        isRespawn: true, 
-                        spawnX: resgateX,
-                        spawnY: resgateY
-                    });
-                }
-            }
-        });
-        
     }
     // ==========================================
     // 🏷️ CRIADOR DE PLAQUINHAS DE NOME ESTILO RPG

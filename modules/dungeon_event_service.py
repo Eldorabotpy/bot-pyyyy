@@ -157,6 +157,360 @@ def _get_player(
 
 
 # ============================================================
+# 🗝️ CONSUMIR CHAVE DE MASMORRA
+# ============================================================
+
+def consumir_chave_masmorra(
+    *,
+    user_id: str,
+    dungeon_id: str
+) -> dict:
+
+    """
+    Verifica e consome 1 Chave de Masmorra.
+
+    Esta função deve ser chamada somente
+    quando o jogador confirma uma NOVA
+    entrada em uma dungeon.
+
+    Recarregar o jogo já estando dentro
+    da dungeon não deve chamar esta função.
+    """
+
+    with _EVENT_LOCK:
+
+        # ====================================================
+        # 🏰 VALIDAR DUNGEON
+        # ====================================================
+
+        dungeon_id = str(
+            dungeon_id
+            or ""
+        ).strip()
+
+        if not dungeon_id:
+
+            raise DungeonEventError(
+                "Dungeon inválida."
+            )
+
+
+        # ====================================================
+        # 👤 BUSCAR JOGADOR
+        # ====================================================
+
+        player = _get_player(
+            user_id
+        )
+
+
+        # ====================================================
+        # 📦 INVENTÁRIO
+        # ====================================================
+
+        inventory = (
+            player.get(
+                "inventory",
+                {}
+            )
+            or {}
+        )
+
+        if not isinstance(
+            inventory,
+            dict
+        ):
+
+            inventory = {}
+
+
+        item_id = (
+            "chave_masmorra"
+        )
+
+        item = inventory.get(
+            item_id
+        )
+
+
+        # ====================================================
+        # 🔎 QUANTIDADE ATUAL
+        # ====================================================
+
+        quantidade = 0
+
+
+        if isinstance(
+            item,
+            dict
+        ):
+
+            try:
+
+                quantidade = int(
+                    item.get(
+                        "quantity",
+                        0
+                    )
+                    or 0
+                )
+
+            except (
+                TypeError,
+                ValueError
+            ):
+
+                quantidade = 0
+
+
+        elif isinstance(
+            item,
+            int
+        ):
+
+            quantidade = max(
+                0,
+                int(item)
+            )
+
+
+        # ====================================================
+        # 🔒 SEM CHAVE
+        # ====================================================
+
+        if quantidade <= 0:
+
+            return {
+
+                "success":
+                    False,
+
+                "autorizado":
+                    False,
+
+                "acao":
+                    "sem_chave",
+
+                "dungeon_id":
+                    dungeon_id,
+
+                "item_id":
+                    item_id,
+
+                "quantidade":
+                    0,
+
+                "mensagem":
+                    (
+                        "Você precisa de 1 "
+                        "Chave de Masmorra "
+                        "para entrar."
+                    ),
+            }
+
+
+        nova_quantidade = (
+            quantidade - 1
+        )
+
+
+        # ====================================================
+        # 🗝️ CONSUMIR FORMATO NOVO
+        # ====================================================
+        #
+        # inventory:
+        #
+        # "chave_masmorra": {
+        #     "base_id": "chave_masmorra",
+        #     "quantity": 3
+        # }
+        # ====================================================
+
+        if isinstance(
+            item,
+            dict
+        ):
+
+            filtro = {
+
+                "_id":
+                    player["_id"],
+
+                (
+                    "inventory."
+                    "chave_masmorra."
+                    "quantity"
+                ):
+                    quantidade,
+            }
+
+
+            if nova_quantidade <= 0:
+
+                atualizacao = {
+
+                    "$unset": {
+
+                        (
+                            "inventory."
+                            "chave_masmorra"
+                        ):
+                            ""
+                    }
+                }
+
+            else:
+
+                atualizacao = {
+
+                    "$inc": {
+
+                        (
+                            "inventory."
+                            "chave_masmorra."
+                            "quantity"
+                        ):
+                            -1
+                    }
+                }
+
+
+        # ====================================================
+        # 🗝️ CONSUMIR FORMATO ANTIGO
+        # ====================================================
+        #
+        # inventory:
+        #
+        # "chave_masmorra": 3
+        # ====================================================
+
+        else:
+
+            filtro = {
+
+                "_id":
+                    player["_id"],
+
+                (
+                    "inventory."
+                    "chave_masmorra"
+                ):
+                    quantidade,
+            }
+
+
+            if nova_quantidade <= 0:
+
+                atualizacao = {
+
+                    "$unset": {
+
+                        (
+                            "inventory."
+                            "chave_masmorra"
+                        ):
+                            ""
+                    }
+                }
+
+            else:
+
+                atualizacao = {
+
+                    "$inc": {
+
+                        (
+                            "inventory."
+                            "chave_masmorra"
+                        ):
+                            -1
+                    }
+                }
+
+
+        # ====================================================
+        # 💾 ATUALIZAÇÃO ATÔMICA
+        # ====================================================
+
+        resultado = (
+            users_collection.update_one(
+                filtro,
+                atualizacao
+            )
+        )
+
+
+        # Se a quantidade mudou entre a leitura
+        # e a atualização, não autoriza a entrada.
+        if (
+            resultado.modified_count
+            != 1
+        ):
+
+            return {
+
+                "success":
+                    False,
+
+                "autorizado":
+                    False,
+
+                "acao":
+                    "inventario_alterado",
+
+                "dungeon_id":
+                    dungeon_id,
+
+                "item_id":
+                    item_id,
+
+                "quantidade":
+                    quantidade,
+
+                "mensagem":
+                    (
+                        "O inventário foi alterado. "
+                        "Tente entrar novamente."
+                    ),
+            }
+
+
+        # ====================================================
+        # ✅ ENTRADA AUTORIZADA
+        # ====================================================
+
+        return {
+
+            "success":
+                True,
+
+            "autorizado":
+                True,
+
+            "acao":
+                "entrada_autorizada",
+
+            "dungeon_id":
+                dungeon_id,
+
+            "item_id":
+                item_id,
+
+            "consumido":
+                1,
+
+            "quantidade":
+                nova_quantidade,
+
+            "mensagem":
+                (
+                    "1 Chave de Masmorra "
+                    "foi consumida."
+                ),
+        }
+
+
+# ============================================================
 # 📦 CAMINHO DO ESTADO
 # ============================================================
 

@@ -4,6 +4,7 @@ from flask import Blueprint, current_app, jsonify, request
 
 from modules.dungeon_event_service import (
     DungeonEventError,
+    consumir_chave_masmorra,
     interagir_bau,
     interagir_luz,
     obter_estado_evento,
@@ -21,7 +22,112 @@ def _motor_cacada():
         "SISTEMA_CACADA"
     )
 
+# ============================================================
+# 🗝️ ENTRADA EM DUNGEON
+# ============================================================
 
+@dungeon_events_bp.route(
+    "/api/dungeon/entrada",
+    methods=["POST"]
+)
+def dungeon_entry():
+    try:
+
+        data = (
+            request.get_json(
+                silent=True
+            )
+            or {}
+        )
+
+
+        user_id = data.get(
+            "user_id"
+        )
+
+        dungeon_id = data.get(
+            "dungeon_id"
+        )
+
+
+        # ====================================================
+        # 🔎 VALIDAÇÃO BÁSICA
+        # ====================================================
+
+        if not user_id:
+
+            return jsonify({
+                "success": False,
+                "autorizado": False,
+                "error": "Jogador não informado."
+            }), 400
+
+
+        if not dungeon_id:
+
+            return jsonify({
+                "success": False,
+                "autorizado": False,
+                "error": "Dungeon não informada."
+            }), 400
+
+
+        # ====================================================
+        # 🗝️ VERIFICA E CONSOME A CHAVE
+        # ====================================================
+
+        result = consumir_chave_masmorra(
+            user_id=user_id,
+            dungeon_id=dungeon_id,
+        )
+
+
+        # ====================================================
+        # ✅ AUTORIZADO
+        # ====================================================
+
+        if result.get(
+            "autorizado"
+        ):
+
+            return jsonify(
+                result
+            ), 200
+
+
+        # ====================================================
+        # 🔒 SEM CHAVE / NÃO AUTORIZADO
+        # ====================================================
+
+        return jsonify(
+            result
+        ), 403
+
+
+    except DungeonEventError as exc:
+
+        return jsonify({
+            "success": False,
+            "autorizado": False,
+            "error": str(exc)
+        }), 400
+
+
+    except Exception:
+
+        current_app.logger.exception(
+            "Erro ao autorizar entrada na dungeon"
+        )
+
+        return jsonify({
+            "success": False,
+            "autorizado": False,
+            "error": (
+                "Erro interno ao tentar entrar "
+                "na dungeon."
+            )
+        }), 500
+    
 @dungeon_events_bp.route(
     "/api/dungeon/evento/status",
     methods=["GET"]
