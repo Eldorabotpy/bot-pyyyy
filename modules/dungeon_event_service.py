@@ -427,7 +427,34 @@ def consumir_chave_masmorra(
                     }
                 }
 
+        # ====================================================
+        # ♻️ NOVA EXECUÇÃO DA DUNGEON
+        # ====================================================
+        #
+        # Cada entrada paga com uma nova Chave de Masmorra
+        # inicia uma execução nova.
+        #
+        # Apaga todos os eventos salvos da dungeon anterior:
+        # - baús
+        # - pedras
+        # - sequência
+        # - puzzle resolvido
+        # - estado do mímico
+        #
+        # O estado será recriado automaticamente ao carregar
+        # a dungeon.
+        # ====================================================
 
+        atualizacao.setdefault(
+            "$unset",
+            {}
+        )
+
+        atualizacao[
+            "$unset"
+        ][
+            f"{STATE_ROOT}.{dungeon_id}"
+        ] = ""
         # ====================================================
         # 💾 ATUALIZAÇÃO ATÔMICA
         # ====================================================
