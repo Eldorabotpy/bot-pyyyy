@@ -529,6 +529,18 @@
 
                             )
 
+                            .setFlip(
+
+                                Boolean(
+                                    obj.flippedHorizontal
+                                ),
+
+                                Boolean(
+                                    obj.flippedVertical
+                                )
+
+                            )
+
                             .setDepth(
                                 9
                             );
@@ -545,6 +557,16 @@
                             puzzle,
 
                             sprite,
+
+                            flipX:
+                                Boolean(
+                                    obj.flippedHorizontal
+                                ),
+
+                            flipY:
+                                Boolean(
+                                    obj.flippedVertical
+                                ),
 
                             fechadoTexture:
                                 "dungeon_bau_01_fechado",
@@ -2670,6 +2692,15 @@
             // 👹 COLOCA O MÍMICO SOBRE O BAÚ
             // ================================================
 
+            const chestVisual =
+                this.chestVisuals.get(
+                    String(
+                        chestId
+                        || ""
+                    )
+                );
+
+
             const mimic =
                 this.scene.add.sprite(
 
@@ -2686,6 +2717,18 @@
                     .setOrigin(
                         0.5,
                         0.65
+                    )
+
+                    .setFlip(
+
+                        Boolean(
+                            chestVisual?.flipX
+                        ),
+
+                        Boolean(
+                            chestVisual?.flipY
+                        )
+
                     )
 
                     .setDepth(

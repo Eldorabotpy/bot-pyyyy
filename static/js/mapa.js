@@ -427,10 +427,10 @@ class MapaScene extends Phaser.Scene {
             ) {
 
                 if (l === 'fundo') {
-                    profundidade = 0;
+                    profundidade = 1;
                 }
                 else if (l === 'chao') {
-                    profundidade = 1;
+                    profundidade = 0;
                 }
                 else if (l === 'detalhes_chao') {
                     profundidade = 2;
