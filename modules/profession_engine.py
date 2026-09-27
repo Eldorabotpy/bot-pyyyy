@@ -1372,6 +1372,42 @@ def _consume_repair_scroll(player_data: dict, base_id: str) -> bool:
     return False
 
 
+def _repair_durability(item: dict, info: dict) -> tuple[int, int]:
+    """O máximo da instância acompanha o desgaste e a barra exibida no perfil.
+
+    O catálogo serve apenas para itens antigos sem um máximo válido salvo.
+    Reparar não deve mudar a capacidade de um equipamento já existente.
+    """
+    raw = item.get("durability")
+    current, maximum = 0, 0
+    if isinstance(raw, (list, tuple)) and len(raw) >= 2:
+        current, maximum = raw[:2]
+    elif isinstance(raw, dict):
+        current = raw.get("current", raw.get("cur", 0))
+        maximum = raw.get("max", raw.get("mx", 0))
+    elif isinstance(raw, (int, float)):
+        current = raw
+    try:
+        maximum = max(0, int(maximum))
+    except (TypeError, ValueError):
+        maximum = 0
+    if not maximum:
+        catalog = info.get("durability")
+        if isinstance(catalog, (list, tuple)) and len(catalog) >= 2:
+            catalog = catalog[1]
+        elif isinstance(catalog, dict):
+            catalog = catalog.get("max", catalog.get("mx", 0))
+        try:
+            maximum = max(0, int(catalog or 0))
+        except (TypeError, ValueError):
+            maximum = 0
+    try:
+        current = max(0, int(current))
+    except (TypeError, ValueError):
+        current = 0
+    return current, maximum
+
+
 async def restore_durability(player_data: dict, unique_id: str) -> dict:
     inv = player_data.get('inventory', {}) or {}
     item = inv.get(unique_id)
@@ -1391,11 +1427,7 @@ async def restore_durability(player_data: dict, unique_id: str) -> dict:
 
     # Pega durabilidade máxima real
     info = _get_item_info(item.get("base_id"))
-    cur, max_d = _dur_tuple(item.get("durability"))
-    raw_dur = info.get("durability")
-    if isinstance(raw_dur, (list, tuple)) and len(raw_dur) >= 2: max_d = int(raw_dur[1])
-    elif isinstance(raw_dur, int): max_d = raw_dur
-    elif isinstance(raw_dur, dict): max_d = int(raw_dur.get("max", max_d))
+    cur, max_d = _repair_durability(item, info)
 
     if max_d <= 0 or cur >= max_d:
         return {"error": "Este equipamento já está com durabilidade máxima."}
@@ -1429,50 +1461,6 @@ async def restore_all_equipped_durability(player_data: dict) -> dict:
 
     if not isinstance(equip_tools, dict):
         equip_tools = {}
-
-    def _dur_tuple_local(raw):
-        cur, mx = 0, 0
-
-        if isinstance(raw, (list, tuple)) and len(raw) >= 2:
-            try:
-                cur, mx = int(raw[0]), int(raw[1])
-            except Exception:
-                cur, mx = 0, 0
-
-        elif isinstance(raw, dict):
-            try:
-                cur = int(raw.get("current", raw.get("cur", 0)))
-                mx = int(raw.get("max", raw.get("mx", 0)))
-            except Exception:
-                cur, mx = 0, 0
-
-        mx = max(0, mx)
-        cur = max(0, min(cur, mx)) if mx > 0 else max(0, cur)
-
-        return cur, mx
-
-    def _max_from_info_local(info: dict, fallback_max: int) -> int:
-        if not isinstance(info, dict):
-            return int(fallback_max or 0)
-
-        raw = info.get("durability")
-
-        if isinstance(raw, (list, tuple)) and len(raw) >= 2:
-            try:
-                return int(raw[1])
-            except Exception:
-                return int(fallback_max or 0)
-
-        if isinstance(raw, int):
-            return int(raw)
-
-        if isinstance(raw, dict):
-            try:
-                return int(raw.get("max", fallback_max or 0))
-            except Exception:
-                return int(fallback_max or 0)
-
-        return int(fallback_max or 0)
 
     def _set_dur_local(item: dict, cur: int, mx: int) -> None:
         item["durability"] = [int(max(0, min(cur, mx))), int(max(0, mx))]
@@ -1571,14 +1559,9 @@ async def restore_all_equipped_durability(player_data: dict) -> dict:
     need_repair = []
 
     for uid, inst in itens_equipados.items():
-        cur, mx = _dur_tuple_local(inst.get("durability"))
-
         base_id = inst.get("base_id")
         info = _get_item_info_local(base_id)
-        real_max = _max_from_info_local(info, mx)
-
-        if real_max <= 0 and mx > 0:
-            real_max = mx
+        cur, real_max = _repair_durability(inst, info)
 
         if real_max <= 0:
             continue
