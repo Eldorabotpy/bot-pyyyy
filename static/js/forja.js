@@ -552,6 +552,20 @@ function getPastasPossiveisItemForja(item) {
     return ["equipamentos", "ferramentas", "materiais"];
 }
 
+function caminhosCadastradosForja(item, ids) {
+    const caminhos = [];
+    for (const campo of ['image_url', 'icon_url', 'imagem', 'image', 'icon']) {
+        const valor = item?.[campo];
+        if (typeof valor !== 'string') continue;
+        if (/^https?:\/\//i.test(valor) || valor.startsWith('/static/')) caminhos.push(valor);
+        else if (/\.(png|webp|jpg|jpeg)$/i.test(valor) && valor.includes('/')) caminhos.push(GITHUB_BASE_ITENS + valor.replace(/^assets\/itens\//, ''));
+    }
+    for (const id of ids) {
+        for (const path of window.FORJA_IMAGENS?.[id] || []) caminhos.push(GITHUB_BASE_ITENS + path);
+    }
+    return caminhos;
+}
+
 function getCaminhosImagemItemForja(item) {
     const baseId = item?.base_id || item?.id || "";
     const idsPossiveis = [];
@@ -564,7 +578,7 @@ function getCaminhosImagemItemForja(item) {
     }
 
     const pastas = getPastasPossiveisItemForja(item);
-    const caminhos = [];
+    const caminhos = caminhosCadastradosForja(item, idsPossiveis);
 
     for (const pasta of pastas) {
         for (const id of idsPossiveis) {
@@ -630,7 +644,7 @@ function getCaminhosImagemMaterialForja(matId) {
     const info = FORJA_MAT_INFO[matId] || {};
     const pastas = info.pastas || ["materiais", "consumiveis", "equipamentos", "ferramentas"];
 
-    const caminhos = [];
+    const caminhos = caminhosCadastradosForja(null, [matId]);
 
     pastas.forEach(pasta => {
         caminhos.push(`${GITHUB_BASE_ITENS}${pasta}/${matId}.png`);
@@ -1116,7 +1130,7 @@ const ForjaUI = {
         let moved = false;
 
         container.addEventListener('wheel', (e) => {
-            if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+            if (window.innerWidth > 768 && Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
                 container.scrollLeft += e.deltaY;
                 e.preventDefault();
             }
@@ -1201,7 +1215,7 @@ const ForjaUI = {
                             this.setAttribute('data-tried', 'true');
                             this.src='${imgPath2}';
                         } else {
-                            this.src='/static/assets/box.png';
+                            this.onerror=null; this.src='/static/assets/box.png';
                         }
                     "
                 >
@@ -1240,6 +1254,12 @@ const ForjaUI = {
                 card.classList.add('active');
                 ForjaEngine.receitaSelecionada = id;
                 this.atualizarDetalhesDaReceita(id, r);
+            };
+            aplicarImagemItemForja(card.querySelector('img'), {...r, base_id: info.outputId});
+            card.tabIndex = 0;
+            card.setAttribute('role', 'button');
+            card.onkeydown = event => {
+                if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); card.click(); }
             };
             lista.appendChild(card);
         });
@@ -1286,6 +1306,11 @@ const ForjaUI = {
                 this.atualizarDetalhesMelhorar(item, corRaridade);
             };
 
+            card.tabIndex = 0;
+            card.setAttribute('role', 'button');
+            card.onkeydown = event => {
+                if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); card.click(); }
+            };
             lista.appendChild(card);
         });
     },
@@ -1450,6 +1475,11 @@ const ForjaUI = {
                 this.atualizarDetalhesDesmontar(item, corRaridade);
             };
 
+            card.tabIndex = 0;
+            card.setAttribute('role', 'button');
+            card.onkeydown = event => {
+                if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); card.click(); }
+            };
             lista.appendChild(card);
         });
     },
@@ -1496,15 +1526,8 @@ const ForjaUI = {
 
         const info = descobrirPastaForja(receita, id);
         const imgElement = document.getElementById('img-item-resultado');
-        imgElement.src = `${GITHUB_BASE_ITENS}${info.pasta}/${info.outputId}.png`; 
-        imgElement.setAttribute('data-tried', 'false');
-        imgElement.onerror = function() {
-            if (this.getAttribute('data-tried') !== 'true') {
-                this.setAttribute('data-tried', 'true');
-                this.src = `${GITHUB_BASE_ITENS}${info.pasta}/${info.idReceita}.png`;
-            } else { this.onerror = null; this.src = '/static/assets/box.png'; }
-        };
-        
+        aplicarImagemItemForja(imgElement, {...receita, base_id: info.outputId});
+
         const verificacao = ForjaEngine.verificarPermissaoDeCraft(receita);
         const grid = document.getElementById('lista-materiais');
 
