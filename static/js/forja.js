@@ -677,6 +677,9 @@ const ForjaEngine = {
     usarSigiloMelhoria: false,
 
     async iniciar() {
+        this.receitaSelecionada = null;
+        this.itemDesmontarSelecionado = null;
+        this.itemMelhorarSelecionado = null;
         try {
             const charId = localStorage.getItem("jogadorEldoraID");
 
@@ -687,6 +690,7 @@ const ForjaEngine = {
                 }
             );
 
+            if (!resReceitas.ok) throw new Error("Não foi possível carregar os projetos.");
             this.receitas = await resReceitas.json();
             this.unlocksGuilda = new Set();
 
@@ -810,7 +814,7 @@ const ForjaEngine = {
         if (!p || !p.inventario) return [];
         
         // 1. Pega os IDs únicos de tudo o que está equipado no corpo do personagem
-        const equipados = p.equipamentos.map(e => e.uid);
+        const equipados = [...(p.equipamentos || []).map(e => e.uid || e.id), ...Object.values(p.equipment_tools || {})];
         
         // 2. Filtra a mochila procurando o que é reciclável
         return p.inventario.filter(i => {
@@ -875,8 +879,7 @@ const ForjaEngine = {
         let ingredientes = receita.inputs || receita.ingredients || receita.materials || {};
 
         for (const [mat_id, qtd_req] of Object.entries(ingredientes)) {
-            const itemInv = inv.find(i => i.base_id === mat_id);
-            const qtdTenho = itemInv ? (itemInv.qtd || itemInv.quantity || 0) : 0;
+            const qtdTenho = getQtdMaterialInventario(mat_id);
 
             if (qtdTenho < qtd_req) {
                 podeCriar = false;
@@ -920,6 +923,9 @@ window.fecharUIForja = function() {
 };
 
 window.tentarIniciarForja = async function() {
+    if (ForjaEngine.enviando) return;
+    ForjaEngine.enviando = true;
+    try {
     const charId = localStorage.getItem("jogadorEldoraID");
     const btn = document.getElementById('btn-iniciar-forja');
     
@@ -1037,10 +1043,14 @@ window.tentarIniciarForja = async function() {
             btn.disabled = false; btn.innerText = "INICIAR FORJA";
         }
     } catch (e) { btn.disabled = false; btn.innerText = "INICIAR FORJA"; }
+    } finally { ForjaEngine.enviando = false; }
 };
 
 const ForjaUI = {
     renderizarTudo() {
+        document.getElementById("forja-container").classList.remove("forja-detalhando");
+        const busca = document.getElementById("forja-busca");
+        if (busca) busca.value = "";
         this.desenharAbas();
         
         if (ForjaEngine.profSelecionada === 'desmontar') {
@@ -1281,6 +1291,7 @@ const ForjaUI = {
     },
 
     atualizarDetalhesMelhorar(item, corRaridade) {
+        document.getElementById("forja-container").classList.add("forja-detalhando");
         const sidebar = document.querySelector('.forja-sidebar');
         const detailsView = document.querySelector('.forja-details-view');
 
@@ -1444,6 +1455,7 @@ const ForjaUI = {
     },
 
     atualizarDetalhesDaReceita(id, receita) {
+        document.getElementById("forja-container").classList.add("forja-detalhando");
         // 👇 FORÇA BRUTA: Limpa a injeção e devolve o layout dividido
         const sidebar = document.querySelector('.forja-sidebar');
         const detailsView = document.querySelector('.forja-details-view');
@@ -1557,6 +1569,7 @@ const ForjaUI = {
     },
     
     atualizarDetalhesDesmontar(item, corRaridade) {
+        document.getElementById("forja-container").classList.add("forja-detalhando");
         const sidebar = document.querySelector('.forja-sidebar');
         const detailsView = document.querySelector('.forja-details-view');
         if (sidebar && detailsView) {
@@ -2753,3 +2766,20 @@ window.iniciarAnimacaoTrabalho = function(duracaoSegundos, tipoAcao, metaTrabalh
         }
     }); 
 };
+window.filtrarProjetosForja = function(valor) {
+    const termo = normalizarProfissaoForja(valor);
+    document.querySelectorAll('#lista-receitas .recipe-card').forEach(card => {
+        card.hidden = !normalizarProfissaoForja(card.textContent).includes(termo);
+    });
+};
+window.voltarProjetosForja = function() {
+    ForjaUI.renderizarTudo();
+    document.getElementById('forja-busca')?.focus();
+};
+// Bloqueia propagação para controles globais sem impedir rolagem e botões.
+const painelForja = document.getElementById('forja-container');
+if (painelForja) {
+    ['pointerdown', 'pointerup', 'mousedown', 'mouseup', 'click', 'dblclick', 'touchstart', 'touchend', 'wheel'].forEach(tipo => {
+        painelForja.addEventListener(tipo, evento => evento.stopPropagation(), {passive: true});
+    });
+}

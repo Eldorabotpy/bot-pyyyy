@@ -3326,6 +3326,31 @@ def _forja_consume_by_base(inventory: dict, base_id: str, qty: int) -> bool:
     return restante <= 0
 
 
+def _forja_tempo_restante(state):
+    from datetime import datetime, timezone
+    import math
+    try:
+        finish = datetime.fromisoformat(str(state.get("finish_time", "")).replace("Z", "+00:00"))
+        if finish.tzinfo is None:
+            finish = finish.replace(tzinfo=timezone.utc)
+    except (TypeError, ValueError):
+        raise ValueError("Prazo da melhoria inválido. Atualize a forja.")
+    return max(0, math.ceil((finish - datetime.now(timezone.utc)).total_seconds()))
+
+
+def _forja_salvar_trabalho(original, inventory, state):
+    # Um segundo pedido não pode gastar ou concluir sobre o mesmo estado antigo.
+    query = {"_id": original["_id"]}
+    for field in ("inventory", "player_state", "equipment", "equipment_tools"):
+        query[field] = original[field] if field in original else {"$exists": False}
+    result = users_collection.update_one(query, {"$set": {"inventory": inventory, "player_state": state}})
+    if result.modified_count != 1:
+        return False
+    from modules.player.core import clear_player_cache
+    _run_async(clear_player_cache(str(original["_id"])))
+    return True
+
+
 @webapp_bp.route('/api/equipment/upgrade/start', methods=['POST'])
 def api_start_equipment_upgrade():
     try:
@@ -3345,6 +3370,8 @@ def api_start_equipment_upgrade():
         if not pdata:
             return jsonify({"success": False, "error": "Herói não encontrado."}), 404
 
+        from copy import deepcopy
+        original = deepcopy(pdata)
         estado = pdata.get("player_state", {}) or {}
         if estado.get("action") not in [None, "", "idle"]:
             return jsonify({"success": False, "error": "Você já está ocupado com outra ação."})
@@ -3481,13 +3508,8 @@ def api_start_equipment_upgrade():
             }
         }
 
-        users_collection.update_one(
-            {"_id": busca_id},
-            {"$set": {
-                "inventory": pdata["inventory"],
-                "player_state": pdata["player_state"]
-            }}
-        )
+        if not _forja_salvar_trabalho(original, pdata["inventory"], pdata["player_state"]):
+            return jsonify({"success": False, "error": "Seus itens ou trabalho mudaram. Atualize a forja antes de tentar novamente."}), 409
 
         return jsonify({
             "success": True,
@@ -3526,10 +3548,19 @@ def api_finish_equipment_upgrade():
         if not pdata:
             return jsonify({"success": False, "error": "Herói não encontrado."}), 404
 
+        from copy import deepcopy
+        original = deepcopy(pdata)
         state = pdata.get("player_state", {}) or {}
 
         if state.get("action") != "equipment_upgrading":
             return jsonify({"success": False, "error": "Nenhuma melhoria ativa."})
+
+        try:
+            restante = _forja_tempo_restante(state)
+        except ValueError as exc:
+            return jsonify({"success": False, "error": str(exc)}), 409
+        if restante:
+            return jsonify({"success": False, "error": f"Melhoria em andamento. Aguarde {restante}s.", "remaining_seconds": restante}), 409
 
         details = state.get("details", {}) or {}
         item_uid = details.get("item_uid")
@@ -3606,13 +3637,8 @@ def api_finish_equipment_upgrade():
         pdata["inventory"] = inventory
         pdata["player_state"] = {"action": "idle"}
 
-        users_collection.update_one(
-            {"_id": busca_id},
-            {"$set": {
-                "inventory": pdata["inventory"],
-                "player_state": pdata["player_state"]
-            }}
-        )
+        if not _forja_salvar_trabalho(original, pdata["inventory"], pdata["player_state"]):
+            return jsonify({"success": False, "error": "Seus itens ou trabalho mudaram. Atualize a forja antes de tentar novamente."}), 409
 
         player_atualizado = users_collection.find_one({"_id": busca_id})
 

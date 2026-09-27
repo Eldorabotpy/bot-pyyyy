@@ -1,5 +1,5 @@
 <div id="forja-container" class="eldora-modal" style="display:none;">
-    <div class="forja-modern-wrapper">
+    <div class="forja-modern-wrapper" role="dialog" aria-modal="true" aria-label="Forja de Eldora">
         <div class="forja-top-bar">
             <div class="forja-title-area">
                 <div class="forja-title-row">
@@ -7,11 +7,11 @@
 
                     <div>
                         <span class="forja-title">
-                            BANCADA DE TRABALHO
+                            FORJA DE ELDORA
                         </span>
 
                         <span class="forja-subtitle">
-                            Escolha um ofício e prepare sua criação
+                            Crie, aprimore e recupere seus equipamentos
                         </span>
                     </div>
                 </div>
@@ -31,10 +31,12 @@
 
         <div class="forja-main-content">
             <div class="forja-sidebar">
+                <label class="forja-search">Buscar projeto ou equipamento<input id="forja-busca" type="search" placeholder="Digite o nome…" oninput="filtrarProjetosForja(this.value)"></label>
                 <div id="lista-receitas" class="recipe-scroll-list"></div>
             </div>
 
             <div class="forja-details-view">
+                <button class="forja-back" onclick="voltarProjetosForja()">← Voltar aos projetos</button>
                 <div id="detalhe-vazio" class="view-placeholder">
                     <div class="icon-pulse">⚒️</div>
                     <p>Selecione um projeto na bancada</p>
@@ -80,7 +82,7 @@
    Interface otimizada para Telegram / WebView
    ========================================================= */
 
-.eldora-modal {
+#forja-container {
     position: fixed;
     inset: 0;
     width: 100%;
@@ -112,7 +114,7 @@
    CONTAINER PRINCIPAL
    ========================================================= */
 
-.forja-modern-wrapper {
+#forja-container .forja-modern-wrapper {
     width: 100%;
     max-width: 820px;
 
@@ -145,7 +147,7 @@
    CABEÇALHO
    ========================================================= */
 
-.forja-top-bar {
+#forja-container .forja-top-bar {
     flex-shrink: 0;
 
     display: flex;
@@ -166,18 +168,18 @@
     border-bottom: 1px solid rgba(202, 138, 4, 0.22);
 }
 
-.forja-title-area {
+#forja-container .forja-title-area {
     min-width: 0;
     flex: 1;
 }
 
-.forja-title-row {
+#forja-container .forja-title-row {
     display: flex;
     align-items: center;
     gap: 10px;
 }
 
-.forja-title-icon {
+#forja-container .forja-title-icon {
     width: 36px;
     height: 36px;
 
@@ -204,7 +206,7 @@
         inset 0 0 12px rgba(202, 138, 4, 0.12);
 }
 
-.forja-title {
+#forja-container .forja-title {
     display: block;
 
     color: #facc15;
@@ -221,7 +223,7 @@
         0 2px 4px rgba(0, 0, 0, 0.9);
 }
 
-.forja-subtitle {
+#forja-container .forja-subtitle {
     display: block;
 
     margin-top: 2px;
@@ -234,7 +236,7 @@
     letter-spacing: 0.15px;
 }
 
-.forja-close {
+#forja-container .forja-close {
     width: 36px;
     height: 36px;
 
@@ -265,13 +267,13 @@
         transform .18s ease;
 }
 
-.forja-close:hover {
+#forja-container .forja-close:hover {
     color: #fff;
     background: rgba(239, 68, 68, 0.22);
     border-color: rgba(248, 113, 113, 0.55);
 }
 
-.forja-close:active {
+#forja-container .forja-close:active {
     transform: scale(.94);
 }
 
@@ -280,7 +282,7 @@
    ABAS DE PROFISSÃO
    ========================================================= */
 
-.forja-nav-tabs {
+#forja-container .forja-nav-tabs {
     display: flex;
 
     gap: 7px;
@@ -310,20 +312,20 @@
     scrollbar-color: #854d0e transparent;
 }
 
-.forja-nav-tabs::-webkit-scrollbar {
+#forja-container .forja-nav-tabs::-webkit-scrollbar {
     height: 3px;
 }
 
-.forja-nav-tabs::-webkit-scrollbar-track {
+#forja-container .forja-nav-tabs::-webkit-scrollbar-track {
     background: transparent;
 }
 
-.forja-nav-tabs::-webkit-scrollbar-thumb {
+#forja-container .forja-nav-tabs::-webkit-scrollbar-thumb {
     background: #854d0e;
     border-radius: 10px;
 }
 
-.aba-forja-btn {
+#forja-container .aba-forja-btn {
     min-width: max-content;
 
     flex: 0 0 auto;
@@ -357,16 +359,16 @@
         box-shadow .16s ease;
 }
 
-.aba-forja-btn:hover {
+#forja-container .aba-forja-btn:hover {
     color: #f8fafc;
     border-color: rgba(250, 204, 21, .55);
 }
 
-.aba-forja-btn:active {
+#forja-container .aba-forja-btn:active {
     transform: scale(.97);
 }
 
-.aba-forja-btn.active {
+#forja-container .aba-forja-btn.active {
     color: #fff;
 
     border-color: #fb923c;
@@ -388,7 +390,7 @@
    CORPO
    ========================================================= */
 
-.forja-main-content {
+#forja-container .forja-main-content {
     display: flex;
 
     flex: 1;
@@ -402,7 +404,7 @@
    LISTA DE RECEITAS
    ========================================================= */
 
-.forja-sidebar {
+#forja-container .forja-sidebar {
     width: 35%;
     min-width: 225px;
     max-width: 290px;
@@ -422,7 +424,7 @@
     border-right: 1px solid rgba(51, 65, 85, 0.58);
 }
 
-.recipe-scroll-list {
+#forja-container .recipe-scroll-list {
     flex: 1;
 
     min-height: 0;
@@ -435,16 +437,16 @@
     scrollbar-color: #475569 transparent;
 }
 
-.recipe-scroll-list::-webkit-scrollbar {
+#forja-container .recipe-scroll-list::-webkit-scrollbar {
     width: 4px;
 }
 
-.recipe-scroll-list::-webkit-scrollbar-thumb {
+#forja-container .recipe-scroll-list::-webkit-scrollbar-thumb {
     background: #475569;
     border-radius: 10px;
 }
 
-.recipe-card {
+#forja-container .recipe-card {
     position: relative;
 
     display: flex;
@@ -481,7 +483,7 @@
         box-shadow .15s ease;
 }
 
-.recipe-card:hover {
+#forja-container .recipe-card:hover {
     border-color: rgba(202, 138, 4, 0.55);
 
     background:
@@ -492,7 +494,7 @@
         );
 }
 
-.recipe-card.active {
+#forja-container .recipe-card.active {
     border-color: #f97316;
 
     background:
@@ -507,11 +509,11 @@
         inset 3px 0 0 #f97316;
 }
 
-.recipe-card:active {
+#forja-container .recipe-card:active {
     transform: scale(.985);
 }
 
-.card-icon {
+#forja-container .card-icon {
     width: 38px;
     height: 38px;
 
@@ -531,7 +533,7 @@
         drop-shadow(0 3px 5px rgba(0, 0, 0, 0.85));
 }
 
-.recipe-name {
+#forja-container .recipe-name {
     min-width: 0;
 
     flex: 1;
@@ -560,7 +562,7 @@
    DETALHES
    ========================================================= */
 
-.forja-details-view {
+#forja-container .forja-details-view {
     flex: 1;
 
     min-width: 0;
@@ -585,16 +587,16 @@
     scrollbar-color: #475569 transparent;
 }
 
-.forja-details-view::-webkit-scrollbar {
+#forja-container .forja-details-view::-webkit-scrollbar {
     width: 4px;
 }
 
-.forja-details-view::-webkit-scrollbar-thumb {
+#forja-container .forja-details-view::-webkit-scrollbar-thumb {
     background: #475569;
     border-radius: 10px;
 }
 
-.view-placeholder {
+#forja-container .view-placeholder {
     margin: auto;
 
     padding: 25px;
@@ -604,7 +606,7 @@
     color: #64748b;
 }
 
-.view-placeholder .icon-pulse {
+#forja-container .view-placeholder .icon-pulse {
     margin-bottom: 10px;
 
     font-size: 2.6rem;
@@ -612,14 +614,14 @@
     opacity: .55;
 }
 
-.view-placeholder p {
+#forja-container .view-placeholder p {
     margin: 0;
 
     font-size: .84rem;
     font-weight: 600;
 }
 
-.active-recipe-view {
+#forja-container .active-recipe-view {
     display: flex;
     flex-direction: column;
 
@@ -631,7 +633,7 @@
    ITEM SELECIONADO
    ========================================================= */
 
-.item-header-display {
+#forja-container .item-header-display {
     position: relative;
 
     margin-bottom: 12px;
@@ -651,7 +653,7 @@
         );
 }
 
-.item-image-frame {
+#forja-container .item-image-frame {
     width: 76px;
     height: 76px;
 
@@ -754,7 +756,7 @@
    TAGS
    ========================================================= */
 
-.recipe-tags {
+#forja-container .recipe-tags {
     display: flex;
     justify-content: center;
 
@@ -767,7 +769,7 @@
     color: #cbd5e1;
 }
 
-.recipe-tags span {
+#forja-container .recipe-tags span {
     padding: 4px 8px;
 
     border: 1px solid rgba(71, 85, 105, .48);
@@ -783,7 +785,7 @@
    MATERIAIS
    ========================================================= */
 
-.requirements-container {
+#forja-container .requirements-container {
     flex: 1;
 
     margin-bottom: 10px;
@@ -796,7 +798,7 @@
     background: rgba(2, 6, 23, .34);
 }
 
-.section-label {
+#forja-container .section-label {
     display: flex;
     align-items: center;
 
@@ -812,7 +814,7 @@
     text-transform: uppercase;
 }
 
-.section-label::before {
+#forja-container .section-label::before {
     content: "📦";
 
     margin-right: 6px;
@@ -820,7 +822,7 @@
     font-size: .9rem;
 }
 
-.materials-grid {
+#forja-container .materials-grid {
     display: grid;
 
     grid-template-columns:
@@ -832,7 +834,7 @@
     gap: 6px;
 }
 
-.mat-pill {
+#forja-container .mat-pill {
     min-width: 0;
 
     padding: 7px 9px;
@@ -854,11 +856,11 @@
         );
 }
 
-.mat-pill:not(.missing) {
+#forja-container .mat-pill:not(.missing) {
     border-color: rgba(34, 197, 94, .22);
 }
 
-.mat-pill.missing {
+#forja-container .mat-pill.missing {
     border-color: rgba(239, 68, 68, .6);
 
     background:
@@ -869,7 +871,7 @@
         );
 }
 
-.mat-info {
+#forja-container .mat-info {
     min-width: 0;
 
     display: flex;
@@ -878,7 +880,7 @@
     gap: 7px;
 }
 
-.mat-info img {
+#forja-container .mat-info img {
     flex-shrink: 0;
 
     width: 26px !important;
@@ -893,7 +895,7 @@
     background: rgba(2, 6, 23, .5);
 }
 
-.mat-info span {
+#forja-container .mat-info span {
     min-width: 0;
 
     color: #dbeafe;
@@ -907,7 +909,7 @@
     white-space: nowrap;
 }
 
-.mat-pill b {
+#forja-container .mat-pill b {
     flex-shrink: 0;
 
     color: #86efac;
@@ -916,7 +918,7 @@
     font-weight: 900;
 }
 
-.mat-pill.missing b {
+#forja-container .mat-pill.missing b {
     color: #fca5a5;
 }
 
@@ -925,7 +927,7 @@
    BOTÃO PRINCIPAL
    ========================================================= */
 
-.btn-forge-action {
+#forja-container .btn-forge-action {
     position: sticky;
     bottom: 0;
 
@@ -971,7 +973,7 @@
         box-shadow .15s ease;
 }
 
-.btn-forge-action:hover:not(:disabled) {
+#forja-container .btn-forge-action:hover:not(:disabled) {
     filter: brightness(1.08);
 
     box-shadow:
@@ -979,11 +981,11 @@
         inset 0 1px 0 rgba(255, 255, 255, .2);
 }
 
-.btn-forge-action:active:not(:disabled) {
+#forja-container .btn-forge-action:active:not(:disabled) {
     transform: scale(.985);
 }
 
-.btn-forge-action:disabled {
+#forja-container .btn-forge-action:disabled {
     color: #94a3b8;
 
     border-color: #334155;
@@ -1009,12 +1011,12 @@
 
 @media (max-width: 768px) {
 
-    .eldora-modal {
+    #forja-container {
         padding: 7px;
         align-items: center;
     }
 
-    .forja-modern-wrapper {
+    #forja-container .forja-modern-wrapper {
         width: 100%;
 
         height: calc(100dvh - 14px);
@@ -1023,49 +1025,49 @@
         border-radius: 14px;
     }
 
-    .forja-top-bar {
+    #forja-container .forja-top-bar {
         padding: 10px 11px;
     }
 
-    .forja-title-icon {
+    #forja-container .forja-title-icon {
         width: 32px;
         height: 32px;
 
         font-size: 16px;
     }
 
-    .forja-title {
+    #forja-container .forja-title {
         font-size: .84rem;
     }
 
-    .forja-subtitle {
+    #forja-container .forja-subtitle {
         font-size: .59rem;
     }
 
-    .forja-close {
+    #forja-container .forja-close {
         width: 32px;
         height: 32px;
 
         font-size: 1.2rem;
     }
 
-    .forja-nav-tabs {
+    #forja-container .forja-nav-tabs {
         padding: 8px 9px;
 
         gap: 6px;
     }
 
-    .aba-forja-btn {
+    #forja-container .aba-forja-btn {
         padding: 7px 12px;
 
         font-size: .68rem;
     }
 
-    .forja-main-content {
+    #forja-container .forja-main-content {
         flex-direction: column;
     }
 
-    .forja-sidebar {
+    #forja-container .forja-sidebar {
         width: 100%;
         min-width: 0;
         max-width: none;
@@ -1077,20 +1079,20 @@
         border-bottom: 1px solid rgba(51, 65, 85, .58);
     }
 
-    .forja-sidebar.forja-sidebar-compacta {
+    #forja-container .forja-sidebar.forja-sidebar-compacta {
         height: 22%;
         min-height: 90px;
     }
 
-    .forja-sidebar.forja-sidebar-compacta + .forja-details-view {
+    #forja-container .forja-sidebar.forja-sidebar-compacta + .forja-details-view {
         height: 78%;
     }
 
-    .recipe-scroll-list {
+    #forja-container .recipe-scroll-list {
         padding: 7px;
     }
 
-    .recipe-card {
+    #forja-container .recipe-card {
         min-height: 48px;
 
         padding: 6px 8px;
@@ -1098,16 +1100,16 @@
         margin-bottom: 5px;
     }
 
-    .card-icon {
+    #forja-container .card-icon {
         width: 34px;
         height: 34px;
     }
 
-    .recipe-name {
+    #forja-container .recipe-name {
         font-size: .76rem;
     }
 
-    .forja-details-view {
+    #forja-container .forja-details-view {
         height: 66%;
 
         padding: 9px 9px 70px 9px;
@@ -1115,13 +1117,13 @@
         scroll-padding-bottom: 70px;
     }
 
-    .item-header-display {
+    #forja-container .item-header-display {
         margin-bottom: 8px;
 
         padding: 8px;
     }
 
-    .item-image-frame {
+    #forja-container .item-image-frame {
         width: 58px;
         height: 58px;
 
@@ -1146,58 +1148,58 @@
         font-size: .6rem !important;
     }
 
-    .recipe-tags {
+    #forja-container .recipe-tags {
         gap: 5px;
 
         font-size: .62rem;
     }
 
-    .recipe-tags span {
+    #forja-container .recipe-tags span {
         padding: 3px 6px;
     }
 
-    .requirements-container {
+    #forja-container .requirements-container {
         margin-bottom: 8px;
 
         padding: 8px;
     }
 
-    .section-label {
+    #forja-container .section-label {
         margin-bottom: 6px;
 
         font-size: .62rem;
     }
 
-    .materials-grid {
+    #forja-container .materials-grid {
         grid-template-columns: 1fr 1fr;
 
         gap: 5px;
     }
 
-    .mat-pill {
+    #forja-container .mat-pill {
         padding: 6px 7px;
 
         border-radius: 8px;
     }
 
-    .mat-info {
+    #forja-container .mat-info {
         gap: 5px;
     }
 
-    .mat-info img {
+    #forja-container .mat-info img {
         width: 22px !important;
         height: 22px !important;
     }
 
-    .mat-info span {
+    #forja-container .mat-info span {
         font-size: .64rem;
     }
 
-    .mat-pill b {
+    #forja-container .mat-pill b {
         font-size: .65rem;
     }
 
-    .btn-forge-action {
+    #forja-container .btn-forge-action {
         position: static;
 
         min-height: 44px;
@@ -1219,21 +1221,56 @@
 
 @media (max-width: 390px) {
 
-    .forja-subtitle {
+    #forja-container .forja-subtitle {
         display: none;
     }
 
-    .materials-grid {
+    #forja-container .materials-grid {
         grid-template-columns: 1fr;
     }
 
-    .forja-sidebar {
+    #forja-container .forja-sidebar {
         height: 31%;
     }
 
-    .forja-details-view {
+    #forja-container .forja-details-view {
         height: 69%;
     }
 }
 
+</style>
+<style>
+#forja-container {background:rgba(5,9,16,.88); color:#ece5d7; font-family:Arial,sans-serif; overscroll-behavior:contain;}
+#forja-container .forja-modern-wrapper {max-width:920px; border-color:#9d8044; background:#101823; box-shadow:0 24px 80px #0009;}
+#forja-container .forja-top-bar {background:linear-gradient(120deg,#253246,#171d29); padding:18px;}
+#forja-container .forja-title {color:#efd497; letter-spacing:1.5px;}
+#forja-container .forja-subtitle {font-size:12px; line-height:1.5; color:#aeb8c6;}
+#forja-container .forja-nav-tabs {background:#101721; padding:10px 14px;}
+#forja-container .aba-forja-btn {min-height:42px; border-radius:9px; font-size:12px;}
+#forja-container .aba-forja-btn.active {background:linear-gradient(#715b2a,#3b301b); border-color:#c8a75e; color:#ffe8af; box-shadow:none;}
+#forja-container .forja-search {display:flex; flex-direction:column; gap:8px; padding:14px; color:#b7c1cf; font-size:12px;}
+#forja-container input {box-sizing:border-box; width:100%; min-height:42px; border:1px solid #435064; border-radius:9px; padding:10px 12px; color:#fff; background:#0b111b; font:inherit;}
+#forja-container :focus-visible {outline:2px solid #ebc979; outline-offset:2px;}
+#forja-container .recipe-card {min-height:64px; border-color:#344154; background:linear-gradient(110deg,#202c3d,#151e2b); padding:10px;}
+#forja-container .recipe-card.active {border-color:#c8a75e; box-shadow:inset 3px 0 #c8a75e; background:#302d25;}
+#forja-container .recipe-card[hidden] {display:none;}
+#forja-container .recipe-name {font-size:13px; line-height:1.4;}
+#forja-container .card-icon {width:44px; height:44px;}
+#forja-container .forja-details-view {background:#111a27; overscroll-behavior:contain;}
+#forja-container .forja-back {align-self:flex-start; padding:10px 0; margin-bottom:10px; border:0; background:none; color:#e5c783; font-size:13px; cursor:pointer;}
+#forja-container .item-header-display {background:linear-gradient(140deg,#263246,#171e2a); border:1px solid #405068; border-radius:12px; padding:16px;}
+#forja-container #nome-item-resultado {font-size:19px; line-height:1.3; margin:12px 0;}
+#forja-container .mat-pill {min-height:44px; background:#172232; border:1px solid #344459; border-radius:8px;}
+#forja-container .btn-forge-action:not(:disabled) {background:linear-gradient(#edcf88,#b79147) !important; color:#251b0c; text-shadow:none; border-color:#dfbd71;}
+@media(max-width:768px) {
+ #forja-container .forja-top-bar {padding:12px;}
+ #forja-container .forja-title {font-size:15px;}
+ #forja-container .forja-subtitle {font-size:11px;}
+ #forja-container.forja-detalhando .forja-sidebar {display:none;}
+ #forja-container .forja-details-view {height:auto; padding:12px; scroll-padding-bottom:12px;}
+ #forja-container .active-recipe-view {gap:12px;}
+ #forja-container .forja-back {flex-shrink:0;}
+ #forja-container .materials-grid {grid-template-columns:1fr;}
+ #forja-container .btn-forge-action {min-height:48px; margin-top:12px;}
+}
 </style>

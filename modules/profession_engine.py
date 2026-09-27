@@ -1089,6 +1089,7 @@ def validate_and_prepare_gather(player_data: dict, recurso_tipo: str | None = No
     MAPA_RECURSO_PROFISSAO = {
         "madeira": "lenhador",
         "pedra": "minerador",
+        "ferro": "minerador",
         "minerio_de_ferro": "minerador",
         "linho": "colhedor",
         "pena": "esfolador",
@@ -1175,7 +1176,7 @@ def validate_and_prepare_gather(player_data: dict, recurso_tipo: str | None = No
             "error": f"Ferramenta incompatível. Requer {prof_key}, mas você equipou {tool_type or 'desconhecida'}."
         }
 
-    cur, _ = _dur_tuple(tool_inst.get("durability"))
+    cur, _ = _repair_durability(tool_inst, tool_info)
 
     if cur <= 0:
         return {"ok": False, "error": "Sua ferramenta está quebrada."}

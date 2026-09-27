@@ -550,6 +550,9 @@ async def start_craft(user_id: str, recipe_id: str):
         )
     )
 
+    if current_state.get("action") not in (None, "", "idle", "crafting"):
+        return "Você já está ocupado com outra ação. Conclua-a antes de fabricar."
+
     if current_state.get("action") == "crafting":
 
         finish_raw = current_state.get(

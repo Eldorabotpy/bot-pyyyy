@@ -815,66 +815,26 @@ def coletar_recurso():
             return jsonify({"success": False, "error": "Dados inválidos."}), 400
             
         player = users_collection.find_one({"_id": ObjectId(user_id)})
+        if not player:
+            return jsonify({"success": False, "error": "Herói não encontrado."}), 404
         my_inv = player.get("inventory", {})
 
-        # ==========================================
-        # 🚫 TRAVA DE FERRAMENTAS
-        # ==========================================
-        ferramenta_correta = False
-        ferramenta_necessaria = ""
-        ferramenta_usada_id = None # Para sabermos qual gastar
+        from modules import profession_engine
 
-        if recurso_tipo == 'madeira':
-            ferramenta_necessaria = "Machado"
-            for k in my_inv.keys():
-                if "machado" in k.lower():
-                    ferramenta_correta = True
-                    ferramenta_usada_id = k
-                    break
-                
-        # 👇 MUDANÇA AQUI: Adicionado 'minerio_de_ferro' 👇
-        elif recurso_tipo in ['pedra', 'ferro', 'minerio_de_ferro']:
-            ferramenta_necessaria = "Picareta"
-            for k in my_inv.keys():
-                if "picareta" in k.lower():
-                    ferramenta_correta = True
-                    ferramenta_usada_id = k
-                    break
-                
-        elif recurso_tipo == 'linho':
-            ferramenta_necessaria = "Foice"
-            for k in my_inv.keys():
-                if "foice" in k.lower():
-                    ferramenta_correta = True
-                    ferramenta_usada_id = k
-                    break
-                
-        elif recurso_tipo == 'pena':
-            ferramenta_necessaria = "Faca"
-            for k in my_inv.keys():
-                if "faca" in k.lower():
-                    ferramenta_correta = True
-                    ferramenta_usada_id = k
-                    break
-                
-        elif recurso_tipo == 'sangue':
-            ferramenta_necessaria = "Frasco Vazio"
-            for k in my_inv.keys():
-                if "frasco" in k.lower():
-                    ferramenta_correta = True
-                    ferramenta_usada_id = k
-                    break
+        recursos_validos = {'madeira', 'pedra', 'ferro', 'minerio_de_ferro', 'linho', 'pena', 'sangue'}
+        if recurso_tipo not in recursos_validos:
+            return jsonify({"success": False, "error": "Recurso de coleta inválido."}), 400
+        if acao not in {'verificar', 'coletar'}:
+            return jsonify({"success": False, "error": "Ação de coleta inválida."}), 400
 
-        if not ferramenta_correta:
-            return jsonify({"success": False, "error": f"Falta {ferramenta_necessaria}!"}), 400
-        
-        # ⚠️ VERIFICA SE A FERRAMENTA ESTÁ PARTIDA (DURABILIDADE)
-        item_ferramenta = my_inv.get(ferramenta_usada_id, {})
-        durabilidade = item_ferramenta.get("durability", [20, 20])
-        atual = durabilidade[0]
-        
-        if atual <= 0:
-            return jsonify({"success": False, "error": f"𝑺𝒖𝒂 𝒇𝒆𝒓𝒓𝒂𝒎𝒆𝒏𝒕𝒂 𝒑𝒂𝒓𝒕𝒊𝒖!\n𝑼𝒔𝒆 𝒖𝒎 📜 𝒅𝒆 𝑫𝒖𝒓𝒂𝒃𝒊𝒍𝒊𝒅𝒂𝒅𝒆."}), 400
+        # Usa a instância equipada, nunca a primeira ferramenta da mochila.
+        preparo = profession_engine.validate_and_prepare_gather(player, recurso_tipo)
+        if not preparo.get("ok"):
+            return jsonify({"success": False, "error": preparo.get("error")}), 400
+        ferramenta_usada_id = preparo["tool_uid"]
+        item_ferramenta = preparo["tool_inst"]
+        prof_exigida = preparo["profession"]
+        atual, maximo = profession_engine._repair_durability(item_ferramenta, preparo["tool_info"])
 
         # Se for só verificação, pára aqui
         if acao == 'verificar':
@@ -886,15 +846,6 @@ def coletar_recurso():
         prof_atual = player.get("profession", {})
         learned = player.get("learned_professions", {})
         
-        # Acha o nível da profissão exigida
-        prof_exigida = "lenhador"
-        
-        # 👇 MUDANÇA AQUI: Adicionado 'minerio_de_ferro' 👇
-        if recurso_tipo in ['pedra', 'minerio_de_ferro']: prof_exigida = "minerador"
-        elif recurso_tipo == 'linho': prof_exigida = "colhedor"
-        elif recurso_tipo == 'pena': prof_exigida = "esfolador"
-        elif recurso_tipo == 'sangue': prof_exigida = "alquimista"
-
         prof_alvo = learned.get(prof_exigida)
         if not prof_alvo and prof_atual.get("key") == prof_exigida:
             prof_alvo = prof_atual
@@ -914,7 +865,7 @@ def coletar_recurso():
         nova_qtd = qtd_atual + quantidade
 
         # 📉 Diminui 1 de durabilidade da ferramenta
-        nova_durabilidade = [max(0, atual - 1), durabilidade[1]]
+        nova_durabilidade = [max(0, atual - 1), maximo]
         item_ferramenta["durability"] = nova_durabilidade
 
         # CALCULA XP DA PROFISSÃO
@@ -924,15 +875,6 @@ def coletar_recurso():
         xp_ganho = 10
         subiu_nivel = False
         
-        # Descobre qual profissão ele está usando agora
-        prof_exigida = "lenhador"
-        
-        # 👇 MUDANÇA AQUI: Adicionado 'minerio_de_ferro' 👇
-        if recurso_tipo in ['pedra', 'minerio_de_ferro']: prof_exigida = "minerador"
-        elif recurso_tipo == 'linho': prof_exigida = "colhedor"
-        elif recurso_tipo == 'pena': prof_exigida = "esfolador"
-        elif recurso_tipo == 'sangue': prof_exigida = "alquimista"
-
         learned = player.get("learned_professions", {})
         prof_ativa = player.get("profession", {})
         
