@@ -683,6 +683,91 @@ def _fresh_state(
     config: dict
 ) -> dict:
 
+    event_type = str(
+        config.get(
+            "event_type",
+            "mimic_sequence"
+        )
+        or "mimic_sequence"
+    ).strip()
+
+
+    # ========================================================
+    # 📦 BAÚ COMUM
+    # ========================================================
+
+    if event_type == "common_chest":
+
+        try:
+
+            mimic_chance = float(
+                config.get(
+                    "mimic_chance",
+                    0.0
+                )
+                or 0.0
+            )
+
+        except (
+            TypeError,
+            ValueError
+        ):
+
+            mimic_chance = 0.0
+
+
+        mimic_chance = max(
+            0.0,
+            min(
+                1.0,
+                mimic_chance
+            )
+        )
+
+
+        return {
+
+            "version": int(
+                config.get(
+                    "state_version",
+                    1
+                )
+            ),
+
+            # O sorteio acontece somente
+            # uma vez nesta execução.
+            "kind_rolled": True,
+
+            # SEGREDO.
+            # Nunca enviar isto ao frontend.
+            "is_mimic":
+                random.random()
+                < mimic_chance,
+
+            "mimic_active": False,
+
+            "mimic_spawn_id": None,
+
+            "mimic_defeated": False,
+
+            "loot_claimed": False,
+
+            "chest_open": False,
+
+            "attempts": 0,
+
+            "mimics_defeated": 0,
+
+            "last_mimic_result": None,
+
+            "revision": 0,
+        }
+
+
+    # ========================================================
+    # 🧩 BAÚ ESPECIAL — PUZZLE DAS PEDRAS
+    # ========================================================
+
     return {
 
         "version": int(
@@ -857,6 +942,20 @@ def _public_state(
             state.get(
                 "mimics_defeated",
                 0
+            )
+        ),
+
+        "mimico_derrotado": bool(
+            state.get(
+                "mimic_defeated",
+                False
+            )
+        ),
+
+        "loot_resgatado": bool(
+            state.get(
+                "loot_claimed",
+                False
             )
         ),
 
@@ -2129,6 +2228,223 @@ def interagir_bau(
                     ),
             }
 
+        # ====================================================
+        # 📦 BAÚ COMUM
+        # ====================================================
+
+        event_type = str(
+            config.get(
+                "event_type",
+                "mimic_sequence"
+            )
+            or "mimic_sequence"
+        ).strip()
+
+
+        if event_type == "common_chest":
+
+            # ================================================
+            # 👹 ESTE BAÚ FOI SORTEADO COMO MÍMICO
+            # ================================================
+            #
+            # O sorteio já aconteceu quando o estado
+            # do baú foi criado.
+            #
+            # NÃO sorteia novamente aqui.
+            # ================================================
+
+            if (
+                state.get(
+                    "is_mimic",
+                    False
+                )
+                and
+                not state.get(
+                    "mimic_defeated",
+                    False
+                )
+            ):
+
+                spawn_id = (
+                    _create_mimic_spawn(
+
+                        user_id=
+                            user_id,
+
+                        dungeon_id=
+                            dungeon_id,
+
+                        puzzle_id=
+                            puzzle_id,
+
+                        config=
+                            config,
+
+                        state=
+                            state,
+
+                        sistema_cacada=
+                            sistema_cacada,
+                    )
+                )
+
+
+                _save_state(
+                    user_id,
+                    dungeon_id,
+                    puzzle_id,
+                    state
+                )
+
+
+                state[
+                    "revision"
+                ] += 1
+
+
+                return {
+
+                    "success":
+                        True,
+
+                    "acao":
+                        "bau_mimico",
+
+                    "invocar_mimico":
+                        True,
+
+                    "spawn_id":
+                        spawn_id,
+
+                    "monster_id":
+                        config.get(
+                            "monster_id"
+                        ),
+
+                    "mensagem":
+                        (
+                            "O baú se contorce e "
+                            "revela dentes afiados!"
+                        ),
+
+                    "estado":
+                        _public_state(
+                            state
+                        ),
+                }
+
+
+            # ================================================
+            # 🎁 BAÚ NORMAL
+            # OU MÍMICO JÁ DERROTADO
+            # ================================================
+
+            loot_id = str(
+                config.get(
+                    "loot_id",
+                    ""
+                )
+            )
+
+
+            (
+                delivered,
+                rewards,
+                error
+            ) = _grant_chest_reward(
+                player,
+                loot_id
+            )
+
+
+            # ================================================
+            # ⚠️ RECOMPENSA AINDA NÃO CONFIGURADA
+            # ================================================
+
+            if not delivered:
+
+                return {
+
+                    "success":
+                        False,
+
+                    "acao":
+                        "loot_nao_configurado",
+
+                    "mensagem":
+                        error,
+
+                    "loot_id":
+                        loot_id,
+
+                    "estado":
+                        _public_state(
+                            state
+                        ),
+                }
+
+
+            # ================================================
+            # ✅ MARCAR COMO RESGATADO
+            # ================================================
+
+            state[
+                "loot_claimed"
+            ] = True
+
+            state[
+                "chest_open"
+            ] = True
+
+
+            _save_state(
+                user_id,
+                dungeon_id,
+                puzzle_id,
+                state
+            )
+
+
+            state[
+                "revision"
+            ] += 1
+
+
+            return {
+
+                "success":
+                    True,
+
+                "acao":
+                    "bau_aberto",
+
+                "mensagem":
+                    (
+                        "Você abriu o baú "
+                        "e encontrou um tesouro!"
+                    ),
+
+                "loot_id":
+                    loot_id,
+
+                "recompensas":
+                    rewards,
+
+                "estado":
+                    _public_state(
+                        state
+                    ),
+            }
+
+
+        # ====================================================
+        # 🧩 BAÚ 01 — PUZZLE DAS PEDRAS
+        # ====================================================
+        #
+        # A partir daqui continua exatamente
+        # a lógica antiga do bau_01.
+        # ====================================================
+
         sequence = [
 
             int(x)
@@ -2571,6 +2887,35 @@ def finalizar_combate_mimico(
         ] = str(
             resultado
         )
+
+
+        # ====================================================
+        # 📦 RESULTADO DO MÍMICO DE BAÚ COMUM
+        # ====================================================
+
+        event_type = str(
+            (
+                _config
+                or {}
+            ).get(
+                "event_type",
+                "mimic_sequence"
+            )
+            or "mimic_sequence"
+        ).strip()
+
+
+        if event_type == "common_chest":
+
+            # Só libera o tesouro se
+            # o jogador realmente vencer.
+            state[
+                "mimic_defeated"
+            ] = (
+                str(resultado)
+                == "vitoria"
+            )
+
 
         if (
             str(resultado)

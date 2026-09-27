@@ -6,16 +6,16 @@
 
 DUNGEON_EVENTS = {
     "dungeon_01": {
+
+        # ====================================================
+        # 🧩 BAÚ ESPECIAL — PUZZLE DAS PEDRAS
+        # ====================================================
+
         "bau_01": {
             "event_type": "mimic_sequence",
-
-            # Monstro especial ativado pelo puzzle
             "monster_id": "mimico_dungeon_01",
-
-            # Recompensa do baú
             "loot_id": "bau_dungeon_01",
 
-            # Pedras disponíveis no puzzle
             "available_lights": [
                 1,
                 2,
@@ -25,21 +25,51 @@ DUNGEON_EVENTS = {
                 6,
             ],
 
-            # Quantidade de pedras corretas
             "sequence_length": 3,
-
-            # A combinação é criada aleatoriamente
             "random_sequence": True,
 
-            # Errou uma pedra = Mímico
             "trigger_mimic_on_wrong": True,
-
-            # Tentou abrir o baú antes de resolver = Mímico
             "trigger_mimic_on_early_chest": True,
 
-            # Controle de versão do estado salvo
-            "state_version": 2,
-        }
+            "state_version": 1,
+        },
+
+
+        # ====================================================
+        # 📦 BAÚS COMUNS — 30% DE CHANCE DE MÍMICO
+        # ====================================================
+
+        "bau_02": {
+            "event_type": "common_chest",
+            "monster_id": "mimico_dungeon_01",
+            "loot_id": "bau_dungeon_01_comum",
+            "mimic_chance": 0.30,
+            "state_version": 1,
+        },
+
+        "bau_03": {
+            "event_type": "common_chest",
+            "monster_id": "mimico_dungeon_01",
+            "loot_id": "bau_dungeon_01_comum",
+            "mimic_chance": 0.30,
+            "state_version": 1,
+        },
+
+        "bau_04": {
+            "event_type": "common_chest",
+            "monster_id": "mimico_dungeon_01",
+            "loot_id": "bau_dungeon_01_comum",
+            "mimic_chance": 0.30,
+            "state_version": 1,
+        },
+
+        "bau_05": {
+            "event_type": "common_chest",
+            "monster_id": "mimico_dungeon_01",
+            "loot_id": "bau_dungeon_01_comum",
+            "mimic_chance": 0.30,
+            "state_version": 1,
+        },
     }
 }
 

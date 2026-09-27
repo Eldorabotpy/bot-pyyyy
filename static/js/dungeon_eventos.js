@@ -363,6 +363,8 @@
 
 
             await this.carregarEstado();
+
+            await this.carregarEstadosBausComuns();
         }
 
 
@@ -453,6 +455,10 @@
                     classe
                     ===
                     "dungeon_chest_visual"
+                    ||
+                    classe
+                    ===
+                    "dungeon_chest_common_visual"
                 ) {
 
                     const chestId =
@@ -1001,6 +1007,10 @@
                     classe
                     ===
                     "dungeon_chest"
+                    ||
+                    classe
+                    ===
+                    "dungeon_chest_common"
                 ) {
 
                     const chestId =
@@ -1013,7 +1023,8 @@
                     const puzzle =
                         String(
                             props.puzzle
-                            || ""
+                            || props.chest_id
+                            || chestId
                         );
 
 
@@ -1251,6 +1262,13 @@
                         || {};
 
 
+                    const puzzleId =
+                        String(
+                            detail.puzzle_id
+                            || ""
+                        );
+
+
                     if (
 
                         String(
@@ -1262,19 +1280,33 @@
 
                         ||
 
-                        String(
-                            detail.puzzle_id
-                            || ""
+                        !puzzleId
+
+                        ||
+
+                        !this.chests.has(
+                            puzzleId
                         )
-                        !==
-                        this.puzzleId
 
                     ) {
                         return;
                     }
 
 
-                    await this.carregarEstado();
+                    if (
+                        puzzleId
+                        === this.puzzleId
+                    ) {
+
+                        await this.carregarEstado();
+
+                    }
+
+                    else {
+
+                        await this.carregarEstadosBausComuns();
+
+                    }
 
                 };
 
@@ -1671,7 +1703,8 @@
         // ====================================================
 
         aplicarEstado(
-            estado
+            estado,
+            puzzleId = this.puzzleId
         ) {
 
             if (
@@ -1681,8 +1714,22 @@
             }
 
 
-            this.estado =
-                estado;
+            const puzzleAtual =
+                String(
+                    puzzleId
+                    || this.puzzleId
+                );
+
+
+            if (
+                puzzleAtual
+                === this.puzzleId
+            ) {
+
+                this.estado =
+                    estado;
+
+            }
 
 
             const ativas =
@@ -1702,6 +1749,17 @@
                 const visual
                 of this.visuais.values()
             ) {
+
+                if (
+                    String(
+                        visual.puzzle
+                        || ""
+                    )
+                    !== puzzleAtual
+                ) {
+                    continue;
+                }
+
 
                 this._setVisual(
 
@@ -1733,6 +1791,12 @@
 
                 if (
                     !visual.sprite
+                    ||
+                    String(
+                        visual.puzzle
+                        || ""
+                    )
+                    !== puzzleAtual
                 ) {
                     continue;
                 }
@@ -1842,6 +1906,157 @@
                     "[DUNGEON EVENT] carregarEstado:",
                     err
                 );
+
+            }
+
+        }
+
+
+        // ====================================================
+        // 📦 CARREGAR ESTADOS DOS BAÚS COMUNS
+        // ====================================================
+
+        async carregarEstadosBausComuns() {
+
+            if (
+                !this.ativo
+            ) {
+                return;
+            }
+
+
+            const userId =
+                localStorage.getItem(
+                    "jogadorEldoraID"
+                );
+
+
+            if (
+                !userId
+            ) {
+                return;
+            }
+
+
+            const puzzleIds =
+                new Set();
+
+
+            for (
+                const chest
+                of this.chests.values()
+            ) {
+
+                const puzzleId =
+                    String(
+                        chest?.puzzle
+                        || ""
+                    );
+
+
+                if (
+                    !puzzleId
+                    ||
+                    puzzleId
+                    === this.puzzleId
+                ) {
+                    continue;
+                }
+
+
+                puzzleIds.add(
+                    puzzleId
+                );
+
+            }
+
+
+            for (
+                const puzzleId
+                of puzzleIds
+            ) {
+
+                try {
+
+                    const params =
+                        new URLSearchParams({
+
+                            user_id:
+                                userId,
+
+                            dungeon_id:
+                                this.dungeonId,
+
+                            puzzle_id:
+                                puzzleId,
+
+                            _:
+                                String(
+                                    Date.now()
+                                ),
+
+                        });
+
+
+                    const res =
+                        await fetch(
+
+                            "/api/dungeon/evento/status?"
+                            +
+                            params.toString()
+
+                        );
+
+
+                    const data =
+                        await res.json();
+
+
+                    if (
+                        !res.ok
+                        || !data.success
+                    ) {
+
+                        console.warn(
+
+                            "[DUNGEON EVENT] Falha ao carregar baú:",
+
+                            puzzleId,
+
+                            data.error
+                            || "Falha ao carregar evento."
+
+                        );
+
+                        continue;
+                    }
+
+
+                    this.aplicarEstado(
+
+                        data.estado,
+
+                        puzzleId
+
+                    );
+
+                }
+
+                catch (
+                    err
+                ) {
+
+                    console.error(
+
+                        "[DUNGEON EVENT] carregar estado do baú:",
+
+                        puzzleId,
+
+                        err
+
+                    );
+
+                }
 
             }
 
@@ -2205,7 +2420,8 @@
                 ) {
 
                     this.aplicarEstado(
-                        result.estado
+                        result.estado,
+                        chest.puzzle
                     );
 
                 }
