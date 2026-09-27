@@ -996,33 +996,6 @@ def coletar_recurso():
 # ==========================================
 @character_bp.route('/api/personagem/reparar_ferramenta', methods=['POST'])
 def reparar_ferramenta():
-    from flask import request, jsonify
-    from bson import ObjectId
-    from modules.player.core import users_collection
-
-    try:
-        data = request.json
-        user_id = data.get('user_id')
-        item_uuid = data.get('item_id')
-
-        player = users_collection.find_one({"_id": ObjectId(user_id)})
-        inv = player.get("inventory", {})
-
-        if "pergaminho_durabilidade" not in inv or int(inv["pergaminho_durabilidade"].get("quantity", 0)) < 1:
-            return jsonify({"success": False, "error": "Não tens Pergaminhos de Durabilidade!"}), 400
-
-        ferramenta = inv.get(item_uuid)
-        if not ferramenta or "durability" not in ferramenta:
-            return jsonify({"success": False, "error": "Item inválido para reparo."}), 400
-
-        max_dur = ferramenta["durability"][1]
-        ferramenta["durability"] = [max_dur, max_dur]
-
-        # Consome 1 pergaminho
-        inv["pergaminho_durabilidade"]["quantity"] = int(inv["pergaminho_durabilidade"]["quantity"]) - 1
-        
-        users_collection.update_one({"_id": ObjectId(user_id)}, {"$set": {"inventory": inv}})
-        
-        return jsonify({"success": True, "msg": "Ferramenta restaurada como nova!"})
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
+    # Mantém a mesma regra independentemente da ordem dos blueprints.
+    from modules.webapp_api import api_reparar_ferramenta
+    return api_reparar_ferramenta()

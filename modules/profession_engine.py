@@ -1347,6 +1347,31 @@ def _set_dur(item: dict, cur: int, mx: int) -> None:
 # 3. REPARO E REPARO EM MASSA
 # ==================================================================
 
+def _consume_repair_scroll(player_data: dict, base_id: str) -> bool:
+    """Consome da mesma pilha (inclusive por UID) reconhecida por _inv_qty."""
+    inv = player_data.get("inventory", {}) or {}
+    for uid, value in list(inv.items()):
+        item_base = value.get("base_id", uid) if isinstance(value, dict) else uid
+        if item_base != base_id:
+            continue
+        raw = value.get("quantity", value.get("qtd", 1)) if isinstance(value, dict) else value
+        try:
+            quantity = int(raw or 0)
+        except (TypeError, ValueError):
+            continue
+        if quantity <= 0:
+            continue
+        if quantity == 1:
+            del inv[uid]
+        elif isinstance(value, dict):
+            key = "qtd" if "qtd" in value and "quantity" not in value else "quantity"
+            value[key] = quantity - 1
+        else:
+            inv[uid] = quantity - 1
+        return True
+    return False
+
+
 async def restore_durability(player_data: dict, unique_id: str) -> dict:
     inv = player_data.get('inventory', {}) or {}
     item = inv.get(unique_id)
@@ -1364,15 +1389,18 @@ async def restore_durability(player_data: dict, unique_id: str) -> dict:
     if not pergaminho_usado:
         return {"error": "Você precisa de 1x Pergaminho de Reparo."}
 
-    # Consome 1 pergaminho e restaura totalmente
-    player_manager.remove_item_from_inventory(player_data, pergaminho_usado, 1)
-    
     # Pega durabilidade máxima real
     info = _get_item_info(item.get("base_id"))
-    max_d = 20
+    cur, max_d = _dur_tuple(item.get("durability"))
     raw_dur = info.get("durability")
-    if isinstance(raw_dur, list): max_d = raw_dur[1]
+    if isinstance(raw_dur, (list, tuple)) and len(raw_dur) >= 2: max_d = int(raw_dur[1])
     elif isinstance(raw_dur, int): max_d = raw_dur
+    elif isinstance(raw_dur, dict): max_d = int(raw_dur.get("max", max_d))
+
+    if max_d <= 0 or cur >= max_d:
+        return {"error": "Este equipamento já está com durabilidade máxima."}
+    if not _consume_repair_scroll(player_data, pergaminho_usado):
+        return {"error": "Você precisa de 1x Pergaminho de Reparo."}
 
     _set_dur(item, max_d, max_d)
     
@@ -1562,7 +1590,8 @@ async def restore_all_equipped_durability(player_data: dict) -> dict:
         return {"error": "Todos os equipamentos equipados já estão com durabilidade máxima."}
 
     # 5. Consome 1 pergaminho.
-    player_manager.remove_item_from_inventory(player_data, pergaminho_usado, 1)
+    if not _consume_repair_scroll(player_data, pergaminho_usado):
+        return {"error": "Você precisa de 1x Pergaminho de Reparo."}
 
     # 6. Repara todos.
     count = 0

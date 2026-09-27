@@ -1588,40 +1588,6 @@ window.abrirModalItem = function(idAlvo, origem) {
 
     
     // 👇 BOTÃO DE CONSERTAR (Aparece se o item estiver gasto e o jogador tiver o pergaminho) 👇
-    const temPergaminho = window.perfilDadosGlobais.inventario.some(i => i.base_id === 'pergaminho_durabilidade' || i.id === 'pergaminho_durabilidade');
-    if (
-        [
-            'weapon',
-            'armor',
-            'helmet',
-            'boots',
-            'ring',
-            'necklace',
-            'earring',
-            'equipamento',
-            'tool',
-            'arma',
-            'armadura',
-            'lenhador',
-            'minerador',
-            'colhedor',
-            'esfolador',
-            'ferreiro',
-            'armeiro',
-            'alfaiate',
-            'joalheiro',
-            'curtidor'
-        ].includes(t)
-        &&
-        itemData.durability
-        &&
-        itemData.durability[0] < itemData.durability[1]
-        &&
-        temPergaminho
-    ) {
-        botoesHtml += `<button onclick="repararFerramentaAPI('${itemData.id}')" style="width: 100%; padding:10px; background: #ca8a04; color:black; border:none; border-radius:4px; font-weight:bold; cursor:pointer; margin-bottom: 8px;">CONSERTAR (1x 📜)</button>`;
-    }
-    
     // 👇 MÁGICA 2: RECONHECIMENTO INFALÍVEL DE POÇÕES 👇
     if (origem === 'mochila' || origem === 'inventario') {
         
@@ -1694,6 +1660,40 @@ window.abrirModalItem = function(idAlvo, origem) {
         botoesHtml = `<button onclick="desequiparItem('${itemData.slot}')" style="flex:1; padding:10px; background: linear-gradient(180deg, #c0392b 0%, #922b21 100%); color:white; border:1px solid #e74c3c; border-radius:4px; font-weight:bold; cursor:pointer;">Remover</button>`;
     }
     
+    const temPergaminho = window.perfilDadosGlobais.inventario.some(i => ['pergaminho_durabilidade', 'pergaminho_de_reparo'].includes(i.base_id || i.id));
+    if (
+        [
+            'weapon',
+            'armor',
+            'helmet',
+            'boots',
+            'ring',
+            'necklace',
+            'earring',
+            'equipamento',
+            'tool',
+            'arma',
+            'armadura',
+            'lenhador',
+            'minerador',
+            'colhedor',
+            'esfolador',
+            'ferreiro',
+            'armeiro',
+            'alfaiate',
+            'joalheiro',
+            'curtidor'
+        ].includes(t)
+        &&
+        itemData.durability
+        &&
+        itemData.durability[0] < itemData.durability[1]
+        &&
+        temPergaminho
+    ) {
+        botoesHtml += `<button onclick="repararFerramentaAPI('${itemData.id}')" style="width: 100%; padding:10px; background: #ca8a04; color:black; border:none; border-radius:4px; font-weight:bold; cursor:pointer; margin-bottom: 8px;">CONSERTAR (1x 📜)</button>`;
+    }
+
     botoesHtml += `<button onclick="fecharModalItem()" style="flex:1; padding:10px; background: linear-gradient(180deg, #334155 0%, #1e293b 100%); color:white; border:1px solid #475569; border-radius:4px; font-weight:bold; cursor:pointer;">Fechar</button>`;
     
     if (itemData.rune_slots?.length) {
