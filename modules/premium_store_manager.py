@@ -45,6 +45,21 @@ STATUS_RECUSADO = "recusado"
 STATUS_CANCELADO = "cancelado"
 STATUS_EXPIRADO = "expirado"
 
+CUSTO_TROCA_CLASSE = 550
+CUSTO_TROCA_PROFISSAO = 250
+
+SKILLS_INICIAIS_CLASSE = {
+    "guerreiro": "guerreiro_corte_perfurante",
+    "mago": "mago_bola_de_fogo",
+    "cacador": "cacador_flecha_precisa",
+    "assassino": "assassino_ataque_furtivo",
+    "monge": "monge_rajada_de_punhos",
+    "samurai": "samurai_corte_iaijutsu",
+    "berserker": "berserker_golpe_selvagem",
+    "curandeiro": "curandeiro_chama_sagrada",
+    "bardo": "bardo_nota_cortante",
+}
+
 
 # ============================================================
 # 🗄️ BANCO DE DADOS
@@ -1512,6 +1527,277 @@ def _serializar_pedido_admin(
 
 
 # ============================================================
+# 🏛️ SERVIÇOS PAGOS COM GEMAS
+# ============================================================
+
+def obter_servicos_jogador(user_id):
+    jogador_id = _object_id(user_id)
+
+    if not jogador_id or users_col is None:
+        return {
+            "success": False,
+            "error": "Herói não encontrado.",
+        }
+
+    jogador = users_col.find_one({"_id": jogador_id})
+    if not jogador:
+        return {
+            "success": False,
+            "error": "Herói não encontrado.",
+        }
+
+    from modules.game_data.classes import CLASSES_DATA
+    from modules.game_data.professions import PROFESSIONS_DATA
+
+    classe_atual = str(
+        jogador.get("class") or "aventureiro"
+    ).strip().lower()
+
+    classes = []
+    if classe_atual in CLASSES_DATA:
+        for chave, dados in CLASSES_DATA.items():
+            if int(dados.get("tier", 0) or 0) != 1:
+                continue
+            classes.append({
+                "id": chave,
+                "nome": dados.get("display_name", chave.title()),
+                "icone": dados.get("emoji", "⚔️"),
+                "descricao": dados.get("description", ""),
+                "atual": chave == classe_atual,
+            })
+
+    classes.sort(key=lambda item: item["nome"])
+
+    aprendidas = dict(jogador.get("learned_professions") or {})
+    profissao_atual = jogador.get("profession") or {}
+    chave_atual = str(
+        profissao_atual.get("key")
+        or profissao_atual.get("type")
+        or ""
+    ).strip().lower()
+
+    if chave_atual and chave_atual not in aprendidas:
+        aprendidas[chave_atual] = profissao_atual
+
+    profissoes = []
+    for chave, progresso in aprendidas.items():
+        chave = str(chave).strip().lower()
+        dados = PROFESSIONS_DATA.get(chave)
+        if not dados:
+            continue
+        progresso = progresso if isinstance(progresso, dict) else {}
+        profissoes.append({
+            "id": chave,
+            "nome": dados.get("display_name", chave.title()),
+            "categoria": dados.get("category", ""),
+            "nivel": int(progresso.get("level", 1) or 1),
+            "atual": chave == chave_atual,
+        })
+
+    profissoes.sort(key=lambda item: (-item["nivel"], item["nome"]))
+
+    return {
+        "success": True,
+        "saldo_gemas": int(jogador.get("gems", 0) or 0),
+        "classe_atual": classe_atual,
+        "profissao_atual": chave_atual,
+        "classes": classes,
+        "profissoes": profissoes,
+        "custos": {
+            "classe": CUSTO_TROCA_CLASSE,
+            "profissao": CUSTO_TROCA_PROFISSAO,
+        },
+    }
+
+
+def comprar_servico_gemas(
+    user_id,
+    tipo,
+    destino,
+    concordou=False,
+):
+    jogador_id = _object_id(user_id)
+    tipo = str(tipo or "").strip().lower()
+    destino = str(destino or "").strip().lower()
+
+    if not concordou:
+        return {
+            "success": False,
+            "error": "Marque Li e concordo antes de confirmar.",
+        }
+
+    if not jogador_id or users_col is None:
+        return {"success": False, "error": "Herói não encontrado."}
+
+    jogador = users_col.find_one({"_id": jogador_id})
+    if not jogador:
+        return {"success": False, "error": "Herói não encontrado."}
+
+    acao_atual = str(
+        (jogador.get("player_state") or {}).get("action") or "idle"
+    ).strip().lower()
+    if acao_atual not in {"", "idle"}:
+        return {
+            "success": False,
+            "error": "Finalize sua atividade atual antes de usar este serviço.",
+        }
+
+    agora = _agora()
+
+    if tipo == "profissao":
+        from modules.game_data.professions import PROFESSIONS_DATA
+
+        aprendidas = dict(jogador.get("learned_professions") or {})
+        atual = jogador.get("profession") or {}
+        atual_key = str(
+            atual.get("key") or atual.get("type") or ""
+        ).strip().lower()
+
+        if atual_key and atual_key not in aprendidas:
+            aprendidas[atual_key] = atual
+
+        if destino == atual_key:
+            return {"success": False, "error": "Este ofício já está ativo."}
+
+        progresso = aprendidas.get(destino)
+        dados_profissao = PROFESSIONS_DATA.get(destino)
+        if not isinstance(progresso, dict) or not dados_profissao:
+            return {
+                "success": False,
+                "error": "Você ainda não aprendeu este ofício.",
+            }
+
+        nova_profissao = dict(progresso)
+        nova_profissao.update({
+            "key": destino,
+            "type": destino,
+            "category": dados_profissao.get("category"),
+            "display_name": dados_profissao.get("display_name"),
+        })
+
+        custo = CUSTO_TROCA_PROFISSAO
+        atualizado = users_col.find_one_and_update(
+            {
+                "_id": jogador_id,
+                "gems": {"$gte": custo},
+                "$or": [
+                    {"profession.key": {"$ne": destino}},
+                    {"profession.key": {"$exists": False}},
+                ],
+            },
+            {
+                "$inc": {"gems": -custo},
+                "$set": {"profession": nova_profissao},
+                "$push": {
+                    "premium_service_history": {
+                        "tipo": tipo,
+                        "destino": destino,
+                        "custo_gemas": custo,
+                        "criado_em": agora,
+                    }
+                },
+            },
+            return_document=ReturnDocument.AFTER,
+        )
+
+        nome_destino = dados_profissao.get("display_name", destino.title())
+
+    elif tipo == "classe":
+        from modules.game_data.classes import CLASSES_DATA
+
+        dados_classe = CLASSES_DATA.get(destino)
+        if not dados_classe or int(dados_classe.get("tier", 0) or 0) != 1:
+            return {
+                "success": False,
+                "error": "Escolha uma classe base válida.",
+            }
+
+        classe_atual = str(
+            jogador.get("class") or "aventureiro"
+        ).strip().lower()
+        if classe_atual not in CLASSES_DATA:
+            return {
+                "success": False,
+                "error": "Desperte sua primeira classe antes de usar este serviço.",
+            }
+
+        if destino == classe_atual:
+            return {"success": False, "error": "Esta já é sua classe atual."}
+
+        arquivos = dict(jogador.get("class_skill_loadouts") or {})
+        arquivos[classe_atual] = {
+            "skills": dict(jogador.get("skills") or {}),
+            "equipped_skills": dict(jogador.get("equipped_skills") or {}),
+        }
+
+        salvo_destino = arquivos.get(destino) or {}
+        skills_destino = dict(salvo_destino.get("skills") or {})
+        equipadas_destino = dict(
+            salvo_destino.get("equipped_skills") or {}
+        )
+
+        if not skills_destino:
+            skill_inicial = SKILLS_INICIAIS_CLASSE.get(destino)
+            if skill_inicial:
+                skills_destino[skill_inicial] = {
+                    "unlocked": True,
+                    "rarity": "comum",
+                    "level": 1,
+                }
+
+        custo = CUSTO_TROCA_CLASSE
+        atualizado = users_col.find_one_and_update(
+            {
+                "_id": jogador_id,
+                "gems": {"$gte": custo},
+                "class": {"$ne": destino},
+            },
+            {
+                "$inc": {"gems": -custo},
+                "$set": {
+                    "class": destino,
+                    "equipment": {},
+                    "equipped_skin": "padrao",
+                    "evolution_progress": {},
+                    "skills": skills_destino,
+                    "equipped_skills": equipadas_destino,
+                    "class_skill_loadouts": arquivos,
+                },
+                "$push": {
+                    "premium_service_history": {
+                        "tipo": tipo,
+                        "destino": destino,
+                        "custo_gemas": custo,
+                        "criado_em": agora,
+                    }
+                },
+            },
+            return_document=ReturnDocument.AFTER,
+        )
+
+        nome_destino = dados_classe.get("display_name", destino.title())
+
+    else:
+        return {"success": False, "error": "Serviço inválido."}
+
+    if not atualizado:
+        atual = users_col.find_one({"_id": jogador_id}, {"gems": 1}) or {}
+        if int(atual.get("gems", 0) or 0) < custo:
+            erro = f"Saldo insuficiente. Este serviço custa {custo} Gemas."
+        else:
+            erro = "Não foi possível concluir a troca. Atualize e tente novamente."
+        return {"success": False, "error": erro}
+
+    return {
+        "success": True,
+        "message": f"Troca concluída: {nome_destino}.",
+        "tipo": tipo,
+        "destino": destino,
+        "saldo_gemas": int(atualizado.get("gems", 0) or 0),
+    }
+
+
+# ============================================================
 # 📋 LISTAR PEDIDOS PARA ADMIN
 # ============================================================
 
@@ -1884,6 +2170,7 @@ def aprovar_pedido_manual(
 
 
     if status not in {
+        STATUS_AGUARDANDO_PAGAMENTO,
         STATUS_EM_ANALISE,
         STATUS_PROCESSANDO_APROVACAO,
     }:
@@ -1892,7 +2179,7 @@ def aprovar_pedido_manual(
             "success": False,
 
             "error": (
-                "Somente pedidos em análise "
+                "Somente pedidos pendentes "
                 "podem ser aprovados."
             ),
         }
@@ -1904,11 +2191,14 @@ def aprovar_pedido_manual(
     # --------------------------------------------------------
     # 🔒 RESERVA ATÔMICA DO PEDIDO
     #
-    # Antes de mexer nas Gems, tira o pedido de "em_analise".
+    # Antes de mexer nas Gems, reserva o pedido pendente.
     # Assim uma recusa não pode acontecer simultaneamente.
     # --------------------------------------------------------
 
-    if status == STATUS_EM_ANALISE:
+    if status in {
+        STATUS_AGUARDANDO_PAGAMENTO,
+        STATUS_EM_ANALISE,
+    }:
 
         reservado = (
             premium_orders_col
@@ -1918,7 +2208,7 @@ def aprovar_pedido_manual(
                         pedido["_id"],
 
                     "status":
-                        STATUS_EM_ANALISE,
+                        status,
                 },
 
                 {
@@ -2310,8 +2600,12 @@ def recusar_pedido_manual(
                 "codigo":
                     codigo_pedido,
 
-                "status":
-                    STATUS_EM_ANALISE,
+                "status": {
+                    "$in": [
+                        STATUS_AGUARDANDO_PAGAMENTO,
+                        STATUS_EM_ANALISE,
+                    ]
+                },
             },
 
             {
@@ -2385,7 +2679,7 @@ def recusar_pedido_manual(
             "success": False,
 
             "error": (
-                "Somente pedidos em análise "
+                "Somente pedidos pendentes "
                 "podem ser recusados."
             ),
         }

@@ -220,7 +220,7 @@
     display: grid;
 
     grid-template-columns:
-        repeat(2, 1fr);
+        repeat(3, 1fr);
 
     gap: 7px;
 
@@ -945,6 +945,122 @@
     cursor: default;
 }
 
+/* ==========================================================
+   SERVIÇOS
+   ========================================================== */
+
+.loja-premium-servicos {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.loja-premium-servico-card {
+    min-width: 0;
+    padding: 13px;
+    background: linear-gradient(145deg, rgba(28, 39, 59, 0.95), rgba(12, 18, 30, 0.98));
+    border: 1px solid rgba(216, 184, 90, 0.25);
+    border-radius: 13px;
+}
+
+.loja-premium-servico-cabecalho {
+    display: grid;
+    grid-template-columns: 38px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 9px;
+}
+
+.loja-premium-servico-icone {
+    width: 36px;
+    height: 36px;
+    display: grid;
+    place-items: center;
+    background: rgba(139, 108, 36, 0.15);
+    border: 1px solid rgba(216, 184, 90, 0.28);
+    border-radius: 10px;
+    font-size: 1.1rem;
+}
+
+.loja-premium-servico-cabecalho strong {
+    display: block;
+    color: #f4dc91;
+    font-size: 0.74rem;
+}
+
+.loja-premium-servico-cabecalho small {
+    display: block;
+    margin-top: 2px;
+    color: #7f8ca0;
+    font-size: 0.54rem;
+}
+
+.loja-premium-servico-cabecalho b {
+    color: #ddd6fe;
+    font-size: 0.72rem;
+    white-space: nowrap;
+}
+
+.loja-premium-servico-select {
+    width: 100%;
+    min-height: 40px;
+    margin-top: 12px;
+    padding: 8px 9px;
+    color: #e5e7eb;
+    background: #0b1220;
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    border-radius: 8px;
+    font-size: 0.66rem;
+}
+
+.loja-premium-servico-aviso {
+    min-height: 66px;
+    margin-top: 9px;
+    padding: 9px;
+    color: #9ba7b8;
+    background: rgba(15, 23, 42, 0.72);
+    border-radius: 8px;
+    font-size: 0.58rem;
+    line-height: 1.45;
+}
+
+.loja-premium-concordo {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin-top: 10px;
+    color: #dbe4ef;
+    font-size: 0.61rem;
+    line-height: 1.35;
+    cursor: pointer;
+}
+
+.loja-premium-concordo input {
+    width: 17px;
+    height: 17px;
+    flex: 0 0 17px;
+    margin: 0;
+    accent-color: #c99724;
+}
+
+.loja-premium-servico-comprar {
+    width: 100%;
+    min-height: 39px;
+    margin-top: 10px;
+    color: #fff8dc;
+    background: linear-gradient(180deg, #94711e, #664b13);
+    border: 1px solid rgba(244, 220, 145, 0.42);
+    border-radius: 8px;
+    font-size: 0.62rem;
+    font-weight: 900;
+    cursor: pointer;
+}
+
+.loja-premium-servico-comprar:disabled {
+    opacity: 0.42;
+    filter: grayscale(0.5);
+    cursor: default;
+}
+
 /* Fluxo guiado do pagamento manual */
 .loja-premium-etapas {
     display: flex;
@@ -1051,6 +1167,19 @@
     .loja-premium-qrcode-box {
         width: 184px;
         height: 184px;
+    }
+
+    .loja-premium-aba {
+        padding-inline: 4px;
+        font-size: 0.62rem;
+    }
+
+    .loja-premium-servicos {
+        grid-template-columns: 1fr;
+    }
+
+    .loja-premium-servico-aviso {
+        min-height: 0;
     }
 
     #loja-premium-qrcode,

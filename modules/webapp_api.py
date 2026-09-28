@@ -146,6 +146,73 @@ def api_premium_catalogo(
 
 
 # ============================================================
+# 🏛️ SERVIÇOS PREMIUM PAGOS COM GEMAS
+# ============================================================
+
+@webapp_bp.route(
+    '/api/premium/servicos/<user_id>',
+    methods=['GET']
+)
+def api_premium_servicos(user_id):
+    try:
+        from modules import premium_store_manager
+
+        resultado = premium_store_manager.obter_servicos_jogador(user_id)
+        codigo = 200 if resultado.get("success") else 400
+        return jsonify(resultado), codigo
+
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": f"Erro ao carregar serviços: {str(e)}",
+        }), 500
+
+
+@webapp_bp.route(
+    '/api/premium/servico/comprar',
+    methods=['POST']
+)
+def api_premium_comprar_servico():
+    try:
+        from modules import premium_store_manager, player_manager
+        from modules.player.combat_stats import sync_combat_stats_to_db
+
+        dados = request.json or {}
+        user_id = dados.get("user_id")
+
+        resultado = premium_store_manager.comprar_servico_gemas(
+            user_id=user_id,
+            tipo=dados.get("tipo"),
+            destino=dados.get("destino"),
+            concordou=dados.get("concordou") is True,
+        )
+
+        if not resultado.get("success"):
+            return jsonify(resultado), 400
+
+        try:
+            _run_async(player_manager.clear_player_cache(user_id))
+
+            if resultado.get("tipo") == "classe":
+                pdata = users_collection.find_one({"_id": ObjectId(user_id)})
+                if pdata:
+                    _run_async(sync_combat_stats_to_db(user_id, pdata))
+                    _run_async(player_manager.clear_player_cache(user_id))
+        except Exception:
+            # A compra já foi concluída atomicamente. Uma falha na
+            # sincronização derivada não pode induzir o jogador a pagar outra vez.
+            traceback.print_exc()
+
+        return jsonify(resultado)
+
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": f"Erro ao concluir serviço: {str(e)}",
+        }), 500
+
+
+# ============================================================
 # 🧾 CRIAR PEDIDO
 # ============================================================
 

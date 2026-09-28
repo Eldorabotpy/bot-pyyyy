@@ -95,6 +95,15 @@
             <button
                 type="button"
                 class="loja-premium-aba"
+                data-loja-premium-aba="servicos"
+            >
+                🔄 Serviços
+            </button>
+
+
+            <button
+                type="button"
+                class="loja-premium-aba"
                 data-loja-premium-aba="pedidos"
             >
                 📜 Meus pedidos
@@ -146,6 +155,102 @@
                     class="loja-premium-grade"
                 ></div>
 
+            </section>
+
+
+            <!-- =============================================
+                 SERVIÇOS
+                 ============================================= -->
+
+            <section
+                id="loja-premium-aba-servicos"
+                class="loja-premium-conteudo"
+            >
+                <div class="loja-premium-secao-topo">
+                    <h3>Serviços do Reino</h3>
+                    <p>Use Gemas para reorganizar o caminho do seu herói.</p>
+                </div>
+
+                <div
+                    id="loja-premium-servicos-carregando"
+                    class="loja-premium-vazio"
+                >
+                    ✨ Consultando os escribas...
+                </div>
+
+                <div
+                    id="loja-premium-servicos"
+                    class="loja-premium-servicos"
+                    style="display:none;"
+                >
+                    <article class="loja-premium-servico-card">
+                        <div class="loja-premium-servico-cabecalho">
+                            <span class="loja-premium-servico-icone">⚔️</span>
+                            <div>
+                                <strong>Trocar classe</strong>
+                                <small>Escolha uma nova classe base</small>
+                            </div>
+                            <b>💎 550</b>
+                        </div>
+
+                        <select
+                            id="loja-premium-classe-destino"
+                            class="loja-premium-servico-select"
+                        ></select>
+
+                        <div class="loja-premium-servico-aviso">
+                            Seus itens permanecem na mochila. Equipamentos de combate serão desequipados, a evolução da classe será reiniciada e as habilidades da classe atual ficarão guardadas.
+                        </div>
+
+                        <label class="loja-premium-concordo">
+                            <input type="checkbox" id="loja-premium-concordo-classe">
+                            <span>Li e concordo com a troca de classe.</span>
+                        </label>
+
+                        <button
+                            type="button"
+                            class="loja-premium-servico-comprar"
+                            data-servico="classe"
+                            disabled
+                        >
+                            CONFIRMAR POR 550 GEMAS
+                        </button>
+                    </article>
+
+                    <article class="loja-premium-servico-card">
+                        <div class="loja-premium-servico-cabecalho">
+                            <span class="loja-premium-servico-icone">🛠️</span>
+                            <div>
+                                <strong>Trocar profissão ativa</strong>
+                                <small>Alterne entre ofícios aprendidos</small>
+                            </div>
+                            <b>💎 250</b>
+                        </div>
+
+                        <select
+                            id="loja-premium-profissao-destino"
+                            class="loja-premium-servico-select"
+                        ></select>
+
+                        <div class="loja-premium-servico-aviso">
+                            O nível e o XP dos seus ofícios serão preservados. Este serviço não desbloqueia uma profissão nova.
+                        </div>
+
+                        <label class="loja-premium-concordo">
+                            <input type="checkbox" id="loja-premium-concordo-profissao">
+                            <span>Li e concordo com a troca de profissão.</span>
+                        </label>
+
+                        <button
+                            type="button"
+                            class="loja-premium-servico-comprar"
+                            data-servico="profissao"
+                            disabled
+                        >
+                            CONFIRMAR POR 250 GEMAS
+                        </button>
+                    </article>
+                </div>
             </section>
 
 

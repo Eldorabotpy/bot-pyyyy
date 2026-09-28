@@ -15,6 +15,8 @@
         abaAtual: "pacotes",
         atualizadorPedidos: null,
         pedidosAprovadosConhecidos: new Set(),
+        carregandoServicos: false,
+        comprandoServico: false,
     };
 
 
@@ -298,6 +300,182 @@
 
         if (aba === "pedidos") {
             carregarPedidosLojaPremium();
+        }
+
+        if (aba === "servicos") {
+            carregarServicosPremium();
+        }
+    }
+
+
+    async function carregarServicosPremium() {
+        if (estadoLojaPremium.carregandoServicos) return;
+
+        const userId = obterUserIdLojaPremium();
+        const carregando = document.getElementById(
+            "loja-premium-servicos-carregando"
+        );
+        const area = document.getElementById("loja-premium-servicos");
+
+        if (!userId || !area) return;
+
+        estadoLojaPremium.carregandoServicos = true;
+        if (carregando) {
+            carregando.style.display = "block";
+            carregando.textContent = "✨ Consultando os escribas...";
+        }
+        area.style.display = "none";
+
+        try {
+            const resposta = await fetch(
+                `/api/premium/servicos/${encodeURIComponent(userId)}?t=${Date.now()}`,
+                { cache: "no-store" }
+            );
+            const dados = await resposta.json();
+            if (!resposta.ok || !dados.success) {
+                throw new Error(dados.error || "Não foi possível carregar os serviços.");
+            }
+
+            renderizarOpcoesServico(
+                "classe",
+                dados.classes || [],
+                "Escolha a nova classe"
+            );
+            renderizarOpcoesServico(
+                "profissao",
+                dados.profissoes || [],
+                "Escolha o ofício ativo"
+            );
+
+            atualizarCabecalhoLojaPremium({
+                ...(estadoLojaPremium.catalogo?.jogador || {}),
+                gems: dados.saldo_gemas,
+            });
+
+            area.style.display = "grid";
+            if (carregando) carregando.style.display = "none";
+        } catch (erro) {
+            if (carregando) {
+                carregando.textContent = `❌ ${erro.message}`;
+            }
+        } finally {
+            estadoLojaPremium.carregandoServicos = false;
+        }
+    }
+
+
+    function renderizarOpcoesServico(tipo, opcoes, placeholder) {
+        const select = document.getElementById(
+            `loja-premium-${tipo}-destino`
+        );
+        const concordo = document.getElementById(
+            `loja-premium-concordo-${tipo}`
+        );
+        const botao = document.querySelector(
+            `.loja-premium-servico-comprar[data-servico="${tipo}"]`
+        );
+
+        if (!select || !concordo || !botao) return;
+
+        const disponiveis = opcoes.filter(item => !item.atual);
+        select.innerHTML = `
+            <option value="">${escaparHtml(placeholder)}</option>
+            ${disponiveis.map(item => `
+                <option value="${escaparHtml(item.id)}">
+                    ${escaparHtml(item.icone || "")} ${escaparHtml(item.nome)}${item.nivel ? ` · Nv. ${Number(item.nivel)}` : ""}
+                </option>
+            `).join("")}
+        `;
+
+        if (disponiveis.length === 0) {
+            select.innerHTML = `
+                <option value="">Nenhuma opção disponível</option>
+            `;
+        }
+
+        select.disabled = disponiveis.length === 0;
+        concordo.checked = false;
+        concordo.disabled = disponiveis.length === 0;
+        botao.disabled = true;
+    }
+
+
+    function sincronizarBotaoServico(tipo) {
+        const select = document.getElementById(
+            `loja-premium-${tipo}-destino`
+        );
+        const concordo = document.getElementById(
+            `loja-premium-concordo-${tipo}`
+        );
+        const botao = document.querySelector(
+            `.loja-premium-servico-comprar[data-servico="${tipo}"]`
+        );
+
+        if (botao) {
+            botao.disabled = !select?.value || !concordo?.checked
+                || estadoLojaPremium.comprandoServico;
+        }
+    }
+
+
+    async function comprarServicoPremium(tipo, botao) {
+        if (estadoLojaPremium.comprandoServico) return;
+
+        const userId = obterUserIdLojaPremium();
+        const select = document.getElementById(
+            `loja-premium-${tipo}-destino`
+        );
+        const concordo = document.getElementById(
+            `loja-premium-concordo-${tipo}`
+        );
+
+        if (!userId || !select?.value || !concordo?.checked) {
+            mostrarMensagemLojaPremium(
+                "Escolha o destino e marque Li e concordo.",
+                "erro"
+            );
+            return;
+        }
+
+        estadoLojaPremium.comprandoServico = true;
+        const textoAnterior = botao.textContent;
+        botao.disabled = true;
+        botao.textContent = "REALIZANDO TROCA...";
+
+        try {
+            const resposta = await fetch("/api/premium/servico/comprar", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    user_id: userId,
+                    tipo,
+                    destino: select.value,
+                    concordou: true,
+                }),
+            });
+            const dados = await resposta.json();
+            if (!resposta.ok || !dados.success) {
+                throw new Error(dados.error || "Não foi possível concluir a troca.");
+            }
+
+            mostrarMensagemLojaPremium(
+                `✅ ${dados.message} Saldo: ${formatarNumero(dados.saldo_gemas)} Gemas.`,
+                "sucesso"
+            );
+
+            await Promise.all([
+                carregarCatalogoLojaPremium(),
+                typeof window.carregarMeuPerfil === "function"
+                    ? window.carregarMeuPerfil()
+                    : Promise.resolve(),
+            ]);
+            await carregarServicosPremium();
+        } catch (erro) {
+            mostrarMensagemLojaPremium(erro.message, "erro");
+        } finally {
+            estadoLojaPremium.comprandoServico = false;
+            botao.textContent = textoAnterior;
+            sincronizarBotaoServico(tipo);
         }
     }
 
@@ -1864,6 +2042,31 @@
     // =========================================================
 
     function instalarEventosLojaPremium() {
+
+        ["classe", "profissao"].forEach(tipo => {
+            const select = document.getElementById(
+                `loja-premium-${tipo}-destino`
+            );
+            const concordo = document.getElementById(
+                `loja-premium-concordo-${tipo}`
+            );
+            const botao = document.querySelector(
+                `.loja-premium-servico-comprar[data-servico="${tipo}"]`
+            );
+
+            select?.addEventListener(
+                "change",
+                () => sincronizarBotaoServico(tipo)
+            );
+            concordo?.addEventListener(
+                "change",
+                () => sincronizarBotaoServico(tipo)
+            );
+            botao?.addEventListener(
+                "click",
+                () => comprarServicoPremium(tipo, botao)
+            );
+        });
         
         const jaPaguei =
             document.getElementById(
