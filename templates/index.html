@@ -15,7 +15,7 @@
     <link rel="stylesheet" href="/static/css/loja_aventureiro.css">
 
     <link rel="stylesheet" href="{{ url_for('static', filename='css/joystick.css') }}">
-    <link rel="stylesheet" href="/static/css/style.css?v=302">
+    <link rel="stylesheet" href="/static/css/style.css?v=303">
     <link rel="stylesheet" href="/static/css/perfil.css">
     <link rel="stylesheet" href="/static/css/perfil_moderno.css?v=1">
     <link rel="stylesheet" href="/static/css/ui_game.css">
@@ -571,6 +571,8 @@
     <script src="/static/js/dialogos_eldora.js?v=1"></script>
     <link rel="stylesheet" href="/static/css/runas.css?v=1">
     <script src="/static/js/runas.js?v=1"></script>
+<link rel="stylesheet" href="/static/css/menu_heroi.css?v=1">
+    <script defer src="/static/js/menu_heroi.js?v=1"></script>
 </head>
 <body>
 
@@ -749,7 +751,7 @@
     
     <header><h1>🏰 𝐑𝐞𝐢𝐧𝐨 𝐝𝐞 𝐄𝐥𝐝𝐨𝐫𝐚 🏰</h1></header>
 
-    <button id="btn-abrir-menu" onclick="abrirMenu()">
+    <button id="btn-abrir-menu" onclick="abrirMenu()" aria-label="Abrir menu do herói" aria-controls="side-menu" aria-expanded="false">
         <img src="/static/assets/sprites/ui/botao_menu.png" alt="Menu" onerror="this.src='https://img.icons8.com/color/48/settings.png'">
     </button>
 
