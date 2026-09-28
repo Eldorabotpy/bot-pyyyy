@@ -336,6 +336,44 @@
                 throw new Error(dados.error || "Não foi possível carregar os serviços.");
             }
 
+            const premium =
+                dados.eldora_premium || {};
+
+
+            const trocaClasseGratis =
+                premium.troca_classe_gratis
+                === true;
+
+
+            const precoClasse =
+                document.getElementById(
+                    "loja-premium-classe-preco"
+                );
+
+
+            const botaoClasse =
+                document.querySelector(
+                    '.loja-premium-servico-comprar[data-servico="classe"]'
+                );
+
+
+            if (precoClasse) {
+
+                precoClasse.textContent =
+                    trocaClasseGratis
+                        ? "👑 GRÁTIS"
+                        : "💎 550";
+            }
+
+
+            if (botaoClasse) {
+
+                botaoClasse.textContent =
+                    trocaClasseGratis
+                        ? "USAR TROCA PREMIUM"
+                        : "CONFIRMAR POR 550 GEMAS";
+            }
+
             renderizarOpcoesServico(
                 "classe",
                 dados.classes || [],
@@ -439,6 +477,7 @@
 
         estadoLojaPremium.comprandoServico = true;
         const textoAnterior = botao.textContent;
+        let textoServicoAtualizado = false;        
         botao.disabled = true;
         botao.textContent = "REALIZANDO TROCA...";
 
@@ -470,11 +509,14 @@
                     : Promise.resolve(),
             ]);
             await carregarServicosPremium();
+            textoServicoAtualizado = true;
         } catch (erro) {
             mostrarMensagemLojaPremium(erro.message, "erro");
         } finally {
             estadoLojaPremium.comprandoServico = false;
-            botao.textContent = textoAnterior;
+            if (!textoServicoAtualizado) {
+                botao.textContent = textoAnterior;
+            }
             sincronizarBotaoServico(tipo);
         }
     }
@@ -611,6 +653,10 @@
                 dados.pacotes || []
             );
 
+            renderizarEldoraPremium(
+                dados.premium || null,
+                dados.eldora_premium || {}
+            );
 
             if (carregando) {
 
@@ -687,6 +733,188 @@
         }
     }
 
+        function renderizarEldoraPremium(
+        plano,
+        status
+    ) {
+
+        const area =
+            document.getElementById(
+                "loja-premium-plano"
+            );
+
+
+        if (!area) {
+            return;
+        }
+
+
+        if (!plano) {
+
+            area.innerHTML = `
+                <div class="loja-premium-vazio">
+                    Eldora Premium indisponível
+                    no momento.
+                </div>
+            `;
+
+            return;
+        }
+
+
+        const ativo =
+            status?.ativo === true;
+
+
+        const nome =
+            escaparHtml(
+                plano.nome ||
+                "Eldora Premium"
+            );
+
+
+        const valor =
+            escaparHtml(
+                plano.valor_formatado ||
+                ""
+            );
+
+
+        const dias =
+            Number(
+                plano.dias || 0
+            );
+
+
+        const chaves =
+            Number(
+                plano.chaves_masmorra || 0
+            );
+
+
+        const trocas =
+            Number(
+                plano.trocas_classe || 0
+            );
+
+
+        const autoCacada =
+            plano.auto_cacada === true;
+
+
+        const expiraEm =
+            ativo
+                ? formatarData(
+                    status.expira_em
+                )
+                : "";
+
+
+        area.className =
+            "loja-premium-pacote destaque";
+
+
+        area.innerHTML = `
+
+            <div class="loja-premium-badge">
+                👑 ELDORA PREMIUM
+            </div>
+
+
+            <div
+                class="loja-premium-pacote-icone"
+            >
+                👑
+            </div>
+
+
+            <div
+                class="loja-premium-pacote-nome"
+            >
+                ${nome}
+            </div>
+
+
+            <div
+                class="loja-premium-pacote-descricao"
+            >
+                ${dias} dias de benefícios
+                especiais para sua jornada.
+            </div>
+
+
+            <div
+                class="loja-premium-pacote-descricao"
+            >
+                ${autoCacada
+                    ? "🤖 Auto Caçada<br>"
+                    : ""
+                }
+
+                🗝️ ${chaves}
+                Chaves de Masmorra<br>
+
+                🔄 ${trocas}
+                Troca de Classe
+            </div>
+
+
+            ${
+                ativo
+                    ? `
+                        <div
+                            class="loja-premium-pacote-descricao"
+                        >
+                            ✅ Premium ativo<br>
+                            Expira em:
+                            ${escaparHtml(expiraEm)}
+                        </div>
+                    `
+                    : ""
+            }
+
+
+            <div
+                class="loja-premium-pacote-preco"
+            >
+                ${valor}
+            </div>
+
+
+            <button
+                type="button"
+                class="loja-premium-comprar"
+                id="loja-premium-assinar"
+            >
+                ${
+                    ativo
+                        ? "RENOVAR ELDORA PREMIUM"
+                        : "ASSINAR ELDORA PREMIUM"
+                }
+            </button>
+        `;
+
+
+        const botao =
+            document.getElementById(
+                "loja-premium-assinar"
+            );
+
+
+        if (botao) {
+
+            botao.addEventListener(
+                "click",
+                () => {
+
+                    criarPedidoLojaPremium(
+                        plano.id,
+                        botao
+                    );
+                }
+            );
+        }
+    }
 
     function renderizarPacotesLojaPremium(
         pacotes
@@ -1139,10 +1367,21 @@
                 );
 
 
-            const campoGemas =
+            const campoProdutoIcone =
                 document.getElementById(
-                    "loja-premium-checkout-gemas"
+                    "loja-premium-checkout-produto-icone"
                 );
+
+
+            const campoProdutoUnidade =
+                document.getElementById(
+                    "loja-premium-checkout-produto-unidade"
+                );
+
+
+            const pedidoPremium =
+                pedido.tipo_produto ===
+                "eldora_premium";
 
 
             const campoValor =
@@ -1164,12 +1403,35 @@
             }
 
 
+            if (campoProdutoIcone) {
+
+                campoProdutoIcone.textContent =
+                    pedidoPremium
+                        ? "👑"
+                        : "💎";
+            }
+
+
             if (campoGemas) {
 
                 campoGemas.textContent =
-                    formatarNumero(
-                        pedido.gemas || 0
-                    );
+                    pedidoPremium
+                        ? (
+                            pedido.pacote_nome ||
+                            "Eldora Premium"
+                        )
+                        : formatarNumero(
+                            pedido.gemas || 0
+                        );
+            }
+
+
+            if (campoProdutoUnidade) {
+
+                campoProdutoUnidade.textContent =
+                    pedidoPremium
+                        ? ""
+                        : "Gemas";
             }
 
 
@@ -1570,6 +1832,20 @@
                                 "📜",
                         };
 
+                    const pedidoPremium =
+                        pedido.tipo_produto ===
+                        "eldora_premium";
+
+
+                    const produtoResumo =
+                        pedidoPremium
+                            ? `👑 ${escaparHtml(
+                                pedido.pacote_nome ||
+                                "Eldora Premium"
+                            )}`
+                            : `💎 ${formatarNumero(
+                                pedido.gemas || 0
+                            )} Gemas`;
 
                     const statusHtml = `
                         <span
@@ -1616,11 +1892,24 @@
                                     ✅ PAGAMENTO APROVADO
                                 </div>
                     
-                                <div>
-                                    💎 ${formatarNumero(
-                                        pedido.gemas || 0
-                                    )} Gemas adicionadas à sua conta.
-                                </div>
+                                ${
+                                    pedidoPremium
+                                        ? `
+                                            <div>
+                                                👑 ${escaparHtml(
+                                                    pedido.pacote_nome ||
+                                                    "Eldora Premium"
+                                                )} aplicado à sua conta.
+                                            </div>
+                                        `
+                                        : `
+                                            <div>
+                                                💎 ${formatarNumero(
+                                                    pedido.gemas || 0
+                                                )} Gemas adicionadas à sua conta.
+                                            </div>
+                                        `
+                                }
 
                                 ${
                                     pedido.aprovado_em
@@ -1766,9 +2055,7 @@
                                     font-weight:900;
                                 "
                             >
-                                💎 ${formatarNumero(
-                                    pedido.gemas
-                                )} Gemas
+                                ${produtoResumo}
                             </div>
                     
                     

@@ -285,37 +285,96 @@
         },
     ];
 
+    const indiceEnciclopedia = new Map(ENCICLOPEDIA_ELDORA.map(item => [item.id, item]));
+    let caminhoEnciclopedia = [];
+    let carregamentoEnciclopedia = null;
+    let catalogoEnciclopediaPronto = false;
+    let limiteAssuntosEnciclopedia = 30;
+    const filhosEnciclopedia = new Map();
+    const normalizarBuscaEnciclopedia = texto => String(texto).normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
+    function cardEnciclopedia(item) {
+        const filhos = (filhosEnciclopedia.get(item.id) || []).length;
+        return `<button class="central-card central-enciclopedia-card" type="button"
+            data-enciclopedia-id="${escaparHtmlCentral(item.id)}">
+            <span class="central-card-icone">${escaparHtmlCentral(item.icone)}</span>
+            <h4>${escaparHtmlCentral(item.titulo)}</h4>
+            <p>${escaparHtmlCentral(item.resumo)}</p>
+            <small>${filhos ? filhos + ' assuntos · Explorar' : 'Ler detalhes'} →</small>
+        </button>`;
+    }
+
+    async function carregarEnciclopediaCentral() {
+        if (catalogoEnciclopediaPronto) return;
+        if (carregamentoEnciclopedia) return carregamentoEnciclopedia;
+        const status = elemento('central-enciclopedia-status');
+        status.textContent = 'Consultando os registros do reino…';
+        carregamentoEnciclopedia = (async () => {
+            try {
+                const resposta = await fetch('/api/enciclopedia');
+                if (!resposta.ok) throw new Error('Falha no catálogo');
+                const dados = await resposta.json();
+                if (!dados.success || !Array.isArray(dados.nodes)) throw new Error('Catálogo inválido');
+                dados.nodes.forEach(item => indiceEnciclopedia.set(item.id, item));
+                // General guides remain available beside the detailed catalogues.
+                ENCICLOPEDIA_ELDORA.filter(x => x.id !== 'mundo').forEach(item => {
+                    item.secoes.forEach((secao, i) => {
+                        const id = `guia:${item.id}:${i}`;
+                        indiceEnciclopedia.set(id, { id, parent: item.id, titulo: secao[0], resumo: secao[1], icone: item.icone, secoes: [secao] });
+                    });
+                });
+                catalogoEnciclopediaPronto = true;
+                for (const item of indiceEnciclopedia.values()) {
+                    if (!item.parent) continue;
+                    if (!filhosEnciclopedia.has(item.parent)) filhosEnciclopedia.set(item.parent, []);
+                    filhosEnciclopedia.get(item.parent).push(item);
+                }
+                status.textContent = 'Busque um nome ou toque em um assunto para explorar.';
+                renderizarEnciclopediaCentral(elemento('central-enciclopedia-busca').value);
+                if (caminhoEnciclopedia.length) mostrarPaginaEnciclopedia();
+            } catch (erro) {
+                status.textContent = 'Não foi possível carregar o catálogo. Toque aqui para tentar novamente.';
+            } finally {
+                carregamentoEnciclopedia = null;
+            }
+        })();
+        return carregamentoEnciclopedia;
+    }
+
     function renderizarEnciclopediaCentral(termo = "") {
         const grade = elemento("central-enciclopedia-grade");
         const vazio = elemento("central-enciclopedia-vazio");
         if (!grade) return;
 
-        const busca = String(termo || "").trim().toLocaleLowerCase("pt-BR");
-        const itens = ENCICLOPEDIA_ELDORA.filter(function (item) {
+        const busca = normalizarBuscaEnciclopedia(termo || '').trim();
+        const itens = [...indiceEnciclopedia.values()].filter(function (item) {
             const texto = [item.titulo, item.resumo]
                 .concat(item.secoes.flat())
                 .join(" ")
-                .toLocaleLowerCase("pt-BR");
-            return !busca || texto.includes(busca);
+                ;
+            return busca ? normalizarBuscaEnciclopedia(texto).includes(busca) : !item.parent;
         });
 
-        grade.innerHTML = itens.map(function (item) {
-            return `
-                <button class="central-card central-enciclopedia-card"
-                    type="button" data-enciclopedia-id="${escaparHtmlCentral(item.id)}">
-                    <span class="central-card-icone">${escaparHtmlCentral(item.icone)}</span>
-                    <h4>${escaparHtmlCentral(item.titulo)}</h4>
-                    <p>${escaparHtmlCentral(item.resumo)}</p>
-                </button>`;
-        }).join("");
+        grade.innerHTML = itens.map(cardEnciclopedia).join('');
 
         if (vazio) vazio.style.display = itens.length ? "none" : "block";
     }
 
     function abrirVerbeteEnciclopediaCentral(id) {
-        const item = ENCICLOPEDIA_ELDORA.find(function (entrada) {
-            return entrada.id === id;
-        });
+        if (!indiceEnciclopedia.has(id)) return;
+        limiteAssuntosEnciclopedia = 30;
+        elemento('central-enciclopedia-filtro').value = '';
+        caminhoEnciclopedia = [];
+        let atual = indiceEnciclopedia.get(id);
+        while (atual) {
+            caminhoEnciclopedia.unshift(atual.id);
+            atual = indiceEnciclopedia.get(atual.parent);
+        }
+        mostrarPaginaEnciclopedia();
+    }
+
+    function mostrarPaginaEnciclopedia(moverFoco = true) {
+        const item = indiceEnciclopedia.get(caminhoEnciclopedia.at(-1));
         if (!item) return;
 
         const menu = elemento("central-enciclopedia-menu");
@@ -326,23 +385,45 @@
         elemento("central-enciclopedia-detalhe-icone").textContent = item.icone;
         elemento("central-enciclopedia-detalhe-titulo").textContent = item.titulo;
         elemento("central-enciclopedia-detalhe-resumo").textContent = item.resumo;
+        elemento('central-enciclopedia-caminho').textContent = ['Enciclopédia', ...caminhoEnciclopedia.map(id => indiceEnciclopedia.get(id).titulo)].join(' › ');
+        elemento('central-enciclopedia-voltar').textContent = caminhoEnciclopedia.length > 1 ? '← ' + indiceEnciclopedia.get(caminhoEnciclopedia.at(-2)).titulo : '← Todas as categorias';
+        const todosFilhos = filhosEnciclopedia.get(item.id) || [];
+        const filtro = elemento('central-enciclopedia-filtro');
+        filtro.hidden = !todosFilhos.length;
+        const termo = normalizarBuscaEnciclopedia(filtro.value).trim();
+        const filhos = todosFilhos.filter(x => normalizarBuscaEnciclopedia(x.titulo + ' ' + x.resumo).includes(termo));
+        const mais = elemento('central-enciclopedia-mais');
+        mais.hidden = filhos.length <= limiteAssuntosEnciclopedia;
+        mais.textContent = `Mostrar mais (${Math.max(0, filhos.length - limiteAssuntosEnciclopedia)} restantes)`;
         elemento("central-enciclopedia-detalhe-conteudo").innerHTML =
-            item.secoes.map(function (secao) {
+            (item.parent ? item.secoes : []).map(function (secao) {
                 return `<article class="central-enciclopedia-bloco">
                     <h4>${escaparHtmlCentral(secao[0])}</h4>
                     <p>${escaparHtmlCentral(secao[1])}</p>
                 </article>`;
-            }).join("");
+            }).join("") + '<div class="central-grade">' + filhos.slice(0, limiteAssuntosEnciclopedia).map(cardEnciclopedia).join('') + '</div>'
+            + (termo && !filhos.length ? '<p class="central-enciclopedia-status">Nenhum assunto encontrado nesta página.</p>' : '');
 
         const scroll = elemento("central-eldora-scroll");
-        if (scroll) scroll.scrollTop = 0;
+        if (moverFoco) {
+            if (scroll) scroll.scrollTop = elemento('central-tab-enciclopedia').offsetTop - 64;
+            elemento('central-enciclopedia-voltar').focus({preventScroll: true});
+        }
     }
 
     function voltarMenuEnciclopediaCentral() {
+        limiteAssuntosEnciclopedia = 30;
+        elemento('central-enciclopedia-filtro').value = '';
+        caminhoEnciclopedia.pop();
+        if (caminhoEnciclopedia.length) {
+            mostrarPaginaEnciclopedia();
+            return;
+        }
         const menu = elemento("central-enciclopedia-menu");
         const detalhe = elemento("central-enciclopedia-detalhe");
         if (menu) menu.style.display = "block";
         if (detalhe) detalhe.style.display = "none";
+        elemento('central-enciclopedia-busca').focus({preventScroll: true});
     }
 
 
@@ -817,6 +898,8 @@
         atualizarHeroCentral(
             abaId
         );
+
+        if (abaId === 'enciclopedia') carregarEnciclopediaCentral();
 
 
         // ====================================================
@@ -7629,6 +7712,21 @@
     // ========================================================
 
     function prepararCentralEldora() {
+
+        elemento('central-enciclopedia-filtro')?.addEventListener('input', () => {
+            limiteAssuntosEnciclopedia = 30;
+            mostrarPaginaEnciclopedia(false);
+        });
+        elemento('central-enciclopedia-mais')?.addEventListener('click', () => {
+            limiteAssuntosEnciclopedia += 30;
+            mostrarPaginaEnciclopedia(false);
+        });
+
+        elemento('central-enciclopedia-status')?.addEventListener('click', carregarEnciclopediaCentral);
+        elemento('central-enciclopedia-detalhe-conteudo')?.addEventListener('click', evento => {
+            const card = evento.target.closest('[data-enciclopedia-id]');
+            if (card) abrirVerbeteEnciclopediaCentral(card.dataset.enciclopediaId);
+        });
 
         renderizarEnciclopediaCentral();
 

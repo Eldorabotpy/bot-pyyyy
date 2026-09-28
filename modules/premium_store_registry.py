@@ -215,6 +215,47 @@ PACOTES_GEMAS = {
     },
 }
 
+# ============================================================
+# 👑 ELDORA PREMIUM
+# ============================================================
+
+ELDORA_PREMIUM = {
+
+    "id":
+        "eldora_premium_30d",
+
+    "tipo_produto":
+        "eldora_premium",
+
+    "nome":
+        "Eldora Premium",
+
+    "valor_centavos":
+        5000,
+
+    "dias":
+        30,
+
+    "chaves_masmorra":
+        10,
+
+    "trocas_classe":
+        1,
+
+    "auto_cacada":
+        True,
+        
+    "icone":
+        "👑",
+
+    "descricao": (
+        "30 dias de Eldora Premium com "
+        "benefícios exclusivos."
+    ),
+
+    "ativo":
+        True,
+}
 
 # ============================================================
 # 📦 LISTAR PACOTES ATIVOS
@@ -289,6 +330,67 @@ def obter_pacote_gemas(
         pacote
     )
 
+# ============================================================
+# 👑 OBTER ELDORA PREMIUM
+# ============================================================
+
+def obter_eldora_premium():
+
+    if not ELDORA_PREMIUM.get(
+        "ativo",
+        False,
+    ):
+        return None
+
+
+    return deepcopy(
+        ELDORA_PREMIUM
+    )
+
+# ============================================================
+# 🛒 OBTER PRODUTO DA LOJA
+# ============================================================
+
+def obter_produto_loja(
+    produto_id,
+):
+
+    produto_id = str(
+        produto_id or ""
+    ).strip()
+
+
+    if not produto_id:
+        return None
+
+
+    pacote = obter_pacote_gemas(
+        produto_id
+    )
+
+
+    if pacote:
+
+        pacote[
+            "tipo_produto"
+        ] = "gemas"
+
+        return pacote
+
+
+    premium = obter_eldora_premium()
+
+
+    if (
+        premium
+        and premium.get(
+            "id"
+        ) == produto_id
+    ):
+        return premium
+
+
+    return None
 
 # ============================================================
 # 💵 FORMATAR VALOR

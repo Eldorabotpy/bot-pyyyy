@@ -20,7 +20,9 @@ from pymongo import (
 from modules.premium_store_registry import (
     formatar_valor_reais,
     listar_pacotes_gemas,
+    obter_eldora_premium,
     obter_pacote_gemas,
+    obter_produto_loja,
 )
 
 
@@ -162,6 +164,494 @@ def _normalizar_datetime_utc(
         timezone.utc
     )
 
+def _calcular_expiracao_eldora_premium(
+    expira_atual,
+    dias,
+    agora=None,
+):
+
+    agora = _normalizar_datetime_utc(
+        agora or _agora()
+    )
+
+
+    expira_atual = (
+        _normalizar_datetime_utc(
+            expira_atual
+        )
+    )
+
+
+    dias = max(
+        0,
+        int(
+            dias or 0
+        ),
+    )
+
+
+    if dias <= 0:
+        return None
+
+
+    base = agora
+
+
+    if (
+        isinstance(
+            expira_atual,
+            datetime,
+        )
+        and expira_atual > agora
+    ):
+        base = expira_atual
+
+
+    return (
+        base
+        + timedelta(
+            days=dias
+        )
+    )
+
+def _quantidade_chaves_masmorra(
+    item,
+):
+
+    if isinstance(
+        item,
+        dict,
+    ):
+
+        try:
+            return max(
+                0,
+                int(
+                    item.get(
+                        "quantity",
+                        0,
+                    )
+                    or 0
+                ),
+            )
+
+        except (
+            TypeError,
+            ValueError,
+        ):
+            return 0
+
+
+    if isinstance(
+        item,
+        int,
+    ):
+
+        return max(
+            0,
+            int(item),
+        )
+
+
+    return 0
+
+
+def _montar_chave_masmorra(
+    item_atual,
+    adicionar,
+):
+
+    quantidade_atual = (
+        _quantidade_chaves_masmorra(
+            item_atual
+        )
+    )
+
+
+    adicionar = max(
+        0,
+        int(
+            adicionar or 0
+        ),
+    )
+
+
+    novo_item = {}
+
+
+    if isinstance(
+        item_atual,
+        dict,
+    ):
+        novo_item = dict(
+            item_atual
+        )
+
+
+    novo_item[
+        "base_id"
+    ] = "chave_masmorra"
+
+    novo_item[
+        "quantity"
+    ] = (
+        quantidade_atual
+        + adicionar
+    )
+
+
+    return novo_item
+
+def _montar_estado_eldora_premium(
+    premium_atual,
+    dias,
+    trocas_classe,
+    codigo_pedido,
+    agora=None,
+):
+
+    agora = _normalizar_datetime_utc(
+        agora or _agora()
+    )
+
+
+    if not isinstance(
+        premium_atual,
+        dict,
+    ):
+        premium_atual = {}
+
+
+    expiracao_atual = (
+        _normalizar_datetime_utc(
+            premium_atual.get(
+                "expires_at"
+            )
+        )
+    )
+
+
+    premium_ativo = (
+        isinstance(
+            expiracao_atual,
+            datetime,
+        )
+        and expiracao_atual > agora
+    )
+
+
+    creditos_atuais = 0
+
+
+    if premium_ativo:
+
+        try:
+            creditos_atuais = max(
+                0,
+                int(
+                    premium_atual.get(
+                        "class_change_credits",
+                        0,
+                    )
+                    or 0
+                ),
+            )
+
+        except (
+            TypeError,
+            ValueError,
+        ):
+            creditos_atuais = 0
+
+
+    novos_creditos = (
+        creditos_atuais
+        + max(
+            0,
+            int(
+                trocas_classe or 0
+            ),
+        )
+    )
+
+
+    nova_expiracao = (
+        _calcular_expiracao_eldora_premium(
+            expiracao_atual,
+            dias,
+            agora,
+        )
+    )
+
+
+    activated_at = agora
+
+
+    if premium_ativo:
+
+        activated_at = (
+            _normalizar_datetime_utc(
+                premium_atual.get(
+                    "activated_at"
+                )
+            )
+            or agora
+        )
+
+
+    return {
+        "activated_at":
+            activated_at,
+
+        "expires_at":
+            nova_expiracao,
+
+        "class_change_credits":
+            novos_creditos,
+
+        "last_order_code":
+            str(
+                codigo_pedido or ""
+            ).strip(),
+
+        "updated_at":
+            agora,
+    }
+
+def _obter_status_eldora_premium(
+    jogador,
+    agora=None,
+):
+
+    agora = _normalizar_datetime_utc(
+        agora or _agora()
+    )
+
+
+    if not isinstance(
+        jogador,
+        dict,
+    ):
+        jogador = {}
+
+
+    premium = (
+        jogador.get(
+            "eldora_premium"
+        )
+        or {}
+    )
+
+
+    if not isinstance(
+        premium,
+        dict,
+    ):
+        premium = {}
+
+
+    expires_at = (
+        _normalizar_datetime_utc(
+            premium.get(
+                "expires_at"
+            )
+        )
+    )
+
+
+    ativo = (
+        isinstance(
+            expires_at,
+            datetime,
+        )
+        and expires_at > agora
+    )
+
+
+    creditos_classe = 0
+
+
+    if ativo:
+
+        try:
+            creditos_classe = max(
+                0,
+                int(
+                    premium.get(
+                        "class_change_credits",
+                        0,
+                    )
+                    or 0
+                ),
+            )
+
+        except (
+            TypeError,
+            ValueError,
+        ):
+            creditos_classe = 0
+
+
+    return {
+        "ativo":
+            ativo,
+
+        "expires_at":
+            expires_at,
+
+        "class_change_credits":
+            creditos_classe,
+    }
+
+def _preparar_credito_eldora_premium(
+    jogador,
+    pedido,
+    codigo_pedido,
+    agora=None,
+):
+
+    if not isinstance(
+        jogador,
+        dict,
+    ):
+        return None
+
+
+    if not isinstance(
+        pedido,
+        dict,
+    ):
+        return None
+
+
+    agora = _normalizar_datetime_utc(
+        agora or _agora()
+    )
+
+
+    dias = max(
+        0,
+        int(
+            pedido.get(
+                "dias",
+                0,
+            )
+            or 0
+        ),
+    )
+
+
+    chaves = max(
+        0,
+        int(
+            pedido.get(
+                "chaves_masmorra",
+                0,
+            )
+            or 0
+        ),
+    )
+
+
+    trocas_classe = max(
+        0,
+        int(
+            pedido.get(
+                "trocas_classe",
+                0,
+            )
+            or 0
+        ),
+    )
+
+
+    if dias <= 0:
+        return None
+
+
+    inventario_atual = (
+        jogador.get(
+            "inventory",
+            {},
+        )
+        or {}
+    )
+
+
+    if not isinstance(
+        inventario_atual,
+        dict,
+    ):
+        inventario_atual = {}
+
+
+    novo_inventario = dict(
+        inventario_atual
+    )
+
+
+    chave_uid = (
+        "chave_masmorra"
+    )
+
+
+    item_chave = (
+        novo_inventario.get(
+            chave_uid
+        )
+    )
+
+
+    if item_chave is None:
+
+        for uid, item in (
+            novo_inventario.items()
+        ):
+
+            if (
+                isinstance(
+                    item,
+                    dict,
+                )
+                and item.get(
+                    "base_id"
+                )
+                == "chave_masmorra"
+            ):
+                chave_uid = uid
+                item_chave = item
+                break
+
+
+    novo_inventario[
+        chave_uid
+    ] = _montar_chave_masmorra(
+        item_chave,
+        chaves,
+    )
+
+
+    novo_premium = (
+        _montar_estado_eldora_premium(
+            jogador.get(
+                "eldora_premium"
+            ),
+            dias,
+            trocas_classe,
+            codigo_pedido,
+            agora,
+        )
+    )
+
+
+    return {
+        "inventory":
+            novo_inventario,
+
+        "eldora_premium":
+            novo_premium,
+    }
+
 def _object_id(valor):
     if isinstance(
         valor,
@@ -289,10 +779,42 @@ def _serializar_pedido(
                 "",
             ),
 
+        "tipo_produto":
+            pedido.get(
+                "tipo_produto",
+                "gemas",
+            ),
+
         "gemas":
             int(
                 pedido.get(
                     "gemas",
+                    0,
+                )
+                or 0
+            ),
+        "dias":
+            int(
+                pedido.get(
+                    "dias",
+                    0,
+                )
+                or 0
+            ),
+
+        "chaves_masmorra":
+            int(
+                pedido.get(
+                    "chaves_masmorra",
+                    0,
+                )
+                or 0
+            ),
+
+        "trocas_classe":
+            int(
+                pedido.get(
+                    "trocas_classe",
                     0,
                 )
                 or 0
@@ -462,6 +984,7 @@ def obter_catalogo(
         {
             "character_name": 1,
             "gems": 1,
+            "eldora_premium": 1,
         },
     )
 
@@ -473,6 +996,11 @@ def obter_catalogo(
                 "Jogador não encontrado.",
         }
 
+    status_premium = (
+        _obter_status_eldora_premium(
+            jogador
+        )
+    )
 
     pacotes = []
 
@@ -491,6 +1019,25 @@ def obter_catalogo(
                     )
                 ),
         })
+
+    premium = (
+        obter_eldora_premium()
+    )
+
+
+    if premium:
+
+        premium = {
+            **premium,
+
+            "valor_formatado":
+                formatar_valor_reais(
+                    premium.get(
+                        "valor_centavos",
+                        0,
+                    )
+                ),
+        }
 
 
     return {
@@ -517,9 +1064,37 @@ def obter_catalogo(
                     or 0
                 ),
         },
+        "eldora_premium": {
 
+            "ativo":
+                bool(
+                    status_premium.get(
+                        "ativo",
+                        False,
+                    )
+                ),
+
+            "expira_em":
+                _serializar_data(
+                    status_premium.get(
+                        "expires_at"
+                    )
+                ),
+
+            "trocas_classe_disponiveis":
+                int(
+                    status_premium.get(
+                        "class_change_credits",
+                        0,
+                    )
+                    or 0
+                ),
+        },
         "pacotes":
             pacotes,
+
+        "premium":
+            premium,
     }
 
 
@@ -544,7 +1119,7 @@ def criar_pedido(
         }
 
 
-    pacote = obter_pacote_gemas(
+    pacote = obter_produto_loja(
         pacote_id
     )
 
@@ -553,7 +1128,7 @@ def criar_pedido(
         return {
             "success": False,
             "error": (
-                "Pacote de gemas inválido "
+                "Produto inválido "
                 "ou indisponível."
             ),
         }
@@ -623,10 +1198,46 @@ def criar_pedido(
 
         "pacote_nome":
             pacote["nome"],
+        "tipo_produto":
+            pacote.get(
+                "tipo_produto",
+                "gemas",
+            ),
 
         "gemas":
             int(
-                pacote["gemas"]
+                pacote.get(
+                    "gemas",
+                    0,
+                )
+                or 0
+            ),
+
+        "dias":
+            int(
+                pacote.get(
+                    "dias",
+                    0,
+                )
+                or 0
+            ),
+
+        "chaves_masmorra":
+            int(
+                pacote.get(
+                    "chaves_masmorra",
+                    0,
+                )
+                or 0
+            ),
+
+        "trocas_classe":
+            int(
+                pacote.get(
+                    "trocas_classe",
+                    0,
+                )
+                or 0
             ),
 
         "valor_centavos":
@@ -730,7 +1341,37 @@ def criar_pedido(
                     pedido.get(
                         "valor_centavos",
                         0,
-                    ) 
+                    )
+                ),
+
+            tipo_produto=
+                pedido.get(
+                    "tipo_produto",
+                    "gemas",
+                ),
+
+            pacote_nome=
+                pedido.get(
+                    "pacote_nome",
+                    "",
+                ),
+
+            dias=
+                pedido.get(
+                    "dias",
+                    0,
+                ),
+
+            chaves_masmorra=
+                pedido.get(
+                    "chaves_masmorra",
+                    0,
+                ),
+
+            trocas_classe=
+                pedido.get(
+                    "trocas_classe",
+                    0,
                 ),
         )
 
@@ -1015,6 +1656,33 @@ def gerar_checkout_pix(
                 int(
                     pedido.get(
                         "gemas",
+                        0,
+                    )
+                    or 0
+                ),
+
+            "dias":
+                int(
+                    pedido.get(
+                        "dias",
+                        0,
+                    )
+                    or 0
+                ),
+
+            "chaves_masmorra":
+                int(
+                    pedido.get(
+                        "chaves_masmorra",
+                        0,
+                    )
+                    or 0
+                ),
+
+            "trocas_classe":
+                int(
+                    pedido.get(
+                        "trocas_classe",
                         0,
                     )
                     or 0
@@ -1354,6 +2022,36 @@ def enviar_comprovante_pix(
                             0,
                         )
                     ),
+
+                tipo_produto=
+                    pedido.get(
+                        "tipo_produto",
+                        "gemas",
+                    ),
+
+                pacote_nome=
+                    pedido.get(
+                        "pacote_nome",
+                        "",
+                    ),
+
+                dias=
+                    pedido.get(
+                        "dias",
+                        0,
+                    ),
+
+                chaves_masmorra=
+                    pedido.get(
+                        "chaves_masmorra",
+                        0,
+                    ),
+
+                trocas_classe=
+                    pedido.get(
+                        "trocas_classe",
+                        0,
+                    ),
             )
 
 
@@ -1382,10 +2080,55 @@ def enviar_comprovante_pix(
                 "status":
                     STATUS_EM_ANALISE,
 
+                "pacote_id":
+                    pedido.get(
+                        "pacote_id",
+                        "",
+                    ),
+
+                "pacote_nome":
+                    pedido.get(
+                        "pacote_nome",
+                        "",
+                    ),
+
+                "tipo_produto":
+                    pedido.get(
+                        "tipo_produto",
+                        "gemas",
+                    ),
+
                 "gemas":
                     int(
                         pedido.get(
                             "gemas",
+                            0,
+                        )
+                        or 0
+                    ),
+
+                "dias":
+                    int(
+                        pedido.get(
+                            "dias",
+                            0,
+                        )
+                        or 0
+                    ),
+
+                "chaves_masmorra":
+                    int(
+                        pedido.get(
+                            "chaves_masmorra",
+                            0,
+                        )
+                        or 0
+                    ),
+
+                "trocas_classe":
+                    int(
+                        pedido.get(
+                            "trocas_classe",
                             0,
                         )
                         or 0
@@ -1530,6 +2273,21 @@ def _serializar_pedido_admin(
 # 🏛️ SERVIÇOS PAGOS COM GEMAS
 # ============================================================
 
+def _profissoes_disponiveis_troca(jogador, catalogo):
+    aprendidas = dict(jogador.get('learned_professions') or {})
+    atual = jogador.get('profession') or {}
+    chave_atual = str(atual.get('key') or atual.get('type') or '').strip().lower()
+    if chave_atual:
+        aprendidas[chave_atual] = atual
+    maestrias = set(jogador.get('maestrias_resgatadas') or [])
+    return {
+        chave: dict(aprendidas.get(chave) or {'level': 1, 'xp': 0})
+        for chave in catalogo
+        if chave != chave_atual and chave not in maestrias
+        and int((aprendidas.get(chave) or {}).get('level', 1) or 1) < 50
+    }
+
+
 def obter_servicos_jogador(user_id):
     jogador_id = _object_id(user_id)
 
@@ -1545,6 +2303,12 @@ def obter_servicos_jogador(user_id):
             "success": False,
             "error": "Herói não encontrado.",
         }
+
+    status_premium = (
+        _obter_status_eldora_premium(
+            jogador
+        )
+    )
 
     from modules.game_data.classes import CLASSES_DATA
     from modules.game_data.professions import PROFESSIONS_DATA
@@ -1580,7 +2344,7 @@ def obter_servicos_jogador(user_id):
         aprendidas[chave_atual] = profissao_atual
 
     profissoes = []
-    for chave, progresso in aprendidas.items():
+    for chave, progresso in _profissoes_disponiveis_troca(jogador, PROFESSIONS_DATA).items():
         chave = str(chave).strip().lower()
         dados = PROFESSIONS_DATA.get(chave)
         if not dados:
@@ -1599,6 +2363,50 @@ def obter_servicos_jogador(user_id):
     return {
         "success": True,
         "saldo_gemas": int(jogador.get("gems", 0) or 0),
+        "eldora_premium": {
+
+            "ativo":
+                bool(
+                    status_premium.get(
+                        "ativo",
+                        False,
+                    )
+                ),
+
+            "expira_em":
+                _serializar_data(
+                    status_premium.get(
+                        "expires_at"
+                    )
+                ),
+
+            "trocas_classe_disponiveis":
+                int(
+                    status_premium.get(
+                        "class_change_credits",
+                        0,
+                    )
+                    or 0
+                ),
+
+            "troca_classe_gratis":
+                (
+                    bool(
+                        status_premium.get(
+                            "ativo",
+                            False,
+                        )
+                    )
+                    and
+                    int(
+                        status_premium.get(
+                            "class_change_credits",
+                            0,
+                        )
+                        or 0
+                    ) > 0
+                ),
+        },
         "classe_atual": classe_atual,
         "profissao_atual": chave_atual,
         "classes": classes,
@@ -1653,18 +2461,18 @@ def comprar_servico_gemas(
             atual.get("key") or atual.get("type") or ""
         ).strip().lower()
 
-        if atual_key and atual_key not in aprendidas:
+        if atual_key:
             aprendidas[atual_key] = atual
 
         if destino == atual_key:
             return {"success": False, "error": "Este ofício já está ativo."}
 
-        progresso = aprendidas.get(destino)
+        progresso = _profissoes_disponiveis_troca(jogador, PROFESSIONS_DATA).get(destino)
         dados_profissao = PROFESSIONS_DATA.get(destino)
         if not isinstance(progresso, dict) or not dados_profissao:
             return {
                 "success": False,
-                "error": "Você ainda não aprendeu este ofício.",
+                "error": "Escolha uma profissão diferente da atual e ainda sem maestria.",
             }
 
         nova_profissao = dict(progresso)
@@ -1674,20 +2482,21 @@ def comprar_servico_gemas(
             "category": dados_profissao.get("category"),
             "display_name": dados_profissao.get("display_name"),
         })
+        aprendidas[destino] = nova_profissao
 
         custo = CUSTO_TROCA_PROFISSAO
         atualizado = users_col.find_one_and_update(
             {
                 "_id": jogador_id,
                 "gems": {"$gte": custo},
-                "$or": [
-                    {"profession.key": {"$ne": destino}},
-                    {"profession.key": {"$exists": False}},
-                ],
+                "profession": jogador.get('profession') if 'profession' in jogador else {"$exists": False},
+                "learned_professions": jogador.get('learned_professions') if 'learned_professions' in jogador else {"$exists": False},
+                "maestrias_resgatadas": jogador.get('maestrias_resgatadas') if 'maestrias_resgatadas' in jogador else {"$exists": False},
+                "player_state": jogador.get('player_state') if 'player_state' in jogador else {"$exists": False},
             },
             {
                 "$inc": {"gems": -custo},
-                "$set": {"profession": nova_profissao},
+                "$set": {"profession": nova_profissao, "learned_professions": aprendidas},
                 "$push": {
                     "premium_service_history": {
                         "tipo": tipo,
@@ -1745,35 +2554,205 @@ def comprar_servico_gemas(
                     "level": 1,
                 }
 
-        custo = CUSTO_TROCA_CLASSE
-        atualizado = users_col.find_one_and_update(
-            {
-                "_id": jogador_id,
-                "gems": {"$gte": custo},
-                "class": {"$ne": destino},
-            },
-            {
-                "$inc": {"gems": -custo},
-                "$set": {
-                    "class": destino,
-                    "equipment": {},
-                    "equipped_skin": "padrao",
-                    "evolution_progress": {},
-                    "skills": skills_destino,
-                    "equipped_skills": equipadas_destino,
-                    "class_skill_loadouts": arquivos,
-                },
-                "$push": {
-                    "premium_service_history": {
-                        "tipo": tipo,
-                        "destino": destino,
-                        "custo_gemas": custo,
-                        "criado_em": agora,
-                    }
-                },
-            },
-            return_document=ReturnDocument.AFTER,
+        status_premium = (
+            _obter_status_eldora_premium(
+                jogador,
+                agora,
+            )
         )
+
+
+        usar_credito_premium = (
+            bool(
+                status_premium.get(
+                    "ativo",
+                    False,
+                )
+            )
+            and
+            int(
+                status_premium.get(
+                    "class_change_credits",
+                    0,
+                )
+                or 0
+            ) > 0
+        )
+
+
+        if usar_credito_premium:
+
+            custo = 0
+
+
+            atualizado = (
+                users_col.find_one_and_update(
+                    {
+                        "_id":
+                            jogador_id,
+
+                        "class": {
+                            "$ne":
+                                destino
+                        },
+
+                        "eldora_premium.expires_at": {
+                            "$gt":
+                                agora
+                        },
+
+                        "eldora_premium.class_change_credits": {
+                            "$gte":
+                                1
+                        },
+                    },
+
+                    {
+                        "$inc": {
+                            "eldora_premium.class_change_credits":
+                                -1
+                        },
+
+                        "$set": {
+                            "class":
+                                destino,
+
+                            "equipment":
+                                {},
+
+                            "equipped_skin":
+                                "padrao",
+
+                            "evolution_progress":
+                                {},
+
+                            "skills":
+                                skills_destino,
+
+                            "equipped_skills":
+                                equipadas_destino,
+
+                            "class_skill_loadouts":
+                                arquivos,
+
+                            "eldora_premium.updated_at":
+                                agora,
+                        },
+
+                        "$push": {
+                            "premium_service_history": {
+                                "tipo":
+                                    tipo,
+
+                                "destino":
+                                    destino,
+
+                                "custo_gemas":
+                                    0,
+
+                                "origem":
+                                    "eldora_premium",
+
+                                "criado_em":
+                                    agora,
+                            }
+                        },
+                    },
+
+                    return_document=
+                        ReturnDocument.AFTER,
+                )
+            )
+
+
+            if not atualizado:
+
+                return {
+                    "success": False,
+
+                    "error": (
+                        "Seu crédito Premium mudou "
+                        "durante a troca. "
+                        "Atualize a loja e tente novamente."
+                    ),
+                }
+
+
+        else:
+
+            custo = CUSTO_TROCA_CLASSE
+
+
+            atualizado = (
+                users_col.find_one_and_update(
+                    {
+                        "_id":
+                            jogador_id,
+
+                        "gems": {
+                            "$gte":
+                                custo
+                        },
+
+                        "class": {
+                            "$ne":
+                                destino
+                        },
+                    },
+
+                    {
+                        "$inc": {
+                            "gems":
+                                -custo
+                        },
+
+                        "$set": {
+                            "class":
+                                destino,
+
+                            "equipment":
+                                {},
+
+                            "equipped_skin":
+                                "padrao",
+
+                            "evolution_progress":
+                                {},
+
+                            "skills":
+                                skills_destino,
+
+                            "equipped_skills":
+                                equipadas_destino,
+
+                            "class_skill_loadouts":
+                                arquivos,
+                        },
+
+                        "$push": {
+                            "premium_service_history": {
+                                "tipo":
+                                    tipo,
+
+                                "destino":
+                                    destino,
+
+                                "custo_gemas":
+                                    custo,
+
+                                "origem":
+                                    "gemas",
+
+                                "criado_em":
+                                    agora,
+                            }
+                        },
+                    },
+
+                    return_document=
+                        ReturnDocument.AFTER,
+                )
+            )
 
         nome_destino = dados_classe.get("display_name", destino.title())
 
@@ -2138,17 +3117,20 @@ def aprovar_pedido_manual(
                         )
                 },
                 {
-                    "gems": 1
+                    "gems": 1,
+                    "inventory": 1,
+                    "eldora_premium": 1,
                 },
             )
             or {}
         )
 
 
-        return {
+        resposta = {
             "success": True,
 
-            "ja_processado": True,
+            "ja_processado":
+                True,
 
             "message":
                 "Este pedido já havia sido aprovado.",
@@ -2167,6 +3149,87 @@ def aprovar_pedido_manual(
                     or 0
                 ),
         }
+
+
+        if (
+            pedido.get(
+                "tipo_produto",
+                "gemas",
+            )
+            == "eldora_premium"
+        ):
+
+            premium_atual = (
+                jogador.get(
+                    "eldora_premium"
+                )
+                or {}
+            )
+
+
+            inventario_atual = (
+                jogador.get(
+                    "inventory"
+                )
+                or {}
+            )
+
+
+            item_chave = (
+                inventario_atual.get(
+                    "chave_masmorra"
+                )
+            )
+
+
+            if item_chave is None:
+
+                for _uid, _item in (
+                    inventario_atual.items()
+                ):
+
+                    if (
+                        isinstance(
+                            _item,
+                            dict,
+                        )
+                        and _item.get(
+                            "base_id"
+                        )
+                        == "chave_masmorra"
+                    ):
+                        item_chave = _item
+                        break
+
+
+            resposta[
+                "premium_expira_em"
+            ] = _serializar_data(
+                premium_atual.get(
+                    "expires_at"
+                )
+            )
+
+
+            resposta[
+                "chaves_masmorra"
+            ] = _quantidade_chaves_masmorra(
+                item_chave
+            )
+
+
+            resposta[
+                "trocas_classe_disponiveis"
+            ] = int(
+                premium_atual.get(
+                    "class_change_credits",
+                    0,
+                )
+                or 0
+            )
+
+
+        return resposta
 
 
     if status not in {
@@ -2259,14 +3322,16 @@ def aprovar_pedido_manual(
                                 )
                         },
                         {
-                            "gems": 1
+                            "gems": 1,
+                            "inventory": 1,
+                            "eldora_premium": 1,
                         },
                     )
                     or {}
                 )
 
 
-                return {
+                resposta = {
                     "success": True,
 
                     "ja_processado":
@@ -2291,6 +3356,87 @@ def aprovar_pedido_manual(
                 }
 
 
+                if (
+                    pedido.get(
+                        "tipo_produto",
+                        "gemas",
+                    )
+                    == "eldora_premium"
+                ):
+
+                    premium_atual = (
+                        jogador.get(
+                            "eldora_premium"
+                        )
+                        or {}
+                    )
+
+
+                    inventario_atual = (
+                        jogador.get(
+                            "inventory"
+                        )
+                        or {}
+                    )
+
+
+                    item_chave = (
+                        inventario_atual.get(
+                            "chave_masmorra"
+                        )
+                    )
+
+
+                    if item_chave is None:
+
+                        for _uid, _item in (
+                            inventario_atual.items()
+                        ):
+
+                            if (
+                                isinstance(
+                                    _item,
+                                    dict,
+                                )
+                                and _item.get(
+                                    "base_id"
+                                )
+                                == "chave_masmorra"
+                            ):
+                                item_chave = _item
+                                break
+
+
+                    resposta[
+                        "premium_expira_em"
+                    ] = _serializar_data(
+                        premium_atual.get(
+                            "expires_at"
+                        )
+                    )
+
+
+                    resposta[
+                        "chaves_masmorra"
+                    ] = _quantidade_chaves_masmorra(
+                        item_chave
+                    )
+
+
+                    resposta[
+                        "trocas_classe_disponiveis"
+                    ] = int(
+                        premium_atual.get(
+                            "class_change_credits",
+                            0,
+                        )
+                        or 0
+                    )
+
+
+                return resposta
+
+
             if (
                 pedido.get(
                     "status"
@@ -2313,6 +3459,15 @@ def aprovar_pedido_manual(
     )
 
 
+    tipo_produto = str(
+        pedido.get(
+            "tipo_produto",
+            "gemas",
+        )
+        or "gemas"
+    ).strip()
+
+
     gemas = int(
         pedido.get(
             "gemas",
@@ -2322,20 +3477,467 @@ def aprovar_pedido_manual(
     )
 
 
-    if (
-        not jogador_id
-        or gemas <= 0
-    ):
+    if not jogador_id:
         return {
             "success": False,
 
             "error": (
-                "Dados de crédito do pedido "
-                "são inválidos."
+                "Jogador do pedido "
+                "não foi informado."
             ),
         }
 
 
+    if tipo_produto == "gemas":
+
+        if gemas <= 0:
+            return {
+                "success": False,
+
+                "error": (
+                    "Dados de crédito do pedido "
+                    "são inválidos."
+                ),
+            }
+
+
+    elif tipo_produto == "eldora_premium":
+
+        dias = int(
+            pedido.get(
+                "dias",
+                0,
+            )
+            or 0
+        )
+
+
+        chaves_masmorra = int(
+            pedido.get(
+                "chaves_masmorra",
+                0,
+            )
+            or 0
+        )
+
+
+        trocas_classe = int(
+            pedido.get(
+                "trocas_classe",
+                0,
+            )
+            or 0
+        )
+
+
+        if (
+            dias <= 0
+            or chaves_masmorra < 0
+            or trocas_classe < 0
+        ):
+            return {
+                "success": False,
+
+                "error": (
+                    "Dados do Eldora Premium "
+                    "são inválidos."
+                ),
+            }
+
+
+        # --------------------------------------------------------
+        # 👑 CRÉDITO PREMIUM ATÔMICO E IDEMPOTENTE
+        # --------------------------------------------------------
+
+        jogador = (
+            users_col.find_one(
+                {
+                    "_id":
+                        jogador_id,
+                },
+
+                {
+                    "inventory": 1,
+                    "eldora_premium": 1,
+                    "premium_order_credits": 1,
+                    "gems": 1,
+                },
+            )
+            or {}
+        )
+
+
+        if not jogador:
+            return {
+                "success": False,
+
+                "error":
+                    "Jogador do pedido não encontrado.",
+            }
+
+
+        creditos = (
+            jogador.get(
+                "premium_order_credits"
+            )
+            or []
+        )
+
+
+        ja_creditado = (
+            codigo_pedido
+            in creditos
+        )
+
+
+        if not ja_creditado:
+
+            credito_premium = (
+                _preparar_credito_eldora_premium(
+                    jogador,
+                    pedido,
+                    codigo_pedido,
+                    agora,
+                )
+            )
+
+
+            if not credito_premium:
+                return {
+                    "success": False,
+
+                    "error": (
+                        "Não foi possível preparar "
+                        "o crédito do Eldora Premium."
+                    ),
+                }
+
+
+            filtro_credito = {
+                "_id":
+                    jogador_id,
+
+                "premium_order_credits": {
+                    "$ne":
+                        codigo_pedido
+                },
+            }
+
+
+            if "inventory" in jogador:
+
+                filtro_credito[
+                    "inventory"
+                ] = jogador.get(
+                    "inventory"
+                )
+
+            else:
+
+                filtro_credito[
+                    "inventory"
+                ] = {
+                    "$exists":
+                        False
+                }
+
+
+            if "eldora_premium" in jogador:
+
+                filtro_credito[
+                    "eldora_premium"
+                ] = jogador.get(
+                    "eldora_premium"
+                )
+
+            else:
+
+                filtro_credito[
+                    "eldora_premium"
+                ] = {
+                    "$exists":
+                        False
+                }
+
+
+            credito = (
+                users_col.update_one(
+                    filtro_credito,
+
+                    {
+                        "$set": {
+                            "inventory":
+                                credito_premium[
+                                    "inventory"
+                                ],
+
+                            "eldora_premium":
+                                credito_premium[
+                                    "eldora_premium"
+                                ],
+                        },
+
+                        "$addToSet": {
+                            "premium_order_credits":
+                                codigo_pedido
+                        },
+                    },
+                )
+            )
+
+
+            if credito.modified_count != 1:
+
+                jogador_conferencia = (
+                    users_col.find_one(
+                        {
+                            "_id":
+                                jogador_id,
+                        },
+
+                        {
+                            "premium_order_credits": 1,
+                        },
+                    )
+                    or {}
+                )
+
+
+                creditos = (
+                    jogador_conferencia.get(
+                        "premium_order_credits"
+                    )
+                    or []
+                )
+
+
+                if (
+                    codigo_pedido
+                    not in creditos
+                ):
+                    return {
+                        "success": False,
+
+                        "error": (
+                            "Os dados do jogador mudaram "
+                            "durante a aprovação. "
+                            "Execute Aprovar novamente."
+                        ),
+                    }
+
+
+        # --------------------------------------------------------
+        # ✅ FINALIZA PEDIDO PREMIUM
+        # --------------------------------------------------------
+
+        finalizacao = (
+            premium_orders_col
+            .update_one(
+                {
+                    "_id":
+                        pedido["_id"],
+
+                    "status":
+                        STATUS_PROCESSANDO_APROVACAO,
+                },
+
+                {
+                    "$set": {
+                        "status":
+                            STATUS_APROVADO,
+
+                        "aprovado_em":
+                            agora,
+
+                        "aprovado_por":
+                            aprovado_por,
+
+                        "atualizado_em":
+                            agora,
+
+                        "credito_confirmado":
+                            True,
+                    }
+                },
+            )
+        )
+
+
+        if finalizacao.modified_count != 1:
+
+            pedido_atual = (
+                premium_orders_col
+                .find_one({
+                    "_id":
+                        pedido["_id"]
+                })
+            )
+
+
+            if (
+                not pedido_atual
+                or pedido_atual.get(
+                    "status"
+                )
+                != STATUS_APROVADO
+            ):
+                return {
+                    "success": False,
+
+                    "error": (
+                        "O Eldora Premium foi registrado "
+                        "para o jogador, mas o pedido "
+                        "não conseguiu finalizar. "
+                        "Execute Aprovar novamente para "
+                        "concluir com segurança."
+                    ),
+                }
+
+
+        jogador_atual = (
+            users_col.find_one(
+                {
+                    "_id":
+                        jogador_id,
+                },
+
+                {
+                    "gems": 1,
+                    "inventory": 1,
+                    "eldora_premium": 1,
+                },
+            )
+            or {}
+        )
+
+
+        premium_atual = (
+            jogador_atual.get(
+                "eldora_premium"
+            )
+            or {}
+        )
+
+
+        inventario_atual = (
+            jogador_atual.get(
+                "inventory"
+            )
+            or {}
+        )
+
+
+        item_chave = (
+            inventario_atual.get(
+                "chave_masmorra"
+            )
+        )
+
+
+        if item_chave is None:
+
+            for _uid, _item in (
+                inventario_atual.items()
+            ):
+
+                if (
+                    isinstance(
+                        _item,
+                        dict,
+                    )
+                    and _item.get(
+                        "base_id"
+                    )
+                    == "chave_masmorra"
+                ):
+                    item_chave = _item
+                    break
+
+
+        quantidade_chaves = (
+            _quantidade_chaves_masmorra(
+                item_chave
+            )
+        )
+
+
+        pedido_final = (
+            premium_orders_col
+            .find_one({
+                "_id":
+                    pedido["_id"]
+            })
+            or pedido
+        )
+
+
+        return {
+            "success": True,
+
+            "message": (
+                f"Pedido {codigo_pedido} aprovado. "
+                "Eldora Premium ativado com sucesso."
+            ),
+
+            "pedido":
+                _serializar_pedido_admin(
+                    pedido_final
+                ),
+
+            "novo_saldo_gemas":
+                int(
+                    jogador_atual.get(
+                        "gems",
+                        0,
+                    )
+                    or 0
+                ),
+
+            "premium_expira_em":
+                _serializar_data(
+                    premium_atual.get(
+                        "expires_at"
+                    )
+                ),
+
+            "chaves_masmorra":
+                quantidade_chaves,
+
+            "trocas_classe_disponiveis":
+                int(
+                    premium_atual.get(
+                        "class_change_credits",
+                        0,
+                    )
+                    or 0
+                ),
+        }
+
+
+    else:
+        return {
+            "success": False,
+
+            "error": (
+                "Tipo de produto do pedido "
+                "não é reconhecido."
+            ),
+        }
+
+    # --------------------------------------------------------
+    # 💎 GARANTIA DO FLUXO DE GEMAS
+    # --------------------------------------------------------
+
+    if tipo_produto != "gemas":
+        return {
+            "success": False,
+
+            "error": (
+                "O produto não pode utilizar "
+                "o fluxo de crédito de Gemas."
+            ),
+        }
+    
     jogador = users_col.find_one(
         {
             "_id":

@@ -91,6 +91,13 @@
                 💎 Gemas
             </button>
 
+            <button
+                type="button"
+                class="loja-premium-aba"
+                data-loja-premium-aba="premium"
+            >
+                👑 Premium
+            </button>
 
             <button
                 type="button"
@@ -157,6 +164,37 @@
 
             </section>
 
+            <!-- =============================================
+                 ELDORA PREMIUM
+                 ============================================= -->
+
+            <section
+                id="loja-premium-aba-premium"
+                class="loja-premium-conteudo"
+            >
+
+                <div class="loja-premium-secao-topo">
+
+                    <h3>
+                        👑 Eldora Premium
+                    </h3>
+
+                    <p>
+                        Benefícios especiais para sua jornada
+                        em Eldora.
+                    </p>
+
+                </div>
+
+
+                <div
+                    id="loja-premium-plano"
+                    class="loja-premium-vazio"
+                >
+                    ✨ Carregando Eldora Premium...
+                </div>
+
+            </section>
 
             <!-- =============================================
                  SERVIÇOS
@@ -190,7 +228,9 @@
                                 <strong>Trocar classe</strong>
                                 <small>Escolha uma nova classe base</small>
                             </div>
-                            <b>💎 550</b>
+                            <b id="loja-premium-classe-preco">
+                                💎 550
+                            </b>
                         </div>
 
                         <select
@@ -222,7 +262,7 @@
                             <span class="loja-premium-servico-icone">🛠️</span>
                             <div>
                                 <strong>Trocar profissão ativa</strong>
-                                <small>Alterne entre ofícios aprendidos</small>
+                                <small>Escolha um ofício ainda sem maestria</small>
                             </div>
                             <b>💎 250</b>
                         </div>
@@ -233,7 +273,7 @@
                         ></select>
 
                         <div class="loja-premium-servico-aviso">
-                            O nível e o XP dos seus ofícios serão preservados. Este serviço não desbloqueia uma profissão nova.
+                            Substitui sua profissão ativa por uma ainda sem maestria. Ofícios novos começam no nível 1. O progresso já obtido é preservado. A profissão atual, as de nível 50 ou superior e aquelas com maestria resgatada não aparecem na lista.
                         </div>
 
                         <label class="loja-premium-concordo">
@@ -351,11 +391,23 @@
                         </div>
 
                         <div>
-                            💎
-                            <strong id="loja-premium-checkout-gemas">
+                            <span
+                                id="loja-premium-checkout-produto-icone"
+                            >
+                                💎
+                            </span>
+
+                            <strong
+                                id="loja-premium-checkout-gemas"
+                            >
                                 0
                             </strong>
-                            Gemas
+
+                            <span
+                                id="loja-premium-checkout-produto-unidade"
+                            >
+                                Gemas
+                            </span>
                         </div>
 
                         <div class="loja-premium-checkout-valor">

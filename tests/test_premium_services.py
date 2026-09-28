@@ -34,6 +34,8 @@ class FakeUsers:
                 continue
             actual = nested(self.player, key)
             if isinstance(expected, dict):
+                if not any(str(k).startswith('$') for k in expected) and actual != expected:
+                    return False
                 if "$gte" in expected and not actual >= expected["$gte"]:
                     return False
                 if "$ne" in expected and actual == expected["$ne"]:
@@ -72,6 +74,7 @@ def load_service_function():
         and item.name == "comprar_servico_gemas"
     )
     namespace = {
+        "_obter_status_eldora_premium": lambda jogador, agora: {"ativo": False},
         "_object_id": lambda value: ObjectId(value) if ObjectId.is_valid(value) else None,
         "_agora": lambda: datetime.now(timezone.utc),
         "ReturnDocument": ReturnDocument,
@@ -79,7 +82,8 @@ def load_service_function():
         "CUSTO_TROCA_PROFISSAO": 250,
         "SKILLS_INICIAIS_CLASSE": {"mago": "mago_bola_de_fogo"},
     }
-    exec(compile(ast.Module(body=[node], type_ignores=[]), "<service>", "exec"), namespace)
+    helper = next(item for item in tree.body if isinstance(item, ast.FunctionDef) and item.name == '_profissoes_disponiveis_troca')
+    exec(compile(ast.Module(body=[helper, node], type_ignores=[]), "<service>", "exec"), namespace)
     return namespace
 
 
@@ -149,6 +153,35 @@ class PremiumServicesTest(unittest.TestCase):
         self.assertEqual(self.users.player["gems"], 750)
         self.assertEqual(self.users.player["profession"]["level"], 12)
         self.assertEqual(self.users.player["profession"]["xp"], 90)
+
+    def test_new_profession_replaces_active_and_preserves_old_progress(self):
+        self.users.player['learned_professions'].pop('minerador')
+        result = self.buy(tipo='profissao', destino='minerador')
+        self.assertTrue(result['success'])
+        self.assertEqual(self.users.player['profession']['key'], 'minerador')
+        self.assertEqual(self.users.player['profession']['level'], 1)
+        self.assertEqual(self.users.player['profession']['xp'], 0)
+        self.assertEqual(self.users.player['learned_professions']['ferreiro']['level'], 8)
+        self.assertEqual(self.users.player['learned_professions']['minerador'], self.users.player['profession'])
+        self.assertEqual(self.users.player['gems'], 750)
+
+    def test_mastered_professions_are_not_listed_or_purchasable(self):
+        catalog = sys.modules['modules.game_data.professions'].PROFESSIONS_DATA
+        for claimed, level in [(False, 50), (True, 12), (False, 60)]:
+            self.users.player['maestrias_resgatadas'] = ['minerador'] if claimed else []
+            self.users.player['learned_professions']['minerador']['level'] = level
+            before = copy.deepcopy(self.users.player)
+            options = self.ns['_profissoes_disponiveis_troca'](before, catalog)
+            self.assertNotIn('minerador', options)
+            self.assertNotIn('ferreiro', options)
+            self.assertFalse(self.buy(tipo='profissao', destino='minerador')['success'])
+            self.assertEqual(self.users.player, before)
+
+    def test_options_include_unlearned_professions(self):
+        self.users.player['learned_professions'].pop('minerador')
+        catalog = sys.modules['modules.game_data.professions'].PROFESSIONS_DATA
+        options = self.ns['_profissoes_disponiveis_troca'](self.users.player, catalog)
+        self.assertEqual(set(options), {'minerador'})
 
     def test_missing_agreement_or_balance_never_changes_player(self):
         before = copy.deepcopy(self.users.player)

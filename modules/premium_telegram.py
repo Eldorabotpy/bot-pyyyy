@@ -179,6 +179,11 @@ def notificar_novo_pedido(
     personagem,
     gemas,
     valor_formatado,
+    tipo_produto="gemas",
+    pacote_nome="",
+    dias=0,
+    chaves_masmorra=0,
+    trocas_classe=0,
 ):
 
     codigo = html.escape(
@@ -204,13 +209,41 @@ def notificar_novo_pedido(
         )
     )
 
+    tipo_produto = str(
+        tipo_produto
+        or "gemas"
+    ).strip()
+
+
+    pacote_nome = html.escape(
+        str(
+            pacote_nome
+            or "Eldora Premium"
+        )
+    )
+
+
+    if tipo_produto == "eldora_premium":
+
+        produto_texto = (
+            f"👑 Produto: <b>{pacote_nome}</b>\n"
+            f"⏳ Duração: <b>{int(dias or 0)} dias</b>\n"
+            f"🗝️ Chaves: <b>{int(chaves_masmorra or 0)}</b>\n"
+            f"🔄 Troca de classe: <b>{int(trocas_classe or 0)}</b>\n"
+        )
+
+    else:
+
+        produto_texto = (
+            f"💎 Pacote: <b>{gemas} Gemas</b>\n"
+        )
 
     texto = (
         "💎 <b>NOVO PEDIDO NA LOJA DE ELDORA</b>\n\n"
 
         f"📜 Pedido: <code>{codigo}</code>\n"
         f"👤 Jogador: <b>{personagem}</b>\n"
-        f"💎 Pacote: <b>{gemas} Gemas</b>\n"
+        f"{produto_texto}"
         f"💵 Valor: <b>{valor_formatado}</b>\n\n"
 
         "⏳ Status: Aguardando pagamento."
@@ -231,6 +264,11 @@ def notificar_comprovante_recebido(
     personagem,
     gemas,
     valor_formatado,
+    tipo_produto="gemas",
+    pacote_nome="",
+    dias=0,
+    chaves_masmorra=0,
+    trocas_classe=0,
 ):
 
     codigo = html.escape(
@@ -256,13 +294,41 @@ def notificar_comprovante_recebido(
         )
     )
 
+    tipo_produto = str(
+        tipo_produto
+        or "gemas"
+    ).strip()
+
+
+    pacote_nome = html.escape(
+        str(
+            pacote_nome
+            or "Eldora Premium"
+        )
+    )
+
+
+    if tipo_produto == "eldora_premium":
+
+        produto_texto = (
+            f"👑 Produto: <b>{pacote_nome}</b>\n"
+            f"⏳ Duração: <b>{int(dias or 0)} dias</b>\n"
+            f"🗝️ Chaves: <b>{int(chaves_masmorra or 0)}</b>\n"
+            f"🔄 Troca de classe: <b>{int(trocas_classe or 0)}</b>\n"
+        )
+
+    else:
+
+        produto_texto = (
+            f"💎 Gemas: <b>{gemas}</b>\n"
+        )
 
     texto = (
         "🚨 <b>COMPROVANTE PIX RECEBIDO</b>\n\n"
 
         f"📜 Pedido: <code>{codigo}</code>\n"
         f"👤 Jogador: <b>{personagem}</b>\n"
-        f"💎 Gemas: <b>{gemas}</b>\n"
+        f"{produto_texto}"
         f"💵 Valor: <b>{valor_formatado}</b>\n\n"
 
         "🔎 Status: <b>EM ANÁLISE</b>\n\n"

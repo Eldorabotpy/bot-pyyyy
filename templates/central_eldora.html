@@ -775,6 +775,14 @@
         transform: scale(0.98);
     }
 
+    .central-enciclopedia-status { color: #aab4c3; background: none; border: 0; font: inherit; font-size: .75rem; text-align: left; line-height: 1.5; overflow-wrap: anywhere; }
+    button.central-enciclopedia-status { min-height: 44px; cursor: pointer; }
+    .central-enciclopedia-card { font: inherit; }
+    .central-enciclopedia-card small { display: block; color: #e5cc85; margin-top: 10px; font-size: .7rem; }
+    .central-enciclopedia-card:focus-visible, .central-enciclopedia-voltar:focus-visible { outline: 2px solid #e5cc85; outline-offset: 2px; }
+    .central-enciclopedia-cabecalho { min-width: 0; overflow-wrap: anywhere; }
+    #central-enciclopedia-mais { width: 100%; margin-top: 12px; }
+
     .central-enciclopedia-vazio {
         display: none;
         padding: 24px 14px;
@@ -2558,6 +2566,7 @@
 
 
                     <div id="central-enciclopedia-menu">
+                        <button type="button" id="central-enciclopedia-status" class="central-enciclopedia-status" aria-live="polite"></button>
                         <input
                             id="central-enciclopedia-busca"
                             class="central-enciclopedia-busca"
@@ -2603,7 +2612,10 @@
                             </div>
                         </div>
 
+                        <p id="central-enciclopedia-caminho" class="central-enciclopedia-status"></p>
+                        <input id="central-enciclopedia-filtro" class="central-enciclopedia-busca" type="search" placeholder="Filtrar assuntos desta página…" aria-label="Filtrar assuntos desta página">
                         <div id="central-enciclopedia-detalhe-conteudo"></div>
+                        <button id="central-enciclopedia-mais" class="central-enciclopedia-voltar" type="button" hidden>Mostrar mais assuntos</button>
                     </div>
                 </section>
 

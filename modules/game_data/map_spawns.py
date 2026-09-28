@@ -369,16 +369,66 @@ MAP_SPAWNS = {
     ]),
 
     # ==========================================
-    # 🏰 DUNGEON 01
+    # 🏰 DUNGEON 01 — CATACUMBAS DO REI CAÍDO
     # ==========================================
     "dungeon_01": gerar_spawns("dungeon01", [
 
-        # Os mobs normais da dungeon serão
-        # adicionados aqui depois.
+        # ======================================
+        # 🟢 SLIMES DAS CATACUMBAS — 3
+        # ======================================
+        ("slime_catacumbas", 12, 11),
+        ("slime_catacumbas", 17, 12),
+        ("slime_catacumbas", 20, 16),
+
+        # ======================================
+        # 🍄 COGUMELOS ESPORÍFEROS — 2
+        # ======================================
+        ("cogumelo_esporifero", 26, 12),
+        ("cogumelo_esporifero", 28, 17),
+
+        # ======================================
+        # 🦇 MORCEGOS DE MANA — 2
+        # ======================================
+        ("morcego_mana", 36, 10),
+        ("morcego_mana", 40, 15),
+
+        # ======================================
+        # 💀 ESQUELETOS DAS CATACUMBAS — 3
+        # ======================================
+        ("esqueleto_catacumbas", 14, 27),
+        ("esqueleto_catacumbas", 20, 30),
+        ("esqueleto_catacumbas", 26, 28),
+
+        # ======================================
+        # 🗿 GUARDIÕES DE PEDRA — 2
+        # ======================================
+        ("guardiao_pedra_corrompido", 37, 28),
+        ("guardiao_pedra_corrompido", 43, 31),
+
+        # ======================================
+        # 🌿 CADÁVERES ENRAIZADOS — 2
+        # ======================================
+        ("cadaver_enraizado", 16, 42),
+        ("cadaver_enraizado", 23, 45),
+
+        # ======================================
+        # 👻 ESPECTRO — 1
+        # ======================================
+        ("espectro_rei_caido", 36, 44),
+
+        # ======================================
+        # ⚔️ CAVALEIRO CAÍDO — ELITE — 1
+        # ======================================
+        ("cavaleiro_caido", 47, 47),
 
         # IMPORTANTE:
+        #
         # mimico_dungeon_01 NÃO entra aqui.
-        # Ele só nasce através do puzzle do baú.
+        # Ele nasce pelos eventos dos baús.
+        #
+        # rei_caido_dungeon_01 também NÃO entra aqui.
+        # Ele será criado somente quando todos
+        # estes mobs forem derrotados.
 
     ]),
 }

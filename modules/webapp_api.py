@@ -18,6 +18,12 @@ import random
 contas_collection = db["contas_mestre"]
 webapp_bp = Blueprint('webapp_bp', __name__)
 
+
+@webapp_bp.get('/api/enciclopedia')
+def api_enciclopedia():
+    from modules.encyclopedia import build_catalog
+    return jsonify({'success': True, 'nodes': build_catalog()})
+
 def _run_async(coro):
     """Ferramenta interna para rodar funções Async do Telegram no Flask"""
     try:
@@ -1720,6 +1726,19 @@ def api_login_conta():
     except Exception as e:
         return jsonify({"sucesso": False, "erro": str(e)}), 500
 
+MERLIN_ITENS = ('pocao_cura_leve', 'pocao_cura_media', 'pocao_cura_grande',
+                'pocao_mana_leve', 'pocao_mana_media', 'pocao_mana_grande',
+                'pedra_de_aprimoramento', 'pergaminho_de_reparo', 'nucleo_de_forja')
+
+
+@webapp_bp.get('/api/loja/catalogo')
+def api_loja_catalogo():
+    return jsonify({'itens': [
+        {'id': key, 'preco': int(items_data.ITEMS_DATA[key].get('price', items_data.ITEMS_DATA[key].get('preco', 9999999)))}
+        for key in MERLIN_ITENS if key in items_data.ITEMS_DATA
+    ]})
+
+
 @webapp_bp.route('/api/loja/comprar', methods=['POST'])
 def api_loja_comprar():
     try:
@@ -1730,14 +1749,20 @@ def api_loja_comprar():
         data = request.json
         user_id = data.get("user_id")
         item_id = data.get("item_id")
+        if item_id not in MERLIN_ITENS:
+            return jsonify({'erro': 'Este item não é vendido por Merlin.'}), 400
 
         # 1. Pega as informações reais do item no Backend
+        quantidade = data.get('quantidade', 1)
+        if type(quantidade) is not int or not 1 <= quantidade <= 999:
+            return jsonify({'erro': 'Escolha uma quantidade inteira entre 1 e 999.'}), 400
         info_item = items_data.ITEMS_DATA.get(item_id)
         if not info_item:
             return jsonify({"erro": "Este item não existe na loja."}), 404
             
         # 2. Pega o preço real (Se não tiver preço, bota um valor absurdo para bloquear)
         preco_real = int(info_item.get("price", info_item.get("preco", 9999999)))
+        preco_real *= quantidade
 
         # Suporte para ObjectId ou ID numérico do Telegram
         busca_id = ObjectId(user_id) if len(str(user_id)) == 24 else int(user_id) if str(user_id).isdigit() else user_id
@@ -1753,22 +1778,25 @@ def api_loja_comprar():
             return jsonify({"erro": f"Ouro insuficiente! Custa {preco_real} moedas."}), 400
 
         # Atualização do Inventário
+        inventario_original = copy.deepcopy(pdata.get('inventory', {}))
         inventario = pdata.get("inventory", {})
         if item_id in inventario:
             if isinstance(inventario[item_id], dict):
-                inventario[item_id]["quantity"] = inventario[item_id].get("quantity", 1) + 1
+                inventario[item_id]["quantity"] = inventario[item_id].get("quantity", 1) + quantidade
             else:
-                inventario[item_id] += 1
+                inventario[item_id] += quantidade
         else:
-            inventario[item_id] = {"base_id": item_id, "quantity": 1}
+            inventario[item_id] = {"base_id": item_id, "quantity": quantidade}
 
         # Salva o novo saldo e o inventário
-        users_collection.update_one(
-            {"_id": pdata["_id"]},
+        resultado = users_collection.update_one(
+            {"_id": pdata["_id"], "gold": ouro_atual, "inventory": inventario_original},
             {"$set": {"gold": ouro_atual - preco_real, "inventory": inventario}}
         )
 
-        return jsonify({"sucesso": True, "novo_ouro": ouro_atual - preco_real})
+        if resultado.modified_count != 1:
+            return jsonify({'erro': 'Seu saldo ou mochila mudou. Atualize e tente novamente.'}), 409
+        return jsonify({"sucesso": True, "novo_ouro": ouro_atual - preco_real, 'quantidade': quantidade})
     except Exception as e:
         return jsonify({"erro": "Erro na transação: " + str(e)}), 500
     

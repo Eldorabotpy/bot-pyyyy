@@ -6,4 +6,44 @@
     </div>
     
     <div id="lista-itens-aventureiro" class="loja-lista-scroll"></div>
+    <section id="merlin-compra" hidden>
+        <button type="button" class="merlin-voltar" onclick="voltarItensMerlin()">← Itens</button>
+        <img id="merlin-imagem" alt="" class="loja-item-img">
+        <h3 id="merlin-nome"></h3>
+        <p id="merlin-descricao"></p>
+        <p id="merlin-unitario"></p>
+        <fieldset id="merlin-controles">
+            <legend>Quantidade</legend>
+            <div class="merlin-quantidades">
+                <button type="button" aria-label="Diminuir quantidade" onclick="ajustarQuantidadeMerlin(-1)">−</button>
+                <input id="merlin-quantidade" aria-label="Quantidade" type="number" inputmode="numeric" min="1" max="999" step="1" value="1" oninput="atualizarTotalMerlin()">
+                <button type="button" aria-label="Aumentar quantidade" onclick="ajustarQuantidadeMerlin(1)">+</button>
+            </div>
+        </fieldset>
+        <div class="merlin-resumo">Total <strong id="merlin-total"></strong></div>
+        <button type="button" id="merlin-confirmar" onclick="comprarItemAventureiro()">Confirmar compra</button>
+        <p id="merlin-feedback" role="status" aria-live="polite"></p>
+    </section>
 </div>
+<style>
+#menu-loja-aventureiro { box-sizing: border-box; width: calc(100% - 20px); max-width: 390px; max-height: 90dvh; padding: 16px; }
+#menu-loja-aventureiro [hidden] { display: none !important; }
+#lista-itens-aventureiro { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; }
+#lista-itens-aventureiro .loja-item-card { flex-direction: column; justify-content: flex-start; gap: 8px; padding: 12px 8px; min-width: 0; font: inherit; color: #eee5d0; text-align: center; }
+#lista-itens-aventureiro .loja-item-nome { white-space: normal; overflow: visible; font-size: 12px; line-height: 1.4; }
+#lista-itens-aventureiro .loja-item-preco { font-size: 11px; margin-top: auto; }
+#merlin-compra { overflow-y: auto; text-align: center; font: 14px Arial,sans-serif; }
+#merlin-compra h3 { color: #ecd18a; margin: 10px 0; }
+#merlin-compra p { color: #aebdce; line-height: 1.5; }
+#merlin-compra .loja-item-img { width: 64px; height: 64px; }
+#merlin-compra button { cursor: pointer; min-height: 44px; border-radius: 9px; }
+.merlin-voltar { display: block; color: #d9c085; background: transparent; border: 1px solid #475569; padding: 8px 12px; }
+#merlin-controles { border: 0; margin: 15px 0; padding: 0; }
+#merlin-controles legend { width: 100%; margin-bottom: 8px; }
+.merlin-quantidades { display: flex; gap: 10px; justify-content: center; }
+.merlin-quantidades button { width: 48px; background: #263348; color: #f0dc99; border: 1px solid #58657c; font-size: 22px; }
+#merlin-quantidade { width: 85px; min-width: 0; color: white; background: #0b1320; border: 1px solid #58657c; border-radius: 9px; text-align: center; font-size: 18px; }
+.merlin-resumo { display: flex; justify-content: space-between; padding: 15px 0; color: #edcf7a; }
+#merlin-confirmar { width: 100%; color: #231b0b; background: linear-gradient(#edcf7a,#ba9349); border: 1px solid #e2be66; font-weight: bold; }
+#merlin-confirmar:disabled { opacity: .5; cursor: default; }
+</style>

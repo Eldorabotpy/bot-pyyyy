@@ -1447,9 +1447,242 @@ MONSTERS_DATA = {
     ],
 
     # ==========================================
-    # 🏰 DUNGEON 01
+    # 🏰 DUNGEON 01 — CATACUMBAS DO REI CAÍDO
     # ==========================================
     "dungeon_01": [
+
+        # ======================================
+        # 🟢 SLIME DAS CATACUMBAS
+        # ======================================
+        {
+            "id": "slime_catacumbas",
+            "name": "Slime das Catacumbas",
+            "min_level": 5,
+            "max_level": 7,
+            "skills": [
+                "gosma_pegajosa",
+                "golpe_sujo"
+            ],
+            "hp": 55,
+            "attack": 7,
+            "defense": 3,
+            "initiative": 5,
+            "luck": 4,
+            "xp_reward": 12,
+            "gold_drop": 4,
+            "loot_table": [],
+            "ambush_chance": 0.05,
+            "dungeon_mob": True,
+            "media_key": "slime_catacumbas_media"
+        },
+
+        # ======================================
+        # 🍄 COGUMELO ESPORÍFERO
+        # ======================================
+        {
+            "id": "cogumelo_esporifero",
+            "name": "Cogumelo Esporífero",
+            "min_level": 5,
+            "max_level": 7,
+            "skills": [
+                "gosma_pegajosa",
+                "drenar_vida"
+            ],
+            "hp": 65,
+            "attack": 8,
+            "defense": 4,
+            "initiative": 4,
+            "luck": 5,
+            "xp_reward": 13,
+            "gold_drop": 4,
+            "loot_table": [],
+            "ambush_chance": 0.05,
+            "dungeon_mob": True,
+            "media_key": "cogumelo_esporifero_media"
+        },
+
+        # ======================================
+        # 🦇 MORCEGO DE MANA
+        # ======================================
+        {
+            "id": "morcego_mana",
+            "name": "Morcego de Mana",
+            "min_level": 5,
+            "max_level": 8,
+            "skills": [
+                "mordida_feroz",
+                "garras_dilacerantes"
+            ],
+            "hp": 50,
+            "attack": 9,
+            "defense": 2,
+            "initiative": 12,
+            "luck": 6,
+            "xp_reward": 14,
+            "gold_drop": 4,
+            "loot_table": [],
+            "ambush_chance": 0.15,
+            "dungeon_mob": True,
+            "media_key": "morcego_mana_media"
+        },
+
+        # ======================================
+        # 💀 ESQUELETO DAS CATACUMBAS
+        # ======================================
+        {
+            "id": "esqueleto_catacumbas",
+            "name": "Esqueleto das Catacumbas",
+            "min_level": 6,
+            "max_level": 8,
+            "skills": [
+                "golpe_sujo",
+                "golpe_de_escudo"
+            ],
+            "hp": 85,
+            "attack": 10,
+            "defense": 6,
+            "initiative": 6,
+            "luck": 4,
+            "xp_reward": 16,
+            "gold_drop": 6,
+            "loot_table": [],
+            "ambush_chance": 0.05,
+            "dungeon_mob": True,
+            "media_key": "esqueleto_catacumbas_media"
+        },
+
+        # ======================================
+        # 🗿 GUARDIÃO DE PEDRA CORROMPIDO
+        # ======================================
+        {
+            "id": "guardiao_pedra_corrompido",
+            "name": "Guardião de Pedra Corrompido",
+            "min_level": 6,
+            "max_level": 8,
+            "skills": [
+                "terremoto_local",
+                "esmagar"
+            ],
+            "hp": 115,
+            "attack": 11,
+            "defense": 10,
+            "initiative": 4,
+            "luck": 3,
+            "xp_reward": 18,
+            "gold_drop": 7,
+            "loot_table": [],
+            "ambush_chance": 0.0,
+            "dungeon_mob": True,
+            "media_key": "guardiao_pedra_corrompido_media"
+        },
+
+        # ======================================
+        # 🌿 CADÁVER ENRAIZADO
+        # ======================================
+        {
+            "id": "cadaver_enraizado",
+            "name": "Cadáver Enraizado",
+            "min_level": 6,
+            "max_level": 9,
+            "skills": [
+                "drenar_vida",
+                "garras_dilacerantes"
+            ],
+            "hp": 105,
+            "attack": 12,
+            "defense": 7,
+            "initiative": 5,
+            "luck": 4,
+            "xp_reward": 19,
+            "gold_drop": 7,
+            "loot_table": [],
+            "ambush_chance": 0.05,
+            "dungeon_mob": True,
+            "media_key": "cadaver_enraizado_media"
+        },
+
+        # ======================================
+        # 👻 ESPECTRO DO REI CAÍDO
+        # ======================================
+        {
+            "id": "espectro_rei_caido",
+            "name": "Espectro do Rei Caído",
+            "min_level": 7,
+            "max_level": 9,
+            "skills": [
+                "grito_amedrontador",
+                "drenar_vida"
+            ],
+            "hp": 120,
+            "attack": 13,
+            "defense": 7,
+            "initiative": 10,
+            "luck": 8,
+            "xp_reward": 22,
+            "gold_drop": 9,
+            "loot_table": [],
+            "ambush_chance": 0.10,
+            "dungeon_mob": True,
+            "media_key": "espectro_rei_caido_media"
+        },
+
+        # ======================================
+        # ⚔️ CAVALEIRO CAÍDO — ELITE
+        # ======================================
+        {
+            "id": "cavaleiro_caido",
+            "name": "Cavaleiro Caído",
+            "min_level": 8,
+            "max_level": 10,
+            "skills": [
+                "golpe_de_escudo",
+                "investida_brutal"
+            ],
+            "hp": 170,
+            "attack": 15,
+            "defense": 12,
+            "initiative": 8,
+            "luck": 7,
+            "xp_reward": 28,
+            "gold_drop": 12,
+            "loot_table": [],
+            "ambush_chance": 0.0,
+            "dungeon_mob": True,
+            "elite": True,
+            "media_key": "cavaleiro_caido_media"
+        },
+
+        # ======================================
+        # 👑 REI CAÍDO — BOSS DA DUNGEON
+        # ======================================
+        {
+            "id": "rei_caido_dungeon_01",
+            "name": "Rei Caído",
+            "min_level": 8,
+            "max_level": 10,
+            "skills": [
+                "grito_amedrontador",
+                "drenar_vida",
+                "investida_brutal"
+            ],
+            "hp": 550,
+            "attack": 18,
+            "defense": 14,
+            "initiative": 10,
+            "luck": 12,
+            "xp_reward": 100,
+            "gold_drop": 50,
+            "loot_table": [],
+            "ambush_chance": 0.0,
+            "dungeon_mob": True,
+            "dungeon_boss": True,
+            "boss": True,
+            "media_key": "rei_caido_dungeon_01_media"
+        },
+
+        # ======================================
+        # 👹 MÍMICO — EVENTO DOS BAÚS
+        # ======================================
         {
             "id": "mimico_dungeon_01",
             "name": "Mimico",
@@ -1466,7 +1699,7 @@ MONSTERS_DATA = {
             "luck": 8,
 
             # O Mimico pode ser enfrentado várias vezes
-            # enquanto o jogador tenta resolver o puzzle.
+            # enquanto o jogador tenta resolver os baús.
             # Por isso ele NÃO dá recompensa própria.
             "xp_reward": 0,
             "gold_drop": 0,
@@ -1474,7 +1707,7 @@ MONSTERS_DATA = {
 
             "ambush_chance": 0.0,
 
-            # Identifica que não é um mob normal de caça.
+            # Nunca entra na limpeza normal da dungeon.
             "event_only": True,
             "event_id": "bau_01",
 
