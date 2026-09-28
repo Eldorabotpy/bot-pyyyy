@@ -737,6 +737,111 @@
         line-height: 1.42;
     }
 
+    .central-enciclopedia-busca {
+        width: 100%;
+        min-height: 44px;
+        margin: 12px 0;
+        padding: 0 14px;
+        border: 1px solid rgba(216, 184, 90, 0.22);
+        border-radius: 12px;
+        outline: none;
+        color: #edf2f8;
+        background: rgba(8, 15, 26, 0.86);
+        font: inherit;
+    }
+
+    .central-enciclopedia-busca:focus {
+        border-color: #d8b85a;
+        box-shadow: 0 0 0 3px rgba(216, 184, 90, 0.10);
+    }
+
+    .central-enciclopedia-card {
+        width: 100%;
+        text-align: left;
+        cursor: pointer;
+    }
+
+    .central-enciclopedia-card::after {
+        content: "›";
+        position: absolute;
+        top: 14px;
+        right: 15px;
+        color: #d8b85a;
+        font-size: 1.25rem;
+        font-weight: 900;
+    }
+
+    .central-enciclopedia-card:active {
+        transform: scale(0.98);
+    }
+
+    .central-enciclopedia-vazio {
+        display: none;
+        padding: 24px 14px;
+        color: #94a0b2;
+        text-align: center;
+    }
+
+    .central-enciclopedia-detalhe {
+        display: none;
+    }
+
+    .central-enciclopedia-voltar {
+        min-height: 40px;
+        margin-bottom: 13px;
+        padding: 0 14px;
+        border: 1px solid rgba(216, 184, 90, 0.30);
+        border-radius: 11px;
+        color: #f0d98e;
+        background: rgba(216, 184, 90, 0.08);
+        font-weight: 800;
+        cursor: pointer;
+    }
+
+    .central-enciclopedia-cabecalho {
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        margin-bottom: 14px;
+    }
+
+    .central-enciclopedia-cabecalho .central-card-icone {
+        flex: 0 0 44px;
+        margin: 0;
+    }
+
+    .central-enciclopedia-cabecalho h3,
+    .central-enciclopedia-cabecalho p {
+        margin: 0;
+    }
+
+    .central-enciclopedia-cabecalho p {
+        margin-top: 3px;
+        color: #8d99aa;
+        font-size: 0.72rem;
+    }
+
+    .central-enciclopedia-bloco {
+        margin-bottom: 10px;
+        padding: 13px;
+        border: 1px solid rgba(123, 143, 171, 0.18);
+        border-radius: 12px;
+        background: rgba(18, 29, 45, 0.78);
+    }
+
+    .central-enciclopedia-bloco h4 {
+        margin: 0 0 6px;
+        color: #ecd487;
+        font-size: 0.80rem;
+    }
+
+    .central-enciclopedia-bloco p {
+        margin: 0;
+        color: #aab4c3;
+        font-size: 0.72rem;
+        line-height: 1.55;
+    }
+
 
     /* =====================================================
        GUERRA
@@ -2452,91 +2557,53 @@
                     </p>
 
 
-                    <div class="central-grade">
+                    <div id="central-enciclopedia-menu">
+                        <input
+                            id="central-enciclopedia-busca"
+                            class="central-enciclopedia-busca"
+                            type="search"
+                            placeholder="Buscar classes, runas, mercado..."
+                            aria-label="Buscar na Enciclopédia de Eldora"
+                            autocomplete="off"
+                        >
 
-                        <article class="central-card">
-                            <div class="central-card-icone">
-                                🌍
+                        <div
+                            id="central-enciclopedia-grade"
+                            class="central-grade"
+                        ></div>
+
+                        <div
+                            id="central-enciclopedia-vazio"
+                            class="central-enciclopedia-vazio"
+                        >
+                            Nenhum conhecimento encontrado.
+                        </div>
+                    </div>
+
+                    <div
+                        id="central-enciclopedia-detalhe"
+                        class="central-enciclopedia-detalhe"
+                    >
+                        <button
+                            id="central-enciclopedia-voltar"
+                            class="central-enciclopedia-voltar"
+                            type="button"
+                        >
+                            ← Voltar à enciclopédia
+                        </button>
+
+                        <div class="central-enciclopedia-cabecalho">
+                            <div
+                                id="central-enciclopedia-detalhe-icone"
+                                class="central-card-icone"
+                            ></div>
+                            <div>
+                                <h3 id="central-enciclopedia-detalhe-titulo"></h3>
+                                <p id="central-enciclopedia-detalhe-resumo"></p>
                             </div>
+                        </div>
 
-                            <h4>Mundo</h4>
-
-                            <p>
-                                Regiões, cidades, mapas
-                                e locais importantes.
-                            </p>
-                        </article>
-
-
-                        <article class="central-card">
-                            <div class="central-card-icone">
-                                🧙
-                            </div>
-
-                            <h4>Classes</h4>
-
-                            <p>
-                                Classes, atributos,
-                                especialidades e habilidades.
-                            </p>
-                        </article>
-
-
-                        <article class="central-card">
-                            <div class="central-card-icone">
-                                ⚔️
-                            </div>
-
-                            <h4>Combate</h4>
-
-                            <p>
-                                Turnos, atributos, skills
-                                e sistemas de batalha.
-                            </p>
-                        </article>
-
-
-                        <article class="central-card">
-                            <div class="central-card-icone">
-                                🛠️
-                            </div>
-
-                            <h4>Profissões</h4>
-
-                            <p>
-                                Coleta, fabricação,
-                                evolução e ferramentas.
-                            </p>
-                        </article>
-
-
-                        <article class="central-card">
-                            <div class="central-card-icone">
-                                🛡️
-                            </div>
-
-                            <h4>Clãs</h4>
-
-                            <p>
-                                Estrutura, cargos,
-                                evolução e guerras.
-                            </p>
-                        </article>
-
-
-                        <article class="central-card">
-                            <div class="central-card-icone">
-                                🌌
-                            </div>
-
-                            <h4>Eventos</h4>
-
-                            <p>
-                                Invasões, fendas e
-                                acontecimentos especiais.
-                            </p>
-                        </article>
-
+                        <div id="central-enciclopedia-detalhe-conteudo"></div>
                     </div>
                 </section>
 

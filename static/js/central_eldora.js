@@ -147,6 +147,204 @@
         );
     }
 
+    // ========================================================
+    // 📚 ENCICLOPÉDIA DE ELDORA
+    // ========================================================
+
+    const ENCICLOPEDIA_ELDORA = [
+        {
+            id: "mundo", icone: "🌍", titulo: "Mundo e regiões",
+            resumo: "Mapas, cidades, perigos e progressão pelo reino.",
+            secoes: [
+                ["Reino de Eldora", "Centro seguro da jornada. Aqui ficam os principais serviços, comércio e preparação do herói."],
+                ["Pradaria Inicial · níveis 1–10", "Primeira região de caça, indicada para aprender combate, coleta e evolução."],
+                ["Floresta Sombria · níveis 6–20", "Região mais perigosa, ligada à madeira, alquimia e à Bruxa das Poções."],
+                ["Picos Gelados · níveis 15–35", "Criaturas resistentes e desafios de iniciativa aguardam nas montanhas."],
+                ["Deserto Ancestral · níveis 30–60", "Área avançada, com dificuldade elevada e recompensas maiores."],
+            ]
+        },
+        {
+            id: "classes", icone: "🧙", titulo: "Classes e evolução",
+            resumo: "Caminhos de combate, atributos e especializações.",
+            secoes: [
+                ["Classes iniciais", "Guerreiro, Berserker, Caçador, Monge, Mago, Bardo, Assassino, Samurai e Curandeiro."],
+                ["Atributos de classe", "Cada classe altera HP, mana, ataque, defesa, iniciativa e sorte de maneira própria."],
+                ["Evoluções", "Ao cumprir os requisitos e provas da classe, o herói libera especializações de tiers superiores."],
+                ["Troca de classe", "A Loja de Eldora permite trocar a classe base com Gemas. Equipamentos são removidos e as habilidades da classe anterior ficam arquivadas."],
+            ]
+        },
+        {
+            id: "combate", icone: "⚔️", titulo: "Combate",
+            resumo: "Turnos, recursos, habilidades e caçadas em grupo.",
+            secoes: [
+                ["Ordem da batalha", "A iniciativa ajuda a definir a ordem das ações. Ataques usam os atributos do herói, do equipamento e os efeitos ativos."],
+                ["Ações", "Ataque, magia, item e fuga podem estar disponíveis conforme o estado do combate."],
+                ["Grupo", "O líder inicia a caçada e controla o retorno ao mapa. Os membros acompanham o estado compartilhado da batalha."],
+                ["Derrota e durabilidade", "Combates podem consumir durabilidade dos equipamentos. Conserte as peças antes que deixem de oferecer seu melhor desempenho."],
+            ]
+        },
+        {
+            id: "profissoes", icone: "🛠️", titulo: "Profissões",
+            resumo: "Coleta, fabricação, ferramentas e progressão.",
+            secoes: [
+                ["Coleta", "Lenhador, Minerador, Colhedor, Esfolador e Alquimista obtêm recursos específicos pelo mundo."],
+                ["Fabricação", "Ferreiro, Armeiro, Alfaiate, Joalheiro e Curtidor transformam materiais em equipamentos e componentes."],
+                ["Ferramentas", "A ferramenta correta precisa estar equipada e com durabilidade para realizar o trabalho."],
+                ["Bônus de tempo", "Nível da profissão e qualidade da ferramenta podem melhorar o tempo e a eficiência da atividade."],
+            ]
+        },
+        {
+            id: "itens", icone: "🎒", titulo: "Itens e equipamentos",
+            resumo: "Raridades, inventário, durabilidade e consumíveis.",
+            secoes: [
+                ["Categorias", "Materiais, consumíveis, equipamentos, ferramentas, itens de evolução e runas ocupam funções diferentes."],
+                ["Raridade", "A raridade influencia o valor, o potencial do item e, nos equipamentos, a quantidade possível de encaixes rúnicos."],
+                ["Durabilidade", "Equipamentos e ferramentas desgastados precisam ser consertados para continuar funcionando corretamente."],
+                ["Mochila", "Use os filtros da mochila para localizar, equipar, consumir ou examinar os detalhes de cada item."],
+            ]
+        },
+        {
+            id: "runas", icone: "🔮", titulo: "Runas",
+            resumo: "Encaixes, famílias, evolução e extração.",
+            secoes: [
+                ["Encaixes por raridade", "Equipamentos raros possuem 1 encaixe, épicos 2 e lendários 3. Raridades inferiores não possuem encaixes."],
+                ["Famílias", "Crueldade, Precisão, Vampiro, Rocha, Mente, Eco, Midas e Sábio oferecem bônus diferentes."],
+                ["Níveis", "Cada família pode evoluir de Menor para Maior e depois Ancestral usando materiais e ouro."],
+                ["Extração", "Uma runa equipada pode ser extraída na Forja mediante pagamento em ouro."],
+            ]
+        },
+        {
+            id: "criaturas", icone: "🐲", titulo: "Criaturas e chefes",
+            resumo: "Inimigos, recompensas e guardiões de evolução.",
+            secoes: [
+                ["Criaturas regionais", "Cada mapa reúne famílias de inimigos compatíveis com sua faixa de nível e dificuldade."],
+                ["Recompensas", "Vitórias podem conceder ouro, experiência e itens definidos pela criatura e pela região."],
+                ["Chefes", "Chefes possuem atributos e padrões mais perigosos, mas podem guardar recompensas especiais."],
+                ["Guardiões de classe", "As provas de evolução apresentam inimigos próprios e testam a preparação do herói."],
+            ]
+        },
+        {
+            id: "dungeons", icone: "🏰", titulo: "Dungeons e tesouros",
+            resumo: "Chaves, exploração, enigmas, baús e desafios.",
+            secoes: [
+                ["Entrada", "Algumas dungeons exigem uma chave ou condição de acesso. A entrada leva o herói a um mapa separado."],
+                ["Exploração", "Observe o cenário, enfrente ameaças e procure passagens, eventos e tesouros."],
+                ["Baús", "Baús comuns podem ser abertos durante a exploração; alguns tesouros especiais exigem resolver um enigma."],
+                ["Preparação", "Leve consumíveis e confira equipamentos, durabilidade e habilidades antes de entrar."],
+            ]
+        },
+        {
+            id: "guilda", icone: "📜", titulo: "Guilda dos Aventureiros",
+            resumo: "Contratos, reputação, recompensas e loja da guilda.",
+            secoes: [
+                ["Contratos pessoais", "Missões individuais registram objetivos e recompensas do aventureiro."],
+                ["Contratos do clã", "Membros contribuem juntos. Algumas recompensas exigem uma contribuição mínima individual."],
+                ["Reputação", "Concluir e entregar contratos aumenta o progresso e libera novos benefícios na Guilda."],
+                ["Entrega", "Quando o objetivo for concluído, fale com Lyria para registrar a missão e receber o que estiver disponível."],
+            ]
+        },
+        {
+            id: "clas", icone: "🛡️", titulo: "Clãs e guerras",
+            resumo: "Cargos, tesouro, missões coletivas e batalhas.",
+            secoes: [
+                ["Estrutura", "Líderes administram o clã, enquanto membros ajudam no crescimento e nos objetivos coletivos."],
+                ["Tesouro e pontos", "Atividades do clã alimentam recursos usados em progressão, recompensas e sistemas coletivos."],
+                ["Contratos", "Missões do clã registram a contribuição de cada participante e aplicam requisitos mínimos quando indicados."],
+                ["Guerra de Clãs", "Inscrição, escalação e prontidão organizam os participantes antes dos confrontos semanais."],
+            ]
+        },
+        {
+            id: "economia", icone: "⚖️", titulo: "Economia e mercado",
+            resumo: "Ouro, Gemas, anúncios, taxas e compras.",
+            secoes: [
+                ["Ouro", "Moeda principal obtida em aventuras e usada em comércio, reparos, criação e outros serviços."],
+                ["Gemas", "Moeda premium usada na Loja de Eldora para pacotes e serviços especiais."],
+                ["Mercado Central", "Jogadores anunciam itens por ouro ou Gemas. Confira quantidade, preço total e taxa antes de confirmar."],
+                ["Segurança", "O servidor valida saldo, posse e estado do anúncio para impedir compras ou entregas duplicadas."],
+            ]
+        },
+        {
+            id: "forja_alquimia", icone: "⚗️", titulo: "Forja e alquimia",
+            resumo: "Receitas, materiais, consertos, poções e melhorias.",
+            secoes: [
+                ["Forja", "Selecione uma receita, confira os materiais necessários e use a profissão e ferramenta exigidas para fabricar."],
+                ["Conserto", "A Forja restaura a durabilidade de equipamentos elegíveis mediante os recursos informados."],
+                ["Alquimia", "O Caldeirão da Bruxa transforma ingredientes em poções de cura, mana e outros efeitos."],
+                ["Melhorias", "Runas e outros sistemas da Forja permitem desenvolver equipamentos além de sua forma inicial."],
+            ]
+        },
+        {
+            id: "eventos", icone: "🌌", titulo: "Eventos",
+            resumo: "Invasões, fendas e acontecimentos especiais.",
+            secoes: [
+                ["Eventos mundiais", "Acontecimentos temporários podem alterar regiões, inimigos, objetivos e recompensas."],
+                ["Invasões", "Ameaças coletivas pedem atenção dos aventureiros e podem possuir regras próprias de participação."],
+                ["Fendas", "Portais e fenômenos especiais levam a encontros fora da rotina normal das regiões."],
+                ["Acompanhe a Central", "Novidades e regras de cada evento aparecem nas Atualizações e na aba Eventos da Central de Eldora."],
+            ]
+        },
+    ];
+
+    function renderizarEnciclopediaCentral(termo = "") {
+        const grade = elemento("central-enciclopedia-grade");
+        const vazio = elemento("central-enciclopedia-vazio");
+        if (!grade) return;
+
+        const busca = String(termo || "").trim().toLocaleLowerCase("pt-BR");
+        const itens = ENCICLOPEDIA_ELDORA.filter(function (item) {
+            const texto = [item.titulo, item.resumo]
+                .concat(item.secoes.flat())
+                .join(" ")
+                .toLocaleLowerCase("pt-BR");
+            return !busca || texto.includes(busca);
+        });
+
+        grade.innerHTML = itens.map(function (item) {
+            return `
+                <button class="central-card central-enciclopedia-card"
+                    type="button" data-enciclopedia-id="${escaparHtmlCentral(item.id)}">
+                    <span class="central-card-icone">${escaparHtmlCentral(item.icone)}</span>
+                    <h4>${escaparHtmlCentral(item.titulo)}</h4>
+                    <p>${escaparHtmlCentral(item.resumo)}</p>
+                </button>`;
+        }).join("");
+
+        if (vazio) vazio.style.display = itens.length ? "none" : "block";
+    }
+
+    function abrirVerbeteEnciclopediaCentral(id) {
+        const item = ENCICLOPEDIA_ELDORA.find(function (entrada) {
+            return entrada.id === id;
+        });
+        if (!item) return;
+
+        const menu = elemento("central-enciclopedia-menu");
+        const detalhe = elemento("central-enciclopedia-detalhe");
+        if (menu) menu.style.display = "none";
+        if (detalhe) detalhe.style.display = "block";
+
+        elemento("central-enciclopedia-detalhe-icone").textContent = item.icone;
+        elemento("central-enciclopedia-detalhe-titulo").textContent = item.titulo;
+        elemento("central-enciclopedia-detalhe-resumo").textContent = item.resumo;
+        elemento("central-enciclopedia-detalhe-conteudo").innerHTML =
+            item.secoes.map(function (secao) {
+                return `<article class="central-enciclopedia-bloco">
+                    <h4>${escaparHtmlCentral(secao[0])}</h4>
+                    <p>${escaparHtmlCentral(secao[1])}</p>
+                </article>`;
+            }).join("");
+
+        const scroll = elemento("central-eldora-scroll");
+        if (scroll) scroll.scrollTop = 0;
+    }
+
+    function voltarMenuEnciclopediaCentral() {
+        const menu = elemento("central-enciclopedia-menu");
+        const detalhe = elemento("central-enciclopedia-detalhe");
+        if (menu) menu.style.display = "block";
+        if (detalhe) detalhe.style.display = "none";
+    }
+
 
     /*
      * Cache somente da sessão atual
@@ -7431,6 +7629,51 @@
     // ========================================================
 
     function prepararCentralEldora() {
+
+        renderizarEnciclopediaCentral();
+
+        const buscaEnciclopedia =
+            elemento("central-enciclopedia-busca");
+
+        if (buscaEnciclopedia) {
+            buscaEnciclopedia.addEventListener(
+                "input",
+                function () {
+                    renderizarEnciclopediaCentral(
+                        buscaEnciclopedia.value
+                    );
+                }
+            );
+        }
+
+        const gradeEnciclopedia =
+            elemento("central-enciclopedia-grade");
+
+        if (gradeEnciclopedia) {
+            gradeEnciclopedia.addEventListener(
+                "click",
+                function (evento) {
+                    const card = evento.target.closest(
+                        "[data-enciclopedia-id]"
+                    );
+                    if (card) {
+                        abrirVerbeteEnciclopediaCentral(
+                            card.dataset.enciclopediaId
+                        );
+                    }
+                }
+            );
+        }
+
+        const voltarEnciclopedia =
+            elemento("central-enciclopedia-voltar");
+
+        if (voltarEnciclopedia) {
+            voltarEnciclopedia.addEventListener(
+                "click",
+                voltarMenuEnciclopediaCentral
+            );
+        }
 
         document
             .querySelectorAll(
