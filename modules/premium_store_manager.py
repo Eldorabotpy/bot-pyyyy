@@ -1652,6 +1652,12 @@ def gerar_checkout_pix(
                     "pacote_nome"
                 ),
 
+            "tipo_produto":
+                pedido.get(
+                    "tipo_produto",
+                    "gemas",
+                ),
+                
             "gemas":
                 int(
                     pedido.get(
