@@ -665,7 +665,7 @@ class MotorCacada {
             document.body.appendChild(btn);
         }
 
-        btn.onclick = (event) => {
+        btn.onclick = async (event) => {
             if (event) {
                 event.preventDefault();
                 event.stopPropagation();
@@ -673,6 +673,60 @@ class MotorCacada {
 
             if (this.autoCacadaAtiva) {
                 this.pararAutoCacada("parada manualmente", true);
+                return;
+            }
+
+            const userId =
+                localStorage.getItem(
+                    "jogadorEldoraID"
+                );
+
+            if (!userId) {
+                this.mostrarAvisoAutoCacada(
+                    "Auto Caçada",
+                    "Herói não encontrado.",
+                    "erro"
+                );
+                return;
+            }
+
+            try {
+                const resposta = await fetch(
+                    `/api/premium/catalogo/${encodeURIComponent(userId)}?t=${Date.now()}`,
+                    {
+                        cache: "no-store"
+                    }
+                );
+
+                const dados =
+                    await resposta.json();
+
+                const premiumAtivo =
+                    resposta.ok &&
+                    dados.success &&
+                    dados.eldora_premium?.ativo === true &&
+                    dados.premium?.auto_cacada === true;
+
+                if (!premiumAtivo) {
+                    this.mostrarAvisoAutoCacada(
+                        "Eldora Premium",
+                        "👑 Auto Caçada é exclusiva do Eldora Premium.",
+                        "aviso"
+                    );
+                    return;
+                }
+
+            } catch (erro) {
+                console.error(
+                    "❌ [AUTO CAÇADA] Falha ao validar Premium:",
+                    erro
+                );
+
+                this.mostrarAvisoAutoCacada(
+                    "Auto Caçada",
+                    "Não foi possível validar seu Eldora Premium.",
+                    "erro"
+                );
                 return;
             }
 
