@@ -12,6 +12,9 @@
 
         codigoPedidoCheckout: null,
         enviandoComprovante: false,
+        abaAtual: "pacotes",
+        atualizadorPedidos: null,
+        pedidosAprovadosConhecidos: new Set(),
     };
 
 
@@ -204,6 +207,8 @@
 
         modal.style.display = "flex";
 
+        iniciarAtualizacaoPedidosPremium();
+
 
         mudarAbaLojaPremium(
             "pacotes"
@@ -225,6 +230,8 @@
             modal.style.display = "none";
         }
 
+        pararAtualizacaoPedidosPremium();
+
 
         if (
             typeof window.mostrarMenuGlobalEldora
@@ -243,6 +250,8 @@
     function mudarAbaLojaPremium(
         aba
     ) {
+
+        estadoLojaPremium.abaAtual = aba;
 
         document
             .querySelectorAll(
@@ -290,6 +299,37 @@
         if (aba === "pedidos") {
             carregarPedidosLojaPremium();
         }
+    }
+
+
+    function iniciarAtualizacaoPedidosPremium() {
+        pararAtualizacaoPedidosPremium();
+        estadoLojaPremium.atualizadorPedidos = window.setInterval(() => {
+            const modal = document.getElementById("loja-premium-modal");
+            if (
+                modal?.style.display !== "none"
+                && estadoLojaPremium.abaAtual === "pedidos"
+            ) {
+                carregarPedidosLojaPremium({ silencioso: true });
+            }
+        }, 15000);
+    }
+
+
+    function pararAtualizacaoPedidosPremium() {
+        if (estadoLojaPremium.atualizadorPedidos) {
+            window.clearInterval(estadoLojaPremium.atualizadorPedidos);
+            estadoLojaPremium.atualizadorPedidos = null;
+        }
+    }
+
+
+    function atualizarEtapaCheckout(etapa) {
+        document.querySelectorAll(".loja-premium-etapa").forEach(item => {
+            const numero = Number(item.dataset.etapa);
+            item.classList.toggle("active", numero === etapa);
+            item.classList.toggle("concluida", numero < etapa);
+        });
     }
 
 
@@ -856,6 +896,16 @@
                 "Nenhum arquivo selecionado";
         }
 
+        const botaoEnviar = document.getElementById(
+            "loja-premium-enviar-comprovante"
+        );
+
+        if (botaoEnviar) {
+            botaoEnviar.disabled = true;
+        }
+
+        atualizarEtapaCheckout(1);
+
         try {
 
             const resposta = await fetch(
@@ -1118,6 +1168,8 @@
                 "sucesso"
             );
 
+            atualizarEtapaCheckout(2);
+
 
         } catch (erro) {
 
@@ -1132,7 +1184,9 @@
     // 📜 PEDIDOS
     // =========================================================
 
-    async function carregarPedidosLojaPremium() {
+    async function carregarPedidosLojaPremium(
+        opcoes = {}
+    ) {
 
         if (
             estadoLojaPremium
@@ -1164,11 +1218,13 @@
             .carregandoPedidos = true;
 
 
-        area.innerHTML = `
-            <div class="loja-premium-vazio">
-                📜 Consultando seus pedidos...
-            </div>
-        `;
+        if (!opcoes.silencioso) {
+            area.innerHTML = `
+                <div class="loja-premium-vazio">
+                    📜 Consultando seus pedidos...
+                </div>
+            `;
+        }
 
 
         try {
@@ -1211,13 +1267,15 @@
             );
 
 
-            area.innerHTML = `
-                <div class="loja-premium-vazio">
-                    ❌ ${escaparHtml(
-                        erro.message
-                    )}
-                </div>
-            `;
+            if (!opcoes.silencioso) {
+                area.innerHTML = `
+                    <div class="loja-premium-vazio">
+                        ❌ ${escaparHtml(
+                            erro.message
+                        )}
+                    </div>
+                `;
+            }
 
 
         } finally {
@@ -1255,6 +1313,22 @@
             `;
 
             return;
+        }
+
+        const aprovadosAtuais = pedidos
+            .filter(pedido => pedido.status === "aprovado")
+            .map(pedido => pedido.codigo);
+
+        const existeNovaAprovacao = aprovadosAtuais.some(
+            codigo => !estadoLojaPremium.pedidosAprovadosConhecidos.has(codigo)
+        );
+
+        aprovadosAtuais.forEach(codigo => {
+            estadoLojaPremium.pedidosAprovadosConhecidos.add(codigo);
+        });
+
+        if (existeNovaAprovacao) {
+            carregarCatalogoLojaPremium();
         }
 
 
@@ -1453,6 +1527,28 @@
                         `;
                     }
 
+                    if (pedido.status === "em_analise") {
+                        infoExtra = `
+                            <div class="loja-premium-analise">
+                                🔎 Comprovante recebido. A aprovação será mostrada aqui automaticamente.
+                            </div>
+                        `;
+                    }
+
+                    if (
+                        pedido.status === "aguardando_pagamento"
+                    ) {
+                        infoExtra = `
+                            <button
+                                type="button"
+                                class="loja-premium-continuar"
+                                data-pedido-codigo="${escaparHtml(pedido.codigo)}"
+                            >
+                                💠 CONTINUAR PAGAMENTO
+                            </button>
+                        `;
+                    }
+
 
                     return `
                         <div
@@ -1534,6 +1630,12 @@
                 }
             )
             .join("");
+
+        area.querySelectorAll(".loja-premium-continuar").forEach(botao => {
+            botao.addEventListener("click", () => {
+                abrirCheckoutPix(botao.dataset.pedidoCodigo);
+            });
+        });
     }
 
     
@@ -1718,6 +1820,8 @@
                 "sucesso"
             );
 
+            atualizarEtapaCheckout(3);
+
 
             mudarAbaLojaPremium(
                 "pedidos"
@@ -1785,6 +1889,16 @@
                             area.style.display === "none"
                             ? "block"
                             : "none";
+
+                        if (area.style.display !== "none") {
+                            atualizarEtapaCheckout(3);
+                            area.scrollIntoView({
+                                behavior: "smooth",
+                                block: "nearest",
+                            });
+                        } else {
+                            atualizarEtapaCheckout(2);
+                        }
                     }
                 }
             );
@@ -1820,6 +1934,14 @@
                             arquivo
                             ? arquivo.name
                             : "Nenhum arquivo selecionado";
+                    }
+
+                    const enviar = document.getElementById(
+                        "loja-premium-enviar-comprovante"
+                    );
+
+                    if (enviar) {
+                        enviar.disabled = !arquivo;
                     }
                 }
             );

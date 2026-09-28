@@ -944,3 +944,119 @@
     opacity: 0.55;
     cursor: default;
 }
+
+/* Fluxo guiado do pagamento manual */
+.loja-premium-etapas {
+    display: flex;
+    align-items: flex-start;
+    margin: 2px 2px 12px;
+}
+
+.loja-premium-etapa {
+    width: 66px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    color: #64748b;
+}
+
+.loja-premium-etapa span {
+    width: 25px;
+    height: 25px;
+    display: grid;
+    place-items: center;
+    border: 1px solid rgba(148, 163, 184, 0.24);
+    border-radius: 50%;
+    background: rgba(15, 23, 42, 0.92);
+    font-size: 0.62rem;
+    font-weight: 900;
+}
+
+.loja-premium-etapa small {
+    font-size: 0.52rem;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.loja-premium-etapa.active,
+.loja-premium-etapa.concluida {
+    color: #f4dc91;
+}
+
+.loja-premium-etapa.active span {
+    border-color: #e4c35f;
+    background: linear-gradient(180deg, #94711e, #664b13);
+    box-shadow: 0 0 12px rgba(228, 195, 95, 0.22);
+}
+
+.loja-premium-etapa.concluida span {
+    color: #d1fae5;
+    border-color: rgba(74, 222, 128, 0.38);
+    background: rgba(20, 83, 45, 0.72);
+}
+
+.loja-premium-etapa-linha {
+    height: 1px;
+    flex: 1;
+    margin-top: 12px;
+    background: rgba(148, 163, 184, 0.20);
+}
+
+.loja-premium-continuar {
+    width: 100%;
+    min-height: 36px;
+    margin-top: 10px;
+    color: #fff8dc;
+    background: linear-gradient(180deg, #94711e, #664b13);
+    border: 1px solid rgba(244, 220, 145, 0.42);
+    border-radius: 8px;
+    font-size: 0.63rem;
+    font-weight: 900;
+    cursor: pointer;
+}
+
+.loja-premium-analise {
+    margin-top: 10px;
+    padding: 9px 10px;
+    color: #ddd6fe;
+    background: rgba(76, 29, 149, 0.20);
+    border: 1px solid rgba(167, 139, 250, 0.22);
+    border-radius: 8px;
+    font-size: 0.62rem;
+    line-height: 1.45;
+}
+
+@media (max-width: 420px) {
+    .loja-premium-overlay {
+        padding: 0;
+    }
+
+    .loja-premium-container {
+        width: 100vw;
+        max-height: 100dvh;
+        border-radius: 0;
+    }
+
+    .loja-premium-header {
+        min-height: 58px;
+        padding: 9px 12px;
+    }
+
+    .loja-premium-saldo-card {
+        margin-top: 8px;
+        padding: 9px 11px;
+    }
+
+    .loja-premium-qrcode-box {
+        width: 184px;
+        height: 184px;
+    }
+
+    #loja-premium-qrcode,
+    #loja-premium-qrcode img,
+    #loja-premium-qrcode canvas {
+        width: 164px !important;
+        height: 164px !important;
+    }
+}
