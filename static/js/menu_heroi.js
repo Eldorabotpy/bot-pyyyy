@@ -30,6 +30,20 @@
         menu.inert = true;
         toggle.setAttribute('aria-expanded', 'false');
     };
+
+    window.navegarMenuHeroi = function(destino, nomeAcao) {
+        window.fecharMenu();
+
+        window.requestAnimationFrame(() => {
+            if (destino && typeof window.showTab === 'function') {
+                window.showTab(destino);
+            }
+
+            if (nomeAcao && typeof window[nomeAcao] === 'function') {
+                window[nomeAcao]();
+            }
+        });
+    };
     document.addEventListener('keydown', e => {
         if (!menu.classList.contains('aberto')) return;
         if (e.key === 'Escape') { window.fecharMenu(); toggle.focus(); }

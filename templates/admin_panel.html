@@ -158,6 +158,12 @@
         }
 
 
+        .premium-status.aguardando {
+            color: #fde68a;
+            background: #713f12;
+        }
+
+
         .premium-status.aprovado {
             color: #bbf7d0;
             background: #14532d;
@@ -1342,6 +1348,19 @@
                                         class="premium-status analise"
                                     >
                                         ⚙️ Processando aprovação
+                                    </span>
+                                `;
+
+                            } else if (
+                                statusPedido
+                                === "aguardando_pagamento"
+                            ) {
+
+                                statusHtml = `
+                                    <span
+                                        class="premium-status aguardando"
+                                    >
+                                        ⏳ Aguardando pagamento
                                     </span>
                                 `;
 

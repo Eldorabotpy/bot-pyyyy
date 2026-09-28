@@ -572,7 +572,7 @@
     <link rel="stylesheet" href="/static/css/runas.css?v=1">
     <script src="/static/js/runas.js?v=1"></script>
 <link rel="stylesheet" href="/static/css/menu_heroi.css?v=1">
-    <script defer src="/static/js/menu_heroi.js?v=1"></script>
+    <script defer src="/static/js/menu_heroi.js?v=2"></script>
 </head>
 <body>
 
@@ -800,7 +800,7 @@
                 type="button"
                 id="nav-btn-central-eldora"
                 class="menu-btn eldora-menu-btn eldora-menu-central"
-                onclick="fecharMenu(); abrirCentralEldora();"
+                onclick="navegarMenuHeroi(null, 'abrirCentralEldora')"
             >
                 <span class="eldora-menu-icone eldora-central-icone">
                     📜
@@ -826,7 +826,7 @@
 
 
             <button
-                onclick="showTab('aba-reino'); fecharMenu();"
+                onclick="navegarMenuHeroi('aba-reino')"
                 class="menu-btn eldora-menu-btn active"
                 id="nav-btn-reino"
             >
@@ -841,7 +841,7 @@
 
 
             <button
-                onclick="showTab('aba-perfil'); fecharMenu();"
+                onclick="navegarMenuHeroi('aba-perfil')"
                 class="menu-btn eldora-menu-btn"
                 id="nav-btn-perfil"
             >
@@ -856,7 +856,7 @@
 
 
             <button
-                onclick="fecharMenu()"
+                onclick="navegarMenuHeroi('aba-reino')"
                 class="menu-btn eldora-menu-btn"
             >
                 <span class="eldora-menu-icone">
@@ -870,7 +870,7 @@
 
 
             <button
-                onclick="fecharMenu(); abrirTelaCla();"
+                onclick="navegarMenuHeroi(null, 'abrirTelaCla')"
                 class="menu-btn eldora-menu-btn"
                 id="nav-btn-cla"
             >
@@ -894,7 +894,7 @@
                 type="button"
                 class="menu-btn eldora-menu-btn eldora-menu-loja"
                 id="nav-btn-loja-eldora"
-                onclick="abrirLojaPremium()"
+                onclick="navegarMenuHeroi(null, 'abrirLojaPremium')"
             >
                 <span class="eldora-menu-icone">
                     💎

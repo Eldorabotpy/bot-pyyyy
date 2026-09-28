@@ -373,8 +373,6 @@ def _serializar_pedido(
                 )
             ),
     }
-
-
 def _expirar_pedidos_antigos(
     user_id=None,
 ):
@@ -1592,6 +1590,7 @@ def listar_pedidos_admin(
         filtro = {
             "status": {
                 "$in": [
+                    STATUS_AGUARDANDO_PAGAMENTO,
                     STATUS_EM_ANALISE,
                     STATUS_PROCESSANDO_APROVACAO,
                 ]
@@ -2403,5 +2402,3 @@ def recusar_pedido_manual(
                 pedido
             ),
     }
-
-    
