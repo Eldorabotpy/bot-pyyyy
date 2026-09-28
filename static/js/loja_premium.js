@@ -456,6 +456,27 @@
     }
 
 
+    window.recuperarFerramentaPremium = async function(botao) {
+        if (estadoLojaPremium.comprandoServico) return;
+        estadoLojaPremium.comprandoServico = true;
+        botao.disabled = true;
+        try {
+            const res = await fetch('/api/premium/servico/comprar', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({user_id: obterUserIdLojaPremium(), tipo: 'reparar_ferramenta', concordou: true})
+            });
+            const dados = await res.json();
+            if (!res.ok || !dados.success) throw new Error(dados.error || 'Não foi possível recuperar a ferramenta.');
+            mostrarMensagemLojaPremium('Ferramenta do ofício equipada. Nenhuma Gema foi cobrada.', 'sucesso');
+            if (typeof window.carregarMeuPerfil === 'function') await window.carregarMeuPerfil();
+        } catch (erro) {
+            mostrarMensagemLojaPremium(erro.message, 'erro');
+        } finally {
+            estadoLojaPremium.comprandoServico = false;
+            botao.disabled = false;
+        }
+    };
+
     async function comprarServicoPremium(tipo, botao) {
         if (estadoLojaPremium.comprandoServico) return;
 
@@ -1366,7 +1387,11 @@
                     "loja-premium-checkout-pedido"
                 );
 
-
+            const campoGemas =
+                document.getElementById(
+                    "loja-premium-checkout-gemas"
+                );
+                
             const campoProdutoIcone =
                 document.getElementById(
                     "loja-premium-checkout-produto-icone"

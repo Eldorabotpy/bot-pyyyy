@@ -183,6 +183,37 @@ class PremiumServicesTest(unittest.TestCase):
         options = self.ns['_profissoes_disponiveis_troca'](self.users.player, catalog)
         self.assertEqual(set(options), {'minerador'})
 
+    def test_profession_purchase_delivers_and_equips_tool(self):
+        result = self.buy(tipo='profissao', destino='minerador')
+        self.assertTrue(result['success'])
+        uid = self.users.player['equipment_tools']['minerador']
+        tool = self.users.player['inventory'][uid]
+        self.assertEqual(tool['base_id'], 'picareta_pedra')
+        self.assertGreater(tool['durability'][0], 0)
+        self.assertEqual(tool['durability'][0], tool['durability'][1])
+
+    def test_existing_tool_is_preserved(self):
+        self.users.player['inventory'] = {'custom': {'base_id': 'picareta_pedra', 'durability': [3, 10], 'upgrade_level': 4}}
+        self.assertTrue(self.buy(tipo='profissao', destino='minerador')['success'])
+        self.assertEqual(self.users.player['equipment_tools']['minerador'], 'custom')
+        self.assertEqual(len(self.users.player['inventory']), 1)
+        self.assertEqual(self.users.player['inventory']['custom']['upgrade_level'], 4)
+
+    def test_old_purchase_recovery_is_free_and_cannot_be_farmed(self):
+        self.users.player['premium_service_history'] = [{'tipo': 'profissao', 'destino': 'ferreiro'}]
+        result = self.buy(tipo='reparar_ferramenta')
+        self.assertTrue(result['success'])
+        self.assertEqual(self.users.player['gems'], 1000)
+        self.assertIn('ferreiro', self.users.player['equipment_tools'])
+        self.users.player['inventory'] = {}
+        self.users.player['equipment_tools'] = {}
+        self.assertFalse(self.buy(tipo='reparar_ferramenta')['success'])
+        self.assertEqual(self.users.player['inventory'], {})
+
+    def test_recovery_requires_prior_purchase(self):
+        self.assertFalse(self.buy(tipo='reparar_ferramenta')['success'])
+        self.assertEqual(self.users.player['gems'], 1000)
+
     def test_missing_agreement_or_balance_never_changes_player(self):
         before = copy.deepcopy(self.users.player)
         result = self.buy(tipo="classe", destino="mago", concordou=False)

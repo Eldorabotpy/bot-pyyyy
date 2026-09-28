@@ -2452,8 +2452,10 @@ def comprar_servico_gemas(
 
     agora = _agora()
 
-    if tipo == "profissao":
+    reparo_ferramenta = tipo == 'reparar_ferramenta'
+    if tipo == "profissao" or reparo_ferramenta:
         from modules.game_data.professions import PROFESSIONS_DATA
+        from modules.profession_starter import prepare_profession_tool
 
         aprendidas = dict(jogador.get("learned_professions") or {})
         atual = jogador.get("profession") or {}
@@ -2464,10 +2466,20 @@ def comprar_servico_gemas(
         if atual_key:
             aprendidas[atual_key] = atual
 
-        if destino == atual_key:
+        if reparo_ferramenta:
+            destino = atual_key
+            if destino in (jogador.get('premium_tool_recoveries') or []):
+                return {'success': False, 'error': 'A ferramenta desta troca já foi recuperada. Confira sua mochila e o equipamento do ofício.'}
+            if not destino or not any(
+                row.get('tipo') == 'profissao' and row.get('destino') == destino
+                for row in jogador.get('premium_service_history', [])
+            ):
+                return {'success': False, 'error': 'Não há troca da profissão atual pela loja para recuperar.'}
+
+        if destino == atual_key and not reparo_ferramenta:
             return {"success": False, "error": "Este ofício já está ativo."}
 
-        progresso = _profissoes_disponiveis_troca(jogador, PROFESSIONS_DATA).get(destino)
+        progresso = atual if reparo_ferramenta else _profissoes_disponiveis_troca(jogador, PROFESSIONS_DATA).get(destino)
         dados_profissao = PROFESSIONS_DATA.get(destino)
         if not isinstance(progresso, dict) or not dados_profissao:
             return {
@@ -2484,7 +2496,17 @@ def comprar_servico_gemas(
         })
         aprendidas[destino] = nova_profissao
 
-        custo = CUSTO_TROCA_PROFISSAO
+        try:
+            inventario, ferramentas = prepare_profession_tool(jogador, destino)
+        except ValueError as erro:
+            return {'success': False, 'error': str(erro)}
+        if reparo_ferramenta and inventario == (jogador.get('inventory') or {}) and ferramentas == (jogador.get('equipment_tools') or {}):
+            return {'success': True, 'message': 'A ferramenta do ofício já está equipada.', 'saldo_gemas': int(jogador.get('gems', 0))}
+
+        custo = 0 if reparo_ferramenta else CUSTO_TROCA_PROFISSAO
+        recuperacoes = list(jogador.get('premium_tool_recoveries') or [])
+        if destino not in recuperacoes:
+            recuperacoes.append(destino)
         atualizado = users_col.find_one_and_update(
             {
                 "_id": jogador_id,
@@ -2493,10 +2515,15 @@ def comprar_servico_gemas(
                 "learned_professions": jogador.get('learned_professions') if 'learned_professions' in jogador else {"$exists": False},
                 "maestrias_resgatadas": jogador.get('maestrias_resgatadas') if 'maestrias_resgatadas' in jogador else {"$exists": False},
                 "player_state": jogador.get('player_state') if 'player_state' in jogador else {"$exists": False},
+                "inventory": jogador.get('inventory') if 'inventory' in jogador else {"$exists": False},
+                "equipment_tools": jogador.get('equipment_tools') if 'equipment_tools' in jogador else {"$exists": False},
+                "premium_tool_recoveries": jogador.get('premium_tool_recoveries') if 'premium_tool_recoveries' in jogador else {"$exists": False},
             },
             {
                 "$inc": {"gems": -custo},
-                "$set": {"profession": nova_profissao, "learned_professions": aprendidas},
+                "$set": {"profession": nova_profissao, "learned_professions": aprendidas,
+                         "inventory": inventario, "equipment_tools": ferramentas,
+                         "premium_tool_recoveries": recuperacoes},
                 "$push": {
                     "premium_service_history": {
                         "tipo": tipo,
