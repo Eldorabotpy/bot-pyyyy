@@ -1391,7 +1391,7 @@
                 document.getElementById(
                     "loja-premium-checkout-gemas"
                 );
-                
+
             const campoProdutoIcone =
                 document.getElementById(
                     "loja-premium-checkout-produto-icone"
@@ -1403,6 +1403,10 @@
                     "loja-premium-checkout-produto-unidade"
                 );
 
+            const campoAviso =
+                document.getElementById(
+                    "loja-premium-pix-aviso"
+                );
 
             const pedidoPremium =
                 pedido.tipo_produto ===
@@ -1459,7 +1463,14 @@
                         : "Gemas";
             }
 
+            if (campoAviso) {
 
+                campoAviso.textContent =
+                    pedidoPremium
+                        ? "Após pagar, envie o comprovante para análise. O Eldora Premium será ativado após a confirmação."
+                        : "Após pagar, envie o comprovante para análise. As Gemas só serão entregues após a confirmação.";
+            }
+            
             if (campoValor) {
  
                 campoValor.textContent =
