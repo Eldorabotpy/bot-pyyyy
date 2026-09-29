@@ -381,16 +381,18 @@ MAP_SPAWNS = {
         ("slime_catacumbas", 6, 28),
         ("slime_catacumbas", 5, 31),
         ("slime_catacumbas", 6, 41),
+
         # ======================================
         # 🍄 COGUMELOS ESPORÍFEROS — 2
         # ======================================
         ("cogumelo_esporifero", 16, 16),
         ("cogumelo_esporifero", 12, 19),
         ("cogumelo_esporifero", 16, 19),
-        ("cogumelo_esporifero", 15, 24),
-        ("cogumelo_esporifero", 14, 35),
-        ("cogumelo_esporifero", 14, 32),
+        ("cogumelo_esporifero", 15, 27),
         ("cogumelo_esporifero", 17, 42),
+        ("cogumelo_esporifero", 15, 32),
+        ("cogumelo_esporifero", 15, 36),
+
         # ======================================
         # 🦇 MORCEGOS DE MANA — 2
         # ======================================
@@ -424,6 +426,7 @@ MAP_SPAWNS = {
         ("guardiao_pedra_corrompido", 28, 25),
         ("guardiao_pedra_corrompido", 51, 23),
         ("guardiao_pedra_corrompido", 55, 25),
+
         # ======================================
         # 🌿 CADÁVERES ENRAIZADOS — 2
         # ======================================
@@ -452,7 +455,6 @@ MAP_SPAWNS = {
         ("espectro_rei_caido", 43, 37),
         ("espectro_rei_caido", 45, 35),
         ("espectro_rei_caido", 42, 32),
-        ("espectro_rei_caido", 36, 44),
         ("espectro_rei_caido", 47, 36),
         ("espectro_rei_caido", 46, 13),
         ("espectro_rei_caido", 38, 7),
