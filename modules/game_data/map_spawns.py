@@ -422,7 +422,8 @@ MAP_SPAWNS = {
         ("guardiao_pedra_corrompido", 26, 33),
         ("guardiao_pedra_corrompido", 32, 32),
         ("guardiao_pedra_corrompido", 28, 25),
-
+        ("guardiao_pedra_corrompido", 51, 23),
+        ("guardiao_pedra_corrompido", 55, 25),
         # ======================================
         # 🌿 CADÁVERES ENRAIZADOS — 2
         # ======================================
@@ -436,6 +437,10 @@ MAP_SPAWNS = {
         ("cadaver_enraizado", 27, 54),
         ("cadaver_enraizado", 29, 55),
         ("cadaver_enraizado", 30, 53),
+        ("cadaver_enraizado", 55, 6),
+        ("cadaver_enraizado", 54, 11),
+        ("cadaver_enraizado", 56, 14),
+        ("cadaver_enraizado", 53, 17),
 
         # ======================================
         # 👻 ESPECTRO — 1
@@ -449,6 +454,11 @@ MAP_SPAWNS = {
         ("espectro_rei_caido", 42, 32),
         ("espectro_rei_caido", 36, 44),
         ("espectro_rei_caido", 47, 36),
+        ("espectro_rei_caido", 46, 13),
+        ("espectro_rei_caido", 38, 7),
+        ("espectro_rei_caido", 41, 2),
+        ("espectro_rei_caido", 45, 5),
+        ("espectro_rei_caido", 51, 4),
 
         # ======================================
         # ⚔️ CAVALEIRO CAÍDO — ELITE — 1
@@ -456,11 +466,15 @@ MAP_SPAWNS = {
         ("cavaleiro_caido", 53, 48),
         ("cavaleiro_caido", 56, 45),
         ("cavaleiro_caido", 56, 37),
-        ("cavaleiro_caido", 53, 32),
+        ("cavaleiro_caido", 54, 31),
         ("cavaleiro_caido", 48, 33),
         ("cavaleiro_caido", 42, 32),
         ("cavaleiro_caido", 44, 35),
-        
+        ("cavaleiro_caido", 42, 24),
+        ("cavaleiro_caido", 44, 47),
+        ("cavaleiro_caido", 41, 14),
+        ("cavaleiro_caido", 42, 9),
+
 
         # IMPORTANTE:
         #
