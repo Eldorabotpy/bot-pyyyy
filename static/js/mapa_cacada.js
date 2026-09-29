@@ -650,10 +650,61 @@ class MotorCacada {
         document.head.appendChild(style);
     }
 
-    criarBotaoTesteAutoCacada() {
+    async criarBotaoTesteAutoCacada() {
         this.instalarEstiloBotaoAutoCacada();
 
         let btn = document.getElementById("btn-teste-auto-cacada");
+
+        const userId =
+            localStorage.getItem(
+                "jogadorEldoraID"
+            );
+
+        if (!userId) {
+            if (btn) {
+                btn.remove();
+            }
+
+            return;
+        }
+
+        try {
+            const resposta = await fetch(
+                `/api/premium/catalogo/${encodeURIComponent(userId)}?t=${Date.now()}`,
+                {
+                    cache: "no-store"
+                }
+            );
+
+            const dados =
+                await resposta.json();
+
+            const premiumAtivo =
+                resposta.ok &&
+                dados.success &&
+                dados.eldora_premium?.ativo === true &&
+                dados.premium?.auto_cacada === true;
+
+            if (!premiumAtivo) {
+                if (btn) {
+                    btn.remove();
+                }
+
+                return;
+            }
+
+        } catch (erro) {
+            console.error(
+                "❌ [AUTO CAÇADA] Falha ao carregar acesso Premium:",
+                erro
+            );
+
+            if (btn) {
+                btn.remove();
+            }
+
+            return;
+        }
 
         if (!btn) {
             btn = document.createElement("button");
