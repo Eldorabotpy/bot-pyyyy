@@ -469,7 +469,8 @@ window.iniciarCacadaApp = async function(spawnId, opcoesGrupo = {}) {
                 user_id: charId,
                 spawn_id: spawnId,
                 sala_id: opcoesGrupo.salaId || null,
-                modo_grupo: opcoesGrupo.modoGrupo || false
+                modo_grupo: opcoesGrupo.modoGrupo || false,
+                auto_cacada: opcoesGrupo.autoCacada === true
             })
         });
         

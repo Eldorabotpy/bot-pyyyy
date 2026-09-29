@@ -461,7 +461,27 @@ def iniciar_combate():
         if not player:
             return jsonify({"erro": "Herói não encontrado nos registros."})
 
-        # ==========================================
+        if data.get('auto_cacada') is True:
+            from datetime import datetime, timezone
+
+            premium = player.get("eldora_premium") or {}
+            expira_em = premium.get("expires_at")
+
+            if not isinstance(expira_em, datetime):
+                return jsonify({
+                    "erro": "Auto Caçada é exclusiva do Eldora Premium."
+                }), 403
+
+            if expira_em.tzinfo is None:
+                expira_em = expira_em.replace(
+                    tzinfo=timezone.utc
+                )
+
+            if expira_em <= datetime.now(timezone.utc):
+                return jsonify({
+                    "erro": "Auto Caçada é exclusiva do Eldora Premium."
+                }), 403
+
         # 💥 FONTE ÚNICA DE STATUS DE COMBATE
         # ==========================================
         player_stats_calculados = get_combat_stats_sync(player)
