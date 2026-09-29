@@ -820,10 +820,14 @@ class MotorCacada {
 
         if (!this.scene.textures.exists(textureKey)) {
             
-            this.scene.load.spritesheet(textureKey, `${linkNuvem}${mobData.monster_id}.png`, {
-                frameWidth: 48, 
-                frameHeight: 48 
-            });
+            this.scene.load.spritesheet(
+                textureKey,
+                `${linkNuvem}${mobData.monster_id}.png`,
+                {
+                    frameWidth: 256,
+                    frameHeight: 256
+                }
+            );
             
             this.scene.load.once(`filecomplete-spritesheet-${textureKey}`, () => {
                 this.desenharSprite(mobData, textureKey);
@@ -843,7 +847,33 @@ class MotorCacada {
 
     desenharSprite(mobData, textureKey) {
         try {
-            let sprite = this.scene.add.sprite(mobData.x, mobData.y, textureKey, 0).setDepth(14);
+            // ==========================================
+            // 👹 TAMANHO DOS MOBS NO MAPA
+            // Mob normal = 48x48
+            // Boss       = 128x128
+            // ==========================================
+
+            const ehBoss =
+                mobData.is_boss === true ||
+                mobData.boss === true ||
+                String(mobData.tipo || '').toLowerCase() === 'boss';
+
+            const tamanhoMob = ehBoss ? 128 : 48;
+
+            let sprite = this.scene.add.sprite(
+                mobData.x,
+                mobData.y,
+                textureKey,
+                0
+            ).setDepth(14);
+
+            sprite.setDisplaySize(
+                tamanhoMob,
+                tamanhoMob
+            );
+
+            sprite.spawn_id = mobData.spawn_id;
+            sprite.mobData = mobData;
             sprite.spawn_id = mobData.spawn_id;
 
             // Guarda os dados originais do mob dentro do sprite.
@@ -934,17 +964,44 @@ class MotorCacada {
             });
 
             // ==========================================
-            // ANIMAÇÃO DE POP-IN (GELATINA)
+            // ANIMAÇÃO DE POP-IN
+            // Mantém corretamente 48x48 ou 128x128
             // ==========================================
+
+            // Guarda a escala que o setDisplaySize calculou
+            const escalaFinalX = sprite.scaleX;
+            const escalaFinalY = sprite.scaleY;
+
             sprite.setScale(0);
             sprite.setAlpha(0);
+
             sprite.indicadorAlvo.setScale(0);
             sprite.indicadorAlvo.setAlpha(0);
 
+
+            // Mob
             this.scene.tweens.add({
-                targets: [sprite, sprite.indicadorAlvo],
-                scale: 1,
+                targets: sprite,
+
+                scaleX: escalaFinalX,
+                scaleY: escalaFinalY,
+
                 alpha: 1,
+
+                duration: 800,
+                ease: 'Bounce.easeOut'
+            });
+
+
+            // Seta
+            this.scene.tweens.add({
+                targets: sprite.indicadorAlvo,
+
+                scaleX: 1,
+                scaleY: 1,
+
+                alpha: 1,
+
                 duration: 800,
                 ease: 'Bounce.easeOut'
             });
