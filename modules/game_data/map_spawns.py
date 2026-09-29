@@ -376,50 +376,91 @@ MAP_SPAWNS = {
         # ======================================
         # 🟢 SLIMES DAS CATACUMBAS — 3
         # ======================================
-        ("slime_catacumbas", 12, 11),
-        ("slime_catacumbas", 17, 12),
-        ("slime_catacumbas", 20, 16),
-
+        ("slime_catacumbas", 3, 24),
+        ("slime_catacumbas", 8, 24),
+        ("slime_catacumbas", 6, 28),
+        ("slime_catacumbas", 5, 31),
+        ("slime_catacumbas", 6, 41),
         # ======================================
         # 🍄 COGUMELOS ESPORÍFEROS — 2
         # ======================================
-        ("cogumelo_esporifero", 26, 12),
-        ("cogumelo_esporifero", 28, 17),
-
+        ("cogumelo_esporifero", 16, 16),
+        ("cogumelo_esporifero", 12, 19),
+        ("cogumelo_esporifero", 16, 19),
+        ("cogumelo_esporifero", 15, 24),
+        ("cogumelo_esporifero", 14, 35),
+        ("cogumelo_esporifero", 14, 32),
+        ("cogumelo_esporifero", 17, 42),
         # ======================================
         # 🦇 MORCEGOS DE MANA — 2
         # ======================================
-        ("morcego_mana", 36, 10),
-        ("morcego_mana", 40, 15),
+        ("morcego_mana", 3, 43),
+        ("morcego_mana", 8, 43),
+        ("morcego_mana", 10, 41),
+        ("morcego_mana", 11, 46),
+        ("morcego_mana", 6, 50),
+        ("morcego_mana", 10, 55),
 
         # ======================================
         # 💀 ESQUELETOS DAS CATACUMBAS — 3
         # ======================================
-        ("esqueleto_catacumbas", 14, 27),
-        ("esqueleto_catacumbas", 20, 30),
-        ("esqueleto_catacumbas", 26, 28),
-
+        ("esqueleto_catacumbas", 17, 54),
+        ("esqueleto_catacumbas", 24, 54),
+        ("esqueleto_catacumbas", 18, 6),
+        ("esqueleto_catacumbas", 19, 9),
+        ("esqueleto_catacumbas", 23, 12),
+        ("esqueleto_catacumbas", 26, 4),
+        ("esqueleto_catacumbas", 30, 7),
+        ("esqueleto_catacumbas", 22, 10),
         # ======================================
         # 🗿 GUARDIÕES DE PEDRA — 2
         # ======================================
-        ("guardiao_pedra_corrompido", 37, 28),
-        ("guardiao_pedra_corrompido", 43, 31),
+        ("guardiao_pedra_corrompido", 24, 20),
+        ("guardiao_pedra_corrompido", 32, 20),
+        ("guardiao_pedra_corrompido", 22, 25),
+        ("guardiao_pedra_corrompido", 23, 29),
+        ("guardiao_pedra_corrompido", 26, 33),
+        ("guardiao_pedra_corrompido", 32, 32),
+        ("guardiao_pedra_corrompido", 28, 25),
 
         # ======================================
         # 🌿 CADÁVERES ENRAIZADOS — 2
         # ======================================
-        ("cadaver_enraizado", 16, 42),
-        ("cadaver_enraizado", 23, 45),
+        ("cadaver_enraizado", 28, 43),
+        ("cadaver_enraizado", 24, 41),
+        ("cadaver_enraizado", 26, 43),
+        ("cadaver_enraizado", 24, 45),
+        ("cadaver_enraizado", 32, 41),
+        ("cadaver_enraizado", 33, 43),
+        ("cadaver_enraizado", 32, 46),
+        ("cadaver_enraizado", 27, 54),
+        ("cadaver_enraizado", 29, 55),
+        ("cadaver_enraizado", 30, 53),
 
         # ======================================
         # 👻 ESPECTRO — 1
         # ======================================
+        ("espectro_rei_caido", 35, 54),
+        ("espectro_rei_caido", 41, 48),
+        ("espectro_rei_caido", 46, 46),
+        ("espectro_rei_caido", 43, 44),
+        ("espectro_rei_caido", 43, 37),
+        ("espectro_rei_caido", 45, 35),
+        ("espectro_rei_caido", 42, 32),
         ("espectro_rei_caido", 36, 44),
+        ("espectro_rei_caido", 47, 36),
 
         # ======================================
         # ⚔️ CAVALEIRO CAÍDO — ELITE — 1
         # ======================================
-        ("cavaleiro_caido", 47, 47),
+        ("cavaleiro_caido", 53, 48),
+        ("cavaleiro_caido", 56, 45),
+        ("cavaleiro_caido", 56, 37),
+        ("cavaleiro_caido", 53, 32),
+        ("cavaleiro_caido", 48, 33),
+        ("cavaleiro_caido", 42, 32),
+        ("cavaleiro_caido", 44, 35),
+        
 
         # IMPORTANTE:
         #
