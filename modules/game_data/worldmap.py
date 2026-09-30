@@ -3,48 +3,28 @@
 WORLD_MAP = {
     # Ponto de Partida
     "reino_eldora": [
-        "pradaria_inicial"
     ],
     
     # Caminho Principal
     "pradaria_inicial": [
-        "reino_eldora", 
-        "floresta_sombria"
     ],
     "floresta_sombria": [
-        "pradaria_inicial",
-        "campos_linho"
     ],
     "campos_linho": [
-        "floresta_sombria",
-        "pedreira_granito"
     ],
     "pedreira_granito": [
-        "campos_linho",
-        "pico_grifo"
     ],
     "pico_grifo": [
-        "pedreira_granito",
-        "mina_ferro"
     ],
     "mina_ferro": [
-        "pico_grifo",
-        "forja_abandonada"
     ],
     "forja_abandonada": [
-        "mina_ferro",
-        "pantano_maldito"
     ],
     "pantano_maldito": [
-        "forja_abandonada",
-        "picos_gelados"
     ],
     "picos_gelados": [
-        "pantano_maldito",
-        "deserto_ancestral"
     ],
     "deserto_ancestral": [
-        "picos_gelados" 
     ],
 }
 # Pontos de poder “alvo” por região (para calibrar a dificuldade)

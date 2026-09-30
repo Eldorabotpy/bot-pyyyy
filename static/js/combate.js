@@ -28,8 +28,14 @@ const FUNDOS_ARENAS = {
     "capital_eldora":   `${LINK_FUNDOS}capital.png`, 
     "pradaria_inicial": `${LINK_FUNDOS}pradaria.png`, 
     "floresta_sombria": `${LINK_FUNDOS}floresta.png`,
+    "campos_linho":     `${LINK_FUNDOS}campos.png`,
     "pedreira_granito": `${LINK_FUNDOS}pedreira.png`,
+    "pico_grifo":       `${LINK_FUNDOS}pico.png`,
     "mina_ferro":       `${LINK_FUNDOS}mina.png`,
+    "forja_abandonada": `${LINK_FUNDOS}forja.png`,
+    "pantano_maldito":  `${LINK_FUNDOS}pantano.png`,
+    "picos_gelados":    `${LINK_FUNDOS}gelados.png`,
+    "deserto_ancestral":`${LINK_FUNDOS}deserto.png`,
     "dungeon_01":       `${LINK_FUNDOS}fundo_combate_dungeon_01.png`
 };
 
@@ -583,6 +589,9 @@ window.iniciarCacadaApp = async function(spawnId, opcoesGrupo = {}) {
         // 3. ATUALIZANDO O VISUAL DA TELA E EMBOSCADA
         // ==========================================
         document.getElementById('arena-box').style.backgroundImage = `url('${bgArena}')`;
+        document.getElementById('arena-box').style.backgroundSize = '100% auto';
+        document.getElementById('arena-box').style.backgroundPosition = 'center bottom';
+        document.getElementById('arena-box').style.backgroundRepeat = 'no-repeat';
         document.getElementById('hud-nome-mob').innerText = est.mob_nome;
         document.getElementById('hud-lvl-mob').innerText = `LV.${est.monster_level || '??'}`;
         document.getElementById('hud-lvl-player').innerText = `LV.${est.player_level || '??'}`;
