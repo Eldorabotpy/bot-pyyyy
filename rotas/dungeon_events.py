@@ -73,7 +73,125 @@ def dungeon_entry():
 
 
         # ====================================================
-        # 🗝️ VERIFICA E CONSOME A CHAVE
+        # 🏰 CONTROLE DA EXECUÇÃO DA DUNGEON 01
+        # ====================================================
+
+        dungeon_id = str(
+            dungeon_id
+            or ""
+        ).strip()
+
+        user_id = str(
+            user_id
+            or ""
+        )
+
+        motor = (
+            _motor_cacada()
+        )
+
+        group_id = None
+
+        # ================================================
+        # 👥 DESCOBRIR PARTY
+        # ================================================
+        if dungeon_id == "dungeon_01":
+
+            from modules.combat.party_engine import (
+                obter_grupo_do_jogador
+            )
+
+            grupo = (
+                obter_grupo_do_jogador(
+                    user_id
+                )
+            )
+
+            if grupo:
+
+                group_id = str(
+                    grupo.get(
+                        "_id"
+                    )
+                    or ""
+                ).strip()
+
+            if not motor:
+
+                return jsonify({
+                    "success": False,
+                    "autorizado": False,
+                    "error": (
+                        "Sistema da dungeon "
+                        "indisponível."
+                    )
+                }), 503
+
+            # ============================================
+            # 🔒 PARTICIPANTE DA EXECUÇÃO?
+            # ============================================
+            #
+            # Se a party já começou a dungeon,
+            # somente os membros congelados no início
+            # podem participar daquela execução.
+            # ============================================
+            pode_participar = (
+                motor.pode_participar_dungeon(
+                    regiao=dungeon_id,
+                    user_id=user_id,
+                    group_id=group_id
+                )
+            )
+
+            if not pode_participar:
+
+                return jsonify({
+                    "success": False,
+                    "autorizado": False,
+                    "acao": "fora_da_execucao",
+                    "dungeon_id": dungeon_id,
+                    "error": (
+                        "Esta execução da dungeon "
+                        "já começou. Você entrou na "
+                        "party depois do início e "
+                        "deverá aguardar a próxima run."
+                    )
+                }), 403
+
+            # ============================================
+            # 🔁 REENTRADA NA MESMA RUN
+            # ============================================
+            #
+            # Já consumiu a chave desta execução:
+            # não cobra novamente e, principalmente,
+            # NÃO apaga os baús/puzzle pessoais.
+            # ============================================
+            ja_pagou = (
+                motor.jogador_ja_pagou_dungeon(
+                    regiao=dungeon_id,
+                    user_id=user_id,
+                    group_id=group_id
+                )
+            )
+
+            if ja_pagou:
+
+                return jsonify({
+                    "success": True,
+                    "autorizado": True,
+                    "acao": "reentrada_execucao",
+                    "dungeon_id": dungeon_id,
+                    "item_id": "chave_masmorra",
+                    "consumido": 0,
+                    "mensagem": (
+                        "Você retornou à execução "
+                        "atual da dungeon. Nenhuma "
+                        "Chave de Masmorra foi consumida."
+                    )
+                }), 200
+
+        # ====================================================
+        # 🗝️ NOVA ENTRADA — CONSUMIR CHAVE
         # ====================================================
 
         result = consumir_chave_masmorra(
@@ -89,6 +207,18 @@ def dungeon_entry():
         if result.get(
             "autorizado"
         ):
+
+            # Dungeon 01 usa o sistema de instâncias.
+            if (
+                dungeon_id == "dungeon_01"
+                and motor
+            ):
+
+                motor.registrar_pagamento_dungeon(
+                    regiao=dungeon_id,
+                    user_id=user_id,
+                    group_id=group_id
+                )
 
             return jsonify(
                 result

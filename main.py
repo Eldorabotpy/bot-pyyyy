@@ -526,8 +526,68 @@ def iniciar_combate():
             return jsonify({
                 "erro": "Esse encontro pertence a outro jogador."
             }), 403
-            
+
+        # ==========================================
+        # 🏰 SEGURANÇA DA INSTÂNCIA DA DUNGEON
+        # ==========================================
+        if regiao_atual == "dungeon_01":
+
+            # Spawn inexistente não pode virar um
+            # monstro padrão por acidente.
+            if not mob_vivo:
+
+                return jsonify({
+                    "erro": (
+                        "Esse monstro não existe "
+                        "nesta execução da dungeon."
+                    )
+                }), 404
+
+            # ======================================
+            # ⚔️ MOB NORMAL / BOSS
+            # ======================================
+            #
+            # Mímico já foi validado acima pelo dono
+            # do evento individual.
+            #
+            # Para mobs normais e o Rei Caído,
+            # jogador e monstro precisam pertencer
+            # exatamente à mesma instância.
+            # ======================================
+            if not eh_evento_dungeon:
+
+                instancia_jogador = str(
+                    sistema_cacada
+                    .dungeon_jogador_instancia
+                    .get(
+                        str(user_id)
+                    )
+                    or ""
+                )
+
+                instancia_mob = str(
+                    mob_vivo.get(
+                        "dungeon_instance_id"
+                    )
+                    or ""
+                )
+
+                if (
+                    not instancia_jogador
+                    or not instancia_mob
+                    or instancia_jogador
+                    != instancia_mob
+                ):
+
+                    return jsonify({
+                        "erro": (
+                            "Esse monstro pertence "
+                            "a outra execução da dungeon."
+                        )
+                    }), 403
+
         mob_data = None
+
         for categoria, mobs in MONSTERS_DATA.items():
             if categoria.startswith('_'): continue
             for m in mobs:
@@ -537,7 +597,46 @@ def iniciar_combate():
             if mob_data: break
 
         if not mob_data:
-            return jsonify({"erro": "O monstro fugiu para a floresta!"})
+            return jsonify({
+                "erro": "O monstro fugiu para a floresta!"
+            })
+
+        # ==========================================
+        # 👑 BOSS DA DUNGEON
+        # ==========================================
+        eh_boss_dungeon = (
+            regiao_atual == "dungeon_01"
+            and (
+                monster_id_real
+                == "rei_caido_dungeon_01"
+
+                or bool(
+                    mob_vivo
+                    and mob_vivo.get(
+                        "dungeon_boss"
+                    )
+                )
+
+                or bool(
+                    mob_vivo
+                    and mob_vivo.get(
+                        "boss"
+                    )
+                )
+
+                or bool(
+                    mob_data.get(
+                        "dungeon_boss"
+                    )
+                )
+
+                or bool(
+                    mob_data.get(
+                        "boss"
+                    )
+                )
+            )
+        )
             
         # Status dinâmicos do monstro
         mob_level_final = mob_vivo.get("level", mob_data.get('min_level', 1)) if mob_vivo else mob_data.get('min_level', 1)
@@ -580,10 +679,21 @@ def iniciar_combate():
         bestiario = player.get("bestiario", {})
         abates = bestiario.get(monster_id_real, 0)
 
-        # O Mímico já se revelou fisicamente no evento.
-        # Portanto nome, nível e status podem aparecer
-        # independentemente do Bestiário.
-        if eh_evento_dungeon:
+        # ==========================================
+        # 📖 CONHECIMENTO ESPECIAL DA DUNGEON
+        # ==========================================
+        #
+        # Mímico:
+        # já se revelou através do evento.
+        #
+        # Rei Caído:
+        # é o chefe final da dungeon e deve aparecer
+        # com nome e nível completos imediatamente.
+        # ==========================================
+        if (
+            eh_evento_dungeon
+            or eh_boss_dungeon
+        ):
             nivel_conhecimento = 3
 
         else:
@@ -605,11 +715,18 @@ def iniciar_combate():
         estado = {
             "regiao": regiao_atual,
             "spawn_id": spawn_id,
+            "monster_id": monster_id_real,
 
             # ==========================================
             # 🏰 EVENTO ESPECIAL DE DUNGEON
             # ==========================================
             "evento_dungeon": eh_evento_dungeon,
+
+            # ==========================================
+            # 👑 IDENTIFICAÇÃO DO BOSS
+            # ==========================================
+            "boss": eh_boss_dungeon,
+            "dungeon_boss": eh_boss_dungeon,
 
             "mob_nome": nome_mob_tela,
             "mob_img": link_imagem_monstro,
@@ -1226,35 +1343,202 @@ def handle_pedir_amigos():
 @socketio.on('entrarRegiao')
 def handle_entrar_regiao(data):
     player_sid = request.sid
-    char_id = data.get('char_id') 
-    if not char_id: return 
-    
-    sids_para_remover = [sid for sid, info in jogadores_online.items() if info.get('char_id') == char_id and sid != player_sid]
-    
+    char_id = data.get('char_id')
+
+    if not char_id:
+        return
+
+    char_id = str(
+        char_id
+    )
+
+    nova_regiao = str(
+        data.get(
+            'regiao',
+            'capital_eldora'
+        )
+        or 'capital_eldora'
+    )
+
+    # ==========================================
+    # 🏰 DESCOBRIR REGIÃO ANTERIOR
+    # ==========================================
+    regiao_anterior = None
+
+    info_atual = jogadores_online.get(
+        player_sid
+    )
+
+    if (
+        info_atual
+        and str(
+            info_atual.get(
+                'char_id'
+            )
+        ) == char_id
+    ):
+        regiao_anterior = (
+            info_atual.get(
+                'regiao'
+            )
+        )
+
+    sids_para_remover = [
+        sid
+        for sid, info
+        in jogadores_online.items()
+        if (
+            str(
+                info.get(
+                    'char_id'
+                )
+            ) == char_id
+            and sid != player_sid
+        )
+    ]
+
+    # Se o navegador abriu outro socket, ainda conseguimos
+    # descobrir de qual região o jogador estava vindo.
+    if not regiao_anterior:
+
+        for old_sid in sids_para_remover:
+
+            old_info = (
+                jogadores_online.get(
+                    old_sid
+                )
+                or {}
+            )
+
+            regiao_antiga_socket = (
+                old_info.get(
+                    'regiao'
+                )
+            )
+
+            if regiao_antiga_socket:
+                regiao_anterior = (
+                    regiao_antiga_socket
+                )
+                break
+
+    # ==========================================
+    # 🚪 JOGADOR ESTÁ FORA DA DUNGEON
+    # ==========================================
+    #
+    # Chamamos mesmo se não soubermos a região
+    # anterior. Se não houver vínculo de dungeon,
+    # sair_dungeon_jogador() simplesmente não faz nada.
+    #
+    # Isso também limpa corretamente um vínculo antigo
+    # depois de queda de conexão / fechamento do jogo.
+    # ==========================================
+    if nova_regiao != "dungeon_01":
+        sistema_cacada.sair_dungeon_jogador(
+            char_id
+        )
+
     for old_sid in sids_para_remover:
-        emit('desconectarDuplicado', {}, to=old_sid) 
-        # 👇 CORREÇÃO: Usamos o .pop() com None para ignorar se a chave não existir mais
-        jogadores_online.pop(old_sid, None) 
-        emit('jogadorSaiu', old_sid, broadcast=True) 
-    
+        emit(
+            'desconectarDuplicado',
+            {},
+            to=old_sid
+        )
+
+        jogadores_online.pop(
+            old_sid,
+            None
+        )
+
+        emit(
+            'jogadorSaiu',
+            old_sid,
+            broadcast=True
+        )
+
     jogadores_online[player_sid] = {
-        'id': player_sid, 'char_id': char_id,
-        'nome': data.get('nome', 'Herói'), 'regiao': data.get('regiao', 'capital_eldora'),
-        'x': data.get('x', 0), 'y': data.get('y', 0),
-        'skin': data.get('skin', 'aventureiro_masculino') 
+        'id': player_sid,
+        'char_id': char_id,
+        'nome': data.get(
+            'nome',
+            'Herói'
+        ),
+        'regiao': nova_regiao,
+        'x': data.get(
+            'x',
+            0
+        ),
+        'y': data.get(
+            'y',
+            0
+        ),
+        'skin': data.get(
+            'skin',
+            'aventureiro_masculino'
+        )
     }
     
     emit('jogadoresAtuais', jogadores_online, to=player_sid)
     emit('novoJogador', jogadores_online[player_sid], broadcast=True, include_self=False)
     
     if sistema_invasao_mapa.evento_ativo:
-        emit('spawnMonstrosInvasao', sistema_invasao_mapa.monstros_vivos, to=player_sid)
-    mobs_da_regiao = sistema_cacada.obter_mobs_regiao(data.get('regiao', 'capital_eldora'))
-    emit('carregarMobsMapa', mobs_da_regiao, to=player_sid)
-    
-    grupo_atual = obter_grupo_do_jogador(char_id)
+        emit(
+            'spawnMonstrosInvasao',
+            sistema_invasao_mapa.monstros_vivos,
+            to=player_sid
+        )
+
+    # ==========================================
+    # 👥 DESCOBRIR PARTY ANTES DE CARREGAR MOBS
+    # ==========================================
+    grupo_atual = obter_grupo_do_jogador(
+        char_id
+    )
+
+    group_id = None
+    group_members = None
+
     if grupo_atual:
-        emit('atualizarListaGrupo', grupo_atual, to=player_sid)
+
+        group_id = str(
+            grupo_atual.get(
+                "_id"
+            )
+            or ""
+        )
+
+        group_members = (
+            _ids_participantes_grupo(
+                grupo_atual
+            )
+        )
+
+        emit(
+            'atualizarListaGrupo',
+            grupo_atual,
+            to=player_sid
+        )
+
+    # ==========================================
+    # 👹 CARREGAR MOBS
+    # ==========================================
+    mobs_da_regiao = (
+        sistema_cacada.obter_mobs_regiao(
+            data.get(
+                'regiao',
+                'capital_eldora'
+            ),
+            user_id=char_id,
+            group_id=group_id,
+            group_members=group_members
+        )
+    )
+
+    emit(
+        'carregarMobsMapa',
+        mobs_da_regiao,
+        to=player_sid
+    )
     
     # 🌌 FENDA DIMENSIONAL — se o jogador entrou no mapa depois do spawn,
     # envia o evento ativo para ele desenhar portal/mobs sem depender de reload.
@@ -1348,8 +1632,17 @@ def handle_atualizar_visual(dados):
 @socketio.on('disconnect')
 def handle_disconnect():
     if request.sid in jogadores_online:
-        del jogadores_online[request.sid]
-        emit('jogadorSaiu', request.sid, broadcast=True)
+
+        jogadores_online.pop(
+            request.sid,
+            None
+        )
+
+        emit(
+            'jogadorSaiu',
+            request.sid,
+            broadcast=True
+        )
 
 @socketio.on('pedirCuraCatedral')
 def curar_jogador_catedral(data):

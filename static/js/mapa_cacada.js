@@ -47,6 +47,7 @@ class MotorCacada {
             this.socket.off('mobMapaMorreu');
             this.socket.off('mobMapaNasceu');
             this.socket.off('convocarCombateGrupo');
+            this.socket.off('dungeonConcluida');
 
             this.socket.on('convocarCombateGrupo', async (dados) => {
                 console.log("🤝 [MAPA] Convocado para combate em grupo:", dados);
@@ -81,13 +82,182 @@ class MotorCacada {
 
             // 3. Mobs nascendo no tempo certo
             this.socket.on('mobMapaNasceu', (dados) => {
-                let regiaoAtual = this.scene.regiaoAtual || localStorage.getItem("eldora_lastRegiao");
 
-                // Só desenha se o jogador estiver no mesmo mapa
-                if (regiaoAtual === dados.regiao) {
-                    this.spawnMob(dados.mob_data);
+                let regiaoAtual =
+                    this.scene.regiaoAtual
+                    || localStorage.getItem(
+                        "eldora_lastRegiao"
+                    );
+
+                // ==========================================
+                // 🏰 FILTRO DE INSTÂNCIA DA DUNGEON
+                // ==========================================
+                if (
+                    dados.regiao === "dungeon_01"
+                    && dados.mob_data
+                ) {
+
+                    const mobData =
+                        dados.mob_data;
+
+                    const dungeonInstanceId =
+                        String(
+                            mobData.dungeon_instance_id
+                            || dados.dungeon_instance_id
+                            || ""
+                        );
+
+                    // Se for mob de instância da dungeon,
+                    // precisamos confirmar que este jogador
+                    // pertence àquela execução.
+                    if (dungeonInstanceId) {
+
+                        const userId =
+                            String(
+                                localStorage.getItem(
+                                    "jogadorEldoraID"
+                                )
+                                || ""
+                            );
+
+                        const membros =
+                            Array.isArray(
+                                mobData.dungeon_members
+                            )
+                                ? mobData.dungeon_members.map(
+                                    id => String(id)
+                                )
+                                : [];
+
+                        if (
+                            !userId
+                            || !membros.includes(
+                                userId
+                            )
+                        ) {
+
+                            console.log(
+                                "🏰 [DUNGEON] Spawn ignorado de outra instância:",
+                                dungeonInstanceId
+                            );
+
+                            return;
+                        }
+                    }
+
+                }
+
+                // Só desenha se o jogador estiver
+                // realmente no mesmo mapa.
+                if (
+                    regiaoAtual === dados.regiao
+                ) {
+
+                    this.spawnMob(
+                        dados.mob_data
+                    );
                 }
             });
+
+            // ==========================================
+            // 🏆 DUNGEON 01 CONCLUÍDA
+            // ==========================================
+            this.socket.on(
+                'dungeonConcluida',
+                (dados) => {
+
+                    if (
+                        !dados
+                        || dados.dungeon_id !== 'dungeon_01'
+                    ) {
+                        return;
+                    }
+
+                    const userId =
+                        String(
+                            localStorage.getItem(
+                                'jogadorEldoraID'
+                            )
+                            || ''
+                        );
+
+                    const membros =
+                        Array.isArray(
+                            dados.membros
+                        )
+                            ? dados.membros.map(
+                                id => String(id)
+                            )
+                            : [];
+
+                    if (
+                        !userId
+                        || (
+                            membros.length > 0
+                            && !membros.includes(
+                                userId
+                            )
+                        )
+                    ) {
+                        return;
+                    }
+
+                    if (
+                        this.autoCacadaAtiva
+                    ) {
+                        this.pararAutoCacada(
+                            'dungeon concluída',
+                            true
+                        );
+                    }
+
+                    const nomeDungeon =
+                        dados.nome
+                        || 'Catacumbas do Rei Caído';
+
+                    const boss =
+                        dados.boss
+                        || 'Rei Caído';
+
+                    const mensagem =
+                        `👑 ${boss} foi derrotado!\n\n`
+                        + `${nomeDungeon} foi concluída.`;
+
+                    if (
+                        typeof window.alertaEldora
+                        === 'function'
+                    ) {
+
+                        window.alertaEldora(
+                            '🏆 DUNGEON CONCLUÍDA',
+                            mensagem,
+                            'aviso'
+                        );
+
+                    } else if (
+                        typeof window.avisoEldora
+                        === 'function'
+                    ) {
+
+                        window.avisoEldora(
+                            `🏆 DUNGEON CONCLUÍDA\n\n`
+                            + mensagem
+                        );
+
+                    } else {
+
+                        alert(
+                            `🏆 DUNGEON CONCLUÍDA\n\n`
+                            + mensagem
+                        );
+                    }
+
+                    console.log(
+                        '🏆 [DUNGEON] Execução concluída:',
+                        dados.dungeon_instance_id
+                    );
+                }
+            );
         }
     }
 
@@ -880,31 +1050,70 @@ class MotorCacada {
             // Isso será usado pela Auto Caçada para saber qual mob perseguir.
             sprite.mobData = mobData;
 
-            let totalFrames = this.scene.textures.get(textureKey).frameTotal;
-            if (totalFrames >= 3) {
-                const animKey = `${textureKey}_idle`;
-                if (!this.scene.anims.exists(animKey)) {
+            let totalFrames =
+                this.scene.textures.get(
+                    textureKey
+                ).frameTotal;
+
+            // ==========================================
+            // 🎞️ ANIMAÇÃO IDLE — 6 FRAMES
+            // ==========================================
+            if (totalFrames >= 6) {
+
+                const animKey =
+                    `${textureKey}_idle`;
+
+                if (
+                    !this.scene.anims.exists(
+                        animKey
+                    )
+                ) {
+
                     this.scene.anims.create({
-                        key: animKey,
-                        frames: this.scene.anims.generateFrameNumbers(textureKey, { start: 0, end: 2 }),
-                        frameRate: 5,
+                        key:
+                            animKey,
+
+                        frames:
+                            this.scene.anims.generateFrameNumbers(
+                                textureKey,
+                                {
+                                    start: 0,
+                                    end: 5
+                                }
+                            ),
+
+                        frameRate: 6,
+
                         repeat: -1
                     });
                 }
-                sprite.play(animKey);
+
+                sprite.play(
+                    animKey
+                );
             }
 
             // ==========================================
             // 🏹 SETA FLUTUANTE (Substitui o Texto)
             // ==========================================
-            sprite.indicadorAlvo = this.scene.add.text(mobData.x, mobData.y - 30, '▼', {
-                fontSize: '18px', color: '#ff4757', stroke: '#000', strokeThickness: 3
-            }).setOrigin(0.5).setDepth(30);
+            const offsetSeta = ehBoss ? 75 : 30;
+
+            sprite.indicadorAlvo = this.scene.add.text(
+                mobData.x,
+                mobData.y - offsetSeta,
+                '▼',
+                {
+                    fontSize: '18px',
+                    color: '#ff4757',
+                    stroke: '#000',
+                    strokeThickness: 3
+                }
+            ).setOrigin(0.5).setDepth(30);
 
             // Animação da seta flutuando (sobe e desce sem parar)
             this.scene.tweens.add({
                 targets: sprite.indicadorAlvo,
-                y: mobData.y - 22,
+                y: mobData.y - offsetSeta + 8,
                 duration: 600,
                 yoyo: true,
                 repeat: -1,

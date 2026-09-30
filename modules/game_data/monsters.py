@@ -1,4 +1,5 @@
 # modules/game_data/monsters.py
+from .dungeon_mob_loot import catacumbas_loot
 
 MONSTERS_DATA = {
 
@@ -1470,7 +1471,7 @@ MONSTERS_DATA = {
             "luck": 4,
             "xp_reward": 12,
             "gold_drop": 4,
-            "loot_table": [],
+            "loot_table": catacumbas_loot(),
             "ambush_chance": 0.05,
             "dungeon_mob": True,
             "media_key": "slime_catacumbas_media"
@@ -1495,7 +1496,7 @@ MONSTERS_DATA = {
             "luck": 5,
             "xp_reward": 13,
             "gold_drop": 4,
-            "loot_table": [],
+            "loot_table": catacumbas_loot(),
             "ambush_chance": 0.05,
             "dungeon_mob": True,
             "media_key": "cogumelo_esporifero_media"
@@ -1520,7 +1521,7 @@ MONSTERS_DATA = {
             "luck": 6,
             "xp_reward": 14,
             "gold_drop": 4,
-            "loot_table": [],
+            "loot_table": catacumbas_loot(),
             "ambush_chance": 0.15,
             "dungeon_mob": True,
             "media_key": "morcego_mana_media"
@@ -1545,7 +1546,7 @@ MONSTERS_DATA = {
             "luck": 4,
             "xp_reward": 16,
             "gold_drop": 6,
-            "loot_table": [],
+            "loot_table": catacumbas_loot(),
             "ambush_chance": 0.05,
             "dungeon_mob": True,
             "media_key": "esqueleto_catacumbas_media"
@@ -1570,7 +1571,7 @@ MONSTERS_DATA = {
             "luck": 3,
             "xp_reward": 18,
             "gold_drop": 7,
-            "loot_table": [],
+            "loot_table": catacumbas_loot(),
             "ambush_chance": 0.0,
             "dungeon_mob": True,
             "media_key": "guardiao_pedra_corrompido_media"
@@ -1595,7 +1596,7 @@ MONSTERS_DATA = {
             "luck": 4,
             "xp_reward": 19,
             "gold_drop": 7,
-            "loot_table": [],
+            "loot_table": catacumbas_loot(),
             "ambush_chance": 0.05,
             "dungeon_mob": True,
             "media_key": "cadaver_enraizado_media"
@@ -1620,7 +1621,7 @@ MONSTERS_DATA = {
             "luck": 8,
             "xp_reward": 22,
             "gold_drop": 9,
-            "loot_table": [],
+            "loot_table": catacumbas_loot(),
             "ambush_chance": 0.10,
             "dungeon_mob": True,
             "media_key": "espectro_rei_caido_media"
@@ -1645,7 +1646,7 @@ MONSTERS_DATA = {
             "luck": 7,
             "xp_reward": 28,
             "gold_drop": 12,
-            "loot_table": [],
+            "loot_table": catacumbas_loot(elite=True),
             "ambush_chance": 0.0,
             "dungeon_mob": True,
             "elite": True,
@@ -1672,7 +1673,7 @@ MONSTERS_DATA = {
             "luck": 12,
             "xp_reward": 100,
             "gold_drop": 50,
-            "loot_table": [],
+            "loot_table": catacumbas_loot(boss=True),
             "ambush_chance": 0.0,
             "dungeon_mob": True,
             "dungeon_boss": True,

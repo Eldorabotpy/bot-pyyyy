@@ -5,6 +5,7 @@ import logging
 import asyncio
 import random
 from collections import Counter
+from modules.combat.loot_rolls import roll_loot
 from modules import player_manager, game_data
 from modules.player.premium import PremiumManager
 from modules.game_data.season_pass import adicionar_xp_passe
@@ -103,21 +104,9 @@ def calculate_victory_rewards(player_data: dict, combat_details: dict) -> tuple[
     xp_reward = int(base_xp * xp_mult)
     gold_reward = int(base_gold * gold_mult)
     
-    looted_items = []
     loot_table = combat_details.get('loot_table', [])
-    
-    if loot_table and isinstance(loot_table, list):
-        for item in loot_table:
-            if not isinstance(item, dict): continue
-            
-            chance = float(item.get('drop_chance', 0))
-            luck = int(player_data.get('total_stats', {}).get('luck', 0))
-            chance += (luck * 0.1) 
-            
-            if random.random() * 100 <= chance:
-                item_id = item.get('item_id')
-                if item_id:
-                    looted_items.append(item_id)
+    luck = int(player_data.get('total_stats', {}).get('luck', 0))
+    looted_items = roll_loot(loot_table, luck_bonus=luck * 0.1)
     
     return xp_reward, gold_reward, looted_items
 

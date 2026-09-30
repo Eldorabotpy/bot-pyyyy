@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 import random
+from modules.combat.loot_rolls import roll_loot
 from bson import ObjectId
 import logging
 from typing import Dict, Optional, Tuple, Any, List, Union
@@ -1720,11 +1721,25 @@ async def processar_turno_combate(
         dano_heroi = hp_mob_antes - mob_hp
         mob_vivo["hp_atual"] = mob_hp
 
-    recompensas = {"gold": 0, "xp": 0, "itens": []}
+    recompensas = {
+        "gold": 0,
+        "xp": 0,
+        "itens": []
+    }
+
     ouro_perdido = 0
     xp_perdido = 0
     is_derrota = False
-    bestiario = player.get("bestiario", {}) or {}
+
+    resultado_morte_mob = None
+
+    bestiario = (
+        player.get(
+            "bestiario",
+            {}
+        )
+        or {}
+    )
 
     # =============================================================
     # 5. CONTRA-ATAQUE OU VITÓRIA
@@ -1783,9 +1798,12 @@ async def processar_turno_combate(
             })
 
         else:
-            sistema_cacada.processar_morte(
-                regiao_atual,
-                spawn_id
+            resultado_morte_mob = (
+                sistema_cacada.processar_morte(
+                    regiao_atual,
+                    spawn_id
+                )
+                or {}
             )
 
         if monster_id_real and not eh_evento_dungeon:
@@ -2162,22 +2180,16 @@ async def processar_turno_combate(
             if eh_evento_dungeon
             else mob_status_luta.get("loot_table", [])
         )
-        for loot in loot_table:
-            chance = float(loot.get("drop_chance", 0))
-            if random.uniform(0, 100) <= chance:
-                item_id = loot.get("item_id")
-                if not item_id:
-                    continue
+        for item_id in roll_loot(loot_table):
+            recompensas["itens"].append(item_id)
 
-                recompensas["itens"].append(item_id)
-
-                if item_id in inventory:
-                    if isinstance(inventory[item_id], dict):
-                        inventory[item_id]["quantity"] = inventory[item_id].get("quantity", 0) + 1
-                    else:
-                        inventory[item_id] += 1
+            if item_id in inventory:
+                if isinstance(inventory[item_id], dict):
+                    inventory[item_id]["quantity"] = inventory[item_id].get("quantity", 0) + 1
                 else:
-                    inventory[item_id] = {"base_id": item_id, "quantity": 1}
+                    inventory[item_id] += 1
+            else:
+                inventory[item_id] = {"base_id": item_id, "quantity": 1}
 
         levels_gained, points_gained, msg = check_and_apply_level_up(
             player
@@ -2402,10 +2414,36 @@ async def processar_turno_combate(
             print(traceback.format_exc())
 
     # =============================================================
+    # 🏆 CONCLUSÃO DE DUNGEON
+    # =============================================================
+    dungeon_concluida = bool(
+        isinstance(
+            resultado_morte_mob,
+            dict
+        )
+        and resultado_morte_mob.get(
+            "dungeon_concluida"
+        )
+    )
+
+    boss_derrotado = bool(
+        isinstance(
+            resultado_morte_mob,
+            dict
+        )
+        and resultado_morte_mob.get(
+            "boss_derrotado"
+        )
+    )
+
+    # =============================================================
     # 8. RESPOSTA PARA QUEM CLICOU
     # =============================================================
+    
     return {
         "vitoria": mob_hp <= 0,
+        "boss_derrotado": boss_derrotado,
+        "dungeon_concluida": dungeon_concluida,        
         "derrota": is_derrota and not sala_grupo,
         "log": log_turno,
         "player_hp": player_hp,
