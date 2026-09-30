@@ -22,6 +22,31 @@ def _motor_cacada():
         "SISTEMA_CACADA"
     )
 
+
+@dungeon_events_bp.route("/api/dungeon/guia", methods=["GET"])
+def dungeon_guide():
+    """Consulta a execução ativa, sem criar instância nem consumir chave."""
+    from modules.game_data.map_spawns import MAP_SPAWNS
+
+    user_id = str(request.args.get("user_id") or "").strip()
+    if not user_id:
+        return jsonify(success=False, error="Jogador não informado."), 400
+    motor = _motor_cacada()
+    if not motor:
+        return jsonify(success=False, error="Dungeon indisponível."), 503
+    instance_id = motor.dungeon_jogador_instancia.get(user_id)
+    if not instance_id:
+        return jsonify(success=False, error="Você não está em uma execução ativa."), 404
+    mobs = [m for m in list(motor.mobs_vivos.get("dungeon_01", {}).values())
+            if m.get("dungeon_instance_id") == instance_id and not m.get("event_owner_id")]
+    def is_boss(mob):
+        return mob.get("dungeon_boss") or mob.get("monster_id") == "rei_caido_dungeon_01"
+    remaining = sum(1 for m in mobs if m.get("dungeon_mob") and not is_boss(m))
+    completed = motor.dungeon_instancia_concluida(instance_id)
+    boss = "derrotado" if completed else "desperto" if any(is_boss(m) for m in mobs) else "adormecido"
+    return jsonify(success=True, restantes=remaining,
+                   total=len(MAP_SPAWNS.get("dungeon_01", [])), boss=boss)
+
 # ============================================================
 # 🗝️ ENTRADA EM DUNGEON
 # ============================================================

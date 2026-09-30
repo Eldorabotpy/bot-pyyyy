@@ -29,7 +29,8 @@ const FUNDOS_ARENAS = {
     "pradaria_inicial": `${LINK_FUNDOS}pradaria.png`, 
     "floresta_sombria": `${LINK_FUNDOS}floresta.png`,
     "pedreira_granito": `${LINK_FUNDOS}pedreira.png`,
-    "mina_ferro":       `${LINK_FUNDOS}mina.png` 
+    "mina_ferro":       `${LINK_FUNDOS}mina.png`,
+    "dungeon_01":       `${LINK_FUNDOS}fundo_combate_dungeon_01.png`
 };
 
 let musicaDeFundoAtual = null;

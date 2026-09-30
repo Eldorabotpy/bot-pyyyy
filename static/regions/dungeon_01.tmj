@@ -61,6 +61,7 @@
          "id":4,
          "name":"objetos_mapa",
          "objects":[
+                {"id":384,"name":"estatua_guardiao","type":"dungeon_guide","x":352,"y":16,"width":64,"height":112,"rotation":0,"visible":true},
                 {
                  "height":0,
                  "id":1,
@@ -5224,7 +5225,7 @@
          "y":0
         }],
  "nextlayerid":13,
- "nextobjectid":384,
+ "nextobjectid":385,
  "orientation":"orthogonal",
  "renderorder":"right-down",
  "tiledversion":"1.12.2",

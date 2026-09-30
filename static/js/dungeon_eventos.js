@@ -353,6 +353,7 @@
             }
 
 
+            this.guardianGuide = new window.DungeonGuardianGuide(this.scene, this.map);
             this._criarVisuais();
 
             this._criarInteracoes();
