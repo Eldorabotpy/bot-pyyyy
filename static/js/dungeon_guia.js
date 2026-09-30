@@ -26,7 +26,8 @@ window.DungeonGuardianGuide = class DungeonGuardianGuide {
             scene.motorCacada?.pararAutoCacada('consulta ao guardião', true);
             this.pending = true;
             this.deadline = Date.now() + 12000;
-            scene.target = {...this.destination};
+            // O mapa usa um Phaser.Math.Vector2: preservar set() e copy().
+            scene.target.set(this.destination.x, this.destination.y);
             scene.isMoving = true;
             scene.physics.moveToObject(scene.player, scene.target, 150);
         };
@@ -39,7 +40,8 @@ window.DungeonGuardianGuide = class DungeonGuardianGuide {
             }
             if (Math.hypot(scene.player.x - x, scene.player.y - y) <= 78) {
                 this.pending = false;
-                scene.player.body.stop(); scene.isMoving = false; scene.target = null;
+                scene.player.body.stop(); scene.isMoving = false;
+                scene.target.copy(scene.player);
                 this.open();
             }
         };
