@@ -4,9 +4,10 @@ import random
 import math
 from modules.game_data.map_spawns import MAP_SPAWNS
 from modules.game_data.monsters import MONSTERS_DATA
+from modules.dungeon_persistence import DungeonPersistence, durable_dungeon
 
-class GerenciadorCacada:
-    def __init__(self, socketio):
+class GerenciadorCacada(DungeonPersistence):
+    def __init__(self, socketio, dungeon_collection=None):
         self.socketio = socketio
         self.mobs_vivos = {}
 
@@ -50,6 +51,7 @@ class GerenciadorCacada:
         self.dungeon_instancias_concluidas = set()
 
         self.inicializar_mundo()
+        self.iniciar_persistencia_dungeon(dungeon_collection)
 
     def buscar_status_base(self, monster_id):
         """Procura o monstro dentro do seu monsters.py"""
@@ -142,6 +144,7 @@ class GerenciadorCacada:
     # ==========================================
     # 🏰 CRIAR DUNGEON PRIVADA DO JOGADOR
     # ==========================================
+    @durable_dungeon
     def preparar_dungeon_jogador(
         self,
         regiao,
@@ -412,6 +415,7 @@ class GerenciadorCacada:
     # ==========================================
     # ♻️ RESETAR EXECUÇÃO DE DUNGEON
     # ==========================================
+    @durable_dungeon
     def resetar_dungeon_jogador(
         self,
         regiao,
@@ -780,6 +784,7 @@ class GerenciadorCacada:
     # ==========================================
     # 🗝️ REGISTRAR CHAVE PAGA
     # ==========================================
+    @durable_dungeon
     def registrar_pagamento_dungeon(
         self,
         regiao,
@@ -842,6 +847,7 @@ class GerenciadorCacada:
     # ==========================================
     # 🚪 JOGADOR SAIU DA DUNGEON
     # ==========================================
+    @durable_dungeon
     def sair_dungeon_jogador(
         self,
         user_id
@@ -1117,6 +1123,7 @@ class GerenciadorCacada:
 
         return resultado
 
+    @durable_dungeon
     def processar_morte(self, regiao, spawn_id):
         if regiao in self.mobs_vivos and spawn_id in self.mobs_vivos[regiao]:
             mob = self.mobs_vivos[regiao][spawn_id]

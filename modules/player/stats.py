@@ -2310,6 +2310,10 @@ async def processar_turno_combate(
     )
 
     # =============================================================
+    # Checkpoint do monstro vivo. Abates e nascimento do chefe são salvos juntos
+    # pelo motor; não gravar um mob morto como se ainda ocupasse o mapa.
+    sistema_cacada.salvar_hp_dungeon(regiao_atual, spawn_id)
+
     # 7. SINCRONIZA SALA, AVANÇA TURNO E EMITE PARA TODOS OS MEMBROS
     # =============================================================
     if sala_grupo:

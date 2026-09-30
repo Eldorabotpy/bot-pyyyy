@@ -10,12 +10,15 @@ window.DungeonGuardianGuide = class DungeonGuardianGuide {
         this.destination = {x, y: y + 26};
         this.zone = scene.add.zone(x, obj.y + obj.height / 2, obj.width, obj.height)
             .setDepth(25).setInteractive({useHandCursor: true});
-        this.marker = scene.add.text(x, obj.y + 14, '📜', {
-            fontSize: '23px', backgroundColor: '#152031', padding: {x: 5, y: 3}
+        const markerY = obj.y + obj.height * 0.65;
+        this.marker = scene.add.text(x, markerY, '📜', {
+            fontSize: '23px', padding: {x: 4, y: 4},
+            stroke: '#ffd65a', strokeThickness: 3,
+            shadow: {offsetX: 0, offsetY: 0, color: '#ffd65a', blur: 5, fill: true, stroke: true}
         }).setOrigin(0.5).setDepth(26).setInteractive({useHandCursor: true});
         if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-            this.pulse = scene.tweens.add({targets: this.marker, y: obj.y + 8,
-                alpha: 0.65, duration: 900, yoyo: true, repeat: -1});
+            this.pulse = scene.tweens.add({targets: this.marker, y: markerY - 3,
+                alpha: 0.85, duration: 900, yoyo: true, repeat: -1});
         }
         const interact = (pointer, lx, ly, event) => {
             event?.stopPropagation();
