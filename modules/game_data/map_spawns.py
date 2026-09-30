@@ -53,16 +53,11 @@ MAP_SPAWNS = {
         ("pequeno_slime", 8, 5), 
         ("pequeno_slime", 8, 8), 
         ("pequeno_slime", 12, 7),
-        ("pequeno_slime", 10, 6), 
-        ("pequeno_slime", 10, 1), 
-        ("pequeno_slime", 13, 5),
         ("pequeno_slime", 14, 7),    
-        ("pequeno_slime", 4, 3), 
         ("pequeno_slime", 6, 6), 
         ("pequeno_slime", 11, 3),
         ("pequeno_slime", 15, 4), 
         ("pequeno_slime", 5, 9), 
-        ("pequeno_slime", 12, 10),
         ("pequeno_slime", 16, 2), 
         ("pequeno_slime", 18, 6),
         
@@ -80,12 +75,7 @@ MAP_SPAWNS = {
         ("slime_verde", 12, 19), 
         ("slime_verde", 16, 14), 
         ("slime_verde", 18, 18), 
-        ("slime_verde", 22, 16), 
-        ("slime_verde", 7, 24), 
-        ("slime_verde", 12, 26), 
-        ("slime_verde", 18, 24),
-        ("slime_verde", 24, 20), 
-        ("slime_verde", 26, 26),
+        
         
         # ==========================================
         # 🔵 ZONA SUDOESTE (Bottom-Left)
@@ -102,33 +92,20 @@ MAP_SPAWNS = {
         ("slime_azul", 11, 44), 
         ("slime_azul", 22, 40),
 
-        ("slime_terra", 10, 52), 
-        ("slime_terra", 22, 45), 
-        ("slime_terra", 20, 54),
-        ("slime_terra", 8, 51), 
-        ("slime_terra", 12, 54), 
-        ("slime_terra", 15, 50), 
-        ("slime_terra", 18, 56), 
-        ("slime_terra", 24, 50), 
-        ("slime_terra", 25, 55),
-        ("slime_terra", 13, 57), 
-        ("slime_terra", 27, 52),
-
         # ==========================================
         # ✨ ZONA NORDESTE (Top-Right)
         # ==========================================
         ("slime_brilhante", 36, 8), 
-        ("slime_brilhante", 42, 6),
-        ("slime_brilhante", 46, 9),
-        ("slime_brilhante", 35, 5),
+        ("slime_brilhante", 42, 8),
+        ("slime_brilhante", 48, 11),
+        ("slime_brilhante", 34, 5),
         ("slime_brilhante", 39, 10), 
         ("slime_brilhante", 44, 4), 
-        ("slime_brilhante", 49, 7), 
+        ("slime_brilhante", 49, 8), 
         ("slime_brilhante", 53, 5), 
         ("slime_brilhante", 55, 10), 
         ("slime_brilhante", 41, 13), 
-        ("slime_brilhante", 48, 14), 
-        ("slime_brilhante", 56, 15),
+        ("slime_brilhante", 47, 15),
         
         # ==========================================
         # ☠️ ZONA CENTRO-LESTE (Mid-Right)
