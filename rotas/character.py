@@ -246,6 +246,8 @@ def obter_personagem_info(personagem_id):
             "ouro": pdata.get("gold", 0),
             "gems": pdata.get("gems", 0), 
             "xp": pdata.get("xp", 0),
+            "xp_boost": pdata.get("xp_boost") or {},
+            "server_time": datetime.now(timezone.utc).isoformat(),
             "xp_max": xp_necessario,        
             "xp_next_level": xp_necessario, 
             "avatar": f"https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/avatares/avatar_padrao_{letra_gen}.png",
