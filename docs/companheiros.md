@@ -27,3 +27,9 @@ Subir todos os arquivos alterados/novos e reiniciar o backend. Atualizações do
 ## Verificação
 
 `venv/Scripts/python.exe tools/check_companions.py` executa regressão isolada com armazenamento em memória: requisitos, resgate concorrente, ovo único, incubação persistida, XP, custos/evolução, bônus, limites de movimento e endpoints Flask. Não acessa Mongo real. Conferência visual local com dados fictícios em largura estreita. Ainda é necessário jogar o ciclo no servidor de teste para ajustar distância e balanceamento.
+
+## Correção de caminhada e Códice
+
+O mapa agora envia posições intermediárias a cada 250 ms, além da posição de parada. Antes, somente a parada emitia `mover`, e intervalos maiores que 3 segundos eram descartados pelo validador. A amostragem pertence à cena Phaser. A validação de velocidade e os checkpoints permanecem no servidor. Validado com o handler real em armazenamento isolado: 12 segundos caminhando avançaram 1.788 pixels; posição parada e teleporte não avançaram.
+
+As abas Bestiário/Companheiros são independentes. Regiões seguem a ordem reino_eldora → pradaria_inicial → floresta_sombria → campos_linho → pedreira_granito → pico_grifo → mina_ferro → forja_abandonada → pantano_maldito → picos_gelados → deserto_ancestral. capital_eldora é apresentada como Reino de Eldora, preservando criaturas. Regiões extras aparecem depois. Layout e dossiê conferidos em prévia local de 360px, sem overflow horizontal da página.

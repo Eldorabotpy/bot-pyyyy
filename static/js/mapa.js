@@ -1604,6 +1604,9 @@ class MapaScene extends Phaser.Scene {
         
         try {
             if (typeof MapaHUD !== 'undefined') this.hud = new MapaHUD(this);
+            // Posições intermediárias alimentam multiplayer e incubação; timer pertence à cena.
+            this.time.addEvent({ delay: 250, loop: true, callback: () => this.enviarPosicaoMapa() });
+
             // Inicialização do Multiplayer (Não apagar)
             if (typeof socket !== 'undefined' && socket) {
 
@@ -4080,6 +4083,15 @@ class MapaScene extends Phaser.Scene {
 
         }
 
+    }
+
+    enviarPosicaoMapa() {
+        const conexao = window.eldoraSocket || (typeof socket !== 'undefined' ? socket : null);
+        if (!conexao?.connected || !this.player?.body || this.travadoNoPortal) return;
+        conexao.emit('mover', {
+            x: Math.round(this.player.x), y: Math.round(this.player.y),
+            skin: this.skinResolvida || this.skinAtiva
+        });
     }
 
     pararPersonagem() {

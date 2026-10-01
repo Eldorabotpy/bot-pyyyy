@@ -52,7 +52,8 @@
     }
     window.abrirCompanheiros=async()=>{
         const grid=document.getElementById('grid-monstros');if(!grid)return;
-        grid.dataset.tab='companheiros';grid.innerHTML='<p>Carregando companheiros…</p>';
+        window.selecionarAbaCodice?.('companheiros');
+        grid.dataset.tab='companheiros';grid.scrollTop=0;grid.innerHTML='<p>Carregando companheiros…</p>';
         try {await refresh();}catch(e){grid.textContent=e.message;}
     };
     window.addEventListener('eldora:companheiros', event => {
