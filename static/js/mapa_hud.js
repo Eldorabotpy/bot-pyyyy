@@ -4,6 +4,7 @@ class MapaHUD {
         this.slotsContainers = []; 
         this.sidebarAberta = false; 
         this.btnToggle = null;
+        this.criarContadorXP();
         this.init();
     }
 
@@ -14,9 +15,55 @@ class MapaHUD {
         fetch(`/api/personagem/${meuId}?t=${new Date().getTime()}`)
             .then(r => r.json())
             .then(pdata => {
-                //this.criarBarraHabilidades(pdata);
+                if (!this.encerrado) this.sincronizarXP(pdata);
             })
             .catch(e => console.warn("Erro ao carregar o HUD:", e));
+    }
+
+    criarContadorXP() {
+        this.encerrado = false;
+        this.xpExpira = 0;
+        this.xpRelogioOffset = 0;
+        // Pequeno indicador no rodapé do mapa, sem capturar toques.
+        this.xpTexto = this.scene.add.text(0, 0, '', {
+            fontFamily: 'Arial, sans-serif', fontSize: '11px',
+            color: '#e9d5ff', backgroundColor: '#171426cc',
+            padding: { x: 7, y: 4 }
+        }).setOrigin(0.5, 1).setScrollFactor(0).setDepth(950).setVisible(false);
+        this.xpListener = event => this.sincronizarXP(event.detail);
+        window.addEventListener('eldora:xp-boost', this.xpListener);
+        this.xpTimer = this.scene.time.addEvent({ delay: 1000, loop: true, callback: () => this.atualizarContadorXP() });
+        const limpar = () => {
+            if (this.encerrado) return;
+            this.encerrado = true;
+            window.removeEventListener('eldora:xp-boost', this.xpListener);
+            this.xpTimer.remove();
+            this.xpTexto.destroy();
+            this.scene.events.off('shutdown', limpar);
+            this.scene.events.off('destroy', limpar);
+        };
+        this.scene.events.once('shutdown', limpar);
+        this.scene.events.once('destroy', limpar);
+    }
+
+    sincronizarXP(dados) {
+        if (this.encerrado || !dados || !Object.prototype.hasOwnProperty.call(dados, 'xp_boost')) return;
+        const boost = dados.xp_boost || {};
+        const servidor = Date.parse(dados.server_time);
+        this.xpRelogioOffset = Number.isFinite(servidor) ? servidor - Date.now() : 0;
+        this.xpExpira = Number(boost.multiplier) > 1 ? Date.parse(boost.expires_at) : 0;
+        this.atualizarContadorXP();
+    }
+
+    atualizarContadorXP() {
+        if (this.encerrado) return;
+        const restante = Math.max(0, Math.ceil((this.xpExpira - Date.now() - this.xpRelogioOffset) / 1000));
+        this.xpTexto.setVisible(Number.isFinite(restante) && restante > 0);
+        if (!Number.isFinite(restante) || restante <= 0) return;
+        const minutos = Math.floor(restante / 60);
+        const segundos = String(restante % 60).padStart(2, '0');
+        this.xpTexto.setText(`XP ×2 · ${minutos}:${segundos}`);
+        this.xpTexto.setPosition(this.scene.scale.width / 2, this.scene.scale.height - 12);
     }
 
     // 🛡️ TRAVA DE MOVIMENTO: Limpa para apenas bloquear objetos que REALMENTE existam na tela

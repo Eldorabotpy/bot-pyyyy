@@ -475,7 +475,8 @@ async function carregarMeuPerfil() {
             });
         }
 
-        window.perfilDadosGlobais = p; 
+        window.perfilDadosGlobais = p;
+        window.dispatchEvent(new CustomEvent("eldora:xp-boost", { detail: p }));
         
         const classeKey = (p.classe || "aprendiz").toLowerCase();
         const infoClasse = CLASSES_INFO[classeKey] || CLASSES_INFO['aprendiz'];
@@ -1779,7 +1780,8 @@ window.desequiparItem = async function(slot) {
     try {
         const res = await fetch('/api/personagem/desequipar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_id: charId, slot: slot }) });
         const data = await res.json();
-        if(data.sucesso) { 
+        if(data.sucesso) {
+            if (data.xp_boost) window.dispatchEvent(new CustomEvent("eldora:xp-boost", { detail: data }));
             carregarMeuPerfil(); 
             setTimeout(() => alternarAbaPerfil('equips'), 200); 
             

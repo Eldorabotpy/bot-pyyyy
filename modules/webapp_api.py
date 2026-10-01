@@ -1369,6 +1369,8 @@ def obter_perfil(user_id):
         # Envia todas as listas de desbloqueio para o JavaScript[cite: 4, 5]
         return jsonify({
             "is_vip": tem_passe,
+            "xp_boost": pdata.get("xp_boost") or {},
+            "server_time": datetime.now(timezone.utc).isoformat(),
             "nome": pdata.get("character_name", "Aventureiro"), 
             "level": lvl, "gold": pdata.get("gold", 0), "gems": pdata.get("gems", 0),
             "classe": classe_str.capitalize(),
@@ -2080,6 +2082,7 @@ def api_usar_item_direto():
                 ),
                 "xp_boost":
                     novo_boost,
+                "server_time": datetime.now(timezone.utc).isoformat(),
             })
 
 
