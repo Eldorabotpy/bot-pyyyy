@@ -24,12 +24,41 @@ class MapaHUD {
         this.encerrado = false;
         this.xpExpira = 0;
         this.xpRelogioOffset = 0;
-        // Pequeno indicador no rodapé do mapa, sem capturar toques.
-        this.xpTexto = this.scene.add.text(0, 0, '', {
+        // Cápsula fixa, sem área interativa: os toques continuam chegando ao mapa.
+        this.xpCapsula = this.scene.add.container(0, 0)
+            .setScrollFactor(0).setDepth(950).setVisible(false);
+        const moldura = this.scene.add.graphics();
+        moldura.fillStyle(0x000000, 0.22);
+        moldura.fillRoundedRect(-77, -15, 154, 34, 17);
+        moldura.fillStyle(0x101827, 0.96);
+        moldura.fillRoundedRect(-76, -17, 152, 32, 16);
+        moldura.lineStyle(1, 0xc6a35c, 0.85);
+        moldura.strokeRoundedRect(-76, -17, 152, 32, 16);
+        moldura.lineStyle(1, 0xffffff, 0.06);
+        moldura.strokeRoundedRect(-73, -14, 146, 26, 13);
+        // Medalhão violeta com estrela dourada, independente de imagens externas.
+        moldura.fillStyle(0x302342, 1);
+        moldura.fillCircle(-58, -1, 11);
+        moldura.lineStyle(1, 0xa88a51, 0.5);
+        moldura.strokeCircle(-58, -1, 11);
+        moldura.fillStyle(0xf3d894, 1);
+        moldura.fillPoints([
+            { x: -58, y: -8 }, { x: -56, y: -3 },
+            { x: -51, y: -1 }, { x: -56, y: 1 },
+            { x: -58, y: 6 }, { x: -60, y: 1 },
+            { x: -65, y: -1 }, { x: -60, y: -3 }
+        ], true);
+        moldura.lineStyle(1, 0xc6a35c, 0.25);
+        moldura.lineBetween(5, -8, 5, 6);
+        const titulo = this.scene.add.text(-40, -1, 'XP ×2', {
             fontFamily: 'Arial, sans-serif', fontSize: '11px',
-            color: '#e9d5ff', backgroundColor: '#171426cc',
-            padding: { x: 7, y: 4 }
-        }).setOrigin(0.5, 1).setScrollFactor(0).setDepth(950).setVisible(false);
+            fontStyle: 'bold', color: '#e6ca8a'
+        }).setOrigin(0, 0.5).setResolution(2);
+        this.xpTexto = this.scene.add.text(38, -1, '', {
+            fontFamily: 'monospace', fontSize: '12px',
+            fontStyle: 'bold', color: '#f1edf7'
+        }).setOrigin(0.5).setResolution(2);
+        this.xpCapsula.add([moldura, titulo, this.xpTexto]);
         this.xpListener = event => this.sincronizarXP(event.detail);
         window.addEventListener('eldora:xp-boost', this.xpListener);
         this.xpTimer = this.scene.time.addEvent({ delay: 1000, loop: true, callback: () => this.atualizarContadorXP() });
@@ -38,7 +67,7 @@ class MapaHUD {
             this.encerrado = true;
             window.removeEventListener('eldora:xp-boost', this.xpListener);
             this.xpTimer.remove();
-            this.xpTexto.destroy();
+            this.xpCapsula.destroy();
             this.scene.events.off('shutdown', limpar);
             this.scene.events.off('destroy', limpar);
         };
@@ -58,12 +87,14 @@ class MapaHUD {
     atualizarContadorXP() {
         if (this.encerrado) return;
         const restante = Math.max(0, Math.ceil((this.xpExpira - Date.now() - this.xpRelogioOffset) / 1000));
-        this.xpTexto.setVisible(Number.isFinite(restante) && restante > 0);
+        this.xpCapsula.setVisible(Number.isFinite(restante) && restante > 0);
         if (!Number.isFinite(restante) || restante <= 0) return;
         const minutos = Math.floor(restante / 60);
         const segundos = String(restante % 60).padStart(2, '0');
-        this.xpTexto.setText(`XP ×2 · ${minutos}:${segundos}`);
-        this.xpTexto.setPosition(this.scene.scale.width / 2, this.scene.scale.height - 12);
+        const tempo = minutos < 100 ? `${minutos}:${segundos}` : `${Math.floor(minutos / 60)}h${String(minutos % 60).padStart(2, '0')}`;
+        this.xpTexto.setText(tempo);
+        this.xpTexto.setColor(restante <= 60 ? '#f3d894' : '#f1edf7');
+        this.xpCapsula.setPosition(this.scene.scale.width / 2, this.scene.scale.height - 30);
     }
 
     // 🛡️ TRAVA DE MOVIMENTO: Limpa para apenas bloquear objetos que REALMENTE existam na tela
