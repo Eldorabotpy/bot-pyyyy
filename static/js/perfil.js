@@ -42,6 +42,13 @@ window.getCaminhosImagemItemEldora = function(item) {
     }
 
     const caminhos = [];
+    if (typeof item?.icon_url === 'string' && /^(https?:\/\/|\/static\/)/.test(item.icon_url)) {
+        caminhos.push(item.icon_url);
+    }
+    for (const caminho of (window.FORJA_IMAGENS?.[idReal] || [])) {
+        caminhos.push(`${linkBaseNuvem}itens/${caminho}`);
+    }
+
 
     // Equipamentos da forja no GitHub usam prefixo work_
     if (pasta === "equipamentos") {
@@ -1594,6 +1601,9 @@ window.abrirModalItem = function(idAlvo, origem) {
         if (['weapon', 'armor', 'helmet', 'boots', 'ring', 'necklace', 'earring', 'equipamento', 'tool', 'arma', 'armadura', 'lenhador', 'minerador', 'colhedor', 'esfolador', 'ferreiro', 'armeiro', 'alfaiate', 'joalheiro', 'curtidor'].includes(t)) {
             botoesHtml = `<button onclick="usarOuEquiparItem('${itemData.id}')" style="flex:1; padding:10px; background: linear-gradient(180deg, #27ae60 0%, #1e8449 100%); color:white; border:1px solid #2ecc71; border-radius:4px; font-weight:bold; cursor:pointer;">Equipar</button>`;
         } 
+        else if (itemData.on_use?.effect === 'xp_boost' || ['pocao_xp_boost', 'pocao_xp_boost_g', 'elixir_xp_dobrado_10m', 'elixir_xp_dobrado_30m'].includes(idReal)) {
+            botoesHtml = `<button onclick="consumirItemDireto('${itemData.id}', '${idReal}')" style="flex:1; min-height:44px; padding:10px; background:linear-gradient(180deg,#8e44ad,#732d91); color:white; border:1px solid #9b59b6; border-radius:4px; font-weight:bold; cursor:pointer;">Usar · XP ×2</button>`;
+        }
         else if (idReal.includes('pocao') || nomeLower.includes('poção') || ['potion'].includes(t)) {
             botoesHtml = `
                 <button onclick="equiparPocaoAtalho('${idReal}', 'hp')" style="flex:1; padding:10px; background: linear-gradient(180deg, #c0392b 0%, #922b21 100%); color:white; border:1px solid #e74c3c; border-radius:4px; font-weight:bold; cursor:pointer;">Slot ❤️</button>

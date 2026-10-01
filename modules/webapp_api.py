@@ -1025,6 +1025,8 @@ def obter_perfil(user_id):
                     "tradable": info_item.get("tradable", True) and obj_item.get("tradable", True),
                     "tipo": info_item.get("type", obj_item.get("type", "material")),
                     "desc": info_item.get("description", "Um item de Eldora."),
+                    "on_use": info_item.get("on_use", {}),
+                    "icon_url": info_item.get("icon_url"),
                     "raridade": obj_item.get(
                         "rarity",
                         info_item.get(

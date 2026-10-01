@@ -1,5 +1,7 @@
 // Índice dos arquivos de Eldorabotpy/static-img, verificado em 2026-09-27.
 window.FORJA_IMAGENS = {
+  "pocao_xp_boost": ["consumiveis/elixir_xp_dobrado_10m.png"],
+  "pocao_xp_boost_g": ["consumiveis/elixir_xp_dobrado_30m.png"],
   "carta_recomendacao": [
     "consumiveis/carta_recomendacao.png"
   ],
