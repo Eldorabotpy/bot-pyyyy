@@ -28,7 +28,7 @@ def registrar_loja_reino(socketio, db, jogadores_online):
         # Comparação do inventário evita sobrescrever compras/consumos concorrentes.
         for _ in range(3):
             jogador = users_collection.find_one({'_id': oid})
-            if not jogador or int(jogador.get('gemas', 0)) < produto['preco']:
+            if not jogador or int(jogador.get('gems', 0)) < produto['preco']:
                 emit('respostaCompraGema', {'sucesso': False, 'mensagem': f"Gemas insuficientes! Custa {produto['preco']} 💎."})
                 return
             anterior = jogador.get('inventory', {})
@@ -41,9 +41,9 @@ def registrar_loja_reino(socketio, db, jogadores_online):
             else:
                 inventario[item] = int(atual) + 1
             resultado = users_collection.update_one(
-                {'_id': oid, 'gemas': {'$gte': produto['preco']},
+                {'_id': oid, 'gems': {'$gte': produto['preco']},
                  'inventory': anterior if 'inventory' in jogador else {'$exists': False}},
-                {'$inc': {'gemas': -produto['preco']}, '$set': {'inventory': inventario}})
+                {'$inc': {'gems': -produto['preco']}, '$set': {'inventory': inventario}})
             if resultado.modified_count:
                 emit('respostaCompraGema', {'sucesso': True, 'mensagem': f"{produto['nome']} entregue na mochila. Use para ativar o XP dobrado!"})
                 return

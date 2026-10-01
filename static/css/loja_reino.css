@@ -32,3 +32,17 @@
 #modal-loja-reino .xp-duracao { color: #cbd5e1; font-size: .8rem; line-height: 1.4; }
 #modal-loja-reino .container-premium { max-height: 85dvh; overflow-y: auto; }
 #modal-loja-reino .btn-comprar-gema { min-height: 44px; }
+
+#modal-loja-reino .imagem-item-gema {
+    height: 64px;
+    display: grid;
+    place-items: center;
+    font-size: 2.5rem;
+}
+#modal-loja-reino .imagem-item-gema img {
+    width: 64px;
+    height: 64px;
+    max-width: 100%;
+    object-fit: contain;
+    filter: drop-shadow(0 3px 6px rgba(0, 0, 0, .35));
+}
