@@ -29,3 +29,6 @@
     cursor: pointer;
     width: 100%;
 }
+#modal-loja-reino .xp-duracao { color: #cbd5e1; font-size: .8rem; line-height: 1.4; }
+#modal-loja-reino .container-premium { max-height: 85dvh; overflow-y: auto; }
+#modal-loja-reino .btn-comprar-gema { min-height: 44px; }

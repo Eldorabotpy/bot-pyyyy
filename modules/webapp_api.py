@@ -2013,6 +2013,11 @@ def api_usar_item_direto():
                 )
             )
 
+            if not isinstance(quantidade, (int, float)) or quantidade < 1:
+                return jsonify({"erro": "Você não possui essa poção."}), 400
+            from copy import deepcopy
+            inventario_anterior = deepcopy(inventario)
+
             # Gasta exatamente uma unidade.
             if quantidade > 1:
 
@@ -2045,10 +2050,11 @@ def api_usar_item_direto():
                     .isoformat(),
             }
 
-            users_collection.update_one(
+            resultado_boost = users_collection.update_one(
                 {
-                    "_id":
-                        busca_id
+                    "_id": busca_id,
+                    "inventory": inventario_anterior,
+                    "xp_boost": pdata["xp_boost"] if "xp_boost" in pdata else {"$exists": False},
                 },
                 {
                     "$set": {
@@ -2060,6 +2066,9 @@ def api_usar_item_direto():
                     }
                 }
             )
+
+            if not resultado_boost.modified_count:
+                return jsonify({"erro": "O inventário mudou. Atualize a mochila e tente novamente."}), 409
 
             return jsonify({
                 "sucesso": True,

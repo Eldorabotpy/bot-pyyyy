@@ -9,14 +9,27 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # ⚠️ ATENÇÃO: Atualize este link com o seu Cloudflare atual! (precisa ter https://)
-    url_do_jogo = "https://163-176-44-198.sslip.io"
+    url_do_jogo = "https://eldora-rpg.modappmania.workers.dev"
 
-    keyboard = [[
-        InlineKeyboardButton(
-            "🎮 ENTRAR EM ELDORA 🎮", 
-            web_app=WebAppInfo(url=url_do_jogo)
-        )
-    ]]
+    keyboard = [
+        [
+            InlineKeyboardButton(
+                "🎮 ENTRAR EM ELDORA 🎮",
+                web_app=WebAppInfo(url=url_do_jogo)
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                "🌐 JOGAR NA WEB",
+                url="https://eldora-rpg.modappmania.workers.dev"
+            ),
+            InlineKeyboardButton(
+                "👥 COMUNIDADE",
+                url="https://t.me/+rA1Xiom4I_E5MmY5"
+            )
+        ]
+    ]
+
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     msg_text = (

@@ -67,7 +67,7 @@ def build_catalog():
     for key, title, summary, sections in places:
         add('capital:' + key, capital, title, summary, sections)
     add('merlin:estoque', 'capital:merlin', 'Poções e materiais vendidos', 'Produtos da loja a ouro.', [('Poções', 'Cura e Mana P: 100 Ouro cada; M: 300 Ouro; G: 1.000 Ouro.'), ('Materiais', 'Pedra de Aprimoramento: 500 Ouro; Núcleo de Forja: 500 Ouro; Pergaminho de Reparo: 1.000 Ouro.'), ('Antes de comprar', 'Confira o preço atual exibido na loja e o saldo do herói.')])
-    add('flora:estoque', 'capital:flora', 'Tesouro do Rei', 'Compras com Gemas.', [('Produtos', 'Pergaminho de XP: 15 Gemas. Baú Lendário: 50 Gemas.'), ('Como comprar', 'Abra a loja junto de Flora e selecione Adquirir. Confira o saldo em Gemas antes de confirmar.')])
+    add('flora:estoque', 'capital:flora', 'Tesouro do Rei', 'Compras com Gemas.', [('Produtos', 'Poção de XP P: 15 Gemas, XP de combate dobrado por 15 minutos. Poção de XP G: 60 Gemas, por 60 minutos. Ative na mochila; o tempo continua offline e usos adicionais somam duração.'), ('Como comprar', 'Abra a loja junto de Flora e selecione Adquirir. Confira o saldo em Gemas antes de confirmar.')])
     add('capital:estatua', capital, 'Monumento de Pedroca', 'Memória da origem de Eldora.', [('Onde encontrar', 'Na praça central da capital.'), ('Inscrição', 'Foi daqui que tudo começou. Aqui nasceu o sonho de Eldora.')], '🗿')
     for key in ('merlin', 'flora', 'mercado'):
         original = next(n for n in nodes if n['id'] == 'capital:' + key)

@@ -2,6 +2,23 @@
 # (VERSÃO CORRIGIDA: Itens Especiais removidos do mercado)
 
 CONSUMABLES_DATA = {
+    "pocao_xp_boost": {
+        "display_name": "Poção de XP P", "emoji": "🧪",
+        "type": "consumivel", "category": "consumivel",
+        "description": "Dobra o XP de combate por 15 minutos. O tempo começa ao usar e continua offline. Usos adicionais somam duração, não multiplicador.",
+        "icon_url": "https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/itens/consumiveis/elixir_xp_dobrado_10m.png",
+        "stackable": True, "tradable": False,
+        "on_use": {"effect": "xp_boost", "multiplier": 2.0, "duration_seconds": 900}
+    },
+    "pocao_xp_boost_g": {
+        "display_name": "Poção de XP G", "emoji": "🧪",
+        "type": "consumivel", "category": "consumivel",
+        "description": "Dobra o XP de combate por 60 minutos. O tempo começa ao usar e continua offline. Usos adicionais somam duração, não multiplicador.",
+        "icon_url": "https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/itens/consumiveis/elixir_xp_dobrado_30m.png",
+        "stackable": True, "tradable": False,
+        "on_use": {"effect": "xp_boost", "multiplier": 2.0, "duration_seconds": 3600}
+    },
+
     # --- POÇÕES & ALIMENTOS ---
     "frasco_com_agua": {
         "display_name": "Frasco com Água", "emoji": "💧", 

@@ -1,47 +1,50 @@
-# rotas/loja_reino.py
+# Compras da Flora usam a mesma coleção e inventário do personagem.
 from flask_socketio import emit
 from flask import request
 from bson.objectid import ObjectId
 
+CATALOGO_FLORA = {
+    "pocao_xp_boost": {"nome": "Poção de XP P", "preco": 15},
+    "pocao_xp_boost_g": {"nome": "Poção de XP G", "preco": 60},
+}
+
 def registrar_loja_reino(socketio, db, jogadores_online):
-    
     @socketio.on('comprar_item_gema')
     def handle_comprar_item_gema(dados):
-        player_sid = request.sid
-        if player_sid not in jogadores_online: 
+        from modules.player.core import users_collection
+        jogador_online = jogadores_online.get(request.sid)
+        if not jogador_online:
+            emit('respostaCompraGema', {'sucesso': False, 'mensagem': 'Reconecte ao reino para comprar.'})
             return
-
-        char_id = str(jogadores_online[player_sid]['char_id'])
-        item_desejado = dados.get('item')
-
-        # Catálogo Premium (Gemas)
-        loja_premium = {
-            'pocao_xp_boost': {'nome': 'Pergaminho de XP (2x)', 'preco': 15},
-            'bau_lendario': {'nome': 'Baú de Equipamentos Lendários', 'preco': 50}
-        }
-
-        if item_desejado not in loja_premium:
-            emit('respostaCompraGema', {'sucesso': False, 'mensagem': 'Artigo não encontrado no tesouro do reino.'})
+        item = dados.get('item') if isinstance(dados, dict) else None
+        produto = CATALOGO_FLORA.get(item) if isinstance(item, str) else None
+        if not produto:
+            emit('respostaCompraGema', {'sucesso': False, 'mensagem': 'Artigo indisponível.'})
             return
-
-        produto = loja_premium[item_desejado]
-        preco = produto['preco']
-
-        # Busca o jogador (Garante que a coleção se chama 'jogadores' no seu banco)
-        jogador = db.jogadores.find_one({"_id": ObjectId(char_id)})
-        gemas_atuais = int(jogador.get("gemas", 0)) # ATENÇÃO: Verifique se o campo no seu DB é 'gemas' ou 'diamantes'
-
-        if gemas_atuais < preco:
-            emit('respostaCompraGema', {'sucesso': False, 'mensagem': f"Gemas insuficientes! Custa {preco} 💎."})
+        char_id = str(jogador_online.get('char_id', ''))
+        if not ObjectId.is_valid(char_id):
             return
-
-        # Desconta as Gemas e joga na mochila
-        db.jogadores.update_one(
-            {"_id": ObjectId(char_id)},
-            {
-                "$inc": {"gemas": -preco}, 
-                "$push": {"inventario": item_desejado} 
-            }
-        )
-
-        emit('respostaCompraGema', {'sucesso': True, 'mensagem': f"Compra Real Realizada: {produto['nome']}!"})
+        oid = ObjectId(char_id)
+        # Comparação do inventário evita sobrescrever compras/consumos concorrentes.
+        for _ in range(3):
+            jogador = users_collection.find_one({'_id': oid})
+            if not jogador or int(jogador.get('gemas', 0)) < produto['preco']:
+                emit('respostaCompraGema', {'sucesso': False, 'mensagem': f"Gemas insuficientes! Custa {produto['preco']} 💎."})
+                return
+            anterior = jogador.get('inventory', {})
+            if not isinstance(anterior, dict):
+                break
+            inventario = dict(anterior)
+            atual = inventario.get(item, 0)
+            if isinstance(atual, dict):
+                inventario[item] = {**atual, 'quantity': int(atual.get('quantity', 0)) + 1}
+            else:
+                inventario[item] = int(atual) + 1
+            resultado = users_collection.update_one(
+                {'_id': oid, 'gemas': {'$gte': produto['preco']},
+                 'inventory': anterior if 'inventory' in jogador else {'$exists': False}},
+                {'$inc': {'gemas': -produto['preco']}, '$set': {'inventory': inventario}})
+            if resultado.modified_count:
+                emit('respostaCompraGema', {'sucesso': True, 'mensagem': f"{produto['nome']} entregue na mochila. Use para ativar o XP dobrado!"})
+                return
+        emit('respostaCompraGema', {'sucesso': False, 'mensagem': 'O inventário mudou. Tente novamente.'})
