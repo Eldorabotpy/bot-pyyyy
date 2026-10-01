@@ -1366,8 +1366,10 @@ def obter_perfil(user_id):
             
         todas_profissoes.sort(key=lambda x: x["level"], reverse=True)
 
+        from modules.companions import profile_slot
         # Envia todas as listas de desbloqueio para o JavaScript[cite: 4, 5]
         return jsonify({
+            "companion": profile_slot(pdata["_id"]),
             "is_vip": tem_passe,
             "xp_boost": pdata.get("xp_boost") or {},
             "server_time": datetime.now(timezone.utc).isoformat(),
@@ -7454,3 +7456,29 @@ def api_runas_operar():
         return jsonify({'success':True, **state_view(updated,items_data.ITEMS_DATA)})
     except (ValueError,TypeError) as error:
         return jsonify({'success':False,'error':str(error)}),409
+
+
+@webapp_bp.route('/api/companheiros/<user_id>', methods=['GET', 'POST'])
+def api_companheiros(user_id):
+    from modules import companions
+    if not ObjectId.is_valid(user_id):
+        return jsonify({'erro': 'Personagem inválido.'}), 400
+    player = users_collection.find_one({'_id': ObjectId(user_id)})
+    if not player:
+        return jsonify({'erro': 'Personagem não encontrado.'}), 404
+    try:
+        message = None
+        if request.method == 'POST':
+            data = request.get_json(silent=True) or {}
+            if not isinstance(data, dict):
+                return jsonify({'erro': 'Pedido inválido.'}), 400
+            message = companions.mutate(user_id, lambda state: companions.action(
+                player, state, data.get('action'), data.get('family'), data.get('specialty')))
+        response = jsonify({'state': companions.view(player, companions.load(user_id)), 'message': message})
+        response.headers['Cache-Control'] = 'no-store'
+        return response
+    except (ValueError, TypeError):
+        # Detalhes das regras são seguros; erros de tipos não expõem o servidor.
+        import sys
+        error = sys.exc_info()[1]
+        return jsonify({'erro': str(error) if isinstance(error, ValueError) else 'Pedido inválido.'}), 400

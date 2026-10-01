@@ -200,7 +200,7 @@ def process_party_effects(caster_id, caster_name, skill_data, caster_stats, all_
 # ==========================================
 # 💰 DIVISÃO DE RECOMPENSAS DO GRUPO (SISTEMA ANTI-SANGUESSUGA)
 # ==========================================
-def dividir_recompensas_grupo(char_id, xp_total, gold_total):
+def dividir_recompensas_grupo(char_id, xp_total, gold_total, monster_id=None):
     """
     Calcula e divide o XP e Ouro APENAS entre os membros do grupo que estão ONLINE.
     """
@@ -345,6 +345,10 @@ def dividir_recompensas_grupo(char_id, xp_total, gold_total):
                 )
 
                 continue
+
+            if monster_id:
+                from modules import companions
+                companions.record_victory(membro_id, monster_id)
 
             # Depois de confirmar a recompensa,
             # entrega a contribuição ao clã do aliado.

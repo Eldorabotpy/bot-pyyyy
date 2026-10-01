@@ -25,6 +25,7 @@ window.abrirCodiceHunter = async function() {
                 </div>
                 
                 <div style="background: rgba(0,0,0,0.6); border-bottom: 1px solid #5d4037; padding: 10px; display: flex; overflow-x: auto; gap: 10px; white-space: nowrap; align-items: center; min-height: 60px; scrollbar-width: none;">
+                    <button onclick="window.abrirCompanheiros()" style="min-height:44px;background:#29334a;border:1px solid #d4af37;border-radius:20px;padding:8px 15px;color:#f4dfad;font-weight:bold;">🥚 Companheiros</button>
                     ${Object.keys(dados).map((reg) => `
                         <button onclick="window.renderizarCategoriaCodice('${reg}')" style="background: #3e2723; border: 1px solid #d4af37; border-radius: 20px; padding: 8px 15px; color: #f5f5f5; font-family: 'Cinzel', serif; font-size: 0.85em; font-weight: bold; cursor: pointer; flex-shrink: 0; box-shadow: 0 4px 6px rgba(0,0,0,0.5); transition: 0.2s;">
                             📍 ${reg.replace(/_/g, ' ').toUpperCase()}
@@ -49,6 +50,7 @@ window.abrirCodiceHunter = async function() {
 
 window.renderizarCategoriaCodice = function(regiao) {
     const grid = document.getElementById('grid-monstros');
+    grid.dataset.tab = 'criaturas';
     const monstros = window.dadosCodiceCache[regiao];
     
     if (!monstros || monstros.length === 0) {

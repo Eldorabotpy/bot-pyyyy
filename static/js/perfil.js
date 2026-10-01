@@ -815,6 +815,9 @@ async function carregarMeuPerfil() {
                     <div style="position: relative; width: 100%; height: 100%; z-index: 2;">${htmlSlots}</div>
                 </div>
 
+                <button type="button" onclick="window.abrirCodiceHunter().then(() => window.abrirCompanheiros())" style="display:block;width:100%;min-height:60px;margin:12px 0;padding:12px;background:#172231;border:1px solid #b99752;border-radius:12px;color:#ecd08c;text-align:left;cursor:pointer;">
+                    🐾 Companheiro<br><span style="font-size:12px;color:#cbd5e1;">${p.companion ? `${p.companion.icon} ${p.companion.name} · ${p.companion.form} · Nv. ${p.companion.level}` : 'Nenhum equipado · Abrir Bestiário'}</span>
+                </button>
                 ${htmlFerramentas}
             </div>`;
 

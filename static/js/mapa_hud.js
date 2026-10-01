@@ -5,6 +5,7 @@ class MapaHUD {
         this.sidebarAberta = false; 
         this.btnToggle = null;
         this.criarContadorXP();
+        if (window.CompanionMapHUD) this.companions = new window.CompanionMapHUD(scene);
         this.init();
     }
 

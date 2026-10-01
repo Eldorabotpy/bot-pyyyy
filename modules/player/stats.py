@@ -639,6 +639,11 @@ async def get_player_total_stats(player_data: dict, ally_user_ids: list = None) 
     total['max_hp'] = max(1, total.get('max_hp', 1))
     total['max_mana'] = max(10, total.get('max_mana', 10))
     
+    from modules import companions
+    pet_owner = player_data.get('_id') or player_data.get('user_id')
+    if pet_owner and ObjectId.is_valid(str(pet_owner)):
+        for stat, value in companions.bonus(companions.load(pet_owner)).items():
+            total[stat] = total.get(stat, 0) + value
     return total
 
 async def sync_player_stats_to_db(user_id: str, player_data: dict) -> None:
@@ -1808,6 +1813,8 @@ async def processar_turno_combate(
 
         if monster_id_real and not eh_evento_dungeon:
             bestiario[monster_id_real] = bestiario.get(monster_id_real, 0) + 1
+            from modules import companions
+            companions.record_victory(user_id, monster_id_real)
 
         xp_ganho_base = (
             0
@@ -1838,6 +1845,7 @@ async def processar_turno_combate(
                 str(user_id),
                 xp_ganho_base,
                 ouro_ganho_base,
+                monster_id=monster_id_real,
             )
 
         # =============================================================

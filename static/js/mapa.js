@@ -1603,9 +1603,10 @@ class MapaScene extends Phaser.Scene {
         this.target = new Phaser.Math.Vector2();
         
         try {
+            if (typeof MapaHUD !== 'undefined') this.hud = new MapaHUD(this);
             // Inicialização do Multiplayer (Não apagar)
             if (typeof socket !== 'undefined' && socket) {
-                if (typeof MapaHUD !== 'undefined') this.hud = new MapaHUD(this); 
+
                 if (typeof MapaInterativo !== 'undefined') this.interativo = new MapaInterativo(this);
                 if (typeof MotorDeInvasao !== 'undefined') this.motorInvasao = new MotorDeInvasao(this, socket);
                 if (typeof MotorMultiplayer !== 'undefined') this.motorMultiplayer = new MotorMultiplayer(this, socket);

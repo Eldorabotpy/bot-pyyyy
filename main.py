@@ -1456,6 +1456,10 @@ def handle_entrar_regiao(data):
             broadcast=True
         )
 
+    if player_sid in jogadores_online:
+        from modules.companions import flush_movement
+        flush_movement(jogadores_online[player_sid])
+
     jogadores_online[player_sid] = {
         'id': player_sid,
         'char_id': char_id,
@@ -1620,6 +1624,18 @@ def handle_acao_mapa(dados):
 @socketio.on('mover')
 def handle_move(data):
     if request.sid in jogadores_online:
+        from modules import companions
+        import time
+        online = jogadores_online[request.sid]
+        now = time.monotonic()
+        sample, distance = companions.movement_distance(online.get('_pet_sample'), online.get('regiao'), data.get('x'), data.get('y'), now)
+        online['_pet_sample'] = sample
+        online['_pet_distance'] = online.get('_pet_distance', 0) + distance
+        if now - online.get('_pet_flush', 0) >= 1:
+            if companions.load(online['char_id']).get('incubation'):
+                companions.record_distance(online['char_id'], online['_pet_distance'])
+            online['_pet_distance'] = 0
+            online['_pet_flush'] = now
         jogadores_online[request.sid].update({'x': data.get('x'), 'y': data.get('y')})
         emit('jogadorMoveu', {'id': request.sid, 'x': data.get('x'), 'y': data.get('y')}, broadcast=True, include_self=False)
 
@@ -1632,6 +1648,8 @@ def handle_atualizar_visual(dados):
 @socketio.on('disconnect')
 def handle_disconnect():
     if request.sid in jogadores_online:
+        from modules.companions import flush_movement
+        flush_movement(jogadores_online[request.sid])
 
         jogadores_online.pop(
             request.sid,
