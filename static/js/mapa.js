@@ -141,6 +141,12 @@ class MapaScene extends Phaser.Scene {
         this.load.image('icon_maestria', 'https://raw.githubusercontent.com/Eldorabotpy/static-img/refs/heads/main/assets/itens/materiais/selo_maestria.png');
         // Usamos 'main' direto que é mais rápido e estável que refs/heads/main
         const GITHUB_ASSETS = "https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/";
+        for (const [family, path] of Object.entries({slime:'pradaria/slime_verde', lobo:'floresta/lobo_magro', morcego:'mina_ferro/morcego_das_minas'})) {
+            if (!this.textures.exists('companion_' + family)) {
+                this.load.image('companion_' + family, `${GITHUB_ASSETS}mob/combate/${path}.png`);
+            }
+        }
+
         
         // 👇 A MÁGICA CONTRA O CACHE DO GITHUB 👇
         const cacheBuster = `?v=${new Date().getTime()}`;

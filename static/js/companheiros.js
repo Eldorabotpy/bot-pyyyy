@@ -10,8 +10,11 @@
         const pct = egg ? Math.min(100, Math.floor(100*egg.distance/state.hatch_distance)) : 0;
         grid.innerHTML = `<section class="companheiros-panel">
             <header><h3>Companheiros de jornada</h3><p>Conquiste um ovo, explore com a chocadeira e fortaleça seu vínculo nas caçadas.</p></header>
-            <article><h4>🥚 Incubadoras · uso único</h4><p>Disponíveis: <strong>${state.incubators || 0}</strong> · Cada ovo consome uma unidade ao iniciar.</p>${egg ? `<p>Ovo de ${escape(state.families[egg.family].name)} · <strong>${pct}%</strong></p><progress max="100" value="${pct}"></progress><p>${Math.floor(egg.distance/32)} / ${state.hatch_distance/32} blocos percorridos</p><p>A incubadora deste ovo já foi utilizada. Seu progresso fica salvo.</p>${button('Chocar ovo', 'hatch', egg.family, pct<100)}` : '<p>Escolha um ovo abaixo. Durante a incubação não é possível trocar o ovo.</p>'}${!state.incubator_claimed ? `<p>Conquista Primeiros Passos: ${Math.min(10,state.incubator_progress)}/10 abates · 1 incubadora gratuita.</p>${button('Resgatar incubadora','incubator','',state.incubator_progress<10)}` : '<p>✓ Incubadora da conquista já resgatada.</p>'}<p>Outras unidades estão à venda na Flora por 25 gemas.</p></article>
-            <article><h4>👑 Eldora Premium · Incubadoras extras</h4><p>Uma unidade por marco, além dos prêmios atuais do passe. Resgate aqui após atingir o nível com o Premium ativo.</p>${(state.premium_rewards || []).map(r=>button(r.claimed ? `Nível ${r.level} · Resgatada` : `Nível ${r.level} · Receber 1`, 'premium_incubator', String(r.level), r.claimed || !r.eligible)).join('')}</article>
+            <article><h4 class="incubator-heading"><img src="https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/itens/incubadora_pet.png" alt="Incubadora" width="56" height="56" onerror="this.hidden=true"><span>Incubadoras · uso único</span></h4><p>Disponíveis: <strong>${state.incubators || 0}</strong> · Cada ovo consome uma unidade ao iniciar.</p>${egg ? `<p>Ovo de ${escape(state.families[egg.family].name)} · <strong>${pct}%</strong></p><progress max="100" value="${pct}"></progress><p>${Math.floor(egg.distance/32)} / ${state.hatch_distance/32} blocos percorridos</p><p>A incubadora deste ovo já foi utilizada. Seu progresso fica salvo.</p>${button('Chocar ovo', 'hatch', egg.family, pct<100)}` : '<p>Escolha um ovo abaixo. Durante a incubação não é possível trocar o ovo.</p>'}${!state.incubator_claimed ? `<p>Conquista Primeiros Passos: ${Math.min(10,state.incubator_progress)}/10 abates · 1 incubadora gratuita.</p>${button('Resgatar incubadora','incubator','',state.incubator_progress<10)}` : '<p>✓ Incubadora da conquista já resgatada.</p>'}<p>Outras unidades estão à venda na Flora por 25 gemas.</p></article>
+            <article><h4>👑 Missões do Eldora Premium</h4><p>Novas metas a cada ciclo de 30 dias. Até 3 incubadoras por ciclo. Renovar antes do vencimento preserva o progresso atual.</p>
+            ${!state.premium_missions?.active ? '<p>Ative o Eldora Premium para começar a contar novos abates.</p>' : ''}
+            ${(state.premium_missions?.cycles || []).map(c=>`<section><h4>${c.active?'Ciclo atual':'Recompensas pendentes'}</h4><p>${escape(new Date(c.start).toLocaleDateString('pt-BR'))} até ${escape(new Date(c.end).toLocaleDateString('pt-BR'))}</p>${c.rewards.filter(r=>c.active || r.eligible&&!r.claimed).map(r=>`<p>${Math.min(c.kills,r.goal)} / ${r.goal} abates · 1 incubadora</p><progress max="${r.goal}" value="${Math.min(c.kills,r.goal)}"></progress>${button(r.claimed?'Resgatada':'Resgatar incubadora','premium_incubator',r.id,r.claimed||!r.eligible)}`).join('')}</section>`).join('')}
+            <p>Abates contam com o Eldora Premium ativo, mesmo sem pet equipado. Recompensas concluídas continuam disponíveis após o ciclo.</p></article>
             ${Object.entries(state.families).map(([key, family])=>{
                 const pet=state.pets[key], count=state.knowledge[key], claimed=state.claimed.includes(key);
                 if (!pet) return `<article><h4>${family.icon} Ovo de ${escape(family.name)}</h4><p>Conquista no Bestiário: ${Math.min(50,count)}/50 abates dessa família.</p><progress max="50" value="${Math.min(50,count)}"></progress>${!claimed ? button('Resgatar ovo','claim',key,count<50) : state.eggs.includes(key) ? button('Iniciar · usar 1 incubadora','incubate',key,!(state.incubators>0)||!!egg) : '<p>Ovo em incubação.</p>'}</article>`;
@@ -73,7 +76,9 @@
 window.CompanionMapHUD = class {
     constructor(scene) {
         this.scene=scene;this.closed=false;this.state=null;this.fetching=false;
-        this.pet=scene.add.text(0,0,'',{fontSize:'22px'}).setOrigin(0.5,1).setVisible(false);
+        this.pet=scene.add.image(0,0,'__DEFAULT').setOrigin(0.5,1).setVisible(false);
+        this.fallback=scene.add.text(0,0,'',{fontSize:'24px'}).setOrigin(0.5,1).setVisible(false);
+        this.trail=[];this.lastPlayer=null;this.placed=false;
         this.badge=scene.add.container(scene.scale.width/2,scene.scale.height-72).setScrollFactor(0).setDepth(950).setVisible(false);
         const bg=scene.add.graphics();bg.fillStyle(0x101827,.96);bg.fillRoundedRect(-72,-15,144,30,15);bg.lineStyle(1,0xc6a35c,.8);bg.strokeRoundedRect(-72,-15,144,30,15);
         this.text=scene.add.text(0,0,'',{fontFamily:'Arial',fontSize:'12px',color:'#ecd08c',fontStyle:'bold'}).setOrigin(.5).setResolution(2);
@@ -84,7 +89,7 @@ window.CompanionMapHUD = class {
         window.addEventListener('eldora:companheiros',this.listener);
         this.timer=scene.time.addEvent({delay:5000,loop:true,callback:()=>this.refresh()});
         this.follow=scene.time.addEvent({delay:50,loop:true,callback:()=>this.position()});
-        this.cleanup=()=>{if(this.closed)return;this.closed=true;this.abort?.abort();window.removeEventListener('eldora:companheiros',this.listener);this.timer.remove();this.follow.remove();this.pet.destroy();this.badge.destroy();scene.events.off('shutdown',this.cleanup);scene.events.off('destroy',this.cleanup);};
+        this.cleanup=()=>{if(this.closed)return;this.closed=true;this.abort?.abort();window.removeEventListener('eldora:companheiros',this.listener);this.timer.remove();this.follow.remove();this.pet.destroy();this.fallback.destroy();this.badge.destroy();scene.events.off('shutdown',this.cleanup);scene.events.off('destroy',this.cleanup);};
         scene.events.once('shutdown',this.cleanup);scene.events.once('destroy',this.cleanup);
         this.refresh();
     }
@@ -100,8 +105,13 @@ window.CompanionMapHUD = class {
         if(this.closed||!state||this.state&&state.version<this.state.version)return;
         this.state=state;
         const pet=state.pets[state.active];
-        this.pet.setVisible(!!pet);
-        if(pet){this.pet.setText(state.families[state.active].icon);this.pet.setFontSize(20+pet.stage*4);this.pet.setAlpha(.95);}
+        const texture='companion_'+state.active;
+        const hasImage=!!pet&&this.scene.textures.exists(texture);
+        this.pet.setVisible(hasImage);
+        this.fallback.setVisible(!!pet&&!hasImage);
+        if(hasImage)this.pet.setTexture(texture);
+        if(pet)this.fallback.setText(state.families[state.active].icon);
+        else {this.trail=[];this.lastPlayer=null;this.placed=false;}
         const egg=state.incubation;
         this.badge.setVisible(!!egg);
         if(egg){const pct=Math.min(100,Math.floor(egg.distance/state.hatch_distance*100));this.text.setText(pct===100?'🥚 Pronto para chocar':'🥚 Incubando · '+pct+'%');}
@@ -111,6 +121,29 @@ window.CompanionMapHUD = class {
         if(this.closed)return;
         this.badge.setPosition(this.scene.scale.width/2,this.scene.scale.height-72);
         const player=this.scene.player;
-        if(player&&this.pet.visible){const x=player.x-23,y=player.y+12;const far=Math.hypot(this.pet.x-x,this.pet.y-y)>150;this.pet.setPosition(far?x:this.pet.x+(x-this.pet.x)*.3,far?y:this.pet.y+(y-this.pet.y)*.3);this.pet.setDepth(player.depth+1);}
+        if(!player||!this.state?.pets[this.state.active])return;
+        const point={x:player.x,y:player.y};
+        const jumped=this.lastPlayer&&Math.hypot(point.x-this.lastPlayer.x,point.y-this.lastPlayer.y)>150;
+        if(!this.lastPlayer||jumped){
+            this.trail=[{x:point.x-32,y:point.y},point];this.placed=false;
+        } else if(Math.hypot(point.x-this.lastPlayer.x,point.y-this.lastPlayer.y)>0.5){
+            this.trail.push(point);
+            if(this.trail.length>128)this.trail.shift();
+        }
+        this.lastPlayer=point;
+        let remaining=32,target=this.trail[0];
+        for(let i=this.trail.length-1;i>0;i--){
+            const a=this.trail[i],b=this.trail[i-1],length=Math.hypot(b.x-a.x,b.y-a.y);
+            if(length>=remaining){const t=remaining/length;target={x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t};break;}
+            remaining-=length;
+        }
+        const visual=this.pet.visible?this.pet:this.fallback;
+        const size=Math.min(player.displayWidth,player.displayHeight)/2;
+        const scale=size/Math.max(visual.width,visual.height,1);
+        visual.setScale(scale);
+        const feet=target.y+player.displayHeight*(1-(player.originY??0.5));
+        visual.setPosition(this.placed?visual.x+(target.x-visual.x)*.4:target.x,this.placed?visual.y+(feet-visual.y)*.4:feet);
+        visual.setDepth(player.depth+(target.y>player.y?1:-1));
+        this.placed=true;
     }
 };

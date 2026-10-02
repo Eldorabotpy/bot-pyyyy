@@ -3,6 +3,7 @@ As ações usam revisão otimista; o cliente nunca informa XP, distância ou bô
 """
 import copy
 import math
+from datetime import datetime, timedelta, timezone
 from bson import ObjectId
 
 FAMILIES = {
@@ -11,7 +12,7 @@ FAMILIES = {
     "morcego": {"name": "Morcego", "icon": "🦇", "stat": "max_mana", "label": "Mana máxima", "specialties": {"arcano": ["Arcano", "max_mana"], "veloz": ["Veloz", "initiative"]}},
 }
 HATCH_DISTANCE = 96000  # 3000 blocos de 32px; cerca de 11min de caminhada a 150px/s.
-PREMIUM_INCUBATOR_LEVELS = (20, 40, 60, 80)
+PREMIUM_HUNT_GOALS = (100, 500, 1500)
 FORMS = ["Filhote", "Adulto", "Ancestral"]
 
 
@@ -36,6 +37,7 @@ def normalize(state):
     state.pop('incubator', None)
     state.setdefault('premium_incubators', [])
     state.setdefault('supply_receipts', [])
+    state.setdefault('premium_cycles', {})
     return state
 
 
@@ -99,16 +101,62 @@ def bonus(state):
     return {stat: amount * (3 if stat in ('max_hp', 'max_mana') else 1)}
 
 
+def utc_date(value):
+    if isinstance(value, str):
+        try:
+            value = datetime.fromisoformat(value.replace('Z', '+00:00'))
+        except ValueError:
+            return None
+    if not isinstance(value, datetime):
+        return None
+    return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
+
+
+def premium_cycle(player, now=None):
+    """Renovação antecipada estende expires_at, preservando activated_at."""
+    now = utc_date(now) or datetime.now(timezone.utc)
+    premium = player.get('eldora_premium') or {}
+    start, end = utc_date(premium.get('activated_at')), utc_date(premium.get('expires_at'))
+    if not start or not end or not start <= now < end:
+        return None
+    start += timedelta(days=30) * ((now - start) // timedelta(days=30))
+    return {'id': str(int(start.timestamp())), 'start': start.isoformat(),
+            'end': min(start + timedelta(days=30), end).isoformat(), 'kills': 0, 'claimed': []}
+
+
+def premium_player(user_id):
+    from modules.player.core import users_collection
+    return users_collection.find_one({'_id': ObjectId(str(user_id))}, {'eldora_premium': 1}) or {}
+
+
+def advance_premium(state, cycle):
+    if cycle:
+        saved = state.setdefault('premium_cycles', {}).setdefault(cycle['id'], copy.deepcopy(cycle))
+        saved['kills'] = min(PREMIUM_HUNT_GOALS[-1], saved['kills'] + 1)
+
+
+def premium_view(player, state, now=None):
+    current = premium_cycle(player, now)
+    cycles = copy.deepcopy(state.get('premium_cycles', {}))
+    if current:
+        cycles.setdefault(current['id'], current)
+    result = []
+    for key, cycle in sorted(cycles.items(), reverse=True):
+        active = bool(current and current['id'] == key)
+        rewards = [{'goal': goal, 'id': f'{key}:{goal}', 'claimed': goal in cycle['claimed'],
+                    'eligible': cycle['kills'] >= goal} for goal in PREMIUM_HUNT_GOALS]
+        if active or any(r['eligible'] and not r['claimed'] for r in rewards):
+            result.append({**cycle, 'active': active, 'rewards': rewards})
+    return {'active': bool(current), 'cycles': result}
+
+
 def view(player, state):
     result = normalize(state)
     result.pop('_id', None)
     result['families'] = FAMILIES
     result['knowledge'] = knowledge(player)
     result['incubator_progress'] = sum(max(0, int(n)) for n in (player.get('bestiario') or {}).values())
-    passe = player.get('passe_batalha') or {}
-    season = str(passe.get('season_id') or 'S1')
-    result['premium_rewards'] = [{'level': n, 'claimed': f'{season}:{n}' in result['premium_incubators'],
-        'eligible': bool(passe.get('is_premium')) and int(passe.get('level', 1)) >= n} for n in PREMIUM_INCUBATOR_LEVELS]
+    result['premium_missions'] = premium_view(player, result)
     result['hatch_distance'] = HATCH_DISTANCE
     result['bonus'] = bonus(state)
     for key, pet in result['pets'].items():
@@ -130,16 +178,19 @@ def action(player, state, action, family=None, specialty=None):
         state['incubators'] += 1
         return 'Você recebeu 1 incubadora de uso único!'
     if action == 'premium_incubator':
-        passe = player.get('passe_batalha') or {}
-        milestone = int(family or 0)
-        receipt = f"{passe.get('season_id') or 'S1'}:{milestone}"
-        if milestone not in PREMIUM_INCUBATOR_LEVELS or not passe.get('is_premium') or int(passe.get('level', 1)) < milestone:
-            raise ValueError('Este marco exige Eldora Premium ativo e o nível indicado.')
-        if receipt in state['premium_incubators']:
-            raise ValueError('Incubadora deste marco já resgatada.')
-        state['premium_incubators'].append(receipt)
+        try:
+            cycle_id, goal_text = (family or '').split(':')
+            goal = int(goal_text)
+        except (ValueError, TypeError):
+            raise ValueError('Escolha uma missão Premium válida.')
+        cycle = state.get('premium_cycles', {}).get(cycle_id)
+        if not cycle or goal not in PREMIUM_HUNT_GOALS or cycle['kills'] < goal:
+            raise ValueError('Complete os abates desta missão do Eldora Premium.')
+        if goal in cycle['claimed']:
+            raise ValueError('Recompensa desta missão já resgatada.')
+        cycle['claimed'].append(goal)
         state['incubators'] += 1
-        return 'Incubadora extra do Eldora Premium recebida!'
+        return 'Incubadora da missão do Eldora Premium recebida!'
     if action == 'unequip':
         state['active'] = None
         return 'Companheiro guardado.'
@@ -191,9 +242,11 @@ def action(player, state, action, family=None, specialty=None):
 def record_victory(user_id, monster_id):
     # Chamado apenas no fluxo de abate confirmado; não há endpoint de XP.
     state = load(user_id)
-    if not state.get('active'):
+    cycle = premium_cycle(premium_player(user_id))
+    if not state.get('active') and not cycle:
         return
     def reward(s):
+        advance_premium(s, cycle)
         pet = s['pets'].get(s.get('active'))
         if pet:
             pet['xp'] = min(15000, pet['xp'] + 10)

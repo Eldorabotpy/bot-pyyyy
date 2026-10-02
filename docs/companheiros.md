@@ -16,7 +16,7 @@ Entrada: Bestiário > Companheiros ou perfil > Equipamentos > Companheiro.
 - Ancestral: nível 25, 300 vitórias e 100 essências. Especialização escolhida no botão de evolução é definitiva nesta versão.
 - Slime: Guardião/Defesa ou Vital/HP. Lobo: Veloz/Iniciativa ou Guardião/Defesa. Morcego: Arcano/Mana ou Veloz/Iniciativa.
 - Bônus fixo: 1 + nível//5 + 2×estágio. HP/Mana multiplicam o valor por 3. Bônus é aplicado em get_player_total_stats, não grava atributos permanentes.
-- Representações visuais provisórias: ícones de família com tamanho diferente por forma; ainda não são sprites exclusivos animados. Companheiro é visível no mapa do dono nesta versão.
+- No mapa, o pet equipado usa a imagem da criatura do Bestiário (Slime Verde, Lobo Magro ou Morcego das Minas), com ícone como fallback. Cabe em metade do tamanho do personagem: 24px para herói de 48px, preservando proporção. Segue o trajeto com distância de 32px e reposiciona após teleporte. Imagens ainda não têm animações próprias; visível no mapa do dono nesta versão. O cartão de estoque mostra a imagem da incubadora.
 
 ## Persistência e publicação
 
@@ -39,6 +39,15 @@ As abas Bestiário/Companheiros são independentes. Regiões seguem a ordem rein
 - Flora vende 1 unidade por 25 gemas. Estoque em Bestiário > Companheiros.
 - Compra debita `gems` e grava recibo único em `users.companion_incubator_grants` na mesma operação. A sincronização aplica cada recibo somente uma vez em `companions.supply_receipts`, permitindo retomar entregas interrompidas.
 - Ao iniciar, confirmação explica o consumo e bloqueio de troca do ovo. Unidade e ovo são removidos do estoque na mesma atualização da incubação. Nascimento não cobra novamente.
-- Marcos extras do Eldora Premium 20/40/60/80 concedem 1 unidade cada. Resgate na aba Companheiros; exige `passe_batalha.is_premium` e nível. Não substitui prêmios do passe nem reabre resgates antigos. Controle por `season_id`, usando S1 quando ausente; ao criar uma nova temporada, definir um novo season_id.
 - Migração preguiçosa schema 2: chocadeira antiga livre vira 1 unidade; incubação antiga mantém família/distância e não recebe unidade extra. Conquista antiga já recebida permanece marcada. A conversão torna-se persistente na próxima mutação e é idempotente.
 - Backup deve incluir tanto `users` (recibos) quanto `companions` (estoque, incubação e recibos aplicados).
+
+## Missões do Eldora Premium por ciclo
+
+- Independentes do passe de batalha. Usa `eldora_premium.activated_at` e `expires_at`, normalizados em UTC.
+- Cada ciclo de 30 dias oferece metas cumulativas de 100, 500 e 1.500 abates; cada meta concede 1 incubadora (3 por ciclo).
+- Só novos abates confirmados pelo fluxo de recompensas contam, com Premium ativo, mesmo sem pet equipado. Não importa abates anteriores do Bestiário. Mantém os critérios de abate válidos do gancho de companheiros.
+- Renovação antecipada estende a validade sem reiniciar o ciclo; ao atingir 30 dias começa a próxima contagem. Reativação após expirar usa a nova data de ativação.
+- Progresso e resgates ficam em `companions.premium_cycles`, com ID pela data inicial do ciclo. Metas concluídas continuam resgatáveis após expirar; metas incompletas encerram com o ciclo.
+- Crédito da incubadora e marcação de resgate na mesma atualização com controle de revisão. Resgates legados do passe e estoque já recebido são preservados; não há novos resgates pelos níveis do passe.
+- Não há cron necessário: ciclo é calculado no servidor em cada abate/leitura. Reiniciar não zera progresso. Assinantes atuais começam a contar novos abates no ciclo vigente após publicar a atualização.

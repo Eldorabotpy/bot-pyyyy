@@ -47,6 +47,7 @@ def rejected(fn):
 def run():
     store = MemoryCollection()
     c.collection = lambda: store
+    c.premium_player = lambda uid: {}
     uid = str(ObjectId())
     player = {'bestiario': {'slime_verde': 50, 'lobo_magro': 50, 'morcego_das_minas': 50}}
     def act(action, family=None, specialty=None):
@@ -125,14 +126,53 @@ def run():
     legacy['incubation']={'family':'slime','distance':1234}
     converted=c.normalize(legacy)
     assert converted['incubators']==0 and converted['incubation']['distance']==1234
-    premium=c.initial()
+    from datetime import datetime, timedelta, timezone
+    start = datetime(2026, 10, 1, tzinfo=timezone.utc)
+    premium_player = {'eldora_premium': {'activated_at': start, 'expires_at': start+timedelta(days=30)}}
+    first = c.premium_cycle(premium_player, start)
+    early = {'eldora_premium': {**premium_player['eldora_premium'], 'expires_at': start+timedelta(days=60)}}
+    assert c.premium_cycle(early, start+timedelta(days=29))['id'] == first['id']
+    second = c.premium_cycle(early, start+timedelta(days=30))
+    assert second['id'] != first['id'] and second['kills'] == 0
+    assert c.premium_cycle(premium_player, start+timedelta(days=30)) is None
+    assert c.premium_cycle({'passe_batalha': {'is_premium': True, 'level': 80}}, start) is None
+    premium=c.normalize(c.initial())
+    premium['incubators']=4 # unidades legadas preservadas
+    premium['premium_incubators']=['S1:20']
+    for _ in range(1500):
+        c.advance_premium(premium, first)
+    c.advance_premium(premium, second)
+    assert premium['premium_cycles'][second['id']]['kills']==1
+    pending=c.premium_view({},premium,start+timedelta(days=61))
+    assert not pending['active'] and len(pending['cycles'])==1
+    for goal in (100,500,1500):
+        receipt=f"{first['id']}:{goal}"
+        c.action({},premium,'premium_incubator',receipt)
+        rejected(lambda:c.action({},premium,'premium_incubator',receipt))
+    assert premium['incubators']==7 and premium['premium_incubators']==['S1:20']
     rejected(lambda:c.action(player,premium,'premium_incubator','20'))
-    premium_player={**player,'passe_batalha':{'is_premium':True,'level':40}}
-    c.action(premium_player,premium,'premium_incubator','20')
-    c.action(premium_player,premium,'premium_incubator','40')
-    assert premium['incubators']==2
-    rejected(lambda:c.action(premium_player,premium,'premium_incubator','20'))
-    rejected(lambda:c.action(premium_player,premium,'premium_incubator','60'))
+    rejected(lambda:c.action(player,premium,'premium_incubator',f"{second['id']}:100"))
+    assert not c.premium_view({},premium)['cycles']
+    # Ganho real sem pet equipado e resgate simultâneo na mesma revisão persistida.
+    premium_uid=str(ObjectId())
+    now=datetime.now(timezone.utc)
+    c.premium_player=lambda uid: {'eldora_premium': {'activated_at':now-timedelta(days=1), 'expires_at':now+timedelta(days=29)}}
+    for _ in range(100):
+        c.record_victory(premium_uid,'goblin')
+    saved=c.load(premium_uid)
+    assert saved['active'] is None
+    key=next(iter(saved['premium_cycles']))
+    def claim_premium(_):
+        try:
+            c.mutate(premium_uid,lambda state:c.action({},state,'premium_incubator',f'{key}:100'))
+            return 1
+        except ValueError:
+            return 0
+    with ThreadPoolExecutor(8) as pool:
+        assert sum(pool.map(claim_premium,range(8)))==1
+    assert c.load(premium_uid)['incubators']==1
+    c.premium_player=lambda uid: {}
+    print('OK: ciclos Premium, renovação antecipada, expiração, metas, legado, abate sem pet e resgate concorrente.')
 
     # Exercita a rota Flask real via AST, sem importar o módulo conectado ao Mongo.
     import ast
