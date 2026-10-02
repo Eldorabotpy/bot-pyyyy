@@ -16,6 +16,24 @@ PREMIUM_HUNT_GOALS = (100, 500, 1500)
 FORMS = ["Filhote", "Adulto", "Ancestral"]
 
 
+# Aumentar somente quando as missões e artes do próximo capítulo estiverem prontas.
+RELEASED_PET_CHAPTER = 1
+ASSET_ROOT = 'https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/'
+PET_JOURNEYS = {
+    'slime': [('Pequeno Slime', 'pequeno_slime', 'pradaria', 1), ('Slime Verde', 'slime_verde', 'pradaria', 2), ('Rei Slime', 'rei_slime', 'pradaria', 4)],
+    'lobo': [('Lobo Magro', 'lobo_magro', 'floresta', 1), ('Lobo Alfa', 'lobo_alfa', 'floresta', 2), ('Lobisomem', 'lobisomem_campones', 'campos_linho', 4)],
+    'morcego': [('Morcego das Minas', 'morcego_das_minas', 'mina_ferro', 5)],
+}
+
+
+def journey(family):
+    return [{'name': name, 'species': species, 'chapter': chapter,
+             'released': chapter <= RELEASED_PET_CHAPTER,
+             'image': f'{ASSET_ROOT}mob/combate/{region}/{species}.png',
+             'sheet': f'{ASSET_ROOT}mob/pet/{species}.png'}
+            for name, species, region, chapter in PET_JOURNEYS[family]]
+
+
 def family_of(monster_id):
     key = str(monster_id or "")
     if key.startswith(('ond', 'onda')):
@@ -153,7 +171,8 @@ def premium_view(player, state, now=None):
 def view(player, state):
     result = normalize(state)
     result.pop('_id', None)
-    result['families'] = FAMILIES
+    result['families'] = {key: {**value, 'journey': journey(key), 'available': journey(key)[0]['released']} for key, value in FAMILIES.items()}
+    result['chapter'] = RELEASED_PET_CHAPTER
     result['knowledge'] = knowledge(player)
     result['incubator_progress'] = sum(max(0, int(n)) for n in (player.get('bestiario') or {}).values())
     result['premium_missions'] = premium_view(player, result)
@@ -161,7 +180,12 @@ def view(player, state):
     result['bonus'] = bonus(state)
     for key, pet in result['pets'].items():
         pet['level'], pet['level_xp'], pet['next_xp'] = level(pet)
-        pet['form'] = FORMS[pet.get('stage', 0)]
+        steps = journey(key)
+        step = steps[min(pet.get('stage', 0), len(steps)-1)]
+        pet['art'] = step
+        pet['form'] = step['name'] if pet.get('journey_version') == 1 else FORMS[pet.get('stage', 0)]
+        next_stage = pet.get('stage', 0) + 1
+        pet['next_released'] = next_stage < len(steps) and steps[next_stage]['released']
     return result
 
 
@@ -197,6 +221,8 @@ def action(player, state, action, family=None, specialty=None):
     if family not in FAMILIES:
         raise ValueError('Escolha uma família válida.')
     if action == 'claim':
+        if not journey(family)[0]['released']:
+            raise ValueError('Esta família será liberada em um próximo capítulo.')
         if counts[family] < 50 or family in state['claimed']:
             raise ValueError('Conquista indisponível ou já resgatada.')
         state['claimed'].append(family)
@@ -213,7 +239,7 @@ def action(player, state, action, family=None, specialty=None):
         egg = state['incubation']
         if not egg or egg['family'] != family or egg['distance'] < HATCH_DISTANCE or family in state['pets']:
             raise ValueError('O ovo ainda não está pronto.')
-        state['pets'][family] = {'xp': 0, 'bond': 0, 'stage': 0, 'specialty': None}
+        state['pets'][family] = {'xp': 0, 'bond': 0, 'stage': 0, 'specialty': None, 'journey_version': 1}
         state['incubation'] = None
         state['active'] = state['active'] or family
         return 'O ovo chocou! Seu novo companheiro chegou.'
@@ -227,6 +253,9 @@ def action(player, state, action, family=None, specialty=None):
         stage = pet['stage']
         if stage >= 2:
             raise ValueError('Esse companheiro já alcançou a forma final.')
+        steps = journey(family)
+        if stage + 1 >= len(steps) or not steps[stage + 1]['released']:
+            raise ValueError('Esta evolução ainda não foi liberada. Seu progresso está salvo.')
         req_level, req_bond, cost = (10, 50, 25) if stage == 0 else (25, 300, 100)
         if level(pet)[0] < req_level or pet['bond'] < req_bond or state['essences'].get(family, 0) < cost:
             raise ValueError('Complete o nível, o vínculo e as essências da evolução.')

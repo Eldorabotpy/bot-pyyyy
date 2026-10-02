@@ -30,3 +30,5 @@
     flex-shrink: 0; box-shadow: none; text-align: left;
 }
 #modal-bestiario .codice-detail-header { background: #142032; }
+
+#modal-bestiario .codice-mastery{width:85%;height:5px;accent-color:#d9b865;flex-shrink:0;margin:2px 0}

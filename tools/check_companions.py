@@ -45,6 +45,21 @@ def rejected(fn):
 
 
 def run():
+    locked = c.normalize(c.initial())
+    locked['pets']['slime']={'xp':15000,'bond':1500,'stage':0,'specialty':None}
+    locked['essences']['slime']=999
+    before_locked=copy.deepcopy(locked)
+    rejected(lambda:c.action({},locked,'evolve','slime'))
+    assert locked==before_locked
+    rejected(lambda:c.action({'bestiario':{'morcego_das_minas':50}},locked,'claim','morcego'))
+    assert c.view({},locked)['pets']['slime']['next_released'] is False
+    # Ovo de família antiga permanece utilizável mesmo com família futura bloqueada.
+    locked['eggs']=['morcego'];locked['incubators']=1
+    c.action({},locked,'incubate','morcego')
+    locked['incubation']['distance']=c.HATCH_DISTANCE
+    c.action({},locked,'hatch','morcego')
+    assert 'morcego' in locked['pets']
+    c.RELEASED_PET_CHAPTER=4 # Simula liberação editorial para regressão das evoluções.
     store = MemoryCollection()
     c.collection = lambda: store
     c.premium_player = lambda uid: {}
