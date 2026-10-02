@@ -2,10 +2,10 @@
 
 Entrada: Bestiário > Companheiros ou perfil > Equipamentos > Companheiro.
 
-- Conquista de 10 abates concede uma chocadeira permanente gratuita.
+- Conquista de 10 abates concede 1 incubadora de uso único, uma única vez por personagem.
 - 50 abates acumulados no Bestiário de uma família concedem um ovo único. Progresso anterior conta; ondas de invasão não contam.
 - Famílias: Slime (Defesa), Lobo (Iniciativa), Morcego (Mana máxima).
-- Uma incubação por vez. 96.000 pixels = 3.000 blocos de 32px. Cerca de 11 minutos de caminhada contínua a 150px/s; valores iniciais sujeitos a balanceamento.
+- Uma incubação por vez; iniciar consome 1 incubadora do estoque de Companheiros. 96.000 pixels = 3.000 blocos de 32px. Cerca de 11 minutos de caminhada contínua a 150px/s; valores iniciais sujeitos a balanceamento.
 - Contador usa posições recebidas pelo socket do personagem. Saltos, intervalos longos, coordenadas inválidas e trocas de região não concedem progresso. Limite de velocidade validado pelo servidor; colisões continuam a cargo do mapa Phaser. Isto não é um motor de movimento totalmente autoritativo e não impede um cliente adulterado de fabricar deslocamentos lentos.
 - Checkpoint de caminhada a cada segundo e ao sair/trocar de mapa. Reinício abrupto pode perder até um segundo ainda não consolidado, mas preserva ovo e progresso salvo.
 - Ao completar a distância, tocar em Chocar entrega o pet. Se não houver pet equipado, ele é equipado automaticamente.
@@ -33,3 +33,12 @@ Subir todos os arquivos alterados/novos e reiniciar o backend. Atualizações do
 O mapa agora envia posições intermediárias a cada 250 ms, além da posição de parada. Antes, somente a parada emitia `mover`, e intervalos maiores que 3 segundos eram descartados pelo validador. A amostragem pertence à cena Phaser. A validação de velocidade e os checkpoints permanecem no servidor. Validado com o handler real em armazenamento isolado: 12 segundos caminhando avançaram 1.788 pixels; posição parada e teleporte não avançaram.
 
 As abas Bestiário/Companheiros são independentes. Regiões seguem a ordem reino_eldora → pradaria_inicial → floresta_sombria → campos_linho → pedreira_granito → pico_grifo → mina_ferro → forja_abandonada → pantano_maldito → picos_gelados → deserto_ancestral. capital_eldora é apresentada como Reino de Eldora, preservando criaturas. Regiões extras aparecem depois. Layout e dossiê conferidos em prévia local de 360px, sem overflow horizontal da página.
+
+## Incubadoras consumíveis
+
+- Flora vende 1 unidade por 25 gemas. Estoque em Bestiário > Companheiros.
+- Compra debita `gems` e grava recibo único em `users.companion_incubator_grants` na mesma operação. A sincronização aplica cada recibo somente uma vez em `companions.supply_receipts`, permitindo retomar entregas interrompidas.
+- Ao iniciar, confirmação explica o consumo e bloqueio de troca do ovo. Unidade e ovo são removidos do estoque na mesma atualização da incubação. Nascimento não cobra novamente.
+- Marcos extras do Eldora Premium 20/40/60/80 concedem 1 unidade cada. Resgate na aba Companheiros; exige `passe_batalha.is_premium` e nível. Não substitui prêmios do passe nem reabre resgates antigos. Controle por `season_id`, usando S1 quando ausente; ao criar uma nova temporada, definir um novo season_id.
+- Migração preguiçosa schema 2: chocadeira antiga livre vira 1 unidade; incubação antiga mantém família/distância e não recebe unidade extra. Conquista antiga já recebida permanece marcada. A conversão torna-se persistente na próxima mutação e é idempotente.
+- Backup deve incluir tanto `users` (recibos) quanto `companions` (estoque, incubação e recibos aplicados).

@@ -4,6 +4,7 @@ from flask import request
 from bson.objectid import ObjectId
 
 CATALOGO_FLORA = {
+    "incubadora_pet": {"nome": "Incubadora · 1 uso", "preco": 25},
     "pocao_xp_boost": {"nome": "Poção de XP P", "preco": 15},
     "pocao_xp_boost_g": {"nome": "Poção de XP G", "preco": 60},
 }
@@ -25,6 +26,17 @@ def registrar_loja_reino(socketio, db, jogadores_online):
         if not ObjectId.is_valid(char_id):
             return
         oid = ObjectId(char_id)
+        if item == 'incubadora_pet':
+            # Cobrança e recibo de entrega na mesma atualização atômica.
+            receipt = {'id': str(ObjectId()), 'quantity': 1}
+            result = users_collection.update_one(
+                {'_id': oid, 'gems': {'$gte': produto['preco']}},
+                {'$inc': {'gems': -produto['preco']}, '$push': {'companion_incubator_grants': receipt}})
+            if result.modified_count:
+                emit('respostaCompraGema', {'sucesso': True, 'mensagem': 'Incubadora comprada! Abra Bestiário → Companheiros para usar.'})
+            else:
+                emit('respostaCompraGema', {'sucesso': False, 'mensagem': 'Gemas insuficientes! Custa 25 💎.'})
+            return
         # Comparação do inventário evita sobrescrever compras/consumos concorrentes.
         for _ in range(3):
             jogador = users_collection.find_one({'_id': oid})

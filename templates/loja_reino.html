@@ -5,7 +5,7 @@
         <button onclick="window.fecharLojaReino()" style="position: absolute; top: 10px; right: 15px; background: transparent; border: none; color: #fbbf24; font-size: 1.2em; font-weight: bold; cursor: pointer;">X</button>
         
         <h2 style="color: #fbbf24; font-family: 'Cinzel', serif; margin-top: 0;">🌸 Florista Flora</h2>
-        <p style="color: #c7d2fe; font-size: 0.85em; margin-bottom: 20px;">Poções de experiência · Pagamento em gemas.</p>
+        <p style="color: #c7d2fe; font-size: 0.85em; margin-bottom: 20px;">Poções e incubadoras · Pagamento em gemas.</p>
         
         <p class="xp-duracao">Use na mochila para ativar. O tempo continua offline. Outras poções somam tempo, mantendo XP ×2.</p>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
@@ -31,6 +31,13 @@
                 <button onclick="window.comprarItemGema('pocao_xp_boost_g')" class="btn-comprar-gema">Adquirir</button>
             </div>
 
+            <div class="card-item-gema" style="grid-column:1/-1;">
+                <span style="font-size:2.5em;">🥚</span>
+                <h4 style="color:#f8fafc;margin:8px 0;">Incubadora · 1 uso</h4>
+                <p class="xp-duracao">Incuba um ovo caminhando. Consumida ao iniciar. Estoque em Bestiário → Companheiros.</p>
+                <p style="color:#fbbf24;font-weight:bold;">25 💎</p>
+                <button onclick="window.comprarItemGema('incubadora_pet')" class="btn-comprar-gema">Adquirir incubadora</button>
+            </div>
         </div>
     </div>
 </div>

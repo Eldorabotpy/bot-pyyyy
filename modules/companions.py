@@ -11,6 +11,7 @@ FAMILIES = {
     "morcego": {"name": "Morcego", "icon": "🦇", "stat": "max_mana", "label": "Mana máxima", "specialties": {"arcano": ["Arcano", "max_mana"], "veloz": ["Veloz", "initiative"]}},
 }
 HATCH_DISTANCE = 96000  # 3000 blocos de 32px; cerca de 11min de caminhada a 150px/s.
+PREMIUM_INCUBATOR_LEVELS = (20, 40, 60, 80)
 FORMS = ["Filhote", "Adulto", "Ancestral"]
 
 
@@ -22,7 +23,20 @@ def family_of(monster_id):
 
 
 def initial():
-    return {"version": 0, "incubator": False, "claimed": [], "eggs": [], "incubation": None, "pets": {}, "active": None, "essences": {}}
+    return {"version": 0, "incubator_schema": 2, "incubators": 0, "incubator_claimed": False, "premium_incubators": [], "supply_receipts": [], "claimed": [], "eggs": [], "incubation": None, "pets": {}, "active": None, "essences": {}}
+
+
+def normalize(state):
+    state = copy.deepcopy(state)
+    if state.get('incubator_schema') != 2:
+        owned = bool(state.get('incubator'))
+        state['incubators'] = 1 if owned and not state.get('incubation') else 0
+        state['incubator_claimed'] = owned
+        state['incubator_schema'] = 2
+    state.pop('incubator', None)
+    state.setdefault('premium_incubators', [])
+    state.setdefault('supply_receipts', [])
+    return state
 
 
 def collection():
@@ -31,7 +45,7 @@ def collection():
 
 
 def load(user_id):
-    return collection().find_one({'_id': ObjectId(str(user_id))}) or initial()
+    return normalize(collection().find_one({'_id': ObjectId(str(user_id))}) or initial())
 
 
 def mutate(user_id, change):
@@ -44,7 +58,7 @@ def mutate(user_id, change):
         pass
     for _ in range(5):
         old = col.find_one({'_id': oid})
-        state = copy.deepcopy(old)
+        state = normalize(old)
         result = change(state)
         state['version'] = old['version'] + 1
         state.pop('_id', None)
@@ -86,11 +100,15 @@ def bonus(state):
 
 
 def view(player, state):
-    result = copy.deepcopy(state)
+    result = normalize(state)
     result.pop('_id', None)
     result['families'] = FAMILIES
     result['knowledge'] = knowledge(player)
     result['incubator_progress'] = sum(max(0, int(n)) for n in (player.get('bestiario') or {}).values())
+    passe = player.get('passe_batalha') or {}
+    season = str(passe.get('season_id') or 'S1')
+    result['premium_rewards'] = [{'level': n, 'claimed': f'{season}:{n}' in result['premium_incubators'],
+        'eligible': bool(passe.get('is_premium')) and int(passe.get('level', 1)) >= n} for n in PREMIUM_INCUBATOR_LEVELS]
     result['hatch_distance'] = HATCH_DISTANCE
     result['bonus'] = bonus(state)
     for key, pet in result['pets'].items():
@@ -104,12 +122,24 @@ def action(player, state, action, family=None, specialty=None):
         raise ValueError('Pedido inválido.')
     counts = knowledge(player)
     if action == 'incubator':
-        if state['incubator']:
-            raise ValueError('Você já possui uma chocadeira.')
+        if state['incubator_claimed']:
+            raise ValueError('Esta conquista já foi resgatada.')
         if sum(int(n) for n in (player.get('bestiario') or {}).values()) < 10:
             raise ValueError('Registre 10 abates no Bestiário para receber a chocadeira.')
-        state['incubator'] = True
-        return 'Chocadeira permanente recebida!'
+        state['incubator_claimed'] = True
+        state['incubators'] += 1
+        return 'Você recebeu 1 incubadora de uso único!'
+    if action == 'premium_incubator':
+        passe = player.get('passe_batalha') or {}
+        milestone = int(family or 0)
+        receipt = f"{passe.get('season_id') or 'S1'}:{milestone}"
+        if milestone not in PREMIUM_INCUBATOR_LEVELS or not passe.get('is_premium') or int(passe.get('level', 1)) < milestone:
+            raise ValueError('Este marco exige Eldora Premium ativo e o nível indicado.')
+        if receipt in state['premium_incubators']:
+            raise ValueError('Incubadora deste marco já resgatada.')
+        state['premium_incubators'].append(receipt)
+        state['incubators'] += 1
+        return 'Incubadora extra do Eldora Premium recebida!'
     if action == 'unequip':
         state['active'] = None
         return 'Companheiro guardado.'
@@ -122,8 +152,9 @@ def action(player, state, action, family=None, specialty=None):
         state['eggs'].append(family)
         return 'Ovo recebido! Coloque-o na chocadeira.'
     if action == 'incubate':
-        if not state['incubator'] or state['incubation'] or family not in state['eggs']:
+        if state['incubators'] < 1 or state['incubation'] or family not in state['eggs']:
             raise ValueError('Você precisa de uma chocadeira livre e desse ovo.')
+        state['incubators'] -= 1
         state['eggs'].remove(family)
         state['incubation'] = {'family': family, 'distance': 0}
         return 'Incubação iniciada. Explore o mundo para chocar!'
@@ -214,3 +245,18 @@ def flush_movement(online):
     if distance and online.get('char_id') and load(online['char_id']).get('incubation'):
         record_distance(online['char_id'], distance)
     online['_pet_distance'] = 0
+
+
+def deliver_supplies(user_id, player):
+    """Créditos pagos duráveis. Repetir a leitura após falha não duplica a entrega."""
+    grants = player.get('companion_incubator_grants') or []
+    current = load(user_id)
+    missing = [g for g in grants if g['id'] not in current['supply_receipts']]
+    if not missing:
+        return
+    def deliver(state):
+        for grant in missing:
+            if grant['id'] not in state['supply_receipts']:
+                state['incubators'] += int(grant['quantity'])
+                state['supply_receipts'].append(grant['id'])
+    mutate(user_id, deliver)

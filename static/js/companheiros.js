@@ -10,10 +10,11 @@
         const pct = egg ? Math.min(100, Math.floor(100*egg.distance/state.hatch_distance)) : 0;
         grid.innerHTML = `<section class="companheiros-panel">
             <header><h3>Companheiros de jornada</h3><p>Conquiste um ovo, explore com a chocadeira e fortaleça seu vínculo nas caçadas.</p></header>
-            <article><h4>🥚 Chocadeira permanente</h4>${state.incubator ? (egg ? `<p>Ovo de ${escape(state.families[egg.family].name)} · <strong>${pct}%</strong></p><progress max="100" value="${pct}"></progress><p>${Math.floor(egg.distance/32)} / ${state.hatch_distance/32} blocos percorridos</p>${button('Chocar ovo', 'hatch', egg.family, pct<100)}` : '<p>Livre. Escolha um ovo abaixo para iniciar a incubação.</p>') : `<p>Conquista Primeiros Passos: ${Math.min(10,state.incubator_progress)}/10 abates registrados. Receba sua primeira chocadeira gratuitamente.</p>${button('Receber chocadeira','incubator','',state.incubator_progress<10)}`}</article>
+            <article><h4>🥚 Incubadoras · uso único</h4><p>Disponíveis: <strong>${state.incubators || 0}</strong> · Cada ovo consome uma unidade ao iniciar.</p>${egg ? `<p>Ovo de ${escape(state.families[egg.family].name)} · <strong>${pct}%</strong></p><progress max="100" value="${pct}"></progress><p>${Math.floor(egg.distance/32)} / ${state.hatch_distance/32} blocos percorridos</p><p>A incubadora deste ovo já foi utilizada. Seu progresso fica salvo.</p>${button('Chocar ovo', 'hatch', egg.family, pct<100)}` : '<p>Escolha um ovo abaixo. Durante a incubação não é possível trocar o ovo.</p>'}${!state.incubator_claimed ? `<p>Conquista Primeiros Passos: ${Math.min(10,state.incubator_progress)}/10 abates · 1 incubadora gratuita.</p>${button('Resgatar incubadora','incubator','',state.incubator_progress<10)}` : '<p>✓ Incubadora da conquista já resgatada.</p>'}<p>Outras unidades estão à venda na Flora por 25 gemas.</p></article>
+            <article><h4>👑 Eldora Premium · Incubadoras extras</h4><p>Uma unidade por marco, além dos prêmios atuais do passe. Resgate aqui após atingir o nível com o Premium ativo.</p>${(state.premium_rewards || []).map(r=>button(r.claimed ? `Nível ${r.level} · Resgatada` : `Nível ${r.level} · Receber 1`, 'premium_incubator', String(r.level), r.claimed || !r.eligible)).join('')}</article>
             ${Object.entries(state.families).map(([key, family])=>{
                 const pet=state.pets[key], count=state.knowledge[key], claimed=state.claimed.includes(key);
-                if (!pet) return `<article><h4>${family.icon} Ovo de ${escape(family.name)}</h4><p>Conquista no Bestiário: ${Math.min(50,count)}/50 abates dessa família.</p><progress max="50" value="${Math.min(50,count)}"></progress>${!claimed ? button('Resgatar ovo','claim',key,count<50) : state.eggs.includes(key) ? button('Colocar na chocadeira','incubate',key,!state.incubator||!!egg) : '<p>Ovo em incubação.</p>'}</article>`;
+                if (!pet) return `<article><h4>${family.icon} Ovo de ${escape(family.name)}</h4><p>Conquista no Bestiário: ${Math.min(50,count)}/50 abates dessa família.</p><progress max="50" value="${Math.min(50,count)}"></progress>${!claimed ? button('Resgatar ovo','claim',key,count<50) : state.eggs.includes(key) ? button('Iniciar · usar 1 incubadora','incubate',key,!(state.incubators>0)||!!egg) : '<p>Ovo em incubação.</p>'}</article>`;
                 const active=state.active===key, adult=pet.stage===0, cost=adult?25:100, requiredLevel=adult?10:25, requiredBond=adult?50:300;
                 const essences=state.essences[key]||0;
                 const ready=pet.level>=requiredLevel&&pet.bond>=requiredBond&&essences>=cost;
@@ -40,6 +41,10 @@
         if(busy)return;
         busy=true;
         try {
+            if (data.action === 'incubate') {
+                const accepted = await window.confirmarEldora('Iniciar incubação? Será consumida 1 incubadora. O ovo não poderá ser trocado e o progresso ficará salvo.', 'Usar incubadora');
+                if (!accepted) return;
+            }
             const id=localStorage.getItem('jogadorEldoraID');
             const response=await fetch(`/api/companheiros/${encodeURIComponent(id)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
             const result=await response.json();

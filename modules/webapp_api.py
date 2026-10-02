@@ -7467,6 +7467,7 @@ def api_companheiros(user_id):
     if not player:
         return jsonify({'erro': 'Personagem não encontrado.'}), 404
     try:
+        companions.deliver_supplies(user_id, player)
         message = None
         if request.method == 'POST':
             data = request.get_json(silent=True) or {}

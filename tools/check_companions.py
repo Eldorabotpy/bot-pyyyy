@@ -94,7 +94,12 @@ def run():
     before=c.load(uid)
     c.record_victory(uid,'slime_verde')
     assert c.load(uid)==before and c.bonus(before)=={}
+    rejected(lambda: act('incubate','lobo'))
+    c.deliver_supplies(uid, {'companion_incubator_grants':[{'id':'purchase-1','quantity':1}]})
+    c.deliver_supplies(uid, {'companion_incubator_grants':[{'id':'purchase-1','quantity':1}]})
+    assert c.load(uid)['incubators']==1
     act('incubate','lobo')
+    assert c.load(uid)['incubators']==0
     c.record_distance(uid,c.HATCH_DISTANCE)
     act('hatch','lobo')
     assert c.load(uid)['active']=='lobo'
@@ -112,6 +117,23 @@ def run():
     assert c.movement_distance(sample,'capital',160,0,20)[1]==0
     assert c.knowledge({'bestiario':{'ond1_slime_verde':999, 'slime_verde':50}})['slime']==50
     assert c.view(player,c.load(uid))['pets']['lobo']['level']==1
+    # Conversão antiga não gera novas unidades a cada leitura e mantém o ovo.
+    legacy = {'incubator':True, 'incubation':None}
+    converted = c.normalize(legacy)
+    assert converted['incubators']==1 and converted['incubator_claimed']
+    assert c.normalize(converted)==converted
+    legacy['incubation']={'family':'slime','distance':1234}
+    converted=c.normalize(legacy)
+    assert converted['incubators']==0 and converted['incubation']['distance']==1234
+    premium=c.initial()
+    rejected(lambda:c.action(player,premium,'premium_incubator','20'))
+    premium_player={**player,'passe_batalha':{'is_premium':True,'level':40}}
+    c.action(premium_player,premium,'premium_incubator','20')
+    c.action(premium_player,premium,'premium_incubator','40')
+    assert premium['incubators']==2
+    rejected(lambda:c.action(premium_player,premium,'premium_incubator','20'))
+    rejected(lambda:c.action(premium_player,premium,'premium_incubator','60'))
+
     # Exercita a rota Flask real via AST, sem importar o módulo conectado ao Mongo.
     import ast
     import sys
