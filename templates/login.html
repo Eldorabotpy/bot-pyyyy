@@ -263,6 +263,22 @@
         .salvar-conta-opcao input {
             accent-color: #d4af37;
         }
+
+        /* Portal responsivo: o conteúdo não depende do tamanho da moldura antiga. */
+        body{height:auto;min-height:100dvh;box-sizing:border-box;padding:20px 12px;align-items:flex-start;background-attachment:fixed}
+        .portal-main-container{width:100%;max-width:380px;margin:12px auto}
+        .login-box{width:100%;max-width:380px;min-height:0;padding:24px 20px;background:linear-gradient(155deg,#21172eed,#101725f5);border:1px solid #ae8b48;border-radius:20px;box-shadow:0 16px 48px #0009,inset 0 1px #f5d88633}
+        .logo-eldora{margin-bottom:8px}
+        #portal-identidade{width:100%;box-sizing:border-box;padding:0 0 18px!important;margin:12px 0 18px!important;border:0!important;border-bottom:1px solid #a78a4b55!important;border-radius:0!important;background:transparent!important}
+        #portal-identidade [hidden]{display:none!important}
+        #portal-identidade p:empty{display:none}
+        #portal-auth-state,#portal-google-note,#portal-auth-message{font:13px/1.5 Arial,sans-serif;color:#bdc9dc;margin:8px 0 12px}
+        #portal-auth-mode{background:#101a29;color:#e6d5a9;border:1px solid #665a3b;border-radius:8px;padding:8px;font:13px Arial,sans-serif}
+        #portal-identidade .btn-new{width:100%;height:auto;min-height:44px;padding:10px 12px;background:#20344a;border:1px solid #4d6681;border-radius:8px;color:#e5edf8;font:600 13px Arial,sans-serif;text-transform:none;white-space:normal}
+        #portal-identidade #portal-logout{background:transparent;border-color:#665a3b;color:#dcc58b}
+        #portal-google{min-width:0;max-width:100%;overflow:hidden}
+        #tela-login{padding-top:4px}
+        @media(max-width:360px){.login-box{padding:20px 14px}body{padding:12px 8px}}
     </style>
     
     <link rel="stylesheet" href="/static/css/dialogos_eldora.css?v=1">
@@ -755,117 +771,8 @@
         // INICIALIZA CONTAS SALVAS
         // ==========================================
 
-        document.addEventListener("DOMContentLoaded", function() {
-
-            const contasSalvas =
-                obterContasSalvas();
-
-
-            renderizarContasSalvas();
-
-
-            // ==========================================
-            // NOVO JOGADOR NESTE DISPOSITIVO
-            // ==========================================
-
-            if (
-                !contasSalvas ||
-                contasSalvas.length === 0
-            ) {
-
-                document.getElementById(
-                    "tela-login"
-                ).style.display =
-                    "none";
-
-
-                document.getElementById(
-                    "tela-registro-conta"
-                ).style.display =
-                    "block";
-
-
-                document.getElementById(
-                    "rodape-dinamico"
-                ).style.display =
-                    "none";
-
-
-                document.getElementById(
-                    "titulo-caixa"
-                ).innerText =
-                    "CRIAR SUA CONTA";
-
-
-                return;
-            }
-
-
-            // ==========================================
-            // JOGADOR QUE JÁ POSSUI CONTA SALVA
-            // ==========================================
-
-            document.getElementById(
-                "tela-registro-conta"
-            ).style.display =
-                "none";
-
-
-            document.getElementById(
-                "tela-login"
-            ).style.display =
-                "block";
-
-
-            document.getElementById(
-                "rodape-dinamico"
-            ).style.display =
-                "block";
-
-
-            document.getElementById(
-                "titulo-caixa"
-            ).innerText =
-                "ENTRAR NO REINO";
-
-
-            const ultima =
-                localStorage.getItem(
-                    CHAVE_ULTIMA_CONTA
-                );
-
-
-            if (!ultima) {
-                return;
-            }
-
-
-            const conta =
-                contasSalvas.find(
-                    c =>
-                        c.username ===
-                        ultima
-                );
-
-
-            if (!conta) {
-                return;
-            }
-
-
-            const campoUsuario =
-                document.getElementById(
-                    "login-username"
-                );
-
-
-            if (campoUsuario) {
-                campoUsuario.value =
-                    conta.username;
-            }
-        });
-
+        // A inicialização das telas pertence ao portal_auth.js.
     </script>
-<script src="/static/js/portal_auth.js?v=1"></script>
+<script src="/static/js/portal_auth.js?v=2"></script>
 </body>
 </html>

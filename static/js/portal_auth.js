@@ -13,6 +13,7 @@
         const response=await fetch('/api/auth/status',{cache:'no-store'});
         if(!response.ok)throw new Error('Não foi possível verificar sua sessão.');
         status=await response.json();
+        if(!status.authenticated)document.getElementById('titulo-caixa').textContent='ENTRAR NO REINO';
         document.getElementById('portal-auth-state').textContent=status.authenticated?`Conta conectada · Google: ${status.google_linked?'vinculado':'não vinculado'} · Telegram: ${status.telegram_linked?'vinculado':'não vinculado'}`:'Entre ou crie sua conta. Já joga? Entre na conta antiga antes de vincular.';
         const mode=document.getElementById('portal-auth-mode');
         mode.innerHTML=status.authenticated?'<option value="link">Vincular à minha conta atual</option>':'<option value="login">Entrar em conta vinculada</option><option value="create">Criar nova conta</option>';
@@ -43,6 +44,10 @@
             note(mode==='link'?'Vinculação concluída. Seus personagens continuam na mesma conta.':'Conta conectada. Escolha seu personagem.');
         }catch(error){note(error.message);}finally{busy=false;}
     }
+    document.getElementById('portal-auth-mode').onchange=event=>{
+        if(!status?.authenticated)document.getElementById('titulo-caixa').textContent=event.target.value==='create'?'CRIAR SUA CONTA':'ENTRAR NO REINO';
+        document.getElementById('tela-login').style.display=event.target.value==='create'?'none':status?.authenticated?'none':'block';
+    };
     document.getElementById('portal-telegram').onclick=()=>authenticate('telegram',{init_data:window.Telegram?.WebApp?.initData||''});
     document.getElementById('portal-logout').onclick=async()=>{try{await post('/api/auth/logout',{});location.reload();}catch(e){note(e.message);}};
     window.portalSelect=id=>post('/api/auth/select',{character_id:id});
