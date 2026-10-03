@@ -102,6 +102,13 @@ client = MongoClient(
 
 # --- REGISTRO DOS BLUEPRINTS ---
 app.register_blueprint(webapp_bp)
+from modules.portal_auth import portal_auth_bp
+from datetime import timedelta
+app.register_blueprint(portal_auth_bp)
+app.config.update(SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE='Lax',
+                  SESSION_COOKIE_SECURE=os.getenv('ELDORA_COOKIE_SECURE', '1') != '0',
+                  PERMANENT_SESSION_LIFETIME=timedelta(days=7))
+
 
 from rotas.admin import admin_bp
 from rotas.passe import passe_bp

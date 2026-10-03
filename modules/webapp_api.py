@@ -1673,36 +1673,15 @@ def api_mapa_objetos(regiao_id):
 # ==========================================
 @webapp_bp.route('/api/portal/criar_conta', methods=['POST'])
 def api_criar_conta():
-    try:
-        data = request.json
-        username = data.get("username", "").strip().lower()
-        password = data.get("password", "")
-        tg_id = data.get("tg_id", 12345)
-
-        if not username or len(password) < 6:
-            return jsonify({"sucesso": False, "erro": "Usuário ou senha inválidos."})
-
-        # Verifica se o nome de usuário já existe no banco
-        if contas_collection.find_one({"username": username}):
-            return jsonify({"sucesso": False, "erro": "Esse nome de conta já está em uso!"})
-
-        # Cria a conta mestre no MongoDB
-        nova_conta = {
-            "username": username,
-            "password_hash": generate_password_hash(password),
-            "telegram_id": tg_id,
-            "criado_em": datetime.utcnow()
-        }
-        contas_collection.insert_one(nova_conta)
-        
-        return jsonify({"sucesso": True})
-    except Exception as e:
-        return jsonify({"sucesso": False, "erro": str(e)}), 500
+    return jsonify(sucesso=False, erro='Crie sua conta com Google ou pelo Telegram validado. Contas existentes podem entrar com senha.'), 403
 
 
 @webapp_bp.route('/api/portal/login', methods=['POST'])
 def api_login_conta():
     try:
+        from modules.portal_auth import require_csrf, limit_attempts, start_session, account_payload
+        require_csrf()
+        limit_attempts()
         data = request.json
         username = data.get("username", "").strip().lower()
         password = data.get("password", "")
@@ -1711,7 +1690,7 @@ def api_login_conta():
         conta = contas_collection.find_one({"username": username})
         
         # Valida a senha
-        if not conta or not check_password_hash(conta["password_hash"], password):
+        if not conta or not conta.get("password_hash") or not check_password_hash(conta["password_hash"], password):
             return jsonify({"sucesso": False, "erro": "Usuário ou senha incorretos."})
 
         # Se logou com sucesso, busca todos os personagens vinculados a essa conta!
@@ -1728,9 +1707,12 @@ def api_login_conta():
                 "avatar_customizado": p.get("avatar_customizado", "padrao")
             })
 
-        return jsonify({"sucesso": True, "personagens": lista_personagens})
-    except Exception as e:
-        return jsonify({"sucesso": False, "erro": str(e)}), 500
+        start_session(conta)
+        return jsonify(account_payload(conta))
+    except ValueError as e:
+        return jsonify(sucesso=False, erro=str(e)), 400
+    except Exception:
+        return jsonify(sucesso=False, erro="Não foi possível entrar. Tente novamente."), 500
 
 MERLIN_ITENS = ('pocao_cura_leve', 'pocao_cura_media', 'pocao_cura_grande',
                 'pocao_mana_leve', 'pocao_mana_media', 'pocao_mana_grande',
@@ -2545,10 +2527,15 @@ def api_criar_personagem():
     try:
         from modules.player.queries import create_new_player, _normalize_char_name
         from bson import ObjectId
+        from modules.portal_auth import require_csrf, current_account
+        require_csrf()
+        account = current_account()
+        if not account:
+            return jsonify(erro='Entre na sua conta para criar um personagem.'), 401
         data = request.json
         
         # Pega de qual conta mestre esse personagem pertence
-        conta_mestre = data.get("conta", "").strip().lower()
+        conta_mestre = account["username"]
         nome = data.get("nome", "").strip()
         genero = data.get("genero", "masculino")
         
@@ -2571,7 +2558,7 @@ def api_criar_personagem():
             user_id=novo_id, 
             character_name=nome, 
             username=conta_mestre, 
-            telegram_id=12345 # Pode usar um genérico ou puxar do request se preferir
+            telegram_id=account.get("telegram_verified_id")
         ))
         
         # MÁGICA: Vincula este herói à Conta Mestra!
@@ -2607,14 +2594,11 @@ def api_criar_personagem():
 @webapp_bp.route('/api/portal/meus_personagens/<tg_id_recebido>', methods=['GET'])
 def api_meus_personagens(tg_id_recebido):
     try:
-        # 🛡️ MODO DESENVOLVEDOR: Proteção para testar no navegador do PC
-        if not tg_id_recebido or tg_id_recebido in ["undefined", "null", "None"]:
-            tg_id = 123456789
-        else:
-            tg_id = int(tg_id_recebido)
-            
-        # Busca todos os personagens do usuário
-        cursor = users_collection.find({"telegram_id": tg_id})
+        from modules.portal_auth import current_account
+        account = current_account()
+        if not account:
+            return jsonify(erro='Entre na sua conta.'), 401
+        cursor = users_collection.find({'conta_mestre': account['username']})
         personagens = []
         
         for p in cursor:
