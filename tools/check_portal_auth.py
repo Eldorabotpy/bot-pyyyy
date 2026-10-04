@@ -60,6 +60,7 @@ auth.verify_google=lambda token: {'one':'google-1','two':'google-2'}[token]
 assert client.post('/api/auth/google',headers=headers,json={'credential':'one'}).status_code==409
 result=client.post('/api/auth/google',headers=headers,json={'credential':'one','mode':'create'})
 assert result.status_code==200 and len(accounts.docs)==1
+assert 'password_hash' not in accounts.docs[0]
 account=accounts.docs[0];oid=ObjectId();players.docs=[{'_id':oid,'conta_mestre':account['username'],'character_name':'Existente'}]
 csrf=result.json['csrf'];headers={'X-Eldora-CSRF':csrf}
 assert client.post('/api/auth/select',headers=headers,json={'character_id':str(ObjectId())}).status_code==403
@@ -76,7 +77,23 @@ assert client.get('/api/auth/status').json['authenticated'] is False
 csrf=client.get('/api/auth/status').json['csrf'];headers={'X-Eldora-CSRF':csrf}
 assert client.post('/api/auth/google',headers=headers,json={'mode':'link','credential':'two'}).status_code==401
 result=client.post('/api/auth/google',headers=headers,json={'mode':'create','credential':'two'})
+assert result.status_code==200
 headers={'X-Eldora-CSRF':result.json['csrf']}
 assert client.post('/api/auth/telegram',headers=headers,json={'mode':'link','init_data':'verified-by-stub'}).status_code==400
 assert len(accounts.docs)==2
+# Exercita o login legado real sem importar o módulo conectado ao banco.
+import ast
+from flask import request, jsonify
+from werkzeug.security import generate_password_hash, check_password_hash
+sys.modules['modules.portal_auth']=auth
+node=next(n for n in ast.parse((root/'modules/webapp_api.py').read_text(encoding='utf-8-sig')).body if isinstance(n,ast.FunctionDef) and n.name=='api_login_conta')
+node.decorator_list=[]
+scope={'request':request,'jsonify':jsonify,'contas_collection':accounts,'users_collection':players,'check_password_hash':check_password_hash}
+exec(compile(ast.Module(body=[node],type_ignores=[]),'legacy-login','exec'),scope)
+accounts.docs[0]['password_hash']=generate_password_hash('legacy-password')
+with app.test_request_context('/api/portal/login',method='POST',json={'username':accounts.docs[0]['username'],'password':'legacy-password'},headers={'X-Eldora-CSRF':'test-csrf'}):
+    from flask import session
+    session['portal_csrf']='test-csrf'
+    response,code=scope['api_login_conta']()
+    assert code==403 and 'Google' in response.json['erro']
 print('OK: assinatura Telegram, expiração, CSRF, cadastro, sessão, vínculo, identidade duplicada, propriedade do personagem e saída.')

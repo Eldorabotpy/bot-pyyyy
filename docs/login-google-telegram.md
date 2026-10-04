@@ -32,3 +32,13 @@ Esta entrega protege o portal de autenticação e a vinculação. Endpoints lega
 Limite de tentativas persistido por IP em janelas de 15 minutos (30 tentativas), expiração TTL. Atrás de proxy, verificar a configuração confiável de endereço remoto; não confiar diretamente em X-Forwarded-For informado pelo cliente. Várias identidades Google/Telegram não garantem pessoas distintas.
 
 Origem principal informada: `https://eldora-rpg.modappmania.workers.dev`. O proxy deve preservar cookies de sessão e não armazenar em cache `/api/auth/*` nem respostas de login. Não foi feita publicação remota nesta configuração.
+
+## Fluxo atual — sem senha adicional
+
+Conta nova: confirma Google (navegador) ou Telegram (Mini App), recebe identificador interno e vai à criação do personagem. Não pede nome de conta nem senha. A rota temporária /api/auth/register foi removida.
+
+Conta antiga sem Google: pode entrar com usuário/senha e vincular Google depois. Ao vincular, acesso posterior por senha é recusado no servidor; o hash antigo é preservado, sem ser usado para liberar acesso web. Google e Telegram verificado continuam válidos.
+
+Dentro do Telegram não carrega Google Identity Services nem mostra botão Google. Ao entrar por senha em conta antiga ainda sem Google, initData validado pode vincular esse Telegram, desde que não pertença a outra conta. Nunca adota telegram_id legado sem essa prova. Contas já vinculadas ao Google devem usar Google no navegador ou Telegram previamente verificado; não une contas automaticamente.
+
+Painel de vinculação some após vincular Google. Sair / trocar conta permanece visível. Sessões anteriormente abertas mantêm sua validade até sair/expirar.

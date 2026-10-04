@@ -3,6 +3,7 @@ import hashlib
 import hmac
 import json
 import os
+import re
 import secrets
 import time
 from datetime import datetime, timezone
@@ -27,6 +28,7 @@ def google_client_id():
 def accounts():
     from modules.player.core import db
     col = db['contas_mestre']
+    col.create_index('username', unique=True, partialFilterExpression={'username': {'$type': 'string'}})
     col.create_index('google_sub', unique=True, partialFilterExpression={'google_sub': {'$type': 'string'}})
     col.create_index('telegram_verified_id', unique=True, partialFilterExpression={'telegram_verified_id': {'$type': 'number'}})
     return col
@@ -56,6 +58,7 @@ def limit_attempts():
 
 
 def start_session(account):
+    session.pop('portal_pending_identity', None)
     session.pop('portal_character', None)
     session['portal_account'] = str(account['_id'])
     session['portal_csrf'] = secrets.token_urlsafe(32)
@@ -147,10 +150,12 @@ def provider_login(provider):
                 raise ValueError('Vinculação alterada. Entre novamente.')
             account = col.find_one({'_id': account['_id']})
         elif owner:
+            if mode == 'create':
+                return jsonify(erro='Esta identidade já possui conta. Escolha Entrar em conta vinculada.'), 409
             account = owner
         elif mode == 'create':
             oid = ObjectId()
-            account = {'_id': oid, 'username': 'eldora_'+str(oid), field: identity, 'criado_em': datetime.now(timezone.utc)}
+            account = {'_id':oid, 'username':'eldora_'+str(oid), field:identity, 'criado_em':datetime.now(timezone.utc)}
             col.insert_one(account)
         else:
             return jsonify(erro='Identidade ainda não vinculada. Entre na conta antiga e vincule, ou escolha Criar nova conta.'), 409

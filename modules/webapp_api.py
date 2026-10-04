@@ -1693,6 +1693,21 @@ def api_login_conta():
         if not conta or not conta.get("password_hash") or not check_password_hash(conta["password_hash"], password):
             return jsonify({"sucesso": False, "erro": "Usuário ou senha incorretos."})
 
+        if conta.get('google_sub'):
+            # Depois de vincular, a senha antiga deixa de autenticar pelo navegador.
+            return jsonify(sucesso=False, erro='Esta conta já está vinculada. Entre com Google ou pelo Telegram vinculado.'), 403
+        raw_telegram = data.get('init_data')
+        if raw_telegram:
+            from modules.portal_auth import verify_telegram, accounts
+            from config import TELEGRAM_TOKEN
+            verified_id = verify_telegram(str(raw_telegram), TELEGRAM_TOKEN)
+            if conta.get('telegram_verified_id') not in (None, verified_id):
+                return jsonify(sucesso=False, erro='Este Telegram não corresponde à conta.'), 403
+            result = accounts().update_one({'_id':conta['_id'], '$or':[{'telegram_verified_id':{'$exists':False}}, {'telegram_verified_id':verified_id}]}, {'$set':{'telegram_verified_id':verified_id}})
+            if result.matched_count != 1:
+                return jsonify(sucesso=False, erro='Vinculação alterada. Entre novamente.'), 409
+            conta['telegram_verified_id'] = verified_id
+
         # Se logou com sucesso, busca todos os personagens vinculados a essa conta!
         personagens_db = list(users_collection.find({"conta_mestre": username}))
         

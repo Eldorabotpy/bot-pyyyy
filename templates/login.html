@@ -283,7 +283,7 @@
     
     <link rel="stylesheet" href="/static/css/dialogos_eldora.css?v=1">
     <script src="/static/js/dialogos_eldora.js?v=1"></script>
-<link rel="stylesheet" href="/static/css/portal.css?v=1">
+<link rel="stylesheet" href="/static/css/portal.css?v=2">
 </head>
 <body>
     
@@ -304,14 +304,15 @@
         <div class="login-box">
             <div class="titulo-secao" id="titulo-caixa" style="margin-bottom: 10px; color: #d4af37; font-size: 0.9em; font-weight: bold;">ENTRAR NO REINO</div>
             
+            <nav id="portal-entry-tabs" class="portal-entry-tabs" aria-label="Acesso"><button type="button" onclick="portalScreen('login')">Entrar</button><button type="button" onclick="portalScreen('create')">Criar conta</button></nav>
+            <button id="portal-logout" type="button" class="portal-back" hidden>← Sair / trocar conta</button>
             <details id="portal-identidade" open style="padding:14px;margin:8px 0 16px;border:1px solid #665a3b;border-radius:12px;background:#111c2c;color:#dce5f3;font:13px/1.5 Arial,sans-serif">
                 <summary id="portal-account-summary">Acesse sua conta</summary><div class="portal-account-body">
                 <p id="portal-auth-state">Verificando sessão…</p>
-                <select id="portal-auth-mode" aria-label="Entrar, criar ou vincular conta" style="width:100%;min-height:44px;margin-bottom:12px"><option value="login">Entrar em conta vinculada</option></select>
+                <select hidden id="portal-auth-mode" aria-label="Entrar, criar ou vincular conta" style="width:100%;min-height:44px;margin-bottom:12px"><option value="login">Entrar em conta vinculada</option></select>
                 <div id="portal-google" style="display:flex;justify-content:center"></div>
                 <p id="portal-google-note"></p>
                 <button id="portal-telegram" type="button" class="btn-new" hidden>Continuar com Telegram</button>
-                <button id="portal-logout" type="button" class="btn-new" hidden>Sair / trocar conta</button>
                 <p id="portal-auth-message" role="status" aria-live="polite"></p>
             </div></details>
             <!-- ETAPA 1: TELA LOGIN DA CONTA MESTRA -->
@@ -346,7 +347,7 @@
                     <input type="checkbox" id="login-salvar-conta" checked>
                     Lembrar nome da conta (sem guardar senha)
                 </label>
-                <button class="btn-new" onclick="playClick(); realizarLogin()" id="btn-logar">ACESSAR CONTA</button>
+                <button class="btn-new" onclick="playClick(); realizarLogin()" id="btn-logar">ACESSAR CONTA</button><button type="button" class="portal-back" onclick="portalScreen('google')">Já vinculou? Entrar com Google ou Telegram</button>
             </div>
             
             <!-- ETAPA 1.5: TELA DE CRIAR CONTA MESTRA -->
@@ -385,7 +386,7 @@
         </div>
 
         <div class="texto-rodape" id="rodape-dinamico">
-            Nova Conta? <span onclick="playClick(); alternarParaRegistroConta()">Criar Conta.</span>
+            Nova Conta? <span onclick="portalScreen('create')">Criar Conta.</span>
         </div>
     </div>
 
@@ -587,7 +588,7 @@
                 const res = await fetch('/api/portal/login', {
                     method: 'POST',
                     headers: window.portalAuthHeaders(),
-                    body: JSON.stringify({ username: user, password: pass })
+                    body: JSON.stringify({ username: user, password: pass, init_data: window.Telegram?.WebApp?.initData || '' })
                 });
                 const data = await res.json();
                 
@@ -777,6 +778,6 @@
 
         // A inicialização das telas pertence ao portal_auth.js.
     </script>
-<script src="/static/js/portal_auth.js?v=3"></script>
+<script src="/static/js/portal_auth.js?v=5"></script>
 </body>
 </html>
