@@ -1687,7 +1687,7 @@ def api_login_conta():
         password = data.get("password", "")
 
         # Busca a conta mestre no banco
-        conta = contas_collection.find_one({"username": username})
+        conta = contas_collection.find_one({"$or": [{"username": username}, {"login_alias": username}]})
         
         # Valida a senha
         if not conta or not conta.get("password_hash") or not check_password_hash(conta["password_hash"], password):

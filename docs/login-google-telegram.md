@@ -42,3 +42,9 @@ Conta antiga sem Google: pode entrar com usuário/senha e vincular Google depois
 Dentro do Telegram não carrega Google Identity Services nem mostra botão Google. Ao entrar por senha em conta antiga ainda sem Google, initData validado pode vincular esse Telegram, desde que não pertença a outra conta. Nunca adota telegram_id legado sem essa prova. Contas já vinculadas ao Google devem usar Google no navegador ou Telegram previamente verificado; não une contas automaticamente.
 
 Painel de vinculação some após vincular Google. Sair / trocar conta permanece visível. Sessões anteriormente abertas mantêm sua validade até sair/expirar.
+
+## Correção: credenciais próprias para contas Telegram
+
+Cadastro novo pelo Telegram exige usuário e senha (com confirmação na interface) antes de criar personagem. A assinatura Telegram continua validada no servidor. Google permanece sem senha adicional. O usuário escolhido fica em login_alias, com índice único, sem alterar a chave interna username que liga os personagens. Login por senha aceita esse alias no navegador mesmo sem Telegram, para contas ainda sem Google vinculado.
+
+Contas Telegram criadas anteriormente sem senha mostram formulário para Salvar meu acesso. Endpoint exige sessão, CSRF e prova Telegram assinada correspondente à conta. Só configura credenciais ausentes; não substitui senhas existentes. Reinstalar Telegram mantendo a mesma identidade não cria outra conta. Perder acesso ao Telegram antes de configurar credenciais ainda exige recuperação da conta; esta mudança não recupera automaticamente um número perdido.

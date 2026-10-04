@@ -29,6 +29,7 @@ def accounts():
     from modules.player.core import db
     col = db['contas_mestre']
     col.create_index('username', unique=True, partialFilterExpression={'username': {'$type': 'string'}})
+    col.create_index('login_alias', unique=True, partialFilterExpression={'login_alias': {'$type': 'string'}})
     col.create_index('google_sub', unique=True, partialFilterExpression={'google_sub': {'$type': 'string'}})
     col.create_index('telegram_verified_id', unique=True, partialFilterExpression={'telegram_verified_id': {'$type': 'number'}})
     return col
@@ -71,7 +72,7 @@ def account_payload(account):
     characters = []
     for p in users_collection.find({'conta_mestre': account['username']}):
         characters.append({'id': str(p['_id']), 'nome': p.get('character_name','Herói'), 'genero': p.get('gender','masculino'), 'level': p.get('level',1), 'classe': str(p.get('class','aventureiro')).capitalize(), 'avatar_customizado': p.get('avatar_customizado','padrao')})
-    return {'sucesso': True, 'username': account['username'], 'personagens': characters, 'csrf': session['portal_csrf'], 'google_linked': bool(account.get('google_sub')), 'telegram_linked': bool(account.get('telegram_verified_id'))}
+    return {'sucesso': True, 'username': account['username'], 'personagens': characters, 'csrf': session['portal_csrf'], 'has_password': bool(account.get('password_hash')), 'display_name': account.get('login_alias',account['username']), 'google_linked': bool(account.get('google_sub')), 'telegram_linked': bool(account.get('telegram_verified_id'))}
 
 
 def verify_telegram(raw, token, now=None):
@@ -156,6 +157,8 @@ def provider_login(provider):
         elif mode == 'create':
             oid = ObjectId()
             account = {'_id':oid, 'username':'eldora_'+str(oid), field:identity, 'criado_em':datetime.now(timezone.utc)}
+            if provider == 'telegram':
+                account.update(telegram_credentials(data, col))
             col.insert_one(account)
         else:
             return jsonify(erro='Identidade ainda não vinculada. Entre na conta antiga e vincule, ou escolha Criar nova conta.'), 409
@@ -168,6 +171,45 @@ def provider_login(provider):
     except (ValueError, TypeError, KeyError):
         # Detalhes de tokens ou credenciais nunca são devolvidos ao navegador.
         return jsonify(erro='Não foi possível validar ou vincular. Entre novamente; confira se a identidade já pertence a outra conta.'), 400
+
+
+def telegram_credentials(data, col):
+    from werkzeug.security import generate_password_hash
+    alias = str(data.get('username','')).strip().lower()
+    password = data.get('password','')
+    if not re.fullmatch(r'[a-z0-9_]{3,24}',alias) or alias.startswith('eldora_'):
+        raise ValueError('Use 3 a 24 letras, números ou sublinhado. O prefixo eldora_ é reservado.')
+    if not isinstance(password,str) or not 8 <= len(password) <= 128:
+        raise ValueError('A senha precisa ter de 8 a 128 caracteres.')
+    if col.find_one({'$or':[{'username':alias},{'login_alias':alias}]}):
+        raise ValueError('Este usuário já está em uso.')
+    return {'login_alias':alias, 'password_hash':generate_password_hash(password)}
+
+
+@portal_auth_bp.post('/api/auth/telegram-credentials')
+def set_telegram_credentials():
+    try:
+        require_csrf()
+        limit_attempts()
+        account=current_account()
+        if not account or account.get('password_hash'):
+            return jsonify(erro='Entre na conta Telegram que ainda não possui senha.'), 403
+        data=request.get_json(silent=True) or {}
+        from config import TELEGRAM_TOKEN
+        tid=verify_telegram(str(data.get('init_data','')),TELEGRAM_TOKEN)
+        if tid!=account.get('telegram_verified_id'):
+            return jsonify(erro='Este Telegram não corresponde à conta.'), 403
+        col=accounts()
+        credentials=telegram_credentials(data,col)
+        updated=col.update_one({'_id':account['_id'],'password_hash':{'$exists':False}}, {'$set':credentials})
+        if updated.matched_count!=1:
+            return jsonify(erro='As credenciais já foram configuradas. Entre novamente.'), 409
+        account.update(credentials)
+        return jsonify(account_payload(account))
+    except DuplicateKeyError:
+        return jsonify(erro='Este usuário já está em uso.'), 409
+    except ValueError as exc:
+        return jsonify(erro=str(exc)), 400
 
 
 @portal_auth_bp.post('/api/auth/select')

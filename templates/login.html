@@ -305,6 +305,14 @@
             
             <nav id="portal-entry-tabs" class="portal-entry-tabs" aria-label="Acesso"><button type="button" onclick="portalScreen('login')">Entrar</button><button type="button" onclick="portalScreen('create')">Criar conta</button></nav>
             <button id="portal-logout" type="button" class="portal-back" hidden>← Sair / trocar conta</button>
+            <section id="telegram-credentials" hidden style="width:100%">
+                <p class="portal-description">Guarde seu usuário e senha. Eles permitem acessar esta conta mesmo sem o Telegram.</p>
+                <div class="input-container"><label for="telegram-username">USUÁRIO DA CONTA</label><input id="telegram-username" maxlength="24" autocomplete="username" placeholder="De 3 a 24 letras ou números"></div>
+                <div class="input-container"><label for="telegram-password">SENHA</label><input id="telegram-password" type="password" minlength="8" maxlength="128" autocomplete="new-password" placeholder="Pelo menos 8 caracteres"></div>
+                <div class="input-container"><label for="telegram-password-confirm">CONFIRMAR SENHA</label><input id="telegram-password-confirm" type="password" maxlength="128" autocomplete="new-password"></div>
+                <button id="telegram-save-credentials" type="button" class="btn-new" hidden>Salvar meu acesso</button>
+                <p id="telegram-credentials-message" role="status"></p>
+            </section>
             <details id="portal-identidade" open style="padding:14px;margin:8px 0 16px;border:1px solid #665a3b;border-radius:12px;background:#111c2c;color:#dce5f3;font:13px/1.5 Arial,sans-serif">
                 <summary id="portal-account-summary">Acesse sua conta</summary><div class="portal-account-body">
                 <p id="portal-auth-state">Verificando sessão…</p>
@@ -782,6 +790,6 @@
         // A inicialização das telas pertence ao portal_auth.js.
     </script>
 <script src="/static/js/portal_controls.js?v=1"></script>
-<script src="/static/js/portal_auth.js?v=6"></script>
+<script src="/static/js/portal_auth.js?v=7"></script>
 </body>
 </html>

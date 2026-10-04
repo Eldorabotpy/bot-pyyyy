@@ -96,4 +96,27 @@ with app.test_request_context('/api/portal/login',method='POST',json={'username'
     session['portal_csrf']='test-csrf'
     response,code=scope['api_login_conta']()
     assert code==403 and 'Google' in response.json['erro']
+# Cadastro Telegram exige credenciais; entrada por senha funciona sem Telegram.
+auth.verify_telegram=lambda raw,token:84
+csrf=client.get('/api/auth/status').json['csrf'];headers={'X-Eldora-CSRF':csrf}
+client.post('/api/auth/logout',headers=headers,json={})
+csrf=client.get('/api/auth/status').json['csrf'];headers={'X-Eldora-CSRF':csrf}
+assert client.post('/api/auth/telegram',headers=headers,json={'mode':'create','init_data':'verified'}).status_code==400
+result=client.post('/api/auth/telegram',headers=headers,json={'mode':'create','init_data':'verified','username':'novo_telegram','password':'test-password-789'})
+assert result.status_code==200 and result.json['has_password']
+assert accounts.docs[-1]['login_alias']=='novo_telegram'
+assert check_password_hash(accounts.docs[-1]['password_hash'],'test-password-789')
+with app.test_request_context('/api/portal/login',method='POST',json={'username':'novo_telegram','password':'test-password-789'},headers={'X-Eldora-CSRF':'test-csrf'}):
+    session['portal_csrf']='test-csrf'
+    response=scope['api_login_conta']()
+    assert response.json['sucesso'] is True
+# Reparo de conta Telegram antiga não renomeia chave usada pelos personagens.
+legacy={'_id':ObjectId(),'username':'eldora_legado','telegram_verified_id':99}
+accounts.docs.append(legacy)
+with client.session_transaction() as sess:
+    sess['portal_account']=str(legacy['_id']);sess['portal_csrf']='repair'
+auth.verify_telegram=lambda raw,token:99
+result=client.post('/api/auth/telegram-credentials',headers={'X-Eldora-CSRF':'repair'},json={'username':'acesso_legado','password':'test-password-789','init_data':'verified'})
+assert result.status_code==200 and accounts.docs[-1]['username']=='eldora_legado'
+assert accounts.docs[-1]['login_alias']=='acesso_legado'
 print('OK: assinatura Telegram, expiração, CSRF, cadastro, sessão, vínculo, identidade duplicada, propriedade do personagem e saída.')
