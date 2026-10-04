@@ -299,7 +299,7 @@
     </div>
 
     <div class="portal-main-container">
-        <div class="logo-eldora" role="img" aria-label="Eldora RPG"></div><p class="portal-eyebrow">MUNDO DE ELDORA</p>
+        <div class="logo-eldora" role="img" aria-label="Eldora RPG"></div><button id="portal-sound" type="button" class="portal-back" aria-pressed="false">Ativar música</button><p class="portal-eyebrow">MUNDO DE ELDORA</p>
         <div class="login-box">
             <div class="titulo-secao" id="titulo-caixa" style="margin-bottom: 10px; color: #d4af37; font-size: 0.9em; font-weight: bold;">ENTRAR NO REINO</div>
             
@@ -308,7 +308,7 @@
             <section id="telegram-credentials" hidden style="width:100%">
                 <p class="portal-description">Guarde seu usuário e senha. Eles permitem acessar esta conta mesmo sem o Telegram.</p>
                 <div class="input-container"><label for="telegram-username">USUÁRIO DA CONTA</label><input id="telegram-username" maxlength="24" autocomplete="username" placeholder="De 3 a 24 letras ou números"></div>
-                <div class="input-container"><label for="telegram-password">SENHA</label><input id="telegram-password" type="password" minlength="8" maxlength="128" autocomplete="new-password" placeholder="Pelo menos 8 caracteres"></div>
+                <div class="input-container"><label for="telegram-password">SENHA</label><input id="telegram-password" type="password" minlength="6" maxlength="128" autocomplete="new-password" placeholder="Pelo menos 6 caracteres"></div>
                 <div class="input-container"><label for="telegram-password-confirm">CONFIRMAR SENHA</label><input id="telegram-password-confirm" type="password" maxlength="128" autocomplete="new-password"></div>
                 <button id="telegram-save-credentials" type="button" class="btn-new" hidden>Salvar meu acesso</button>
                 <p id="telegram-credentials-message" role="status"></p>
@@ -352,7 +352,7 @@
 
                 <label class="salvar-conta-opcao">
                     <input type="checkbox" id="login-salvar-conta" checked>
-                    Lembrar nome da conta (sem guardar senha)
+                    Manter minha conta conectada neste dispositivo
                 </label>
                 <button class="btn-new" type="button" id="btn-logar">ACESSAR CONTA</button><button type="button" class="portal-back" onclick="portalScreen('google')">Já vinculou? Entrar com Google ou Telegram</button>
             </div>
@@ -595,7 +595,7 @@
                 const res = await fetch('/api/portal/login', {
                     method: 'POST',
                     headers: window.portalAuthHeaders(),
-                    body: JSON.stringify({ username: user, password: pass, init_data: window.Telegram?.WebApp?.initData || '' })
+                    body: JSON.stringify({ username: user, password: pass, remember: document.getElementById('login-salvar-conta').checked, init_data: window.Telegram?.WebApp?.initData || '' })
                 });
                 const data = await res.json();
                 
@@ -789,7 +789,7 @@
 
         // A inicialização das telas pertence ao portal_auth.js.
     </script>
-<script src="/static/js/portal_controls.js?v=1"></script>
-<script src="/static/js/portal_auth.js?v=7"></script>
+<script src="/static/js/portal_controls.js?v=2"></script>
+<script src="/static/js/portal_auth.js?v=8"></script>
 </body>
 </html>

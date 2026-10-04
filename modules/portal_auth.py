@@ -58,13 +58,13 @@ def limit_attempts():
         raise ValueError('Muitas tentativas. Aguarde alguns minutos para tentar novamente.')
 
 
-def start_session(account):
+def start_session(account, remember=True):
     session.pop('portal_pending_identity', None)
     session.pop('portal_character', None)
     session['portal_account'] = str(account['_id'])
     session['portal_csrf'] = secrets.token_urlsafe(32)
     session['portal_login_at'] = time.time()
-    session.permanent = True
+    session.permanent = remember
 
 
 def account_payload(account):
@@ -179,8 +179,8 @@ def telegram_credentials(data, col):
     password = data.get('password','')
     if not re.fullmatch(r'[a-z0-9_]{3,24}',alias) or alias.startswith('eldora_'):
         raise ValueError('Use 3 a 24 letras, números ou sublinhado. O prefixo eldora_ é reservado.')
-    if not isinstance(password,str) or not 8 <= len(password) <= 128:
-        raise ValueError('A senha precisa ter de 8 a 128 caracteres.')
+    if not isinstance(password,str) or not 6 <= len(password) <= 128:
+        raise ValueError('A senha precisa ter de 6 a 128 caracteres.')
     if col.find_one({'$or':[{'username':alias},{'login_alias':alias}]}):
         raise ValueError('Este usuário já está em uso.')
     return {'login_alias':alias, 'password_hash':generate_password_hash(password)}

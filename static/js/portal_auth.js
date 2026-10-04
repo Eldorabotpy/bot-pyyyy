@@ -49,7 +49,7 @@
         if(provider==='telegram'&&mode==='create'){
             credentials.username=document.getElementById('telegram-username').value.trim();
             credentials.password=document.getElementById('telegram-password').value;
-            if(!/^[a-zA-Z0-9_]{3,24}$/.test(credentials.username)||credentials.password.length<8||credentials.password!==document.getElementById('telegram-password-confirm').value){note('Preencha um usuário válido e confirme uma senha de pelo menos 8 caracteres.');return;}
+            if(!/^[a-zA-Z0-9_]{3,24}$/.test(credentials.username)||credentials.password.length<6||credentials.password!==document.getElementById('telegram-password-confirm').value){note('Preencha um usuário válido e confirme uma senha de pelo menos 6 caracteres.');return;}
         }
         busy=true;note('Validando identidade…');
         try{

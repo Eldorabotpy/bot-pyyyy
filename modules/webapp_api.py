@@ -1696,17 +1696,8 @@ def api_login_conta():
         if conta.get('google_sub'):
             # Depois de vincular, a senha antiga deixa de autenticar pelo navegador.
             return jsonify(sucesso=False, erro='Esta conta já está vinculada. Entre com Google ou pelo Telegram vinculado.'), 403
-        raw_telegram = data.get('init_data')
-        if raw_telegram:
-            from modules.portal_auth import verify_telegram, accounts
-            from config import TELEGRAM_TOKEN
-            verified_id = verify_telegram(str(raw_telegram), TELEGRAM_TOKEN)
-            if conta.get('telegram_verified_id') not in (None, verified_id):
-                return jsonify(sucesso=False, erro='Este Telegram não corresponde à conta.'), 403
-            result = accounts().update_one({'_id':conta['_id'], '$or':[{'telegram_verified_id':{'$exists':False}}, {'telegram_verified_id':verified_id}]}, {'$set':{'telegram_verified_id':verified_id}})
-            if result.matched_count != 1:
-                return jsonify(sucesso=False, erro='Vinculação alterada. Entre novamente.'), 409
-            conta['telegram_verified_id'] = verified_id
+        # Senha válida autentica a conta. Vinculação Telegram é uma ação separada,
+        # nunca um efeito colateral que possa bloquear contas antigas.
 
         # Se logou com sucesso, busca todos os personagens vinculados a essa conta!
         personagens_db = list(users_collection.find({"conta_mestre": username}))
@@ -1722,7 +1713,7 @@ def api_login_conta():
                 "avatar_customizado": p.get("avatar_customizado", "padrao")
             })
 
-        start_session(conta)
+        start_session(conta, remember=data.get('remember', True) is True)
         return jsonify(account_payload(conta))
     except ValueError as e:
         return jsonify(sucesso=False, erro=str(e)), 400

@@ -119,4 +119,13 @@ auth.verify_telegram=lambda raw,token:99
 result=client.post('/api/auth/telegram-credentials',headers={'X-Eldora-CSRF':'repair'},json={'username':'acesso_legado','password':'test-password-789','init_data':'verified'})
 assert result.status_code==200 and accounts.docs[-1]['username']=='eldora_legado'
 assert accounts.docs[-1]['login_alias']=='acesso_legado'
+# Regressão: seis caracteres e Telegram de outra conta não bloqueiam login por senha.
+old={'_id':ObjectId(),'username':'seis_digitos','password_hash':generate_password_hash('123456')}
+accounts.docs.append(old)
+for remember in (False,True):
+    with app.test_request_context('/api/portal/login',method='POST',json={'username':'seis_digitos','password':'123456','remember':remember,'init_data':'irrelevante-para-senha'},headers={'X-Eldora-CSRF':'test-csrf'}):
+        session['portal_csrf']='test-csrf'
+        response=scope['api_login_conta']()
+        assert response.json['sucesso'] is True and session.permanent==remember
+assert 'telegram_verified_id' not in old
 print('OK: assinatura Telegram, expiração, CSRF, cadastro, sessão, vínculo, identidade duplicada, propriedade do personagem e saída.')
