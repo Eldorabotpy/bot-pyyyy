@@ -385,9 +385,6 @@
             </div>
         </div>
 
-        <div class="texto-rodape" id="rodape-dinamico">
-            Nova Conta? <span onclick="portalScreen('create')">Criar Conta.</span>
-        </div>
     </div>
 
     <script>
@@ -569,7 +566,7 @@
 
         window.portalAccept = function(data) {
             contaAtiva = data.username;
-            ['tela-login','tela-registro-conta','tela-criacao','rodape-dinamico'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});
+            ['tela-login','tela-registro-conta','tela-criacao'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});
             buscarPersonagens(data.personagens || []);
         };
         // ETAPA 1: FAZER LOGIN NA CONTA MESTRA
@@ -611,7 +608,6 @@
                         renderizarContasSalvas();
                     }
                     document.getElementById('tela-login').style.display = 'none';
-                    document.getElementById('rodape-dinamico').style.display = 'none';
                     
                     // Vai para a etapa 2: Mostrar os personagens
                     buscarPersonagens(data.personagens || []); 
@@ -755,7 +751,6 @@
         window.alternarParaRegistroConta = function() {
             document.getElementById('tela-login').style.display = 'none';
             document.getElementById('tela-registro-conta').style.display = 'block';
-            document.getElementById('rodape-dinamico').style.display = 'none';
             document.getElementById('titulo-caixa').innerText = "NOVA CONTA MESTRA";
         };
 
@@ -763,7 +758,6 @@
         window.alternarParaLogin = function() {
             document.getElementById('tela-registro-conta').style.display = 'none';
             document.getElementById('tela-login').style.display = 'block';
-            document.getElementById('rodape-dinamico').style.display = 'block';
             document.getElementById('titulo-caixa').innerText = "ENTRAR NO REINO";
         };
 
