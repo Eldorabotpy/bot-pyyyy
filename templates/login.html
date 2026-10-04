@@ -283,6 +283,7 @@
     
     <link rel="stylesheet" href="/static/css/dialogos_eldora.css?v=1">
     <script src="/static/js/dialogos_eldora.js?v=1"></script>
+<link rel="stylesheet" href="/static/css/portal.css?v=1">
 </head>
 <body>
     
@@ -299,12 +300,12 @@
     </div>
 
     <div class="portal-main-container">
-        <div class="logo-eldora"></div>
+        <div class="logo-eldora" role="img" aria-label="Eldora RPG"></div><p class="portal-eyebrow">MUNDO DE ELDORA</p>
         <div class="login-box">
             <div class="titulo-secao" id="titulo-caixa" style="margin-bottom: 10px; color: #d4af37; font-size: 0.9em; font-weight: bold;">ENTRAR NO REINO</div>
             
-            <section id="portal-identidade" style="padding:14px;margin:8px 0 16px;border:1px solid #665a3b;border-radius:12px;background:#111c2c;color:#dce5f3;font:13px/1.5 Arial,sans-serif">
-                <strong style="color:#ecd08c">Conta Eldora</strong>
+            <details id="portal-identidade" open style="padding:14px;margin:8px 0 16px;border:1px solid #665a3b;border-radius:12px;background:#111c2c;color:#dce5f3;font:13px/1.5 Arial,sans-serif">
+                <summary id="portal-account-summary">Acesse sua conta</summary><div class="portal-account-body">
                 <p id="portal-auth-state">Verificando sessão…</p>
                 <select id="portal-auth-mode" aria-label="Entrar, criar ou vincular conta" style="width:100%;min-height:44px;margin-bottom:12px"><option value="login">Entrar em conta vinculada</option></select>
                 <div id="portal-google" style="display:flex;justify-content:center"></div>
@@ -312,9 +313,9 @@
                 <button id="portal-telegram" type="button" class="btn-new" hidden>Continuar com Telegram</button>
                 <button id="portal-logout" type="button" class="btn-new" hidden>Sair / trocar conta</button>
                 <p id="portal-auth-message" role="status" aria-live="polite"></p>
-            </section>
+            </div></details>
             <!-- ETAPA 1: TELA LOGIN DA CONTA MESTRA -->
-            <div id="tela-login" style="width: 100%;">
+            <div id="tela-login" style="width: 100%;"><p class="portal-divider">Já tem uma conta? Entre com sua senha</p>
 
                 <div id="contas-salvas-box">
                     <div class="contas-salvas-titulo">CONTAS SALVAS</div>
@@ -358,7 +359,7 @@
 
             <!-- ETAPA 2: TELA DE SELEÇÃO DE PERSONAGENS (LOBBY) -->
             <div id="tela-selecao" style="display: none; width: 100%; text-align: center;">
-                <div style="font-size: 0.7em; color: #ecf0f1; margin-bottom: 10px;">Selecione seu herói:</div>
+                <p class="portal-description">Sua próxima aventura começa aqui. Escolha um herói para continuar.</p>
                 <div id="lista-personagens">
                     <!-- Os botões dos personagens aparecerão aqui via JavaScript -->
                 </div>
@@ -367,17 +368,18 @@
 
             <!-- ETAPA 3: TELA DE CRIAÇÃO (APENAS NOME E GÊNERO) -->
             <div id="tela-criacao" style="display: none; width: 100%;">
-                <div class="input-container"><label>NOME DO NOVO HERÓI</label><input type="text" id="reg-heroiname" placeholder="Nome desejado..."></div>
+                <div class="creation-preview"><img id="creation-avatar" src="https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/avatares/avatar_padrao_m.png" alt="Retrato inicial do aventureiro"><div><small>NOVO AVENTUREIRO</small><strong id="creation-name">Seu herói</strong><p>Escolha um nome e comece sua jornada.</p></div></div>
+                <div class="input-container"><label>NOME DO NOVO HERÓI</label><input type="text" id="reg-heroiname" placeholder="Como seu herói será conhecido?" maxlength="40" oninput="document.getElementById('creation-name').textContent=this.value.trim()||'Seu herói'"></div>
                 <div class="input-container">
                     <label>GÊNERO</label>
-                    <select id="reg-genero">
+                    <select id="reg-genero" onchange="document.getElementById('creation-avatar').src='https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/avatares/avatar_padrao_'+(this.value==='feminino'?'f':'m')+'.png'">
                         <option value="masculino" style="background: #1a0b2e;">Masculino ♂️</option>
                         <option value="feminino" style="background: #1a0b2e;">Feminino ♀️</option>
                     </select>
                 </div>
-                <button class="btn-new" onclick="playClick(); confirmarCriacao()" id="btn-criar">FORJAR DESTINO</button>
+                <button class="btn-new" onclick="playClick(); confirmarCriacao()" id="btn-criar">CRIAR HERÓI</button>
                 <div style="text-align: center; margin-top: 10px;">
-                    <span onclick="playClick(); voltarParaSelecao()" style="color: #ecf0f1; font-size: 0.8em; cursor: pointer; text-decoration: underline;">Voltar</span>
+                    <button type="button" class="portal-back" onclick="voltarParaSelecao()">← Voltar aos meus heróis</button>
                 </div>
             </div>
         </div>
@@ -407,6 +409,7 @@
 
         // Variável global para guardar o Token/Sessão da conta mestra
         let contaAtiva = null;
+        const escapePortal=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
         // ==========================================
         // 💾 CONTAS SALVAS PARA TESTES
@@ -670,21 +673,22 @@
                     const fallbackImg = `${LINK_BASE_GITHUB}avatar_padrao_${generoCurto}.png`;
 
                     // 3. Constrói o HTML do Card
-                    let divCard = document.createElement('div');
+                    let divCard = document.createElement('button');
+                    divCard.type='button';
                     divCard.className = 'card-heroi';
                     divCard.onclick = () => entrarNoMapaComPersonagem(p.id, p.nome, p.genero);
                     
                     divCard.innerHTML = `
-                        <img src="${imgUrl}" class="card-heroi-avatar" onerror="this.onerror=null; this.src='${fallbackImg}';">
+                        <img src="${escapePortal(imgUrl)}" class="card-heroi-avatar" onerror="this.onerror=null; this.src='${fallbackImg}';">
                         <div class="card-heroi-info">
                             <div class="card-heroi-nome">
-                                ${p.nome}
+                                ${escapePortal(p.nome)}
                                 ${ehUltimoHeroi ? '<span class="badge-ultimo-heroi">ÚLTIMO</span>' : ''}
                             </div>
                             
                             <div class="card-heroi-detalhes">
                                 <span class="badge-nivel">Nv. ${nivel}</span>
-                                <span>${classeName}</span>
+                                <span>${escapePortal(classeName)}</span>
                             </div>
                         </div>
                     `;
@@ -773,6 +777,6 @@
 
         // A inicialização das telas pertence ao portal_auth.js.
     </script>
-<script src="/static/js/portal_auth.js?v=2"></script>
+<script src="/static/js/portal_auth.js?v=3"></script>
 </body>
 </html>

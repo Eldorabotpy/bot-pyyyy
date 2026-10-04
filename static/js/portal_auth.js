@@ -12,7 +12,11 @@
     window.portalRefresh=async()=>{
         const response=await fetch('/api/auth/status',{cache:'no-store'});
         if(!response.ok)throw new Error('Não foi possível verificar sua sessão.');
+        const previouslyAuthenticated=!!status?.authenticated;
         status=await response.json();
+        if(previouslyAuthenticated!==!!status.authenticated||!status.authenticated)box.open=!status.authenticated;
+        if(status.authenticated&&new URLSearchParams(location.search).has('conta')&&!previouslyAuthenticated)box.open=true;
+        document.getElementById('portal-account-summary').textContent=status.authenticated?'Minha conta · vínculos e acesso':'Entrar ou criar conta';
         if(!status.authenticated)document.getElementById('titulo-caixa').textContent='ENTRAR NO REINO';
         document.getElementById('portal-auth-state').textContent=status.authenticated?`Conta conectada · Google: ${status.google_linked?'vinculado':'não vinculado'} · Telegram: ${status.telegram_linked?'vinculado':'não vinculado'}`:'Entre ou crie sua conta. Já joga? Entre na conta antiga antes de vincular.';
         const mode=document.getElementById('portal-auth-mode');

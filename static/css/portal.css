@@ -1,0 +1,30 @@
+/* Layout das etapas do portal. Regras restritas à página de login. */
+body{background-color:#0c1020;padding:24px 12px 40px;font-family:Arial,sans-serif}
+.portal-main-container{max-width:420px;margin:0 auto;gap:0}
+.logo-eldora{width:76px;height:76px;margin:0 0 8px}
+.portal-eyebrow{font:600 10px/1.4 Arial,sans-serif;letter-spacing:3px;color:#baa878;margin:0 0 18px}
+.login-box{max-width:420px;padding:24px;background:linear-gradient(150deg,#1e2235f5,#0f1626fa);border-color:#79683f;border-radius:20px;box-shadow:0 20px 60px #0008;gap:0}
+#titulo-caixa{font:700 21px/1.3 Cinzel,Georgia,serif!important;color:#ead39a!important;text-align:center;margin:0 0 18px!important}
+#portal-identidade{order:0;padding:0!important;border:1px solid #39445a!important;border-radius:12px!important;margin:0 0 20px!important;background:#111b2b!important}
+#portal-identidade summary{padding:14px;cursor:pointer;font:600 13px/1.4 Arial,sans-serif;color:#ddc58f;min-height:20px}
+#portal-identidade[open] summary{border-bottom:1px solid #344057}
+.portal-account-body{padding:14px}
+#portal-identidade #portal-auth-state{font-size:12px;color:#9eafc6;margin-top:0}
+#portal-auth-mode{min-height:44px;color:#dce5f3!important;background:#192538!important;border-color:#42516a!important}
+#portal-identidade [hidden]{display:none!important}
+.portal-description{font:13px/1.6 Arial,sans-serif;color:#aebcd0;margin:0 0 18px;text-align:left}
+.portal-divider{font:12px/1.5 Arial,sans-serif;color:#aebcd0;text-align:center;margin:0 0 18px}
+.input-container{margin-bottom:16px}.input-container label{font:600 11px/1.5 Arial,sans-serif;color:#bdc9da;letter-spacing:1px;margin:0 0 6px}
+.input-container input,.input-container select{height:48px;background:#0d1626;border:1px solid #3b4960;border-radius:9px;color:#eff3fa;font:15px Arial,sans-serif;padding:0 12px}
+.input-container input::placeholder{color:#7f90a9;font-size:13px}.input-container input:focus,.input-container select:focus{outline:2px solid #c7ab69;outline-offset:2px}
+.btn-new{width:100%;min-height:46px;height:auto;padding:13px 12px;margin:12px 0 0;background:linear-gradient(110deg,#ead394,#bf9b53);border:1px solid #e5c784;border-radius:9px;color:#271f11;font:700 13px/1.4 Arial,sans-serif;box-sizing:border-box;white-space:normal}
+.btn-new:disabled{opacity:.55;cursor:wait}.salvar-conta-opcao{color:#98a9c0;font:12px/1.5 Arial,sans-serif}
+#lista-personagens{max-height:none;overflow:visible;padding:0;gap:10px;margin:0 0 16px}
+.card-heroi{min-height:86px;margin:0;padding:12px;gap:12px;border:1px solid #414b5b;border-radius:12px;background:linear-gradient(100deg,#263044,#192232);text-align:left;color:#ecf0f1;box-shadow:none}
+.card-heroi:hover{transform:none;background:#2a374a;border-color:#cbb276}.card-heroi:focus-visible{outline:2px solid #e6c780;outline-offset:2px}
+.card-heroi-avatar{width:52px;height:52px;flex-shrink:0;border:1px solid #9d8957;border-radius:11px;object-fit:cover}
+.card-heroi-info{min-width:0;flex:1}.card-heroi-nome{font:700 15px/1.4 Cinzel,Georgia,serif;color:#eee0ba;overflow-wrap:anywhere;display:flex;flex-wrap:wrap;gap:7px;align-items:center}.card-heroi-detalhes{font:12px/1.5 Arial,sans-serif;color:#b2c0d5;margin-top:5px;display:flex;gap:8px;align-items:center}
+.badge-nivel{background:#c4a76a22;border:1px solid #c4a76a44;color:#dfc78e;border-radius:5px;padding:2px 6px;font:600 11px Arial,sans-serif}.badge-ultimo-heroi{font:600 9px Arial,sans-serif;letter-spacing:.5px;background:#a2c3b01a;color:#b0d5be;border:1px solid #70967e66;box-shadow:none;border-radius:4px;padding:3px 5px}
+.creation-preview{display:flex;gap:14px;align-items:center;background:#26314688;border:1px solid #42506a;border-radius:14px;padding:16px;margin-bottom:22px}.creation-preview img{width:68px;height:68px;border-radius:12px;object-fit:cover}.creation-preview div{min-width:0}.creation-preview small{display:block;color:#bba477;font:9px Arial,sans-serif;letter-spacing:1px}.creation-preview strong{display:block;font:700 17px Cinzel,Georgia,serif;color:#ead7a8;margin:6px 0;overflow-wrap:anywhere}.creation-preview p{font:12px/1.5 Arial,sans-serif;color:#9eafc6;margin:0}
+.portal-back{min-height:44px;border:0;background:transparent;color:#b6c4d7;cursor:pointer;font:13px Arial,sans-serif}
+@media(max-width:360px){body{padding:16px 10px 30px}.login-box{padding:18px 14px}#titulo-caixa{font-size:18px!important}.portal-account-body{padding:10px}.logo-eldora{width:64px;height:64px}}
