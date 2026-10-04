@@ -283,11 +283,10 @@
     
     <link rel="stylesheet" href="/static/css/dialogos_eldora.css?v=1">
     <script src="/static/js/dialogos_eldora.js?v=1"></script>
-<link rel="stylesheet" href="/static/css/portal.css?v=2">
+<link rel="stylesheet" href="/static/css/portal.css?v=3">
 </head>
 <body>
     
-    <body>
     <!-- TELA DE CARREGAMENTO -->
     
     <!-- MODAL DE ALERTA -->
@@ -347,7 +346,7 @@
                     <input type="checkbox" id="login-salvar-conta" checked>
                     Lembrar nome da conta (sem guardar senha)
                 </label>
-                <button class="btn-new" onclick="playClick(); realizarLogin()" id="btn-logar">ACESSAR CONTA</button><button type="button" class="portal-back" onclick="portalScreen('google')">Já vinculou? Entrar com Google ou Telegram</button>
+                <button class="btn-new" type="button" id="btn-logar">ACESSAR CONTA</button><button type="button" class="portal-back" onclick="portalScreen('google')">Já vinculou? Entrar com Google ou Telegram</button>
             </div>
             
             <!-- ETAPA 1.5: TELA DE CRIAR CONTA MESTRA -->
@@ -364,11 +363,12 @@
                 <div id="lista-personagens">
                     <!-- Os botões dos personagens aparecerão aqui via JavaScript -->
                 </div>
-                <button class="btn-new" onclick="playClick(); mostrarCriacao()" style="margin-top: 5px;">+ CRIAR NOVO HERÓI</button>
+                <button class="btn-new" type="button" id="btn-novo-heroi" style="margin-top: 5px;">+ CRIAR NOVO HERÓI</button>
             </div>
 
             <!-- ETAPA 3: TELA DE CRIAÇÃO (APENAS NOME E GÊNERO) -->
             <div id="tela-criacao" style="display: none; width: 100%;">
+                <p id="creation-feedback" role="status" aria-live="polite" style="color:#efd49b;font:13px/1.5 Arial,sans-serif"></p>
                 <div class="creation-preview"><img id="creation-avatar" src="https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/avatares/avatar_padrao_m.png" alt="Retrato inicial do aventureiro"><div><small>NOVO AVENTUREIRO</small><strong id="creation-name">Seu herói</strong><p>Escolha um nome e comece sua jornada.</p></div></div>
                 <div class="input-container"><label>NOME DO NOVO HERÓI</label><input type="text" id="reg-heroiname" placeholder="Como seu herói será conhecido?" maxlength="40" oninput="document.getElementById('creation-name').textContent=this.value.trim()||'Seu herói'"></div>
                 <div class="input-container">
@@ -378,9 +378,9 @@
                         <option value="feminino" style="background: #1a0b2e;">Feminino ♀️</option>
                     </select>
                 </div>
-                <button class="btn-new" onclick="playClick(); confirmarCriacao()" id="btn-criar">CRIAR HERÓI</button>
+                <button class="btn-new" type="button" id="btn-criar">CRIAR HERÓI</button>
                 <div style="text-align: center; margin-top: 10px;">
-                    <button type="button" class="portal-back" onclick="voltarParaSelecao()">← Voltar aos meus heróis</button>
+                    <button type="button" class="portal-back" id="btn-voltar-herois">← Voltar aos meus heróis</button>
                 </div>
             </div>
         </div>
@@ -388,11 +388,13 @@
     </div>
 
     <script>
-        window.Telegram.WebApp.ready();
-        window.Telegram.WebApp.expand();
+        window.Telegram?.WebApp?.ready();
+        window.Telegram?.WebApp?.expand();
 
         const clickSound = new Audio("https://github.com/user-attachments/files/26343084/dragon-studio-clicking-433009.mp3");
-        window.playClick = function() { clickSound.currentTime = 0; clickSound.play().catch(e => {}); };
+        window.playClick = function() {
+            try { clickSound.currentTime = 0; const playing=clickSound.play(); playing?.catch?.(()=>{}); } catch (_) {}
+        };
 
         // --- MOTOR DE NOTIFICAÇÃO ---
         window.mostrarAviso = function(titulo, mensagem) {
@@ -711,17 +713,23 @@
 
         // ETAPA 3: CRIAR NOVO PERSONAGEM NA CONTA
         window.confirmarCriacao = async function() {
-            const nome = document.getElementById('reg-heroiname').value;
+            const nome = document.getElementById('reg-heroiname').value.trim();
             const genero = document.getElementById('reg-genero').value;
             
-            if (!nome) return mostrarAviso("AVISO", "⚠️ Dê um nome ao seu herói.");
+            const feedback=document.getElementById('creation-feedback');
+            if (!nome) {feedback.textContent='Digite o nome do seu herói para continuar.';document.getElementById('reg-heroiname').focus();return;}
+            if(document.getElementById('btn-criar').disabled)return;
+            feedback.textContent='Criando seu herói…';
 
             const btn = document.getElementById('btn-criar');
             btn.innerText = "Forjando..."; btn.disabled = true;
+            const controller=new AbortController();
+            const requestTimer=setTimeout(()=>controller.abort(),20000);
 
             try {
                 // Note que aqui não enviamos mais "senha". Enviamos a conta ativa à qual o personagem pertence.
                 const res = await fetch('/api/portal/criar_personagem', {
+                    signal: controller.signal,
                     method: 'POST',
                     headers: window.portalAuthHeaders(),
                     body: JSON.stringify({
@@ -740,12 +748,13 @@
                     document.getElementById('tela-criacao').style.display = 'none';
                     buscarPersonagens(data.nova_lista_personagens || []);
                 } else {
-                    mostrarAviso("ERRO", "❌ " + data.erro);
+                    feedback.textContent=data.erro || "Não foi possível criar o herói.";
                 }
             } catch (e) {
-                mostrarAviso("ERRO", "⚠️ Falha ao criar herói.");
+                feedback.textContent="Não foi possível concluir. Confira sua conexão e tente novamente.";
             }
-            btn.innerText = "FORJAR DESTINO"; btn.disabled = false;
+            clearTimeout(requestTimer);
+            btn.innerText = "CRIAR HERÓI"; btn.disabled = false;
         };
         // NAVEGAÇÃO: IR PARA TELA DE REGISTRAR CONTA
         window.alternarParaRegistroConta = function() {
@@ -772,6 +781,7 @@
 
         // A inicialização das telas pertence ao portal_auth.js.
     </script>
-<script src="/static/js/portal_auth.js?v=5"></script>
+<script src="/static/js/portal_controls.js?v=1"></script>
+<script src="/static/js/portal_auth.js?v=6"></script>
 </body>
 </html>

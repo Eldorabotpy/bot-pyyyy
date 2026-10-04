@@ -17,6 +17,7 @@
         document.getElementById('portal-logout').hidden=!status.authenticated;
         document.getElementById('portal-entry-tabs').hidden=!!status.authenticated;
         document.getElementById('portal-auth-mode').innerHTML='<option value="login">Entrar</option><option value="create">Criar</option><option value="link">Vincular</option>';
+        box.classList.toggle('portal-provider-simple',!status.authenticated);
         if(status.authenticated){
             document.getElementById('portal-auth-mode').value='link';
             box.hidden=inTelegram||status.google_linked;box.open=new URLSearchParams(location.search).has('conta');
