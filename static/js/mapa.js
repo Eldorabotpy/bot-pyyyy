@@ -2558,6 +2558,8 @@ class MapaScene extends Phaser.Scene {
             window.__eldoraDialogAberto
             ||
             window.__oficinaRunasAberta
+            ||
+            window.__coliseuPvPAb
         ) {
 
             this.isMoving = false;

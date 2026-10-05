@@ -1646,6 +1646,17 @@ def api_mapa_objetos(regiao_id):
         mapas_config = {
             "capital_eldora": [
                 {
+                    "id": "entrada_coliseu_pvp",
+                    # Portão do Coliseu, próximo ao bloco (4, 35) do mapa 60x60.
+                    "x": 4 * 32,
+                    "y": 35 * 32,
+                    "icone_x": 4 * 32 + 16,
+                    "icone_y": 35 * 32 - 28,
+                    "texto_botao": "⚔️",
+                    "acao": "abrir_coliseu_pvp",
+                    "mensagem": "",
+                },
+                {
                     "id": "estatua_pedroca",
 
                     "x": 30 * 32,

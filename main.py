@@ -2,9 +2,11 @@ import os
 import asyncio
 import random
 import time
+import math
 import logging
 from datetime import datetime
-from threading import Thread
+from threading import Thread, Lock
+from uuid import uuid4
 from flask import Flask, render_template, jsonify, request
 from flask.json.provider import DefaultJSONProvider
 from flask_socketio import SocketIO, emit
@@ -14,6 +16,7 @@ from pymongo import MongoClient
 from config import MONGO_CONNECTION_STRING
 from modules.database import initialize_database
 from modules.player.core import users_collection
+from pvp.coliseum_event import get_event_status
 from modules.webapp_api import webapp_bp
 from modules.game_data.skills import SKILL_DATA
 from modules.game_data.monsters import MONSTERS_DATA
@@ -165,6 +168,48 @@ def home():
 @app.route('/login')
 def pagina_login():
     return render_template('login.html')
+
+
+@app.get('/api/pvp/coliseu/status')
+def status_coliseu_pvp():
+    agenda = get_event_status()
+    ranking = []
+    placar_evento = []
+    try:
+        from pvp.pvp_utils import get_player_elo
+
+        jogadores = users_collection.find(
+            {"character_name": {"$exists": True, "$ne": ""}},
+            {"character_name": 1, "pvp_points": 1},
+        ).sort("pvp_points", -1).limit(5)
+        for posicao, jogador in enumerate(jogadores, 1):
+            pontos = int(jogador.get("pvp_points", 0) or 0)
+            ranking.append({
+                "posicao": posicao,
+                "nome": jogador.get("character_name", "Herói"),
+                "pontos": pontos,
+                "elo": get_player_elo(pontos),
+            })
+
+        if agenda.get("event_id"):
+            eventos = users_collection.database["coliseu_evento_pvp"].find(
+                {"event_id": agenda["event_id"]},
+                {"nome": 1, "vitorias": 1, "partidas": 1},
+            ).sort([("vitorias", -1), ("partidas", -1)]).limit(5)
+            placar_evento = [
+                {"posicao": i, "nome": doc.get("nome", "Herói"),
+                 "vitorias": int(doc.get("vitorias", 0)),
+                 "partidas": int(doc.get("partidas", 0))}
+                for i, doc in enumerate(eventos, 1)
+            ]
+    except Exception:
+        app.logger.exception("Não foi possível carregar os placares do Coliseu")
+
+    return jsonify({
+        "evento": agenda,
+        "ranking": ranking,
+        "placar_evento": placar_evento,
+    })
 
 @app.route('/api/recent_premium')
 def obter_recent_premium():
@@ -1654,6 +1699,8 @@ def handle_atualizar_visual(dados):
         
 @socketio.on('disconnect')
 def handle_disconnect():
+    _retirar_fila_coliseu(request.sid)
+    _encerrar_duelo_coliseu_ao_desconectar(request.sid)
     if request.sid in jogadores_online:
         from modules.companions import flush_movement
         flush_movement(jogadores_online[request.sid])
@@ -2022,6 +2069,256 @@ def run_bot():
 # ⚔️ SISTEMA DE PVP (DUELOS 1V1)
 # ==============================================================================
 duelos_ativos = {} # Guarda o estado atual de cada duelo rolando no mapa
+filas_coliseu = {"ranqueado": [], "evento": []}
+fila_coliseu_lock = Lock()
+resultado_coliseu_lock = Lock()
+fila_coliseu_evento_id = None
+COLISEU_ENTRADA_X = 4 * 32
+COLISEU_ENTRADA_Y = 35 * 32
+COLISEU_RAIO_FILA = 150
+
+
+def _esta_no_portao_coliseu(info):
+    try:
+        x = float(info.get("x", 0))
+        y = float(info.get("y", 0))
+    except (TypeError, ValueError):
+        return False
+    return math.hypot(x - COLISEU_ENTRADA_X, y - COLISEU_ENTRADA_Y) <= COLISEU_RAIO_FILA
+
+
+def _emitir_fila_coliseu(sid, estado, mensagem, modo=None):
+    socketio.emit("coliseuFila", {"estado": estado, "mensagem": mensagem, "modo": modo}, to=sid)
+
+
+def _iniciar_duelo_coliseu(sid_a, sid_b, modo, event_id=None):
+    """Prepara um duelo do Coliseu com personagens e atributos lidos no servidor."""
+    info_a = jogadores_online.get(sid_a)
+    info_b = jogadores_online.get(sid_b)
+    if not info_a or not info_b or info_a.get("em_combate") or info_b.get("em_combate"):
+        return False
+    if str(info_a.get("char_id")) == str(info_b.get("char_id")):
+        return False
+    if not ObjectId.is_valid(str(info_a.get("char_id"))) or not ObjectId.is_valid(str(info_b.get("char_id"))):
+        return False
+
+    player_a_db = users_collection.find_one({"_id": ObjectId(str(info_a["char_id"]))})
+    player_b_db = users_collection.find_one({"_id": ObjectId(str(info_b["char_id"]))})
+    if not player_a_db or not player_b_db:
+        return False
+    try:
+        stats_a = get_combat_stats_sync(player_a_db)
+        stats_b = get_combat_stats_sync(player_b_db)
+        player_a_db = aplicar_combat_stats_no_player(player_a_db, stats_a)
+        player_b_db = aplicar_combat_stats_no_player(player_b_db, stats_b)
+    except Exception:
+        app.logger.exception("Falha ao preparar duelo do Coliseu")
+        return False
+
+    hp_a = int(stats_a.get("current_hp", stats_a.get("max_hp", 1)))
+    hp_b = int(stats_b.get("current_hp", stats_b.get("max_hp", 1)))
+    duelo_id = f"coliseu_{uuid4().hex}"
+    jogadores_online[sid_a]["em_combate"] = True
+    jogadores_online[sid_b]["em_combate"] = True
+    duelos_ativos[duelo_id] = {
+        "id": duelo_id,
+        "modo": modo,
+        "event_id": event_id,
+        "jogador_a": {"sid": sid_a, "db": player_a_db, "stats": stats_a, "hp": hp_a, "mp": stats_a.get("current_mp", stats_a.get("max_mana", 50))},
+        "jogador_b": {"sid": sid_b, "db": player_b_db, "stats": stats_b, "hp": hp_b, "mp": stats_b.get("current_mp", stats_b.get("max_mana", 50))},
+        "turno_de": sid_a,
+    }
+
+    def estado(meu_sid, rival_sid, meu_db, rival_db, minha_vez):
+        meu = jogadores_online[meu_sid]
+        rival = jogadores_online[rival_sid]
+        return {
+            "duelo_id": duelo_id,
+            "regiao": meu.get("regiao", "capital_eldora"),
+            "oponente_nome": rival.get("nome", rival_db.get("character_name", "Aventureiro")),
+            "oponente_skin": rival.get("skin", "aventureiro_m"),
+            "oponente_level": rival_db.get("level", 1),
+            "oponente_hp": rival_db.get("current_hp", rival_db.get("max_hp", 1)),
+            "oponente_max_hp": rival_db.get("max_hp", 1),
+            "meu_level": meu_db.get("level", 1),
+            "meu_hp": meu_db.get("current_hp", meu_db.get("max_hp", 1)),
+            "meu_max_hp": meu_db.get("max_hp", 1),
+            "meu_mp": meu_db.get("current_mp", meu_db.get("max_mana", 50)),
+            "meu_max_mp": meu_db.get("max_mana", 50),
+            "minha_vez": minha_vez,
+            "modo_pvp": modo,
+        }
+
+    _emitir_fila_coliseu(sid_a, "iniciada", "O adversário foi encontrado. A luta vai começar!", modo)
+    _emitir_fila_coliseu(sid_b, "iniciada", "O adversário foi encontrado. A luta vai começar!", modo)
+    socketio.emit("iniciarArenaPvP", estado(sid_a, sid_b, player_a_db, player_b_db, True), to=sid_a)
+    socketio.emit("iniciarArenaPvP", estado(sid_b, sid_a, player_b_db, player_a_db, False), to=sid_b)
+    return True
+
+
+def _registrar_resultado_coliseu(duelo, vencedor_sid):
+    """Grava Elo ou placar do evento uma vez, usando o vencedor calculado pelo servidor."""
+    with resultado_coliseu_lock:
+        if duelo.get("resultado_registrado"):
+            return
+        modo = duelo.get("modo", "casual")
+        if modo not in ("ranqueado", "evento"):
+            return
+        duelo["resultado_registrado"] = True
+        participantes = [duelo["jogador_a"], duelo["jogador_b"]]
+        documentos = [participantes[0]["db"], participantes[1]["db"]]
+        ids = [doc.get("_id") for doc in documentos]
+        venceu = [participantes[i]["sid"] == vencedor_sid for i in range(2)]
+
+        if modo == "ranqueado":
+            pontos = [max(0, int(doc.get("pvp_points", 0) or 0)) for doc in documentos]
+            esperado_a = 1 / (1 + 10 ** ((pontos[1] - pontos[0]) / 400))
+            esperado_b = 1 - esperado_a
+            deltas = [round(32 * (int(venceu[0]) - esperado_a)), round(32 * (int(venceu[1]) - esperado_b))]
+            resultados = []
+            for i, doc in enumerate(documentos):
+                total = max(0, pontos[i] + deltas[i])
+                contador = "pvp_wins" if venceu[i] else "pvp_losses"
+                users_collection.update_one({"_id": ids[i]}, {"$set": {"pvp_points": total}, "$inc": {contador: 1}})
+                resultados.append({"delta": total - pontos[i], "pontos": total})
+            users_collection.database["coliseu_pvp_partidas"].update_one(
+                {"_id": duelo["id"]},
+                {"$setOnInsert": {"jogadores": [str(ids[0]), str(ids[1])], "vencedor": str(ids[0] if venceu[0] else ids[1]), "alteracoes": resultados, "criado_em": datetime.utcnow()}},
+                upsert=True,
+            )
+            for i, participante in enumerate(participantes):
+                socketio.emit("coliseuResultado", {"modo": modo, "delta": resultados[i]["delta"], "pontos": resultados[i]["pontos"], "vitoria": venceu[i]}, to=participante["sid"])
+            return
+
+        event_id = duelo.get("event_id")
+        if not event_id:
+            return
+        placar = users_collection.database["coliseu_evento_pvp"]
+        for i, doc in enumerate(documentos):
+            placar.update_one(
+                {"_id": f"{event_id}:{ids[i]}", "event_id": event_id},
+                {"$setOnInsert": {"event_id": event_id, "char_id": str(ids[i]), "nome": doc.get("character_name", "Aventureiro")},
+                 "$inc": {"partidas": 1, ("vitorias" if venceu[i] else "derrotas"): 1}},
+                upsert=True,
+            )
+            socketio.emit("coliseuResultado", {"modo": modo, "vitoria": venceu[i], "event_id": event_id}, to=participantes[i]["sid"])
+
+
+def _encerrar_duelo_coliseu_ao_desconectar(sid):
+    """Trata desconexão em partida competitiva como desistência e libera o rival."""
+    for duelo_id, duelo in list(duelos_ativos.items()):
+        if duelo.get("modo") not in ("ranqueado", "evento"):
+            continue
+        participantes = [duelo["jogador_a"], duelo["jogador_b"]]
+        perdedor = next((p for p in participantes if p["sid"] == sid), None)
+        if not perdedor:
+            continue
+        vencedor = next(p for p in participantes if p["sid"] != sid)
+        try:
+            _registrar_resultado_coliseu(duelo, vencedor["sid"])
+        except Exception:
+            app.logger.exception("Falha ao salvar resultado após desconexão no Coliseu")
+        if vencedor["sid"] in jogadores_online:
+            jogadores_online[vencedor["sid"]]["em_combate"] = False
+            socketio.emit("animarTurnoPvP", {
+                "log": [{"autor_sid": vencedor["sid"], "texto": "O adversário desconectou. Vitória por desistência.", "dano": 0}],
+                "vencedor_sid": vencedor["sid"],
+                "novo_hp": 0,
+                "atacante_sid": vencedor["sid"],
+                "novo_mp": vencedor["mp"],
+                "proximo_turno_sid": None,
+            }, to=vencedor["sid"])
+        jogadores_online.get(sid, {})["em_combate"] = False
+        duelos_ativos.pop(duelo_id, None)
+
+
+@socketio.on("buscarFilaColiseu")
+def handle_buscar_fila_coliseu(data):
+    global fila_coliseu_evento_id
+    sid = request.sid
+    modo = (data or {}).get("modo")
+    if modo not in ("ranqueado", "evento"):
+        _emitir_fila_coliseu(sid, "erro", "Modalidade inválida.")
+        return
+    info = jogadores_online.get(sid)
+    if not info or info.get("regiao") != "capital_eldora" or not _esta_no_portao_coliseu(info):
+        _emitir_fila_coliseu(sid, "erro", "Aproxime-se do portão do Coliseu, na Capital de Eldora.", modo)
+        return
+    if info.get("em_combate"):
+        _emitir_fila_coliseu(sid, "erro", "Você já está em combate.", modo)
+        return
+    if not ObjectId.is_valid(str(info.get("char_id"))):
+        _emitir_fila_coliseu(sid, "erro", "Não consegui validar seu personagem.", modo)
+        return
+    jogador = users_collection.find_one({"_id": ObjectId(str(info["char_id"]))}, {"pvp_points": 1})
+    if not jogador:
+        _emitir_fila_coliseu(sid, "erro", "Personagem não encontrado.", modo)
+        return
+
+    event_id = None
+    if modo == "evento":
+        agenda = get_event_status()
+        if not agenda.get("active"):
+            _emitir_fila_coliseu(sid, "erro", "O evento está fechado. Abre terça, quinta e sábado às 20h (Brasília).", modo)
+            return
+        event_id = agenda.get("event_id")
+
+    candidato = None
+    filas_anteriores = []
+    with fila_coliseu_lock:
+        if modo == "evento" and fila_coliseu_evento_id != event_id:
+            filas_anteriores = list(filas_coliseu["evento"])
+            filas_coliseu["evento"].clear()
+            fila_coliseu_evento_id = event_id
+        for fila_existente in filas_coliseu.values():
+            fila_existente[:] = [item for item in fila_existente if item != sid]
+        fila = filas_coliseu[modo]
+        opcoes = []
+        for outro_sid in fila:
+            outro = jogadores_online.get(outro_sid)
+            if not outro or outro.get("em_combate") or outro.get("regiao") != "capital_eldora" or not _esta_no_portao_coliseu(outro):
+                continue
+            if str(outro.get("char_id")) == str(info.get("char_id")):
+                continue
+            if modo == "ranqueado":
+                outro_id = str(outro.get("char_id"))
+                if not ObjectId.is_valid(outro_id):
+                    continue
+                doc = users_collection.find_one({"_id": ObjectId(outro_id)}, {"pvp_points": 1}) or {}
+                diferenca = abs(int(doc.get("pvp_points", 0) or 0) - int(jogador.get("pvp_points", 0) or 0))
+                opcoes.append((diferenca, outro_sid))
+            else:
+                opcoes.append((0, outro_sid))
+        if opcoes:
+            opcoes.sort(key=lambda item: item[0])
+            candidato = opcoes[0][1]
+            fila.remove(candidato)
+        else:
+            fila.append(sid)
+
+    for sid_antigo in filas_anteriores:
+        if sid_antigo != sid:
+            _emitir_fila_coliseu(sid_antigo, "erro", "A edição anterior do evento terminou. Entre novamente na próxima abertura.", "evento")
+
+    if candidato:
+        if not _iniciar_duelo_coliseu(candidato, sid, modo, event_id):
+            _emitir_fila_coliseu(sid, "erro", "Não foi possível preparar a partida. Tente novamente.", modo)
+            _emitir_fila_coliseu(candidato, "erro", "O adversário não pôde entrar na partida.", modo)
+        return
+    _emitir_fila_coliseu(sid, "aguardando", "Na fila. O Coliseu avisará quando encontrar um adversário.", modo)
+
+
+@socketio.on("sairFilaColiseu")
+def handle_sair_fila_coliseu(_data=None):
+    sid = request.sid
+    _retirar_fila_coliseu(sid)
+    _emitir_fila_coliseu(sid, "cancelada", "Busca cancelada.")
+
+
+def _retirar_fila_coliseu(sid):
+    with fila_coliseu_lock:
+        for fila in filas_coliseu.values():
+            fila[:] = [item for item in fila if item != sid]
 
 @socketio.on('enviarAcaoPvP')
 def handle_acao_pvp(dados):
@@ -2121,6 +2418,7 @@ def handle_acao_pvp(dados):
     emit('animarTurnoPvP', pacote_animacao, to=duelo['jogador_b']['sid'])
 
     if vencedor_sid:
+        _registrar_resultado_coliseu(duelo, vencedor_sid)
         if duelo['jogador_a']['sid'] in jogadores_online: jogadores_online[duelo['jogador_a']['sid']]['em_combate'] = False
         if duelo['jogador_b']['sid'] in jogadores_online: jogadores_online[duelo['jogador_b']['sid']]['em_combate'] = False
         del duelos_ativos[duelo_id]

@@ -100,6 +100,7 @@ class MapaInterativo {
                 const objetoRef = {
                     x: obj.x,
                     y: obj.y,
+                    acao: obj.acao || null,
                     botao: botao,
                     mensagem: obj.mensagem || "Foi daqui\nque a lenda começou."
                 };
@@ -109,6 +110,15 @@ class MapaInterativo {
                 // ==========================================
                 botao.on('pointerdown', (p, lx, ly, ev) => {
                     ev.stopPropagation();
+
+                    if (objetoRef.acao === 'abrir_coliseu_pvp') {
+                        this.scene.player?.body?.stop();
+                        this.scene.isMoving = false;
+                        if (typeof window.abrirColiseuPvP === 'function') {
+                            window.abrirColiseuPvP();
+                        }
+                        return;
+                    }
 
                     this.scene.player.body.stop();
                     this.scene.isMoving = false;
@@ -394,4 +404,4 @@ class MapaInterativo {
 
         });
     }
-}    
+}

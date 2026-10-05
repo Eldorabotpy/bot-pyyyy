@@ -20,6 +20,7 @@ window.bloqueioDeTurnoPvP = false;
 // 2. INICIALIZAÇÃO DA ARENA
 // ==========================================
 window.iniciarInterfacePvP = function(estado_arena) {
+    window.fecharColiseuPvP?.();
     // 1. Esconde o Mapa e blinda a Arena PvP
     document.getElementById('aba-reino').style.display = 'none';
     const telaPvp = document.getElementById('tela-pvp-global');
