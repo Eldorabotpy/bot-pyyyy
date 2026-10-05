@@ -1682,9 +1682,14 @@ def api_login_conta():
         from modules.portal_auth import require_csrf, limit_attempts, start_session, account_payload
         require_csrf()
         limit_attempts()
-        data = request.json
-        username = data.get("username", "").strip().lower()
+        data = request.get_json(silent=True) or {}
+        username = data.get("username", "")
         password = data.get("password", "")
+        if not isinstance(username, str) or not isinstance(password, str):
+            return jsonify(sucesso=False, erro="Usuário ou senha incorretos."), 400
+        username = username.strip().lower()
+        if not username or not password:
+            return jsonify(sucesso=False, erro="Usuário ou senha incorretos."), 400
 
         # Busca a conta mestre no banco
         conta = contas_collection.find_one({"$or": [{"username": username}, {"login_alias": username}]})
@@ -1700,19 +1705,6 @@ def api_login_conta():
         # nunca um efeito colateral que possa bloquear contas antigas.
 
         # Se logou com sucesso, busca todos os personagens vinculados a essa conta!
-        personagens_db = list(users_collection.find({"conta_mestre": username}))
-        
-        lista_personagens = []
-        for p in personagens_db:
-            lista_personagens.append({
-                "id": str(p["_id"]),
-                "nome": p.get("character_name", "Herói"),
-                "genero": p.get("gender", "masculino"),
-                "level": p.get("level", 1),
-                "classe": p.get("class", "aventureiro").capitalize(),
-                "avatar_customizado": p.get("avatar_customizado", "padrao")
-            })
-
         start_session(conta, remember=data.get('remember', True) is True)
         return jsonify(account_payload(conta))
     except ValueError as e:

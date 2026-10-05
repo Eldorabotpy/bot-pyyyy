@@ -35,3 +35,5 @@ body{background-color:#0c1020;padding:24px 12px 40px;font-family:Arial,sans-seri
 #portal-identidade.portal-provider-simple{border:0!important;background:transparent!important;margin:0!important;padding:0!important;border-radius:0!important}
 #portal-identidade.portal-provider-simple>summary,#portal-identidade.portal-provider-simple #portal-auth-state{display:none!important}
 #portal-identidade.portal-provider-simple .portal-account-body{padding:6px 0 12px}
+#portal-telegram{background:#20344a;border-color:#4d6681;color:#e5edf8;margin:0 0 12px}
+#portal-telegram-hint{margin:2px 0 8px}

@@ -27,7 +27,8 @@
             document.getElementById('portal-auth-state').textContent=`Conta ${status.display_name||status.username} · Google: ${status.google_linked?'vinculado':'não vinculado'} · Telegram: ${status.telegram_linked?'vinculado':'não vinculado'}`;
         }else window.portalScreen(screen);
         const telegram=window.Telegram?.WebApp?.initData;
-        document.getElementById('portal-telegram').hidden=!telegram;
+        document.getElementById('portal-telegram').hidden=!(telegram&&!status.authenticated);
+        document.getElementById('portal-telegram-hint').hidden=!(telegram&&!status.authenticated);
         document.getElementById('portal-google-note').textContent=(inTelegram||status.google_client_id)?'':'Login Google aguardando configuração. Contas existentes podem entrar com senha; novas contas podem ser criadas pelo Telegram.';
         document.getElementById('portal-google').hidden=inTelegram;
         if(!inTelegram&&status.google_client_id&&!googleLoaded){
@@ -45,11 +46,10 @@
     async function authenticate(provider,credentials){
         if(busy)return;
         const mode=document.getElementById('portal-auth-mode').value;
-        if(mode==='create'&&!confirm('Criar uma conta nova? Se você já joga Eldora, cancele e entre na sua conta existente para vinculá-la.'))return;
         if(provider==='telegram'&&mode==='create'){
             credentials.username=document.getElementById('telegram-username').value.trim();
             credentials.password=document.getElementById('telegram-password').value;
-            if(!/^[a-zA-Z0-9_]{3,24}$/.test(credentials.username)||credentials.password.length<6||credentials.password!==document.getElementById('telegram-password-confirm').value){note('Preencha um usuário válido e confirme uma senha de pelo menos 6 caracteres.');return;}
+            if(!/^[a-zA-Z0-9_]{3,24}$/.test(credentials.username)||credentials.username.toLowerCase().startsWith('eldora_')||credentials.password.length<6||credentials.password!==document.getElementById('telegram-password-confirm').value){note('Use um usuário de 3 a 24 caracteres (sem o prefixo reservado eldora_) e confirme uma senha de pelo menos 6 caracteres.');return;}
         }
         busy=true;note('Validando identidade…');
         try{
@@ -62,6 +62,7 @@
     }
     window.portalScreen=next=>{
         screen=next;
+        note('');
         const create=next==='create',provider=next==='google'||create;
         document.getElementById('telegram-credentials').hidden=!(inTelegram&&create);
         document.getElementById('telegram-save-credentials').hidden=true;
@@ -72,6 +73,12 @@
         box.hidden=!provider;box.open=true;
         document.getElementById('portal-account-summary').textContent=create?(inTelegram?'Criar conta pelo Telegram':'Criar conta com Google'):(inTelegram?'Entrar pelo Telegram':'Entrar com Google');
         document.getElementById('portal-auth-state').textContent=create&&inTelegram?'Defina seu usuário e senha e confirme pelo Telegram.':create?'Confirme sua identidade e crie seu personagem. Não é necessário criar outra senha.':'Use a identidade já vinculada à sua conta Eldora.';
+        const telegramButton=document.getElementById('portal-telegram');
+        const telegramHint=document.getElementById('portal-telegram-hint');
+        telegramButton.hidden=!(inTelegram&&!status?.authenticated);
+        telegramButton.textContent=create?'Criar conta pelo Telegram':'Entrar com Telegram';
+        telegramHint.hidden=!(inTelegram&&!status?.authenticated);
+        telegramHint.textContent=create?'Depois de preencher usuário e senha, confirme a criação pelo Telegram.':'Entre automaticamente com a identidade Telegram deste aplicativo.';
         document.querySelectorAll('#portal-entry-tabs button').forEach((el,index)=>el.setAttribute('aria-pressed',String(create?index===1:index===0)));
     };
     document.getElementById('telegram-save-credentials').onclick=async()=>{
@@ -90,7 +97,7 @@
     document.getElementById('portal-logout').onclick=async()=>{try{await post('/api/auth/logout',{});location.reload();}catch(e){note(e.message);}};
     window.portalSelect=id=>post('/api/auth/select',{character_id:id});
     // Remove cópias antigas de senhas, preservando os dados dos personagens no servidor.
-    localStorage.removeItem('eldora_contas_salvas');
+    try{localStorage.removeItem('eldora_contas_salvas');}catch(_){}
     window.portalAuthReady=window.portalRefresh().then(data=>{
         document.getElementById('tela-registro-conta').style.display='none';
         if(data.authenticated)window.portalAccept(data);

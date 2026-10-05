@@ -39,7 +39,7 @@ Conta nova: confirma Google (navegador) ou Telegram (Mini App), recebe identific
 
 Conta antiga sem Google: pode entrar com usuário/senha e vincular Google depois. Ao vincular, acesso posterior por senha é recusado no servidor; o hash antigo é preservado, sem ser usado para liberar acesso web. Google e Telegram verificado continuam válidos.
 
-Dentro do Telegram não carrega Google Identity Services nem mostra botão Google. Ao entrar por senha em conta antiga ainda sem Google, initData validado pode vincular esse Telegram, desde que não pertença a outra conta. Nunca adota telegram_id legado sem essa prova. Contas já vinculadas ao Google devem usar Google no navegador ou Telegram previamente verificado; não une contas automaticamente.
+Dentro do Telegram não carrega Google Identity Services. Entrar com usuário e senha não vincula automaticamente a identidade Telegram; o login nativo só entra na conta que já pertence àquele Telegram verificado. Nunca adota telegram_id legado sem essa prova. Contas já vinculadas ao Google usam Google no navegador ou a identidade Telegram previamente vinculada; não une contas automaticamente.
 
 Painel de vinculação some após vincular Google. Sair / trocar conta permanece visível. Sessões anteriormente abertas mantêm sua validade até sair/expirar.
 
@@ -48,3 +48,9 @@ Painel de vinculação some após vincular Google. Sair / trocar conta permanece
 Cadastro novo pelo Telegram exige usuário e senha (com confirmação na interface) antes de criar personagem. A assinatura Telegram continua validada no servidor. Google permanece sem senha adicional. O usuário escolhido fica em login_alias, com índice único, sem alterar a chave interna username que liga os personagens. Login por senha aceita esse alias no navegador mesmo sem Telegram, para contas ainda sem Google vinculado.
 
 Contas Telegram criadas anteriormente sem senha mostram formulário para Salvar meu acesso. Endpoint exige sessão, CSRF e prova Telegram assinada correspondente à conta. Só configura credenciais ausentes; não substitui senhas existentes. Reinstalar Telegram mantendo a mesma identidade não cria outra conta. Perder acesso ao Telegram antes de configurar credenciais ainda exige recuperação da conta; esta mudança não recupera automaticamente um número perdido.
+
+## Ajustes do fluxo de entrada
+
+No Mini App, Entrar oferece tanto acesso direto pela identidade Telegram validada quanto usuário e senha como recuperação. Criar conta pelo Telegram exige usuário e senha com pelo menos seis caracteres na senha; nomes numéricos de seis dígitos continuam válidos. No navegador, a conta antiga aceita login por username ou login_alias, e a nova conta Google segue direto para criação do personagem. A aba Entrar abre o formulário de senha; Criar conta abre o cadastro do provedor.
+
+Manter minha conta conectada controla a duração do cookie de sessão do servidor. O navegador pode lembrar apenas o nome do usuário; senhas locais antigas são apagadas e nunca são gravadas novamente. A opção Mostrar senha e os controles de som funcionam mesmo quando o armazenamento local está indisponível.

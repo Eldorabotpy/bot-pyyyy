@@ -18,10 +18,11 @@
     document.getElementById('login-password')?.addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();window.realizarLogin();}});
     const music=new Audio('https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/game_sons/regioes/capital.mp3');
     music.loop=true;music.volume=.2;
-    const sound=document.getElementById('portal-sound');let enabled=localStorage.getItem('eldora_portal_music')!=='off',started=false;
+    const sound=document.getElementById('portal-sound');let enabled=true,started=false;
+    try{enabled=localStorage.getItem('eldora_portal_music')!=='off';}catch(_){}
     const label=()=>{sound.textContent=started?'Silenciar música':'Ativar música';sound.setAttribute('aria-pressed',String(started));};
     const startMusic=()=>{if(!enabled||document.hidden)return;try{music.play().then(()=>{started=true;label();}).catch(()=>{started=false;label();});}catch(_){}};
-    sound.addEventListener('click',()=>{if(started){enabled=false;started=false;music.pause();}else{enabled=true;startMusic();}localStorage.setItem('eldora_portal_music',enabled?'on':'off');label();});
+    sound.addEventListener('click',()=>{if(started){enabled=false;started=false;music.pause();}else{enabled=true;startMusic();}try{localStorage.setItem('eldora_portal_music',enabled?'on':'off');}catch(_){}label();});
     document.addEventListener('pointerdown',event=>{if(event.target!==sound&&!started)startMusic();},{passive:true});
     document.addEventListener('visibilitychange',()=>{if(document.hidden){music.pause();started=false;label();}else startMusic();});
     window.addEventListener('pagehide',()=>music.pause());

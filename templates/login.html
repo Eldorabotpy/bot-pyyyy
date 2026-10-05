@@ -153,100 +153,6 @@
             transition: background-color 9999s ease-out 0s;
         }
 
-        #contas-salvas-box {
-            width: 100%;
-            margin-bottom: 10px;
-            display: none;
-        }
-
-        .contas-salvas-titulo {
-            color: #d4af37;
-            font-size: 0.62em;
-            letter-spacing: 1px;
-            margin: 0 0 5px 5px;
-        }
-
-        #lista-contas-salvas {
-            width: 100%;
-            max-height: 135px;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
-            padding-right: 3px;
-            box-sizing: border-box;
-        }
-
-        #lista-contas-salvas::-webkit-scrollbar {
-            width: 5px;
-        }
-
-        #lista-contas-salvas::-webkit-scrollbar-thumb {
-            background: #d4af37;
-            border-radius: 10px;
-        }
-
-        .conta-salva {
-            width: 100%;
-            min-height: 34px;
-            padding: 4px 7px 4px 10px;
-            box-sizing: border-box;
-
-            display: flex;
-            align-items: center;
-            gap: 7px;
-
-            background: rgba(15, 7, 27, 0.92);
-            border: 1px solid rgba(212, 175, 55, 0.55);
-            border-radius: 5px;
-
-            color: #ecf0f1;
-            cursor: pointer;
-        }
-
-        .conta-salva:hover {
-            background: rgba(212, 175, 55, 0.13);
-        }
-
-        .conta-salva-nome {
-            flex: 1;
-            min-width: 0;
-
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-
-            font-family: 'Georgia', serif;
-            font-size: 0.85em;
-            font-weight: bold;
-        }
-
-        .conta-salva-ultima {
-            padding: 2px 5px;
-            border-radius: 4px;
-
-            background: #d4af37;
-            color: #3b2400;
-
-            font-size: 0.48em;
-            font-weight: 900;
-        }
-
-        .conta-salva-remover {
-            width: 24px;
-            height: 24px;
-
-            padding: 0;
-            border: none;
-            border-radius: 4px;
-
-            background: rgba(120, 25, 25, 0.55);
-            color: #ffb4b4;
-
-            font-weight: bold;
-            cursor: pointer;
-        }
-
         .salvar-conta-opcao {
             width: 100%;
             margin: 4px 0 2px;
@@ -283,7 +189,7 @@
     
     <link rel="stylesheet" href="/static/css/dialogos_eldora.css?v=1">
     <script src="/static/js/dialogos_eldora.js?v=1"></script>
-<link rel="stylesheet" href="/static/css/portal.css?v=3">
+<link rel="stylesheet" href="/static/css/portal.css?v=4">
 </head>
 <body>
     
@@ -319,16 +225,12 @@
                 <select hidden id="portal-auth-mode" aria-label="Entrar, criar ou vincular conta" style="width:100%;min-height:44px;margin-bottom:12px"><option value="login">Entrar em conta vinculada</option></select>
                 <div id="portal-google" style="display:flex;justify-content:center"></div>
                 <p id="portal-google-note"></p>
-                <button id="portal-telegram" type="button" class="btn-new" hidden>Continuar com Telegram</button>
                 <p id="portal-auth-message" role="status" aria-live="polite"></p>
             </div></details>
+            <p id="portal-telegram-hint" class="portal-divider" hidden></p>
+            <button id="portal-telegram" type="button" class="btn-new" hidden>Continuar com Telegram</button>
             <!-- ETAPA 1: TELA LOGIN DA CONTA MESTRA -->
             <div id="tela-login" style="width: 100%;"><p class="portal-divider">Já tem uma conta? Entre com sua senha</p>
-
-                <div id="contas-salvas-box">
-                    <div class="contas-salvas-titulo">CONTAS SALVAS</div>
-                    <div id="lista-contas-salvas"></div>
-                </div>
 
                 <div class="input-container">
                     <label>CONTA (USUÁRIO)</label>
@@ -419,122 +321,20 @@
         let contaAtiva = null;
         const escapePortal=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
-        // ==========================================
-        // 💾 CONTAS SALVAS PARA TESTES
-        // ==========================================
-
-        const CHAVE_CONTAS_SALVAS = "eldora_contas_salvas";
         const CHAVE_ULTIMA_CONTA = "eldora_ultima_conta";
+        // Migra o formulário antigo: remove credenciais guardadas e mantém somente o usuário.
+        try {
+            localStorage.removeItem("eldora_contas_salvas");
+            const ultimoUsuario = localStorage.getItem(CHAVE_ULTIMA_CONTA);
+            if (ultimoUsuario) document.getElementById("login-username").value = ultimoUsuario;
+        } catch (_) {}
 
-        function obterContasSalvas() {
+        function lembrarUsuario(username, manterConectada) {
             try {
-                const dados = JSON.parse(
-                    localStorage.getItem(CHAVE_CONTAS_SALVAS) || "[]"
-                );
-
-                return Array.isArray(dados) ? dados : [];
-            } catch (e) {
-                return [];
-            }
-        }
-
-        function salvarContaLocal(username) {
-            localStorage.removeItem(CHAVE_CONTAS_SALVAS);
-            localStorage.setItem(CHAVE_ULTIMA_CONTA, username);
-        }
-
-        function removerContaSalva(username) {
-            let contas = obterContasSalvas();
-
-            contas = contas.filter(
-                c => c.username.toLowerCase() !== username.toLowerCase()
-            );
-
-            localStorage.setItem(
-                CHAVE_CONTAS_SALVAS,
-                JSON.stringify(contas)
-            );
-
-            if (
-                localStorage.getItem(CHAVE_ULTIMA_CONTA)?.toLowerCase() ===
-                username.toLowerCase()
-            ) {
-                localStorage.removeItem(CHAVE_ULTIMA_CONTA);
-            }
-
-            renderizarContasSalvas();
-        }
-
-        window.entrarComContaSalva = function(username, password) {
-            document.getElementById("login-username").value = username;
-            document.getElementById("login-password").value = password;
-
-            realizarLogin();
-        };
-
-        function renderizarContasSalvas() {
-            const box = document.getElementById("contas-salvas-box");
-            const lista = document.getElementById("lista-contas-salvas");
-
-            if (!box || !lista) return;
-
-            const contas = obterContasSalvas();
-            const ultima = localStorage.getItem(CHAVE_ULTIMA_CONTA);
-
-            lista.innerHTML = "";
-
-            if (contas.length === 0) {
-                box.style.display = "none";
-                return;
-            }
-
-            box.style.display = "block";
-
-            contas
-                .sort((a, b) => {
-                    if (a.username === ultima) return -1;
-                    if (b.username === ultima) return 1;
-
-                    return a.username.localeCompare(b.username);
-                })
-                .forEach(conta => {
-
-                    const item = document.createElement("div");
-                    item.className = "conta-salva";
-
-                    const nome = document.createElement("div");
-                    nome.className = "conta-salva-nome";
-                    nome.textContent = conta.username;
-
-                    item.appendChild(nome);
-
-                    if (conta.username === ultima) {
-                        const badge = document.createElement("span");
-                        badge.className = "conta-salva-ultima";
-                        badge.textContent = "ÚLTIMA";
-                        item.appendChild(badge);
-                    }
-
-                    const remover = document.createElement("button");
-                    remover.type = "button";
-                    remover.className = "conta-salva-remover";
-                    remover.textContent = "×";
-
-                    remover.onclick = function(event) {
-                        event.stopPropagation();
-                        removerContaSalva(conta.username);
-                    };
-
-                    item.onclick = function() {
-                        entrarComContaSalva(
-                            conta.username,
-                            conta.password
-                        );
-                    };
-
-                    item.appendChild(remover);
-                    lista.appendChild(item);
-                });
+                localStorage.removeItem("eldora_contas_salvas");
+                if (manterConectada) localStorage.setItem(CHAVE_ULTIMA_CONTA, username);
+                else localStorage.removeItem(CHAVE_ULTIMA_CONTA);
+            } catch (_) {}
         }
 
         // AÇÃO: O JOGADOR CLICOU NO PERSONAGEM PARA JOGAR
@@ -595,7 +395,7 @@
                 const res = await fetch('/api/portal/login', {
                     method: 'POST',
                     headers: window.portalAuthHeaders(),
-                    body: JSON.stringify({ username: user, password: pass, remember: document.getElementById('login-salvar-conta').checked, init_data: window.Telegram?.WebApp?.initData || '' })
+                    body: JSON.stringify({ username: user, password: pass, remember: document.getElementById('login-salvar-conta').checked })
                 });
                 const data = await res.json();
                 
@@ -604,19 +404,7 @@
                     await window.portalRefresh();
                     contaAtiva = data.username || user;
 
-                    const salvarConta =
-                        document.getElementById("login-salvar-conta")?.checked;
-
-                    if (salvarConta) {
-                        salvarContaLocal(user, pass);
-                    } else {
-                        localStorage.setItem(
-                            CHAVE_ULTIMA_CONTA,
-                            user
-                        );
-
-                        renderizarContasSalvas();
-                    }
+                    lembrarUsuario(user, document.getElementById("login-salvar-conta")?.checked === true);
                     document.getElementById('tela-login').style.display = 'none';
                     
                     // Vai para a etapa 2: Mostrar os personagens
@@ -783,13 +571,9 @@
             mostrarAviso('CRIAR CONTA', 'Escolha Criar nova conta no painel Conta Eldora e continue com Google ou Telegram.');
         };
 
-                // ==========================================
-        // INICIALIZA CONTAS SALVAS
-        // ==========================================
-
         // A inicialização das telas pertence ao portal_auth.js.
     </script>
 <script src="/static/js/portal_controls.js?v=2"></script>
-<script src="/static/js/portal_auth.js?v=8"></script>
+<script src="/static/js/portal_auth.js?v=9"></script>
 </body>
 </html>

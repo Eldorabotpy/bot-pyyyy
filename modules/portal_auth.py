@@ -15,6 +15,10 @@ from pymongo.errors import DuplicateKeyError
 
 portal_auth_bp = Blueprint('portal_auth', __name__)
 
+
+class AccountInputError(ValueError):
+    """Erro claro de validação que pode ser mostrado no formulário."""
+
 # Identificador público do aplicativo Web; não é um segredo nem uma senha.
 DEFAULT_GOOGLE_CLIENT_ID = '16919820429-j7oc4nsbu759h83qkl9i9ngj1vengsvt.apps.googleusercontent.com'
 
@@ -166,6 +170,8 @@ def provider_login(provider):
         return jsonify(account_payload(account))
     except ImportError:
         return jsonify(erro='Dependência de login não instalada no servidor.'), 503
+    except AccountInputError as exc:
+        return jsonify(erro=str(exc)), 400
     except DuplicateKeyError:
         return jsonify(erro='Identidade já vinculada. Entre novamente; não foi criada outra vinculação.'), 409
     except (ValueError, TypeError, KeyError):
@@ -173,16 +179,19 @@ def provider_login(provider):
         return jsonify(erro='Não foi possível validar ou vincular. Entre novamente; confira se a identidade já pertence a outra conta.'), 400
 
 
-def telegram_credentials(data, col):
+def telegram_credentials(data, col, exclude_account_id=None):
     from werkzeug.security import generate_password_hash
     alias = str(data.get('username','')).strip().lower()
     password = data.get('password','')
     if not re.fullmatch(r'[a-z0-9_]{3,24}',alias) or alias.startswith('eldora_'):
-        raise ValueError('Use 3 a 24 letras, números ou sublinhado. O prefixo eldora_ é reservado.')
+        raise AccountInputError('Use 3 a 24 letras, números ou sublinhado. O prefixo eldora_ é reservado.')
     if not isinstance(password,str) or not 6 <= len(password) <= 128:
-        raise ValueError('A senha precisa ter de 6 a 128 caracteres.')
-    if col.find_one({'$or':[{'username':alias},{'login_alias':alias}]}):
-        raise ValueError('Este usuário já está em uso.')
+        raise AccountInputError('A senha precisa ter de 6 a 128 caracteres.')
+    conflict_query = {'$or':[{'username':alias},{'login_alias':alias}]}
+    if exclude_account_id is not None:
+        conflict_query = {'$and':[conflict_query, {'_id':{'$ne':exclude_account_id}}]}
+    if col.find_one(conflict_query):
+        raise AccountInputError('Este usuário já está em uso. Escolha outro nome.')
     return {'login_alias':alias, 'password_hash':generate_password_hash(password)}
 
 
@@ -200,7 +209,7 @@ def set_telegram_credentials():
         if tid!=account.get('telegram_verified_id'):
             return jsonify(erro='Este Telegram não corresponde à conta.'), 403
         col=accounts()
-        credentials=telegram_credentials(data,col)
+        credentials=telegram_credentials(data,col,exclude_account_id=account['_id'])
         updated=col.update_one({'_id':account['_id'],'password_hash':{'$exists':False}}, {'$set':credentials})
         if updated.matched_count!=1:
             return jsonify(erro='As credenciais já foram configuradas. Entre novamente.'), 409
