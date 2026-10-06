@@ -9,9 +9,16 @@
 .coliseu-mode-card,.coliseu-event-card{padding:15px;border:1px solid #3b4b64;border-radius:13px;background:linear-gradient(110deg,#1b293b,#121b2b);margin:10px 0}
 .coliseu-mode-card h3,.coliseu-event-card h3,.coliseu-board h3{margin:0 0 5px;color:#ead39d;font:700 15px Cinzel,Georgia,serif}
 .coliseu-mode-card p,.coliseu-event-card p{margin:0;color:#b6c3d7;font:12px/1.5 Arial,sans-serif}
-.coliseu-mode-card{display:grid;grid-template-columns:1fr auto;gap:14px;align-items:center}
+.coliseu-mode-card{display:grid;grid-template-columns:1fr;gap:14px;align-items:center}
 .coliseu-mode-card button,.coliseu-event-card>button{border:1px solid #e5c879;border-radius:8px;background:linear-gradient(110deg,#ead394,#bd9950);color:#231b0e;padding:11px 15px;font-weight:700;cursor:pointer;white-space:nowrap}
 .coliseu-mode-card button:disabled,.coliseu-event-card>button:disabled{opacity:.48;cursor:not-allowed}
+.coliseu-opponents{list-style:none;padding:0;margin:8px 0 14px;display:grid;gap:8px}
+.coliseu-opponents li{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border:1px solid #35445a;border-radius:10px;background:#101928;color:#dce5f2;font:12px/1.4 Arial,sans-serif}
+.coliseu-opponent-info{display:grid;gap:3px;min-width:0}
+.coliseu-opponent-info strong{color:#f0d597;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.coliseu-opponent-info span{color:#aebbd0;font-size:11px}
+.coliseu-opponents button{flex:0 0 auto;border:1px solid #e5c879;border-radius:7px;background:linear-gradient(110deg,#ead394,#bd9950);color:#231b0e;padding:8px 10px;font-weight:700;cursor:pointer}
+.coliseu-opponents button:disabled{opacity:.5;cursor:not-allowed}
 .coliseu-event-card{border-color:#78633d;background:linear-gradient(110deg,#28283a,#171c2b)}
 .coliseu-event-heading{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:7px}
 .coliseu-event-heading>div{display:flex;align-items:center;gap:8px}

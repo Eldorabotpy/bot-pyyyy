@@ -3,9 +3,10 @@
     if (!modal) return;
 
     const statusText = document.getElementById('coliseu-status');
-    const rankedButton = document.getElementById('coliseu-queue-ranked');
     const eventButton = document.getElementById('coliseu-queue-event');
     const cancelButton = document.getElementById('coliseu-cancel-queue');
+    const refreshOpponentsButton = document.getElementById('coliseu-refresh-opponents');
+    const opponentList = document.getElementById('coliseu-opponent-list');
     let eventSchedule = null;
     let queuedMode = null;
 
@@ -94,7 +95,6 @@
                     ? `Temporada ${season.numero} encerrando após as partidas em andamento. Prêmios do Top 3: 50, 20 e 5 gemas.`
                     : `Temporada ${season.numero} · termina em ${fim} · Top 3: 50, 20 e 5 gemas.`;
             }
-            statusText.textContent = 'Ranqueado: disponível em qualquer região. Evento: entre na fila junto ao portão do Coliseu.';
         } catch (error) {
             eventSchedule = null;
             eventButton.disabled = true;
@@ -108,23 +108,79 @@
             statusText.textContent = 'Reconectando ao mapa. Tente novamente em alguns segundos.';
             return;
         }
-        if (mode === 'evento' && !eventSchedule?.active) {
+        if (mode !== 'evento') {
+            statusText.textContent = 'O PvP ranqueado usa espelhos. Busque um adversário na lista, mesmo que ele esteja offline.';
+            return;
+        }
+        if (!eventSchedule?.active) {
             statusText.textContent = 'O evento está fechado. Ele abre terça, quinta e sábado às 20h, horário de Brasília.';
             return;
         }
         queuedMode = mode;
-        rankedButton.disabled = true;
         eventButton.disabled = true;
         cancelButton.hidden = false;
         statusText.textContent = 'Entrando na fila…';
         connection.emit('buscarFilaColiseu', {modo: mode});
     }
 
+    function refreshOpponents() {
+        const connection = socket();
+        if (!connection?.connected) {
+            statusText.textContent = 'Conectando ao jogo. Aguarde alguns segundos e tente novamente.';
+            return;
+        }
+        opponentList.replaceChildren();
+        const loading = document.createElement('li');
+        loading.textContent = 'Buscando personagens próximos no Elo…';
+        opponentList.appendChild(loading);
+        refreshOpponentsButton.disabled = true;
+        statusText.textContent = 'Buscando personagens próximos no Elo…';
+        connection.emit('buscarAdversariosColiseu', {});
+    }
+
+    function renderOpponents(data) {
+        opponentList.replaceChildren();
+        const adversarios = Array.isArray(data?.adversarios) ? data.adversarios : [];
+        statusText.textContent = data?.mensagem || 'Lista de adversários atualizada.';
+        refreshOpponentsButton.disabled = false;
+        if (!adversarios.length) {
+            const empty = document.createElement('li');
+            empty.textContent = data?.mensagem || 'Nenhum adversário disponível no momento.';
+            opponentList.appendChild(empty);
+            return;
+        }
+        for (const opponent of adversarios) {
+            const row = document.createElement('li');
+            const info = document.createElement('div');
+            info.className = 'coliseu-opponent-info';
+            const name = document.createElement('strong');
+            name.textContent = opponent.nome || 'Herói';
+            const detail = document.createElement('span');
+            detail.textContent = `Nv. ${showValue(opponent.level)} · ${showValue(opponent.elo)} · ${showValue(opponent.pontos)} Elo`;
+            const attack = document.createElement('button');
+            attack.type = 'button';
+            attack.textContent = 'Atacar espelho';
+            attack.dataset.opponentId = opponent.id;
+            attack.addEventListener('click', () => {
+                const connection = socket();
+                if (!connection?.connected) {
+                    statusText.textContent = 'A conexão com o jogo foi perdida. Reconecte e tente novamente.';
+                    return;
+                }
+                opponentList.querySelectorAll('button').forEach(button => { button.disabled = true; });
+                statusText.textContent = `Preparando o espelho de ${name.textContent}…`;
+                connection.emit('atacarEspelhoColiseu', {oponente_id: attack.dataset.opponentId});
+            });
+            info.append(name, detail);
+            row.append(info, attack);
+            opponentList.appendChild(row);
+        }
+    }
+
     function leaveQueue() {
         const connection = socket();
         if (queuedMode && connection?.connected) connection.emit('sairFilaColiseu', {});
         queuedMode = null;
-        rankedButton.disabled = false;
         eventButton.disabled = !eventSchedule?.active;
         cancelButton.hidden = true;
     }
@@ -135,7 +191,7 @@
         modal.setAttribute('aria-hidden', 'false');
         window.__coliseuPvPAb = true;
         document.getElementById('coliseu-close').focus();
-        await refreshStatus();
+        await Promise.all([refreshStatus(), Promise.resolve(refreshOpponents())]);
     };
 
     window.fecharColiseuPvP = () => {
@@ -146,8 +202,8 @@
         if (typeof window.mostrarMenuGlobalEldora === 'function') window.mostrarMenuGlobalEldora();
     };
 
-    rankedButton.addEventListener('click', () => enterQueue('ranqueado'));
     eventButton.addEventListener('click', () => enterQueue('evento'));
+    refreshOpponentsButton.addEventListener('click', refreshOpponents);
     cancelButton.addEventListener('click', () => {
         leaveQueue();
         statusText.textContent = 'Busca cancelada.';
@@ -161,16 +217,20 @@
     });
 
     if (socket()) {
+        socket().on('coliseuAdversarios', renderOpponents);
+        socket().on('coliseuErro', data => {
+            statusText.textContent = data?.mensagem || 'Não foi possível iniciar essa batalha.';
+            refreshOpponentsButton.disabled = false;
+            opponentList.querySelectorAll('button').forEach(button => { button.disabled = false; });
+        });
         socket().on('coliseuFila', data => {
             statusText.textContent = data.mensagem || 'Fila atualizada.';
             if (data.estado === 'aguardando') {
                 queuedMode = data.modo || queuedMode;
-                rankedButton.disabled = true;
                 eventButton.disabled = true;
                 cancelButton.hidden = false;
             } else if (data.estado === 'cancelada' || data.estado === 'erro') {
                 queuedMode = null;
-                rankedButton.disabled = false;
                 eventButton.disabled = !eventSchedule?.active;
                 cancelButton.hidden = true;
             } else if (data.estado === 'iniciada') {

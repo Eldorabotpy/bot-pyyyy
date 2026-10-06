@@ -4,15 +4,16 @@
         <div class="coliseu-emblem" aria-hidden="true">⚔️</div>
         <p class="coliseu-kicker">ARENA REAL</p>
         <h2 id="coliseu-title">Coliseu de Eldora</h2>
-        <p class="coliseu-intro">O ranking inclui todas as contas; partidas ao vivo precisam de dois jogadores conectados.</p>
+        <p class="coliseu-intro">O ranking inclui os personagens mesmo offline. Escolha um adversário salvo e lute contra o espelho controlado pelo jogo.</p>
 
         <div class="coliseu-mode-card">
             <div>
                 <h3>PvP ranqueado</h3>
-                <p>Partidas 1 contra 1. O pareamento procura Elo próximo e amplia a faixa conforme a espera.</p>
+                <p>Sem fila e sem convite: a lista usa personagens do reino, mesmo offline. Você luta contra a defesa espelhada.</p>
             </div>
-            <button id="coliseu-queue-ranked" type="button">Buscar partida</button>
+            <button id="coliseu-refresh-opponents" type="button">Buscar adversários</button>
         </div>
+        <ol id="coliseu-opponent-list" class="coliseu-opponents"><li>Buscando adversários…</li></ol>
 
         <div class="coliseu-event-card">
             <div class="coliseu-event-heading">
@@ -37,7 +38,7 @@
 
         <p id="coliseu-season-status" class="coliseu-season-status">Temporada ranqueada de 35 dias · Top 3 recebe 50, 20 e 5 gemas.</p>
 
-        <p id="coliseu-status" class="coliseu-status" role="status" aria-live="polite">PvP ranqueado disponível em qualquer região; o evento exige presença no portão do Coliseu.</p>
+        <p id="coliseu-status" class="coliseu-status" role="status" aria-live="polite">PvP ranqueado enfrenta espelhos salvos. A fila fica apenas no evento, junto ao portão do Coliseu.</p>
         <button id="coliseu-cancel-queue" class="coliseu-cancel" type="button" hidden>Cancelar busca</button>
         <p class="coliseu-footnote">No fim de cada evento, o 1º lugar recebe 10 gemas. No fim da temporada ranqueada: 50, 20 e 5 gemas para o Top 3.</p>
     </section>

@@ -2097,11 +2097,12 @@ def run_bot():
 # ⚔️ SISTEMA DE PVP (DUELOS 1V1)
 # ==============================================================================
 duelos_ativos = {} # Guarda o estado atual de cada duelo rolando no mapa
-filas_coliseu = {"ranqueado": [], "evento": []}
+filas_coliseu = {"evento": []}
 fila_coliseu_lock = Lock()
 resultado_coliseu_lock = Lock()
+duelo_espelho_coliseu_lock = Lock()
+espelhos_coliseu_ativos = set()
 fila_coliseu_evento_id = None
-fila_coliseu_temporada_numero = None
 fila_coliseu_entrada = {}
 COLISEU_ENTRADA_X = 4 * 32
 COLISEU_ENTRADA_Y = 35 * 32
@@ -2238,6 +2239,8 @@ def _registrar_resultado_coliseu(duelo, vencedor_sid):
                 upsert=True,
             )
             for i, participante in enumerate(participantes):
+                if participante.get("espelho"):
+                    continue
                 socketio.emit("coliseuResultado", {"modo": modo, "delta": resultados[i]["delta"], "pontos": resultados[i]["pontos"], "vitoria": venceu[i]}, to=participante["sid"])
             return
 
@@ -2269,6 +2272,10 @@ def _encerrar_duelo_coliseu_ao_desconectar(sid):
             _registrar_resultado_coliseu(duelo, vencedor["sid"])
         except Exception:
             app.logger.exception("Falha ao salvar resultado após desconexão no Coliseu")
+        if duelo.get("espelho"):
+            espelho_id = str(vencedor["db"].get("_id")) if vencedor.get("espelho") else str(perdedor["db"].get("_id"))
+            with duelo_espelho_coliseu_lock:
+                espelhos_coliseu_ativos.discard(espelho_id)
         if vencedor["sid"] in jogadores_online:
             jogadores_online[vencedor["sid"]]["em_combate"] = False
             socketio.emit("animarTurnoPvP", {
@@ -2283,19 +2290,199 @@ def _encerrar_duelo_coliseu_ao_desconectar(sid):
         duelos_ativos.pop(duelo_id, None)
 
 
+def _preparar_personagem_temporada(char_id, season_number):
+    """Garante que todo personagem usado no ranqueado começa na temporada atual."""
+    oid = ObjectId(str(char_id))
+    users_collection.update_one(
+        {"_id": oid, "pvp_season_number": {"$ne": int(season_number)}},
+        {"$set": {
+            "pvp_points": 0,
+            "pvp_season_number": int(season_number),
+            "pvp_season_matches": 0,
+            "pvp_season_wins": 0,
+            "pvp_season_losses": 0,
+        }},
+    )
+    return users_collection.find_one({"_id": oid})
+
+
+def _skin_personagem_salvo(player):
+    skin = player.get("equipped_skin") or player.get("skin_equipada")
+    if skin and skin != "padrao":
+        return str(skin)
+    classe = str(player.get("class") or player.get("class_key") or "aventureiro").strip().lower()
+    if classe in ("aprendiz", "aventureiro"):
+        classe = "aventureiro"
+    genero = "f" if str(player.get("gender", "masculino")).lower() == "feminino" else "m"
+    return f"{classe}_{genero}"
+
+
+@socketio.on("buscarAdversariosColiseu")
+def handle_buscar_adversarios_coliseu(_data=None):
+    sid = request.sid
+    info = jogadores_online.get(sid)
+    if not info:
+        socketio.emit("coliseuAdversarios", {"adversarios": [], "mensagem": "Entre no jogo para buscar adversários."}, to=sid)
+        return
+    if info.get("em_combate"):
+        socketio.emit("coliseuAdversarios", {"adversarios": [], "mensagem": "Termine o combate atual antes de buscar adversários."}, to=sid)
+        return
+    char_id = str(info.get("char_id", ""))
+    if not ObjectId.is_valid(char_id):
+        socketio.emit("coliseuAdversarios", {"adversarios": [], "mensagem": "Não consegui validar seu personagem."}, to=sid)
+        return
+
+    season = ensure_active_season(users_collection, duelos_ativos)
+    if not season or season.get("status") != "ativa":
+        socketio.emit("coliseuAdversarios", {"adversarios": [], "mensagem": "A temporada está encerrando partidas em andamento. Tente novamente em instantes."}, to=sid)
+        return
+    season_number = int(season["numero"])
+    player = _preparar_personagem_temporada(char_id, season_number)
+    if not player:
+        socketio.emit("coliseuAdversarios", {"adversarios": [], "mensagem": "Personagem não encontrado."}, to=sid)
+        return
+
+    my_points = max(0, int(player.get("pvp_points", 0) or 0))
+    try:
+        from pvp.pvp_utils import get_player_elo
+        candidates = list(users_collection.find(
+            {"character_name": {"$exists": True, "$ne": ""}, "_id": {"$ne": ObjectId(char_id)}},
+            {"character_name": 1, "level": 1, "pvp_points": 1, "pvp_season_number": 1},
+        ))
+        with duelo_espelho_coliseu_lock:
+            espelhos_ocupados = set(espelhos_coliseu_ativos)
+        candidates = [candidate for candidate in candidates if str(candidate.get("_id")) not in espelhos_ocupados]
+        candidates.sort(key=lambda candidate: (
+            abs(max(0, int(candidate.get("pvp_points", 0) or 0)) - my_points),
+            str(candidate.get("character_name", "")).casefold(),
+        ))
+        if candidates:
+            closest = candidates[:min(20, len(candidates))]
+            pool = [candidate for candidate in closest if abs(int(candidate.get("pvp_points", 0) or 0) - my_points) <= 400]
+            if len(pool) < min(5, len(closest)):
+                pool = [candidate for candidate in closest if abs(int(candidate.get("pvp_points", 0) or 0) - my_points) <= 1000]
+            if len(pool) < min(5, len(closest)):
+                pool = closest
+            chosen = random.sample(pool, min(5, len(pool)))
+        else:
+            chosen = []
+        adversarios = [{
+            "id": str(candidate["_id"]),
+            "nome": candidate.get("character_name", "Aventureiro"),
+            "level": int(candidate.get("level", 1) or 1),
+            "pontos": max(0, int(candidate.get("pvp_points", 0) or 0)),
+            "elo": get_player_elo(max(0, int(candidate.get("pvp_points", 0) or 0))),
+        } for candidate in chosen]
+    except Exception:
+        app.logger.exception("Falha ao buscar espelhos do Coliseu")
+        socketio.emit("coliseuAdversarios", {"adversarios": [], "mensagem": "Não foi possível buscar adversários agora."}, to=sid)
+        return
+
+    socketio.emit("coliseuAdversarios", {
+        "adversarios": adversarios,
+        "mensagem": "Escolha um herói salvo no reino. A luta usa a defesa dele mesmo se estiver offline." if adversarios else "Ainda não há outro personagem salvo para enfrentar.",
+    }, to=sid)
+
+
+@socketio.on("atacarEspelhoColiseu")
+def handle_atacar_espelho_coliseu(data):
+    sid = request.sid
+    info = jogadores_online.get(sid)
+    target_id = str((data or {}).get("oponente_id", ""))
+    if not info:
+        socketio.emit("coliseuErro", {"mensagem": "Entre no jogo para iniciar o PvP ranqueado."}, to=sid)
+        return
+    if info.get("em_combate"):
+        socketio.emit("coliseuErro", {"mensagem": "Você já está em combate."}, to=sid)
+        return
+    my_id = str(info.get("char_id", ""))
+    if not ObjectId.is_valid(my_id) or not ObjectId.is_valid(target_id) or my_id == target_id:
+        socketio.emit("coliseuErro", {"mensagem": "Adversário inválido. Atualize a lista e tente de novo."}, to=sid)
+        return
+
+    season = ensure_active_season(users_collection, duelos_ativos)
+    if not season or season.get("status") != "ativa":
+        socketio.emit("coliseuErro", {"mensagem": "A temporada está encerrando as partidas em andamento. Tente novamente em instantes."}, to=sid)
+        return
+    season_number = int(season["numero"])
+    player_a = _preparar_personagem_temporada(my_id, season_number)
+    player_b = _preparar_personagem_temporada(target_id, season_number)
+    if not player_a or not player_b or not player_b.get("character_name"):
+        socketio.emit("coliseuErro", {"mensagem": "Esse personagem não está mais disponível. Atualize a lista."}, to=sid)
+        return
+
+    try:
+        stats_a = get_combat_stats_sync(player_a)
+        stats_b = get_combat_stats_sync(player_b)
+        player_a = aplicar_combat_stats_no_player(player_a, stats_a)
+        player_b = aplicar_combat_stats_no_player(player_b, stats_b)
+        # Espelhos representam a defesa completa salva, não o HP que o dono deixou ao sair.
+        stats_b["current_hp"] = stats_b.get("max_hp", 1)
+        stats_b["current_mp"] = stats_b.get("max_mana", 10)
+        player_b["current_hp"] = stats_b["current_hp"]
+        player_b["current_mp"] = stats_b["current_mp"]
+        hp_a = max(1, int(stats_a.get("current_hp", stats_a.get("max_hp", 1))))
+        hp_b = max(1, int(stats_b.get("max_hp", 1)))
+        duel_id = f"coliseu_espelho_{uuid4().hex}"
+        mirror_sid = f"espelho:{target_id}:{uuid4().hex}"
+        with duelo_espelho_coliseu_lock:
+            info_atual = jogadores_online.get(sid)
+            if not info_atual or info_atual.get("em_combate") or target_id in espelhos_coliseu_ativos:
+                socketio.emit("coliseuErro", {"mensagem": "Esse espelho acabou de entrar em outra batalha. Busque adversários novamente."}, to=sid)
+                return
+            info_atual["em_combate"] = True
+            espelhos_coliseu_ativos.add(target_id)
+            duelos_ativos[duel_id] = {
+                "id": duel_id,
+                "modo": "ranqueado",
+                "espelho": True,
+                "season_number": season_number,
+                "jogador_a": {"sid": sid, "db": player_a, "stats": stats_a, "hp": hp_a, "mp": stats_a.get("current_mp", stats_a.get("max_mana", 50))},
+                "jogador_b": {"sid": mirror_sid, "db": player_b, "stats": stats_b, "hp": hp_b, "mp": stats_b.get("current_mp", stats_b.get("max_mana", 50)), "espelho": True},
+                "turno_de": sid,
+            }
+        socketio.emit("iniciarArenaPvP", {
+            "duelo_id": duel_id,
+            "regiao": info.get("regiao", "capital_eldora"),
+            "oponente_nome": player_b.get("character_name", "Herói"),
+            "oponente_skin": _skin_personagem_salvo(player_b),
+            "oponente_level": player_b.get("level", 1),
+            "oponente_hp": hp_b,
+            "oponente_max_hp": stats_b.get("max_hp", 1),
+            "meu_level": player_a.get("level", 1),
+            "meu_hp": hp_a,
+            "meu_max_hp": stats_a.get("max_hp", 1),
+            "meu_mp": stats_a.get("current_mp", stats_a.get("max_mana", 50)),
+            "meu_max_mp": stats_a.get("max_mana", 50),
+            "minha_vez": True,
+            "modo_pvp": "ranqueado",
+            "espelho": True,
+        }, to=sid)
+    except Exception:
+        app.logger.exception("Falha ao iniciar luta contra espelho do Coliseu")
+        if sid in jogadores_online:
+            jogadores_online[sid]["em_combate"] = False
+        with duelo_espelho_coliseu_lock:
+            espelhos_coliseu_ativos.discard(target_id)
+        socketio.emit("coliseuErro", {"mensagem": "Não foi possível preparar o combate. Tente novamente."}, to=sid)
+
+
 @socketio.on("buscarFilaColiseu")
 def handle_buscar_fila_coliseu(data):
-    global fila_coliseu_evento_id, fila_coliseu_temporada_numero
+    global fila_coliseu_evento_id
     sid = request.sid
     modo = (data or {}).get("modo")
-    if modo not in ("ranqueado", "evento"):
+    if modo != "evento":
+        if modo == "ranqueado":
+            _emitir_fila_coliseu(sid, "erro", "O PvP ranqueado usa espelhos de personagens salvos. A fila existe apenas no evento.", modo)
+            return
         _emitir_fila_coliseu(sid, "erro", "Modalidade inválida.")
         return
     info = jogadores_online.get(sid)
     if not info:
-        _emitir_fila_coliseu(sid, "erro", "Entre no jogo para participar da fila PvP.", modo)
+        _emitir_fila_coliseu(sid, "erro", "Entre no jogo para participar da fila do evento.", modo)
         return
-    if modo == "evento" and (info.get("regiao") != "capital_eldora" or not _esta_no_portao_coliseu(info)):
+    if info.get("regiao") != "capital_eldora" or not _esta_no_portao_coliseu(info):
         _emitir_fila_coliseu(sid, "erro", "Aproxime-se do portão do Coliseu, na Capital de Eldora.", modo)
         return
     if info.get("em_combate"):
@@ -2309,45 +2496,17 @@ def handle_buscar_fila_coliseu(data):
         _emitir_fila_coliseu(sid, "erro", "Personagem não encontrado.", modo)
         return
 
-    event_id = None
-    season_number = None
-    season = None
-    if modo == "ranqueado":
-        season = ensure_active_season(users_collection, duelos_ativos)
-        if not season or season_is_expired(season) or season.get("status") != "ativa":
-            _emitir_fila_coliseu(sid, "erro", "A temporada está encerrando as últimas partidas. Tente novamente em instantes.", modo)
-            return
-        season_number = int(season["numero"])
-        users_collection.update_one(
-            {"_id": ObjectId(str(info["char_id"])), "pvp_season_number": {"$ne": season_number}},
-            {"$set": {
-                "pvp_points": 0,
-                "pvp_season_number": season_number,
-                "pvp_season_matches": 0,
-                "pvp_season_wins": 0,
-                "pvp_season_losses": 0,
-            }},
-        )
-        jogador = users_collection.find_one({"_id": ObjectId(str(info["char_id"]))}, {"pvp_points": 1}) or jogador
-    if modo == "evento":
-        agenda = get_event_status()
-        if not agenda.get("active"):
-            _emitir_fila_coliseu(sid, "erro", "O evento está fechado. Abre terça, quinta e sábado às 20h (Brasília).", modo)
-            return
-        event_id = agenda.get("event_id")
+    agenda = get_event_status()
+    if not agenda.get("active"):
+        _emitir_fila_coliseu(sid, "erro", "O evento está fechado. Abre terça, quinta e sábado às 20h (Brasília).", modo)
+        return
+    event_id = agenda.get("event_id")
 
     candidato = None
     filas_anteriores = []
     agora_mono = time.monotonic()
-    filas_temporada_anterior = []
     with fila_coliseu_lock:
-        if modo == "ranqueado" and fila_coliseu_temporada_numero != season_number:
-            filas_temporada_anterior = list(filas_coliseu["ranqueado"])
-            filas_coliseu["ranqueado"].clear()
-            for sid_antigo in filas_temporada_anterior:
-                fila_coliseu_entrada.pop(sid_antigo, None)
-            fila_coliseu_temporada_numero = season_number
-        if modo == "evento" and fila_coliseu_evento_id != event_id:
+        if fila_coliseu_evento_id != event_id:
             filas_anteriores = list(filas_coliseu["evento"])
             filas_coliseu["evento"].clear()
             for sid_antigo in filas_anteriores:
@@ -2362,7 +2521,7 @@ def handle_buscar_fila_coliseu(data):
             outro = jogadores_online.get(outro_sid)
             if not outro or outro.get("em_combate"):
                 continue
-            if modo == "evento" and (outro.get("regiao") != "capital_eldora" or not _esta_no_portao_coliseu(outro)):
+            if outro.get("regiao") != "capital_eldora" or not _esta_no_portao_coliseu(outro):
                 continue
             if str(outro.get("char_id")) == str(info.get("char_id")):
                 continue
@@ -2387,12 +2546,9 @@ def handle_buscar_fila_coliseu(data):
     for sid_antigo in filas_anteriores:
         if sid_antigo != sid:
             _emitir_fila_coliseu(sid_antigo, "erro", "A edição anterior do evento terminou. Entre novamente na próxima abertura.", "evento")
-    for sid_antigo in filas_temporada_anterior:
-        if sid_antigo != sid:
-            _emitir_fila_coliseu(sid_antigo, "erro", "A temporada mudou. Entre novamente na fila ranqueada.", "ranqueado")
 
     if candidato:
-        if not _iniciar_duelo_coliseu(candidato, sid, modo, event_id, season_number):
+        if not _iniciar_duelo_coliseu(candidato, sid, modo, event_id):
             _emitir_fila_coliseu(sid, "erro", "Não foi possível preparar a partida. Tente novamente.", modo)
             _emitir_fila_coliseu(candidato, "erro", "O adversário não pôde entrar na partida.", modo)
         return
@@ -2492,7 +2648,49 @@ def handle_acao_pvp(dados):
     if alvo['hp'] <= 0:
         vencedor_sid = atacante['sid']
 
-    proximo_turno_sid = alvo['sid'] if not vencedor_sid else None
+    if duelo.get("espelho") and not vencedor_sid:
+        # O espelho joga automaticamente depois da ação do jogador; os dois turnos
+        # seguem no mesmo pacote para evitar animações concorrentes no navegador.
+        espelho = duelo["jogador_b"]
+        heroi = duelo["jogador_a"]
+        espelho["db"], msgs_espelho = iniciar_turno(espelho["db"])
+        for mensagem in msgs_espelho:
+            log_turno.append({"autor_sid": espelho["sid"], "texto": mensagem, "dano": 0, "tipo_skill": "info", "anim_effect": ""})
+
+        try:
+            loop_espelho = asyncio.new_event_loop()
+            try:
+                resultado_espelho = loop_espelho.run_until_complete(processar_acao_combate(
+                    attacker_pdata=espelho["db"],
+                    attacker_stats=espelho["stats"],
+                    target_stats=heroi["stats"],
+                    skill_id=None,
+                    attacker_current_hp=espelho["hp"],
+                    attacker_current_mp=espelho["mp"],
+                ))
+            finally:
+                loop_espelho.close()
+        except Exception:
+            app.logger.exception("Falha na ação automática do espelho do Coliseu")
+            log_turno.append({"autor_sid": espelho["sid"], "texto": "O espelho perdeu a concentração e não conseguiu atacar.", "dano": 0, "tipo_skill": "info", "anim_effect": ""})
+            resultado_espelho = {"total_damage": 0, "log_messages": [], "attacker_mp_left": espelho["mp"]}
+
+        dano_espelho = max(0, int(resultado_espelho.get("total_damage", 0) or 0))
+        heroi["hp"] = max(0, heroi["hp"] - dano_espelho)
+        espelho["mp"] = resultado_espelho.get("attacker_mp_left", espelho["mp"])
+        mensagens_ataque = resultado_espelho.get("log_messages", [])
+        for indice, mensagem in enumerate(mensagens_ataque):
+            log_turno.append({
+                "autor_sid": espelho["sid"],
+                "texto": mensagem,
+                "dano": dano_espelho if indice == len(mensagens_ataque) - 1 else 0,
+                "anim_effect": resultado_espelho.get("anim_effect", ""),
+                "tipo_skill": resultado_espelho.get("tipo_skill", ""),
+            })
+        if heroi["hp"] <= 0:
+            vencedor_sid = espelho["sid"]
+
+    proximo_turno_sid = (duelo["jogador_a"]["sid"] if duelo.get("espelho") else alvo["sid"]) if not vencedor_sid else None
     if not vencedor_sid:
         duelo['turno_de'] = proximo_turno_sid
 
@@ -2507,12 +2705,16 @@ def handle_acao_pvp(dados):
     }
 
     emit('animarTurnoPvP', pacote_animacao, to=duelo['jogador_a']['sid'])
-    emit('animarTurnoPvP', pacote_animacao, to=duelo['jogador_b']['sid'])
+    if not duelo.get("espelho"):
+        emit('animarTurnoPvP', pacote_animacao, to=duelo['jogador_b']['sid'])
 
     if vencedor_sid:
         _registrar_resultado_coliseu(duelo, vencedor_sid)
         if duelo['jogador_a']['sid'] in jogadores_online: jogadores_online[duelo['jogador_a']['sid']]['em_combate'] = False
         if duelo['jogador_b']['sid'] in jogadores_online: jogadores_online[duelo['jogador_b']['sid']]['em_combate'] = False
+        if duelo.get("espelho"):
+            with duelo_espelho_coliseu_lock:
+                espelhos_coliseu_ativos.discard(str(duelo["jogador_b"]["db"].get("_id")))
         del duelos_ativos[duelo_id]
 
 # 👇 A ROTA QUE ESTAVA EM FALTA PARA A RAID! 👇
@@ -2600,13 +2802,12 @@ def loop_agendamento_invasao():
 
 def loop_agendamento_coliseu():
     """Fecha eventos e temporadas mesmo quando nenhum jogador abre o painel."""
-    global fila_coliseu_evento_id, fila_coliseu_temporada_numero
+    global fila_coliseu_evento_id
     while True:
         try:
             finalizar_eventos_encerrados(users_collection, duelos_ativos)
-            temporada = ensure_active_season(users_collection, duelos_ativos)
+            ensure_active_season(users_collection, duelos_ativos)
             filas_evento_encerradas = []
-            filas_temporada_encerrada = []
             with fila_coliseu_lock:
                 if not get_event_status().get("active") and filas_coliseu["evento"]:
                     filas_evento_encerradas = list(filas_coliseu["evento"])
@@ -2615,19 +2816,8 @@ def loop_agendamento_coliseu():
                         fila_coliseu_entrada.pop(sid_antigo, None)
                     fila_coliseu_evento_id = None
 
-                if temporada:
-                    numero = int(temporada["numero"])
-                    if temporada.get("status") != "ativa" or fila_coliseu_temporada_numero not in (None, numero):
-                        filas_temporada_encerrada = list(filas_coliseu["ranqueado"])
-                        filas_coliseu["ranqueado"].clear()
-                        for sid_antigo in filas_temporada_encerrada:
-                            fila_coliseu_entrada.pop(sid_antigo, None)
-                    fila_coliseu_temporada_numero = numero
-
             for sid_antigo in filas_evento_encerradas:
                 _emitir_fila_coliseu(sid_antigo, "erro", "O horário do evento terminou; a busca foi encerrada.", "evento")
-            for sid_antigo in filas_temporada_encerrada:
-                _emitir_fila_coliseu(sid_antigo, "erro", "A temporada encerrou; entre novamente após a abertura da próxima.", "ranqueado")
         except Exception:
             app.logger.exception("Falha no agendador do Coliseu PvP")
         time.sleep(30)
