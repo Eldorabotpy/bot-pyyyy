@@ -16,7 +16,13 @@ from pymongo import MongoClient
 from config import MONGO_CONNECTION_STRING
 from modules.database import initialize_database
 from modules.player.core import users_collection
-from pvp.coliseum_event import get_event_status
+from pvp.coliseum_event import get_event_status, get_ended_event_ids
+from pvp.coliseum_rewards import (
+    ensure_active_season,
+    finalizar_eventos_encerrados,
+    isoformat_utc,
+    season_is_expired,
+)
 from modules.webapp_api import webapp_bp
 from modules.game_data.skills import SKILL_DATA
 from modules.game_data.monsters import MONSTERS_DATA
@@ -173,6 +179,8 @@ def pagina_login():
 @app.get('/api/pvp/coliseu/status')
 def status_coliseu_pvp():
     agenda = get_event_status()
+    finalizar_eventos_encerrados(users_collection, duelos_ativos)
+    temporada = ensure_active_season(users_collection, duelos_ativos)
     ranking = []
     placar_evento = []
     try:
@@ -191,11 +199,22 @@ def status_coliseu_pvp():
                 "elo": get_player_elo(pontos),
             })
 
-        if agenda.get("event_id"):
-            eventos = users_collection.database["coliseu_evento_pvp"].find(
-                {"event_id": agenda["event_id"]},
-                {"nome": 1, "vitorias": 1, "partidas": 1},
-            ).sort([("vitorias", -1), ("partidas", -1)]).limit(5)
+        placar_event_id = agenda.get("event_id")
+        if not agenda.get("active"):
+            eventos_encerrados = get_ended_event_ids()
+            if eventos_encerrados:
+                placar_event_id = eventos_encerrados[0]
+        if placar_event_id:
+            eventos = list(users_collection.database["coliseu_evento_pvp"].find(
+                {"event_id": placar_event_id},
+                {"nome": 1, "vitorias": 1, "partidas": 1, "derrotas": 1},
+            ))
+            eventos.sort(key=lambda doc: (
+                -int(doc.get("vitorias", 0) or 0),
+                -(int(doc.get("vitorias", 0) or 0) / max(1, int(doc.get("partidas", 0) or 0))),
+                int(doc.get("derrotas", 0) or 0),
+                str(doc.get("nome", "")).casefold(),
+            ))
             placar_evento = [
                 {"posicao": i, "nome": doc.get("nome", "Herói"),
                  "vitorias": int(doc.get("vitorias", 0)),
@@ -207,6 +226,15 @@ def status_coliseu_pvp():
 
     return jsonify({
         "evento": agenda,
+        "event_id_placar": placar_event_id if "placar_event_id" in locals() else agenda.get("event_id"),
+        "temporada": {
+            "numero": temporada.get("numero"),
+            "inicio": isoformat_utc(temporada.get("inicio")),
+            "fim": isoformat_utc(temporada.get("fim")),
+            "status": temporada.get("status"),
+            "dias": 35,
+            "recompensas": {"1": 50, "2": 20, "3": 5},
+        } if temporada else None,
         "ranking": ranking,
         "placar_evento": placar_evento,
     })
@@ -2073,6 +2101,8 @@ filas_coliseu = {"ranqueado": [], "evento": []}
 fila_coliseu_lock = Lock()
 resultado_coliseu_lock = Lock()
 fila_coliseu_evento_id = None
+fila_coliseu_temporada_numero = None
+fila_coliseu_entrada = {}
 COLISEU_ENTRADA_X = 4 * 32
 COLISEU_ENTRADA_Y = 35 * 32
 COLISEU_RAIO_FILA = 150
@@ -2087,17 +2117,32 @@ def _esta_no_portao_coliseu(info):
     return math.hypot(x - COLISEU_ENTRADA_X, y - COLISEU_ENTRADA_Y) <= COLISEU_RAIO_FILA
 
 
+def _limite_elo_fila(segundos_esperando):
+    """Amplia a faixa de Elo com a espera e remove o limite após 90 segundos."""
+    if segundos_esperando < 15:
+        return 100
+    if segundos_esperando < 30:
+        return 250
+    if segundos_esperando < 60:
+        return 500
+    if segundos_esperando < 90:
+        return 1000
+    return float("inf")
+
+
 def _emitir_fila_coliseu(sid, estado, mensagem, modo=None):
     socketio.emit("coliseuFila", {"estado": estado, "mensagem": mensagem, "modo": modo}, to=sid)
 
 
-def _iniciar_duelo_coliseu(sid_a, sid_b, modo, event_id=None):
+def _iniciar_duelo_coliseu(sid_a, sid_b, modo, event_id=None, season_number=None):
     """Prepara um duelo do Coliseu com personagens e atributos lidos no servidor."""
     info_a = jogadores_online.get(sid_a)
     info_b = jogadores_online.get(sid_b)
     if not info_a or not info_b or info_a.get("em_combate") or info_b.get("em_combate"):
         return False
     if str(info_a.get("char_id")) == str(info_b.get("char_id")):
+        return False
+    if modo == "evento" and any(not _esta_no_portao_coliseu(info) for info in (info_a, info_b)):
         return False
     if not ObjectId.is_valid(str(info_a.get("char_id"))) or not ObjectId.is_valid(str(info_b.get("char_id"))):
         return False
@@ -2124,6 +2169,7 @@ def _iniciar_duelo_coliseu(sid_a, sid_b, modo, event_id=None):
         "id": duelo_id,
         "modo": modo,
         "event_id": event_id,
+        "season_number": season_number,
         "jogador_a": {"sid": sid_a, "db": player_a_db, "stats": stats_a, "hp": hp_a, "mp": stats_a.get("current_mp", stats_a.get("max_mana", 50))},
         "jogador_b": {"sid": sid_b, "db": player_b_db, "stats": stats_b, "hp": hp_b, "mp": stats_b.get("current_mp", stats_b.get("max_mana", 50))},
         "turno_de": sid_a,
@@ -2176,14 +2222,19 @@ def _registrar_resultado_coliseu(duelo, vencedor_sid):
             esperado_b = 1 - esperado_a
             deltas = [round(32 * (int(venceu[0]) - esperado_a)), round(32 * (int(venceu[1]) - esperado_b))]
             resultados = []
+            season_number = int(duelo.get("season_number", 1))
             for i, doc in enumerate(documentos):
                 total = max(0, pontos[i] + deltas[i])
                 contador = "pvp_wins" if venceu[i] else "pvp_losses"
-                users_collection.update_one({"_id": ids[i]}, {"$set": {"pvp_points": total}, "$inc": {contador: 1}})
+                contador_temporada = "pvp_season_wins" if venceu[i] else "pvp_season_losses"
+                users_collection.update_one(
+                    {"_id": ids[i], "pvp_season_number": season_number},
+                    {"$set": {"pvp_points": total}, "$inc": {contador: 1, "pvp_season_matches": 1, contador_temporada: 1}},
+                )
                 resultados.append({"delta": total - pontos[i], "pontos": total})
             users_collection.database["coliseu_pvp_partidas"].update_one(
                 {"_id": duelo["id"]},
-                {"$setOnInsert": {"jogadores": [str(ids[0]), str(ids[1])], "vencedor": str(ids[0] if venceu[0] else ids[1]), "alteracoes": resultados, "criado_em": datetime.utcnow()}},
+                {"$setOnInsert": {"jogadores": [str(ids[0]), str(ids[1])], "vencedor": str(ids[0] if venceu[0] else ids[1]), "alteracoes": resultados, "temporada": season_number, "criado_em": datetime.utcnow()}},
                 upsert=True,
             )
             for i, participante in enumerate(participantes):
@@ -2234,14 +2285,17 @@ def _encerrar_duelo_coliseu_ao_desconectar(sid):
 
 @socketio.on("buscarFilaColiseu")
 def handle_buscar_fila_coliseu(data):
-    global fila_coliseu_evento_id
+    global fila_coliseu_evento_id, fila_coliseu_temporada_numero
     sid = request.sid
     modo = (data or {}).get("modo")
     if modo not in ("ranqueado", "evento"):
         _emitir_fila_coliseu(sid, "erro", "Modalidade inválida.")
         return
     info = jogadores_online.get(sid)
-    if not info or info.get("regiao") != "capital_eldora" or not _esta_no_portao_coliseu(info):
+    if not info:
+        _emitir_fila_coliseu(sid, "erro", "Entre no jogo para participar da fila PvP.", modo)
+        return
+    if modo == "evento" and (info.get("regiao") != "capital_eldora" or not _esta_no_portao_coliseu(info)):
         _emitir_fila_coliseu(sid, "erro", "Aproxime-se do portão do Coliseu, na Capital de Eldora.", modo)
         return
     if info.get("em_combate"):
@@ -2256,6 +2310,25 @@ def handle_buscar_fila_coliseu(data):
         return
 
     event_id = None
+    season_number = None
+    season = None
+    if modo == "ranqueado":
+        season = ensure_active_season(users_collection, duelos_ativos)
+        if not season or season_is_expired(season) or season.get("status") != "ativa":
+            _emitir_fila_coliseu(sid, "erro", "A temporada está encerrando as últimas partidas. Tente novamente em instantes.", modo)
+            return
+        season_number = int(season["numero"])
+        users_collection.update_one(
+            {"_id": ObjectId(str(info["char_id"])), "pvp_season_number": {"$ne": season_number}},
+            {"$set": {
+                "pvp_points": 0,
+                "pvp_season_number": season_number,
+                "pvp_season_matches": 0,
+                "pvp_season_wins": 0,
+                "pvp_season_losses": 0,
+            }},
+        )
+        jogador = users_collection.find_one({"_id": ObjectId(str(info["char_id"]))}, {"pvp_points": 1}) or jogador
     if modo == "evento":
         agenda = get_event_status()
         if not agenda.get("active"):
@@ -2265,43 +2338,61 @@ def handle_buscar_fila_coliseu(data):
 
     candidato = None
     filas_anteriores = []
+    agora_mono = time.monotonic()
+    filas_temporada_anterior = []
     with fila_coliseu_lock:
+        if modo == "ranqueado" and fila_coliseu_temporada_numero != season_number:
+            filas_temporada_anterior = list(filas_coliseu["ranqueado"])
+            filas_coliseu["ranqueado"].clear()
+            for sid_antigo in filas_temporada_anterior:
+                fila_coliseu_entrada.pop(sid_antigo, None)
+            fila_coliseu_temporada_numero = season_number
         if modo == "evento" and fila_coliseu_evento_id != event_id:
             filas_anteriores = list(filas_coliseu["evento"])
             filas_coliseu["evento"].clear()
+            for sid_antigo in filas_anteriores:
+                fila_coliseu_entrada.pop(sid_antigo, None)
             fila_coliseu_evento_id = event_id
         for fila_existente in filas_coliseu.values():
             fila_existente[:] = [item for item in fila_existente if item != sid]
+        fila_coliseu_entrada.pop(sid, None)
         fila = filas_coliseu[modo]
         opcoes = []
         for outro_sid in fila:
             outro = jogadores_online.get(outro_sid)
-            if not outro or outro.get("em_combate") or outro.get("regiao") != "capital_eldora" or not _esta_no_portao_coliseu(outro):
+            if not outro or outro.get("em_combate"):
+                continue
+            if modo == "evento" and (outro.get("regiao") != "capital_eldora" or not _esta_no_portao_coliseu(outro)):
                 continue
             if str(outro.get("char_id")) == str(info.get("char_id")):
                 continue
-            if modo == "ranqueado":
-                outro_id = str(outro.get("char_id"))
-                if not ObjectId.is_valid(outro_id):
-                    continue
-                doc = users_collection.find_one({"_id": ObjectId(outro_id)}, {"pvp_points": 1}) or {}
-                diferenca = abs(int(doc.get("pvp_points", 0) or 0) - int(jogador.get("pvp_points", 0) or 0))
-                opcoes.append((diferenca, outro_sid))
-            else:
-                opcoes.append((0, outro_sid))
+            outro_id = str(outro.get("char_id"))
+            if not ObjectId.is_valid(outro_id):
+                continue
+            doc = users_collection.find_one({"_id": ObjectId(outro_id)}, {"pvp_points": 1}) or {}
+            diferenca = abs(int(doc.get("pvp_points", 0) or 0) - int(jogador.get("pvp_points", 0) or 0))
+            espera = max(agora_mono - fila_coliseu_entrada.get(outro_sid, agora_mono), 0)
+            limite = _limite_elo_fila(espera)
+            if diferenca <= limite:
+                opcoes.append((diferenca, espera, outro_sid))
         if opcoes:
-            opcoes.sort(key=lambda item: item[0])
-            candidato = opcoes[0][1]
+            opcoes.sort(key=lambda item: (item[0], -item[1]))
+            candidato = opcoes[0][2]
             fila.remove(candidato)
+            fila_coliseu_entrada.pop(candidato, None)
         else:
             fila.append(sid)
+            fila_coliseu_entrada[sid] = agora_mono
 
     for sid_antigo in filas_anteriores:
         if sid_antigo != sid:
             _emitir_fila_coliseu(sid_antigo, "erro", "A edição anterior do evento terminou. Entre novamente na próxima abertura.", "evento")
+    for sid_antigo in filas_temporada_anterior:
+        if sid_antigo != sid:
+            _emitir_fila_coliseu(sid_antigo, "erro", "A temporada mudou. Entre novamente na fila ranqueada.", "ranqueado")
 
     if candidato:
-        if not _iniciar_duelo_coliseu(candidato, sid, modo, event_id):
+        if not _iniciar_duelo_coliseu(candidato, sid, modo, event_id, season_number):
             _emitir_fila_coliseu(sid, "erro", "Não foi possível preparar a partida. Tente novamente.", modo)
             _emitir_fila_coliseu(candidato, "erro", "O adversário não pôde entrar na partida.", modo)
         return
@@ -2319,6 +2410,7 @@ def _retirar_fila_coliseu(sid):
     with fila_coliseu_lock:
         for fila in filas_coliseu.values():
             fila[:] = [item for item in fila if item != sid]
+        fila_coliseu_entrada.pop(sid, None)
 
 @socketio.on('enviarAcaoPvP')
 def handle_acao_pvp(dados):
@@ -2505,6 +2597,41 @@ def loop_agendamento_invasao():
         # Checa o relógio a cada 30 segundos para não pesar o processador
         time.sleep(30)
 
+
+def loop_agendamento_coliseu():
+    """Fecha eventos e temporadas mesmo quando nenhum jogador abre o painel."""
+    global fila_coliseu_evento_id, fila_coliseu_temporada_numero
+    while True:
+        try:
+            finalizar_eventos_encerrados(users_collection, duelos_ativos)
+            temporada = ensure_active_season(users_collection, duelos_ativos)
+            filas_evento_encerradas = []
+            filas_temporada_encerrada = []
+            with fila_coliseu_lock:
+                if not get_event_status().get("active") and filas_coliseu["evento"]:
+                    filas_evento_encerradas = list(filas_coliseu["evento"])
+                    filas_coliseu["evento"].clear()
+                    for sid_antigo in filas_evento_encerradas:
+                        fila_coliseu_entrada.pop(sid_antigo, None)
+                    fila_coliseu_evento_id = None
+
+                if temporada:
+                    numero = int(temporada["numero"])
+                    if temporada.get("status") != "ativa" or fila_coliseu_temporada_numero not in (None, numero):
+                        filas_temporada_encerrada = list(filas_coliseu["ranqueado"])
+                        filas_coliseu["ranqueado"].clear()
+                        for sid_antigo in filas_temporada_encerrada:
+                            fila_coliseu_entrada.pop(sid_antigo, None)
+                    fila_coliseu_temporada_numero = numero
+
+            for sid_antigo in filas_evento_encerradas:
+                _emitir_fila_coliseu(sid_antigo, "erro", "O horário do evento terminou; a busca foi encerrada.", "evento")
+            for sid_antigo in filas_temporada_encerrada:
+                _emitir_fila_coliseu(sid_antigo, "erro", "A temporada encerrou; entre novamente após a abertura da próxima.", "ranqueado")
+        except Exception:
+            app.logger.exception("Falha no agendador do Coliseu PvP")
+        time.sleep(30)
+
 # ==============================================================================
 # 5. EXECUÇÃO PRINCIPAL (O INTERRUPTOR ÚNICO)
 # ==============================================================================
@@ -2516,6 +2643,10 @@ if __name__ == "__main__":
     # 👇 2. NOVO: Inicia o Relógio Automático de Invasões 👇
     cron_invasao_thread = Thread(target=loop_agendamento_invasao, daemon=True)
     cron_invasao_thread.start()
+
+    # Recompensas e reinícios do PvP continuam funcionando sem jogadores online.
+    cron_coliseu_thread = Thread(target=loop_agendamento_coliseu, daemon=True)
+    cron_coliseu_thread.start()
     
     print("🚀 Servidor Web de Eldora rodando em http://localhost:5000")
     socketio.run(

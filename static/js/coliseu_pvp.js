@@ -82,10 +82,19 @@
             const data = await response.json();
             eventSchedule = data.evento || null;
             document.getElementById('coliseu-event-schedule').textContent = 'Terça, quinta e sábado · 20h · horário de Brasília';
+            document.getElementById('coliseu-event-board-title').textContent = eventSchedule?.active ? 'Evento atual' : 'Último evento';
             updateCountdown();
             fillBoard('coliseu-ranked-board', data.ranking || []);
             fillBoard('coliseu-event-board', data.placar_evento || [], true);
-            statusText.textContent = 'Escolha uma modalidade. As partidas começam quando outro aventureiro entrar na fila.';
+            const season = data.temporada;
+            const seasonLabel = document.getElementById('coliseu-season-status');
+            if (season) {
+                const fim = formatDate(season.fim);
+                seasonLabel.textContent = season.status === 'encerrando'
+                    ? `Temporada ${season.numero} encerrando após as partidas em andamento. Prêmios do Top 3: 50, 20 e 5 gemas.`
+                    : `Temporada ${season.numero} · termina em ${fim} · Top 3: 50, 20 e 5 gemas.`;
+            }
+            statusText.textContent = 'Ranqueado: disponível em qualquer região. Evento: entre na fila junto ao portão do Coliseu.';
         } catch (error) {
             eventSchedule = null;
             eventButton.disabled = true;
@@ -121,6 +130,7 @@
     }
 
     window.abrirColiseuPvP = async () => {
+        if (typeof window.ocultarMenuGlobalEldora === 'function') window.ocultarMenuGlobalEldora();
         modal.hidden = false;
         modal.setAttribute('aria-hidden', 'false');
         window.__coliseuPvPAb = true;
@@ -133,6 +143,7 @@
         modal.hidden = true;
         modal.setAttribute('aria-hidden', 'true');
         window.__coliseuPvPAb = false;
+        if (typeof window.mostrarMenuGlobalEldora === 'function') window.mostrarMenuGlobalEldora();
     };
 
     rankedButton.addEventListener('click', () => enterQueue('ranqueado'));
@@ -176,6 +187,10 @@
                 setTimeout(() => window.adicionarLogPvP(`<span style="color:#e7d49f">${texto}</span>`), 1400);
             } else if (data.modo === 'ranqueado') {
                 statusText.textContent = `Partida concluída: ${data.delta >= 0 ? '+' : ''}${data.delta} Elo · total ${data.pontos}.`;
+            } else if (data.modo === 'evento') {
+                statusText.textContent = data.vitoria
+                    ? 'Vitória registrada no evento. O placar foi atualizado.'
+                    : 'Partida registrada no placar do evento.';
             }
         });
     }

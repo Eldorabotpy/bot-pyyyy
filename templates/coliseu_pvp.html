@@ -4,12 +4,12 @@
         <div class="coliseu-emblem" aria-hidden="true">⚔️</div>
         <p class="coliseu-kicker">ARENA REAL</p>
         <h2 id="coliseu-title">Coliseu de Eldora</h2>
-        <p class="coliseu-intro">Desafie aventureiros e prove seu valor no campo de batalha.</p>
+        <p class="coliseu-intro">O ranking inclui todas as contas; partidas ao vivo precisam de dois jogadores conectados.</p>
 
         <div class="coliseu-mode-card">
             <div>
                 <h3>PvP ranqueado</h3>
-                <p>Partidas 1 contra 1. Vitórias e derrotas alteram seus pontos Elo.</p>
+                <p>Partidas 1 contra 1. O pareamento procura Elo próximo e amplia a faixa conforme a espera.</p>
             </div>
             <button id="coliseu-queue-ranked" type="button">Buscar partida</button>
         </div>
@@ -20,7 +20,7 @@
                 <span id="coliseu-event-state">Carregando agenda…</span>
             </div>
             <p id="coliseu-event-schedule">Terça, quinta e sábado · 20h · Brasília</p>
-            <p id="coliseu-event-countdown">O evento fica aberto por uma hora.</p>
+            <p id="coliseu-event-countdown">Entre na fila junto ao portão durante a janela do evento.</p>
             <button id="coliseu-queue-event" type="button" disabled>Entrar no evento</button>
         </div>
 
@@ -30,13 +30,15 @@
                 <ol id="coliseu-ranked-board"><li>Carregando…</li></ol>
             </div>
             <div class="coliseu-board">
-                <h3>Evento atual</h3>
+                <h3 id="coliseu-event-board-title">Evento atual</h3>
                 <ol id="coliseu-event-board"><li>O placar aparece durante o evento.</li></ol>
             </div>
         </div>
 
-        <p id="coliseu-status" class="coliseu-status" role="status" aria-live="polite">Aproxime-se do portão para entrar na fila.</p>
+        <p id="coliseu-season-status" class="coliseu-season-status">Temporada ranqueada de 35 dias · Top 3 recebe 50, 20 e 5 gemas.</p>
+
+        <p id="coliseu-status" class="coliseu-status" role="status" aria-live="polite">PvP ranqueado disponível em qualquer região; o evento exige presença no portão do Coliseu.</p>
         <button id="coliseu-cancel-queue" class="coliseu-cancel" type="button" hidden>Cancelar busca</button>
-        <p class="coliseu-footnote">O evento não entrega recompensas ainda. O placar registra as vitórias da sessão.</p>
+        <p class="coliseu-footnote">No fim de cada evento, o 1º lugar recebe 10 gemas. No fim da temporada ranqueada: 50, 20 e 5 gemas para o Top 3.</p>
     </section>
 </div>

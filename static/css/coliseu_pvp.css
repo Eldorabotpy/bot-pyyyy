@@ -30,4 +30,5 @@
 .coliseu-cancel{display:block;margin:4px auto 0;padding:8px 14px;border:1px solid #5c687b;border-radius:8px;background:#1b2534;color:#dce5f2;cursor:pointer}
 .coliseu-cancel[hidden]{display:none!important}
 .coliseu-footnote{text-align:center;margin:10px 0 0;color:#7f8da3;font:10px/1.4 Arial,sans-serif}
+.coliseu-season-status{text-align:center;margin:10px 0 0;color:#c8d2e2;font:11px/1.5 Arial,sans-serif}
 @media(max-width:440px){.coliseu-panel{padding:24px 15px 16px}.coliseu-mode-card{grid-template-columns:1fr}.coliseu-mode-card button{width:100%}.coliseu-board-wrap{grid-template-columns:1fr}.coliseu-panel h2{font-size:22px}}

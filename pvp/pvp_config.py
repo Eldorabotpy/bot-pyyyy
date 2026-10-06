@@ -27,13 +27,14 @@ WEEKLY_REWARDS = {
     "Mestre da Arena": {"ouro": 250000, "cristal_de_abertura": 10, "gems": 150, "sigilo_protecao": 1},
 }
 
-MONTHLY_RANKING_REWARDS = {
-    1: 100, 
-    2: 50,  
-    3: 25, 
-    4: 10,
-    5: 5
+SEASON_RANKING_REWARDS = {
+    1: 50,
+    2: 20,
+    3: 5,
 }
+
+# Alias para telas e integrações antigas que ainda importam o nome mensal.
+MONTHLY_RANKING_REWARDS = SEASON_RANKING_REWARDS
 
 ARENA_MODIFIERS = {
     # Segunda-feira (weekday() == 0)

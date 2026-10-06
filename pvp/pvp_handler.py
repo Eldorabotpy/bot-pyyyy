@@ -75,6 +75,36 @@ def _get_region_key(pdata: dict) -> str:
         or ""
     )
 
+
+def _registrar_resultado_temporada(jogador_vencedor_id, jogador_derrotado_id):
+    """Inclui o PvP ranqueado do Telegram na mesma temporada de 35 dias."""
+    if users_collection is None:
+        return
+    temporada = users_collection.database["coliseu_pvp_temporadas"].find_one({"_id": "atual"})
+    if not temporada or temporada.get("status") not in ("ativa", "encerrando"):
+        return
+    numero = int(temporada.get("numero", 1))
+    for jogador_id, venceu in ((jogador_vencedor_id, True), (jogador_derrotado_id, False)):
+        jogador_id = str(jogador_id)
+        if not ObjectId.is_valid(jogador_id):
+            continue
+        oid = ObjectId(jogador_id)
+        jogador = users_collection.find_one({"_id": oid}, {"pvp_season_number": 1}) or {}
+        if jogador.get("pvp_season_number") != numero:
+            users_collection.update_one({"_id": oid}, {"$set": {
+                "pvp_season_number": numero,
+                "pvp_season_matches": 0,
+                "pvp_season_wins": 0,
+                "pvp_season_losses": 0,
+            }})
+        users_collection.update_one(
+            {"_id": oid, "pvp_season_number": numero},
+            {"$inc": {
+                "pvp_season_matches": 1,
+                ("pvp_season_wins" if venceu else "pvp_season_losses"): 1,
+            }},
+        )
+
 def _parse_iso(dt_str: str):
     try:
         return datetime.datetime.fromisoformat(dt_str)
@@ -747,6 +777,7 @@ async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAU
     enemy_points = max(0, int(enemy_data.get("pvp_points", 0)) + enemy_delta)
     enemy_data["pvp_points"] = enemy_points
     await player_manager.save_player_data(enemy_id, enemy_data)
+    _registrar_resultado_temporada(user_id if is_win else enemy_id, enemy_id if is_win else user_id)
 
     # Mensagem
     result_text = "🏆 <b>VITÓRIA!</b>" if is_win else "💀 <b>DERROTA...</b>"
@@ -1027,7 +1058,7 @@ async def ranking_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 else:
                     lines.append(f"<b>{i}º</b> {elo_display} - {name} <b>({pts})</b>")
 
-        lines.append("\n💎 <b>Recompensas Mensais (Top 5):</b>")
+        lines.append("\n💎 <b>Recompensas da Temporada (35 dias · Top 3):</b>")
         for rank, reward in sorted(MONTHLY_RANKING_REWARDS.items()):
             lines.append(f"   {rank}º Lugar: {reward} Gemas")
 

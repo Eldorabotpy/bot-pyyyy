@@ -49,3 +49,23 @@ def get_event_status(now=None):
         "days": [EVENT_DAY_NAMES[day] for day in EVENT_WEEKDAYS],
         "duration_minutes": EVENT_DURATION_MINUTES,
     }
+
+
+def get_ended_event_ids(now=None, lookback_days=42):
+    """Datas de eventos cuja janela terminou, da mais recente para a mais antiga."""
+    current = now or datetime.now(BRASILIA)
+    if current.tzinfo is None:
+        current = current.replace(tzinfo=BRASILIA)
+    else:
+        current = current.astimezone(BRASILIA)
+
+    ended = []
+    for offset in range(lookback_days):
+        day = current.date() - timedelta(days=offset)
+        if day.weekday() not in EVENT_WEEKDAYS:
+            continue
+        start = datetime.combine(day, EVENT_START, tzinfo=BRASILIA)
+        end = start + timedelta(minutes=EVENT_DURATION_MINUTES)
+        if end <= current:
+            ended.append(day.isoformat())
+    return ended

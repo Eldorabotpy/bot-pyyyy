@@ -840,6 +840,16 @@
                 </span>
             </button>
 
+            <button
+                type="button"
+                class="menu-btn eldora-menu-btn"
+                id="nav-btn-coliseu-pvp"
+                onclick="fecharMenu(); if(typeof window.abrirColiseuPvP === 'function') window.abrirColiseuPvP()"
+            >
+                <span class="eldora-menu-icone">⚔️</span>
+                <span class="texto">PvP & Coliseu</span>
+            </button>
+
 
             <button
                 onclick="navegarMenuHeroi('aba-perfil')"
@@ -1131,7 +1141,7 @@
     <script src="/static/js/portal_manager.js?v=1"></script>
 
     <script src="/static/js/mapa.js?v=9940"></script>
-    <script src="/static/js/coliseu_pvp.js?v=1"></script>
+    <script src="/static/js/coliseu_pvp.js?v=2"></script>
 
     <script>
         if (window.Telegram && window.Telegram.WebApp) {
