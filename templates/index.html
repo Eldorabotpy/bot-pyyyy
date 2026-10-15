@@ -636,12 +636,6 @@
             height: 100%;
             object-fit: contain;
         }
-
-        .loading-brand {
-            display: none;
-        }
-
-
         /* ==========================================
            BARRA DE CARREGAMENTO ELDORA
            ========================================== */
@@ -663,7 +657,7 @@
 
         @media (orientation: landscape) and (min-width: 768px) {
             #tela-carregamento::before {
-                background-image: url('/static/assets/fundos/capital.png?v=1');
+                background-image: url('/static/assets/loading/carregamento-desktop.png?v=1');
                 background-position: center;
                 filter: brightness(.62) saturate(.9);
                 transform: scale(1.01);
@@ -672,41 +666,6 @@
             .loading-art img {
                 object-fit: cover;
             }
-
-            .loading-brand {
-                position: absolute;
-                z-index: 3;
-                top: clamp(18px, 4vh, 48px);
-                left: clamp(18px, 3vw, 42px);
-                display: flex;
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 1px;
-                padding: 8px 13px 9px;
-                color: #f2d58c;
-                font-family: "Cinzel", Georgia, serif;
-                text-align: center;
-                text-shadow: 0 2px 8px rgba(4, 9, 19, .9), 0 0 22px rgba(5, 12, 24, .7);
-                background: rgba(8, 15, 26, .68);
-                border: 1px solid rgba(216, 183, 109, .5);
-                border-radius: 10px;
-                backdrop-filter: blur(7px);
-                pointer-events: none;
-            }
-
-            .loading-brand span {
-                font-size: clamp(9px, .85vw, 12px);
-                font-weight: 700;
-                letter-spacing: .25em;
-            }
-
-            .loading-brand strong {
-                font-size: clamp(22px, 2.4vw, 34px);
-                font-weight: 900;
-                letter-spacing: .12em;
-                line-height: 1;
-            }
-
             .loading-barra-container {
                 width: min(48vw, 660px);
             }
@@ -807,7 +766,7 @@
         <picture class="loading-art" aria-hidden="true">
             <source
                 media="(orientation: landscape) and (min-width: 768px)"
-                srcset="/static/assets/fundos/capital.png?v=1"
+                srcset="/static/assets/loading/carregamento-desktop.png?v=1"
             >
             <img
                 src="/static/assets/loading/carregamento.jpg?v=3"
@@ -815,11 +774,6 @@
                 draggable="false"
             >
         </picture>
-
-        <div class="loading-brand" aria-hidden="true">
-            <span>REINO DE</span>
-            <strong>ELDORA</strong>
-        </div>
 
         <div
             class="loading-texto"
