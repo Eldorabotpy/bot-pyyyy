@@ -657,17 +657,21 @@
 
         @media (orientation: landscape) and (min-width: 768px) {
             #tela-carregamento::before {
-                background-image: url('/static/assets/loading/carregamento-desktop.png?v=1');
+                background-image: url('/static/assets/loading/carregamento-desktop-ultrawide.png?v=2');
                 background-position: center;
                 filter: brightness(.62) saturate(.9);
                 transform: scale(1.01);
             }
 
             .loading-art img {
-                object-fit: cover;
+                object-fit: contain;
             }
             .loading-barra-container {
-                width: min(48vw, 660px);
+                top: clamp(18px, 3vh, 32px);
+                bottom: auto;
+                left: clamp(18px, 2.5vw, 34px);
+                transform: none;
+                width: min(36vw, 520px);
             }
         }
 
@@ -766,7 +770,7 @@
         <picture class="loading-art" aria-hidden="true">
             <source
                 media="(orientation: landscape) and (min-width: 768px)"
-                srcset="/static/assets/loading/carregamento-desktop.png?v=1"
+                srcset="/static/assets/loading/carregamento-desktop-ultrawide.png?v=2"
             >
             <img
                 src="/static/assets/loading/carregamento.jpg?v=3"
