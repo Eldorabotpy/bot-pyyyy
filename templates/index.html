@@ -568,11 +568,11 @@
             }
         }
     </style>
-    <link rel="stylesheet" href="/static/css/dialogos_eldora.css?v=1">
+    <link rel="stylesheet" href="/static/css/dialogos_eldora.css?v=2">
     <script src="/static/js/dialogos_eldora.js?v=1"></script>
     <link rel="stylesheet" href="/static/css/runas.css?v=1">
     <script src="/static/js/runas.js?v=1"></script>
-<link rel="stylesheet" href="/static/css/menu_heroi.css?v=1">
+<link rel="stylesheet" href="/static/css/menu_heroi.css?v=2">
     <script defer src="/static/js/menu_heroi.js?v=2"></script>
 </head>
 <body>
@@ -583,15 +583,13 @@
     <style>
         #tela-carregamento {
             position: fixed;
-            top: 0;
-            left: 0;
+            inset: 0;
             width: 100%;
             height: 100%;
-
-            background:
-                url('/static/assets/loading/carregamento.jpg?v=1')
-                center / cover
-                no-repeat;
+            height: 100dvh;
+            overflow: hidden;
+            isolation: isolate;
+            background-color: #101827;
 
             z-index: 999999;
 
@@ -602,6 +600,33 @@
             transition: opacity 0.8s ease;
         }
 
+        /* A arte original é vertical: use-a inteira no centro e preencha
+           as laterais com uma versão desfocada em telas largas. */
+        #tela-carregamento::before,
+        #tela-carregamento::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+        }
+
+        #tela-carregamento::before {
+            z-index: 0;
+            background: url('/static/assets/loading/carregamento.jpg?v=2') center 42% / cover no-repeat;
+            filter: blur(20px) brightness(.42) saturate(.82);
+            transform: scale(1.04);
+        }
+
+        #tela-carregamento::after {
+            z-index: 1;
+            background-image:
+                linear-gradient(180deg, rgba(7, 12, 22, .06), transparent 48%, rgba(7, 12, 22, .24)),
+                url('/static/assets/loading/carregamento.jpg?v=2');
+            background-position: center, center;
+            background-size: 100% 100%, contain;
+            background-repeat: no-repeat;
+        }
+
 
         /* ==========================================
            BARRA DE CARREGAMENTO ELDORA
@@ -609,6 +634,7 @@
 
         .loading-barra-container {
             position: absolute;
+            z-index: 2;
 
             left: 50%;
             bottom: clamp(24px, 4vh, 55px);
@@ -619,6 +645,18 @@
             aspect-ratio: 2170 / 340;
 
             pointer-events: none;
+        }
+
+        @media (orientation: landscape) and (min-width: 768px) {
+            #tela-carregamento::before {
+                filter: blur(26px) brightness(.34) saturate(.78);
+            }
+
+            #tela-carregamento::after {
+                background-image:
+                    linear-gradient(90deg, rgba(7, 12, 22, .26), transparent 24%, transparent 76%, rgba(7, 12, 22, .26)),
+                    url('/static/assets/loading/carregamento.jpg?v=2');
+            }
         }
 
 

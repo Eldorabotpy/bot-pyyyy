@@ -75,7 +75,7 @@ def _premiar_jogador(users_collection, jogador, chave_premio, quantidade, origem
         {"_id": chave_premio},
         {"$setOnInsert": {
             "char_id": str(jogador_id),
-            "nome": jogador.get("character_name", "Aventureiro"),
+            "nome": jogador.get("character_name") or jogador.get("name") or jogador.get("nome") or "Aventureiro",
             "gemas": int(quantidade),
             "origem": origem,
             "criado_em": datetime.now(UTC),
@@ -96,9 +96,13 @@ def _fechar_temporada(users_collection, season, now):
             {
                 "pvp_season_number": numero,
                 "pvp_season_matches": {"$gt": 0},
-                "character_name": {"$exists": True, "$ne": ""},
+                "$or": [
+                    {"character_name": {"$type": "string", "$ne": ""}},
+                    {"name": {"$type": "string", "$ne": ""}},
+                    {"nome": {"$type": "string", "$ne": ""}},
+                ],
             },
-            {"character_name": 1, "pvp_points": 1, "pvp_season_wins": 1, "pvp_season_losses": 1},
+            {"character_name": 1, "name": 1, "nome": 1, "pvp_points": 1, "pvp_season_wins": 1, "pvp_season_losses": 1},
         ).sort([
             ("pvp_points", -1),
             ("pvp_season_wins", -1),
@@ -114,7 +118,7 @@ def _fechar_temporada(users_collection, season, now):
             vencedores.append({
                 "posicao": posicao,
                 "char_id": str(jogador["_id"]),
-                "nome": jogador.get("character_name", "Aventureiro"),
+                "nome": jogador.get("character_name") or jogador.get("name") or jogador.get("nome") or "Aventureiro",
                 "pontos": int(jogador.get("pvp_points", 0) or 0),
                 "vitorias": int(jogador.get("pvp_season_wins", 0) or 0),
                 "derrotas": int(jogador.get("pvp_season_losses", 0) or 0),
@@ -222,11 +226,11 @@ def finalizar_eventos_encerrados(users_collection, duelos_ativos, now=None):
                 "status": "finalizado",
                 "finalizado_em": agora,
                 "vencedor_char_id": str(vencedor["_id"]) if vencedor else None,
-                "vencedor_nome": vencedor.get("character_name") if vencedor else None,
+                "vencedor_nome": (vencedor.get("character_name") or vencedor.get("name")) if vencedor else None,
                 "recompensa_gemas": EVENT_WINNER_REWARD if vencedor else 0,
                 "placar": placar_final,
             }},
             upsert=True,
         )
         _FINALIZED_EVENT_CACHE.add(event_id)
-        logger.info("Evento do Coliseu %s finalizado; vencedor=%s", event_id, vencedor.get("character_name") if vencedor else "sem vencedor")
+        logger.info("Evento do Coliseu %s finalizado; vencedor=%s", event_id, (vencedor.get("character_name") or vencedor.get("name")) if vencedor else "sem vencedor")
