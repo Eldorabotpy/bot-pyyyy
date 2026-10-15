@@ -600,8 +600,6 @@
             transition: opacity 0.8s ease;
         }
 
-        /* A arte original é vertical: use-a inteira no centro e preencha
-           as laterais com uma versão desfocada em telas largas. */
         #tela-carregamento::before,
         #tela-carregamento::after {
             content: "";
@@ -612,19 +610,35 @@
 
         #tela-carregamento::before {
             z-index: 0;
-            background: url('/static/assets/loading/carregamento.jpg?v=2') center 42% / cover no-repeat;
+            background: url('/static/assets/loading/carregamento.jpg?v=3') center 42% / cover no-repeat;
             filter: blur(20px) brightness(.42) saturate(.82);
             transform: scale(1.04);
         }
 
         #tela-carregamento::after {
+            z-index: 2;
+            background: linear-gradient(180deg, rgba(7, 12, 22, .06), transparent 48%, rgba(7, 12, 22, .30));
+        }
+
+        .loading-art {
+            position: absolute;
             z-index: 1;
-            background-image:
-                linear-gradient(180deg, rgba(7, 12, 22, .06), transparent 48%, rgba(7, 12, 22, .24)),
-                url('/static/assets/loading/carregamento.jpg?v=2');
-            background-position: center, center;
-            background-size: 100% 100%, contain;
-            background-repeat: no-repeat;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+        }
+
+        .loading-art img {
+            display: block;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .loading-brand {
+            display: none;
         }
 
 
@@ -649,13 +663,63 @@
 
         @media (orientation: landscape) and (min-width: 768px) {
             #tela-carregamento::before {
-                filter: blur(26px) brightness(.34) saturate(.78);
+                background-image: url('/static/assets/fundos/capital.png?v=1');
+                background-position: center;
+                filter: brightness(.62) saturate(.9);
+                transform: scale(1.01);
             }
 
-            #tela-carregamento::after {
-                background-image:
-                    linear-gradient(90deg, rgba(7, 12, 22, .26), transparent 24%, transparent 76%, rgba(7, 12, 22, .26)),
-                    url('/static/assets/loading/carregamento.jpg?v=2');
+            .loading-art img {
+                object-fit: cover;
+            }
+
+            .loading-brand {
+                position: absolute;
+                z-index: 3;
+                top: clamp(18px, 4vh, 48px);
+                left: clamp(18px, 3vw, 42px);
+                display: flex;
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 1px;
+                padding: 8px 13px 9px;
+                color: #f2d58c;
+                font-family: "Cinzel", Georgia, serif;
+                text-align: center;
+                text-shadow: 0 2px 8px rgba(4, 9, 19, .9), 0 0 22px rgba(5, 12, 24, .7);
+                background: rgba(8, 15, 26, .68);
+                border: 1px solid rgba(216, 183, 109, .5);
+                border-radius: 10px;
+                backdrop-filter: blur(7px);
+                pointer-events: none;
+            }
+
+            .loading-brand span {
+                font-size: clamp(9px, .85vw, 12px);
+                font-weight: 700;
+                letter-spacing: .25em;
+            }
+
+            .loading-brand strong {
+                font-size: clamp(22px, 2.4vw, 34px);
+                font-weight: 900;
+                letter-spacing: .12em;
+                line-height: 1;
+            }
+
+            .loading-barra-container {
+                width: min(48vw, 660px);
+            }
+        }
+
+        @media (orientation: landscape) and (min-aspect-ratio: 2/1) {
+            #tela-carregamento::before {
+                filter: blur(24px) brightness(.36) saturate(.82);
+                transform: scale(1.04);
+            }
+
+            .loading-art img {
+                object-fit: contain;
             }
         }
 
@@ -739,6 +803,23 @@
 
 
     <div id="tela-carregamento">
+
+        <picture class="loading-art" aria-hidden="true">
+            <source
+                media="(orientation: landscape) and (min-width: 768px)"
+                srcset="/static/assets/fundos/capital.png?v=1"
+            >
+            <img
+                src="/static/assets/loading/carregamento.jpg?v=3"
+                alt=""
+                draggable="false"
+            >
+        </picture>
+
+        <div class="loading-brand" aria-hidden="true">
+            <span>REINO DE</span>
+            <strong>ELDORA</strong>
+        </div>
 
         <div
             class="loading-texto"
