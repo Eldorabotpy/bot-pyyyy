@@ -9,9 +9,17 @@
     const opponentList = document.getElementById('coliseu-opponent-list');
     let eventSchedule = null;
     let queuedMode = null;
+    let opponentSearchTimer = null;
 
     const socket = () => window.eldoraSocket;
     const showValue = value => value === null || value === undefined ? '—' : String(value);
+
+    function clearOpponentSearchTimer() {
+        if (opponentSearchTimer !== null) {
+            window.clearTimeout(opponentSearchTimer);
+            opponentSearchTimer = null;
+        }
+    }
 
     function fillBoard(id, rows, eventBoard = false) {
         const list = document.getElementById(id);
@@ -129,16 +137,27 @@
             statusText.textContent = 'Conectando ao jogo. Aguarde alguns segundos e tente novamente.';
             return;
         }
+        clearOpponentSearchTimer();
         opponentList.replaceChildren();
         const loading = document.createElement('li');
-        loading.textContent = 'Buscando personagens próximos no Elo…';
+        loading.textContent = 'Buscando contas registradas, inclusive offline…';
         opponentList.appendChild(loading);
         refreshOpponentsButton.disabled = true;
-        statusText.textContent = 'Buscando personagens próximos no Elo…';
+        statusText.textContent = 'Buscando contas registradas, inclusive offline…';
+        opponentSearchTimer = window.setTimeout(() => {
+            opponentSearchTimer = null;
+            refreshOpponentsButton.disabled = false;
+            statusText.textContent = 'A busca não respondeu. Verifique sua conexão com o jogo e tente novamente.';
+            opponentList.replaceChildren();
+            const empty = document.createElement('li');
+            empty.textContent = 'O servidor não respondeu à busca. Tente novamente em alguns segundos.';
+            opponentList.appendChild(empty);
+        }, 15000);
         connection.emit('buscarAdversariosColiseu', {});
     }
 
     function renderOpponents(data) {
+        clearOpponentSearchTimer();
         opponentList.replaceChildren();
         const adversarios = Array.isArray(data?.adversarios) ? data.adversarios : [];
         statusText.textContent = data?.mensagem || 'Lista de adversários atualizada.';
@@ -196,6 +215,7 @@
 
     window.fecharColiseuPvP = () => {
         leaveQueue();
+        clearOpponentSearchTimer();
         modal.hidden = true;
         modal.setAttribute('aria-hidden', 'true');
         window.__coliseuPvPAb = false;
