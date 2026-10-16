@@ -481,6 +481,8 @@ async function carregarMeuPerfil() {
         const classeKey = (p.classe || "aprendiz").toLowerCase();
         const infoClasse = CLASSES_INFO[classeKey] || CLASSES_INFO['aprendiz'];
         let percentXP = Math.min((p.xp / p.xp_max) * 100, 100);
+        const percentHP = Math.min(100, Math.max(0, (Number(p.hp_atual) / Math.max(1, Number(p.hp_max))) * 100));
+        const percentMP = Math.min(100, Math.max(0, (Number(p.mp_atual) / Math.max(1, Number(p.mp_max))) * 100));
 
         // ==========================================
         // 🌟 NOVO: MULTI-PROFISSÕES (LISTA COM SCROLL E BÔNUS)
@@ -676,18 +678,18 @@ async function carregarMeuPerfil() {
         // ==========================================
 
         // --- Status ---
-        let htmlStatus = `<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px;">`;
+        let htmlStatus = `<div class="eldora-status-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px;">`;
         for (const key in p.status) {
             const st = p.status[key];
             const podeUpar = p.pontos_livres > 0 ? `<button onclick="distribuirPonto('${key}')" style="background:#2ecc71; color:#000; border:none; border-radius:4px; width:24px; height:24px; font-weight:bold; cursor:pointer;">+</button>` : '';
             htmlStatus += `
-                <div style="background: #1e293b; border: 1px solid #334155; padding: 10px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center;">
+                <div class="eldora-status-card" style="background: #1e293b; border: 1px solid #334155; padding: 10px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center;">
                     <div><span style="font-size: 1.2em;">${st.emoji}</span> <span style="color: #cbd5e1; font-size: 0.8em; text-transform: uppercase; font-weight: bold;">${st.nome}</span></div>
                     <div style="display: flex; align-items: center; gap: 8px;"><strong style="color: #f8fafc; font-size: 1.2em;">${st.valor}</strong>${podeUpar}</div>
                 </div>`;
         }
         htmlStatus += `</div>
-            <div style="margin-top: 15px; background: #1e293b; border: 1px solid #334155; padding: 10px; border-radius: 8px;">
+            <div class="eldora-status-chances" style="margin-top: 15px; background: #1e293b; border: 1px solid #334155; padding: 10px; border-radius: 8px;">
                 <div style="color: #94a3b8; font-size: 0.7em; font-weight: bold; text-transform: uppercase; margin-bottom: 8px;">🎲 Chances Secundárias</div>
                 <div style="display: flex; justify-content: space-around; font-size: 0.9em;">
                     <div><span style="font-size: 1.2em;">💨</span> Esquiva: <strong style="color: #38bdf8;">${p.esquiva || 0}%</strong></div>
@@ -732,7 +734,7 @@ async function carregarMeuPerfil() {
             <span style="display:none; font-size: 1.8em;">${eq.icon || eq.emoji || '📦'}</span>`;
 
             htmlSlots += `
-                <div onclick="${!eq.vazio ? `abrirModalItem('${eq.slot}', 'equipado')` : ''}" 
+                <div class="eldora-equipment-slot" data-slot="${eq.slot}" onclick="${!eq.vazio ? `abrirModalItem('${eq.slot}', 'equipado')` : ''}"
                      style="position: absolute; ${Object.entries(pos).map(([k, v]) => `${k}:${v};`).join('')} 
                             width: 50px; height: 50px; background: ${corFundo}; border: 2px solid ${corBorda}; 
                             border-radius: 8px; display: flex; justify-content: center; align-items: center; 
@@ -744,7 +746,7 @@ async function carregarMeuPerfil() {
 
         if (ferramentasProfissao.length > 0) {
             htmlFerramentas = `
-                <div style="margin-top: 12px; background: #020617; border: 2px solid #334155; border-radius: 12px; padding: 10px; box-shadow: inset 0 0 20px rgba(0,0,0,0.8);">
+                <div class="eldora-profession-tools" style="margin-top: 12px; background: #020617; border: 2px solid #334155; border-radius: 12px; padding: 10px; box-shadow: inset 0 0 20px rgba(0,0,0,0.8);">
                     <div style="color: #facc15; font-family: 'Cinzel', serif; font-size: 0.8em; font-weight: 900; text-transform: uppercase; margin-bottom: 8px; text-align: center; letter-spacing: 1px;">
                         🛠️ Ferramentas de Profissão
                     </div>
@@ -781,7 +783,7 @@ async function carregarMeuPerfil() {
                        <span style="display:none; font-size: 1.7em;">${eq.icon || eq.emoji || '🛠️'}</span>`;
 
                 htmlFerramentas += `
-                    <div onclick="${!eq.vazio ? `abrirModalItem('${eq.slot}', 'equipado')` : ''}"
+                    <div class="eldora-tool-slot" onclick="${!eq.vazio ? `abrirModalItem('${eq.slot}', 'equipado')` : ''}"
                          title="${eq.nome || nomeProf}"
                          style="position: relative; height: 62px; background: ${corFundo}; border: 2px solid ${corBorda}; border-radius: 9px; display: flex; justify-content: center; align-items: center; cursor: ${eq.vazio ? 'default' : 'pointer'}; box-shadow: 0 4px 8px rgba(0,0,0,0.5);">
                         
@@ -804,18 +806,18 @@ async function carregarMeuPerfil() {
 
         // Aba Equipamentos Visual com Corpo Completo no Fundo
         const htmlEquips = `
-            <div style="margin-top: 15px;">
-                <div style="position: relative; width: 100%; height: 420px; background: #020617; border-radius: 12px; border: 2px solid #334155; overflow: hidden; box-shadow: inset 0 0 30px rgba(0,0,0,0.9);">
-                    <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; opacity: 0.4;">
+            <div class="eldora-equipment-panel" style="margin-top: 15px;">
+                <div class="eldora-equipment-stage" style="position: relative; width: 100%; height: 420px; background: #020617; border-radius: 12px; border: 2px solid #334155; overflow: hidden; box-shadow: inset 0 0 30px rgba(0,0,0,0.9);">
+                    <div class="eldora-equipment-backdrop" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; opacity: 0.4;">
                         <img src="${bannerRawUrl}" onerror="this.style.display='none'" style="width: 100%; height: 100%; object-fit: cover;">
                     </div>
-                    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 70%; height: 95%; z-index: 1; display: flex; justify-content: center; align-items: center; opacity: 0.7;">
+                    <div class="eldora-equipment-avatar" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 70%; height: 95%; z-index: 1; display: flex; justify-content: center; align-items: center; opacity: 0.7;">
                         <img src="${fullBodyImgUrl}" onerror="this.src='${fallbackFullBody}'; this.onerror=null;" style="width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0px 10px 15px rgba(0,0,0,0.9)); pointer-events: none;">
                     </div>
-                    <div style="position: relative; width: 100%; height: 100%; z-index: 2;">${htmlSlots}</div>
+                    <div class="eldora-equipment-slots" style="position: relative; width: 100%; height: 100%; z-index: 2;">${htmlSlots}</div>
                 </div>
 
-                <button type="button" onclick="window.abrirCodiceHunter().then(() => window.abrirCompanheiros())" style="display:block;width:100%;min-height:60px;margin:12px 0;padding:12px;background:#172231;border:1px solid #b99752;border-radius:12px;color:#ecd08c;text-align:left;cursor:pointer;">
+                <button class="eldora-companion-button" type="button" onclick="window.abrirCodiceHunter().then(() => window.abrirCompanheiros())" style="display:block;width:100%;min-height:60px;margin:12px 0;padding:12px;background:#172231;border:1px solid #b99752;border-radius:12px;color:#ecd08c;text-align:left;cursor:pointer;">
                     🐾 Companheiro<br><span style="font-size:12px;color:#cbd5e1;">${p.companion ? `${p.companion.icon} ${p.companion.name} · ${p.companion.form} · Nv. ${p.companion.level}` : 'Nenhum equipado · Abrir Bestiário'}</span>
                 </button>
                 ${htmlFerramentas}
@@ -823,71 +825,74 @@ async function carregarMeuPerfil() {
 
         // --- Inventário ---
         let htmlInv = `
-            <div style="display: flex; gap: 5px; margin-top: 15px; margin-bottom: 15px; overflow-x: auto; padding-bottom: 5px;">
-                <button onclick="filtrarMochila('todos')" id="btn-filtro-todos" style="flex: 1; padding: 6px; background: #3b82f6; color: #fff; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 0.75em;">Todos</button>
-                <button onclick="filtrarMochila('equips')" id="btn-filtro-equips" style="flex: 1; padding: 6px; background: #1e293b; color: #94a3b8; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 0.75em;">Equips</button>
-                <button onclick="filtrarMochila('materiais')" id="btn-filtro-materiais" style="flex: 1; padding: 6px; background: #1e293b; color: #94a3b8; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 0.75em;">Materiais</button>
-                <button onclick="filtrarMochila('usaveis')" id="btn-filtro-usaveis" style="flex: 1; padding: 6px; background: #1e293b; color: #94a3b8; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 0.75em;">Usáveis</button>
+            <div class="eldora-inventory-filters" style="display: flex; gap: 5px; margin-top: 15px; margin-bottom: 15px; overflow-x: auto; padding-bottom: 5px;">
+                <button class="eldora-inventory-filter active" onclick="filtrarMochila('todos')" id="btn-filtro-todos" style="flex: 1; padding: 6px; background: #3b82f6; color: #fff; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 0.75em;">Todos</button>
+                <button class="eldora-inventory-filter" onclick="filtrarMochila('equips')" id="btn-filtro-equips" style="flex: 1; padding: 6px; background: #1e293b; color: #94a3b8; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 0.75em;">Equips</button>
+                <button class="eldora-inventory-filter" onclick="filtrarMochila('materiais')" id="btn-filtro-materiais" style="flex: 1; padding: 6px; background: #1e293b; color: #94a3b8; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 0.75em;">Materiais</button>
+                <button class="eldora-inventory-filter" onclick="filtrarMochila('usaveis')" id="btn-filtro-usaveis" style="flex: 1; padding: 6px; background: #1e293b; color: #94a3b8; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 0.75em;">Usáveis</button>
             </div>
-            <div id="grid-mochila" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); gap: 8px;"></div>
+            <div id="grid-mochila" class="eldora-inventory-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); gap: 8px;"></div>
         `;
 
         // ==========================================
         // 5. INJEÇÃO FINAL NO ECRÃ
         // ==========================================
         conteudo.innerHTML = `
-            <div style="background-image: ${bannerImgCss}; background-size: cover; background-position: center; position: relative; width: 100%; height: 350px; border-radius: 12px; border: 2px solid #334155; overflow: hidden; box-shadow: inset 0 0 50px rgba(0,0,0,0.9); margin-bottom: 15px;">
-                <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(0deg, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.4) 50%, rgba(0,0,0,0.6) 100%); z-index: 1;"></div>
-                
-                <img src="${fullBodyImgUrl}" onerror="this.src='${fallbackFullBody}'; this.onerror=null;" style="position: absolute; bottom: -5px; left: 50%; transform: translateX(-50%); height: 95%; width: auto; object-fit: contain; z-index: 2; filter: drop-shadow(0 0 15px rgba(0,0,0,0.9)); pointer-events: none;">
-
-                <div style="position: absolute; bottom: 20px; right: 20px; z-index: 3; text-align: right;">
-                    <h2 style="margin: 0 0 5px 0; color: #fff; font-size: 2em; text-shadow: 2px 2px 6px #000; text-transform: uppercase;">${p.nome}</h2>
-                    <div style="display: flex; justify-content: flex-end; align-items: center; gap: 8px;">
-                        <span style="color: #fbbf24; font-size: 1.1em; font-weight: bold;">${infoClasse.emoji} ${p.classe || infoClasse.nome}</span>
-                        <span style="background: rgba(243, 156, 18, 0.2); border: 1px solid #f39c12; color: #f39c12; padding: 2px 8px; border-radius: 4px; font-weight: 900; font-size: 0.7em;">Nível ${p.level}</span>
+            <section class="eldora-profile-hero" style="background-image: ${bannerImgCss}; background-size: cover; background-position: center; position: relative; width: 100%; height: 350px; border-radius: 12px; border: 2px solid #334155; overflow: hidden; box-shadow: inset 0 0 50px rgba(0,0,0,0.9); margin-bottom: 15px;">
+                <div class="eldora-profile-hero-shade" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(0deg, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.4) 50%, rgba(0,0,0,0.6) 100%); z-index: 1;"></div>
+                <img class="eldora-profile-hero-avatar" src="${fullBodyImgUrl}" onerror="this.src='${fallbackFullBody}'; this.onerror=null;" style="position: absolute; bottom: -5px; left: 50%; transform: translateX(-50%); height: 95%; width: auto; object-fit: contain; z-index: 2; filter: drop-shadow(0 0 15px rgba(0,0,0,0.9)); pointer-events: none;">
+                <div class="eldora-profile-hero-info" style="position: absolute; bottom: 20px; right: 20px; z-index: 3; text-align: right;">
+                    <p class="eldora-profile-kicker">HERÓI DE ELDORA</p>
+                    <h2>${p.nome}</h2>
+                    <div class="eldora-profile-classline">
+                        <span class="eldora-profile-class">${infoClasse.emoji} ${p.classe || infoClasse.nome}</span>
+                        <span class="eldora-profile-level">Nível ${p.level}</span>
                     </div>
-                    <button onclick="window.perfilVisual.renderizarEdicao()" style="margin-top: 10px; background: rgba(0,0,0,0.5); color:#fff; border: 1px solid #666; padding: 6px 12px; font-size: 0.8em; border-radius: 6px; cursor: pointer;">⚙️ Editar Visual</button>
+                    <button class="eldora-profile-edit" onclick="window.perfilVisual.renderizarEdicao()">⚙️ Editar visual</button>
                 </div>
-            </div>
-            
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 15px;">
-                <div style="background: #1a1a1a; padding: 8px 12px; border-radius: 8px; border-left: 3px solid #e74c3c; display: flex; justify-content: space-between; align-items: center;">
-                    <span style="color: #e74c3c; font-size: 0.7em; font-weight: bold;">❤️ HP</span>
-                    <div style="font-size: 1em; color: #fff; font-weight: bold;">${p.hp_atual} <span style="font-size:0.7em; color:#777;">/ ${p.hp_max}</span></div>
-                </div>
-                <div style="background: #1a1a1a; padding: 8px 12px; border-radius: 8px; border-left: 3px solid #3b82f6; display: flex; justify-content: space-between; align-items: center;">
-                    <span style="color: #3b82f6; font-size: 0.7em; font-weight: bold;">💧 MP</span>
-                    <div style="font-size: 1em; color: #fff; font-weight: bold;">${p.mp_atual} <span style="font-size:0.7em; color:#777;">/ ${p.mp_max}</span></div>
-                </div>
-                <!-- 👇 AQUI DIVIDIMOS O ESPAÇO: MEIO A MEIO PARA OURO E GEMAS 👇 -->
-                <div style="background: #1a1a1a; padding: 8px 12px; border-radius: 8px; border-left: 3px solid #f1c40f; display: flex; justify-content: space-between; align-items: center;">
-                    <span style="color: #f1c40f; font-size: 0.7em; font-weight: bold;">💰 Ouro</span>
-                    <div style="font-size: 1em; color: #fff; font-weight: bold;">${p.gold.toLocaleString('pt-BR')}</div>
-                </div>
-                <div style="background: #1a1a1a; padding: 8px 12px; border-radius: 8px; border-left: 3px solid #9b59b6; display: flex; justify-content: space-between; align-items: center;">
-                    <span style="color: #9b59b6; font-size: 0.7em; font-weight: bold;">💎 Gemas</span>
-                    <div style="font-size: 1em; color: #fff; font-weight: bold;">${p.gems.toLocaleString('pt-BR')}</div>
-                </div>
-            </div>
+            </section>
 
-            <div style="background: #1e1e1e; padding: 12px; border-radius: 10px; border: 1px solid #333; margin-bottom: 20px;">
-                <div style="display: flex; justify-content: space-between; font-size: 0.75em; margin-bottom: 5px;"><span style="color: #aaa; font-weight: bold;">Experiência</span><span style="color: #fff;">${p.xp.toLocaleString('pt-BR')} / ${p.xp_max.toLocaleString('pt-BR')}</span></div>
-                <div style="width: 100%; height: 8px; background: #111; border-radius: 4px; border: 1px solid #000;"><div style="width: ${percentXP}%; height: 100%; background: linear-gradient(90deg, #8e44ad, #9b59b6); border-radius: 4px;"></div></div>
-            </div>
-            
-            ${htmlProfissao}
-            <div style="display: flex; gap: 5px; background: #0f172a; padding: 5px; border-radius: 8px; border: 1px solid #1e293b; margin-bottom: 15px;">
-                <button onclick="alternarAbaPerfil('status')" id="btn-perf-status" style="flex:1; padding:8px 5px; background:#1e293b; color:#fff; border:none; border-radius:6px; font-weight:bold; cursor:pointer; font-size:0.85em;">Atributos ${p.pontos_livres > 0 ? `<span style="background:#e74c3c; padding:2px 6px; border-radius:10px; font-size:0.8em; color:white;">${p.pontos_livres}</span>` : ''}</button>
-                <button onclick="alternarAbaPerfil('equips')" id="btn-perf-equips" style="flex:1; padding:8px 5px; background:transparent; color:#94a3b8; border:none; border-radius:6px; font-weight:bold; cursor:pointer; font-size:0.85em;">Equips</button>
-                <button onclick="alternarAbaPerfil('inv')" id="btn-perf-inv" style="flex:1; padding:8px 5px; background:transparent; color:#94a3b8; border:none; border-radius:6px; font-weight:bold; cursor:pointer; font-size:0.85em;">Mochila</button>
-                <button onclick="alternarAbaPerfil('magias')" id="btn-perf-magias" style="flex:1; padding:8px 5px; background:transparent; color:#94a3b8; border:none; border-radius:6px; font-weight:bold; cursor:pointer; font-size:0.85em;">✨ Magias</button>
-            </div>
+            <section class="eldora-profile-resources" aria-label="Recursos do personagem">
+                <div class="eldora-profile-resource resource-hp">
+                    <div class="eldora-resource-heading"><span>❤️ VIDA</span><b>${p.hp_atual} <small>/ ${p.hp_max}</small></b></div>
+                    <div class="eldora-resource-track"><i style="width:${percentHP}%"></i></div>
+                </div>
+                <div class="eldora-profile-resource resource-mp">
+                    <div class="eldora-resource-heading"><span>💧 MANA</span><b>${p.mp_atual} <small>/ ${p.mp_max}</small></b></div>
+                    <div class="eldora-resource-track"><i style="width:${percentMP}%"></i></div>
+                </div>
+                <div class="eldora-profile-resource resource-gold"><span>💰 OURO</span><b>${p.gold.toLocaleString('pt-BR')}</b></div>
+                <div class="eldora-profile-resource resource-gems"><span>💎 GEMAS</span><b>${p.gems.toLocaleString('pt-BR')}</b></div>
+            </section>
 
-            <div id="conteudo-perf-status" style="display: block;">${htmlStatus}</div>
-            <div id="conteudo-perf-equips" style="display: none;">${htmlEquips}</div>
-            <div id="conteudo-perf-inv" style="display: none;">${htmlInv}</div>
-            <div id="conteudo-perf-magias" style="display: none;"></div>
+            <section class="eldora-profile-xp">
+                <div class="eldora-xp-heading"><span>✦ Experiência</span><b>${p.xp.toLocaleString('pt-BR')} <small>/ ${p.xp_max.toLocaleString('pt-BR')} XP</small></b></div>
+                <div class="eldora-xp-track"><i style="width:${percentXP}%"></i></div>
+            </section>
+
+            <div class="eldora-profile-professions">${htmlProfissao}</div>
+            <nav class="eldora-profile-tabs" aria-label="Abas do perfil">
+                <button onclick="alternarAbaPerfil('status')" id="btn-perf-status" class="eldora-profile-tab is-active">⚔️ Atributos ${p.pontos_livres > 0 ? `<span class="eldora-points-badge">${p.pontos_livres}</span>` : ''}</button>
+                <button onclick="alternarAbaPerfil('equips')" id="btn-perf-equips" class="eldora-profile-tab">🛡️ Equipamentos</button>
+                <button onclick="alternarAbaPerfil('inv')" id="btn-perf-inv" class="eldora-profile-tab">🎒 Mochila</button>
+                <button onclick="alternarAbaPerfil('magias')" id="btn-perf-magias" class="eldora-profile-tab">✨ Magias</button>
+            </nav>
+
+            <section id="conteudo-perf-status" class="eldora-profile-pane eldora-status-pane" style="display: block;">
+                <header class="eldora-pane-heading"><span>PERSONAGEM</span><h3>Atributos do herói</h3></header>
+                ${htmlStatus}
+            </section>
+            <section id="conteudo-perf-equips" class="eldora-profile-pane eldora-equipment-pane" style="display: none;">
+                <header class="eldora-pane-heading"><span>PREPARAÇÃO</span><h3>Equipamentos</h3></header>
+                ${htmlEquips}
+            </section>
+            <section id="conteudo-perf-inv" class="eldora-profile-pane eldora-inventory-pane" style="display: none;">
+                <header class="eldora-pane-heading"><span>ITENS DO HERÓI</span><h3>Mochila</h3></header>
+                ${htmlInv}
+            </section>
+            <section id="conteudo-perf-magias" class="eldora-profile-pane eldora-spells-pane" style="display: none;">
+                <header class="eldora-pane-heading"><span>GRIMÓRIO</span><h3>Magias</h3></header>
+            </section>
         `;
         setTimeout(() => {
             document.querySelectorAll("[data-equip-img]").forEach(img => {
@@ -933,6 +938,7 @@ window.alternarAbaPerfil = function(abaID) {
     ['btn-perf-status', 'btn-perf-equips', 'btn-perf-inv', 'btn-perf-skins', 'btn-perf-magias'].forEach(b => {
         let btn = document.getElementById(b);
         if(btn) {
+            btn.classList.remove('is-active');
             btn.style.background = 'transparent';
             btn.style.color = '#94a3b8';
         }
@@ -943,6 +949,7 @@ window.alternarAbaPerfil = function(abaID) {
     
     let abaBotao = document.getElementById(`btn-perf-${abaID}`);
     if(abaBotao) {
+        abaBotao.classList.add('is-active');
         abaBotao.style.background = '#1e293b';
         abaBotao.style.color = '#fff';
     }
@@ -954,6 +961,7 @@ window.alternarAbaPerfil = function(abaID) {
     
     if (abaID === 'skins') carregarMenuSkins();
     if (abaID === 'magias') carregarMenuMagias();
+    if (abaID === 'inv') filtrarMochila(window.perfilFiltroMochilaAtual || 'todos');
 }
 
 // --- FUNÇÃO PARA DESENHAR AS SKINS ---
@@ -1155,6 +1163,7 @@ window.equiparSkillPerfil = async function(skillId, slotNum) {
 // ==========================================
 window.filtrarMochila = function(filtro) {
     window.perfilFiltroMochilaAtual = filtro || 'todos';
+    filtro = window.perfilFiltroMochilaAtual;
 
     if (!window.perfilDadosGlobais || !window.perfilDadosGlobais.inventario) return;
     
@@ -1166,6 +1175,7 @@ window.filtrarMochila = function(filtro) {
     ['todos', 'equips', 'materiais', 'usaveis'].forEach(f => {
         const btn = document.getElementById(`btn-filtro-${f}`);
         if (btn) {
+            btn.classList.toggle('is-active', f === filtro);
             btn.style.background = (f === filtro) ? '#3b82f6' : '#1e293b';
             btn.style.color = (f === filtro) ? '#fff' : '#94a3b8';
         }
@@ -1212,18 +1222,18 @@ window.filtrarMochila = function(filtro) {
         const corBorda = coresRaridade[(item.raridade || 'comum').toLowerCase()] || '#334155';
         
         const slotHtml = `
-            <div onclick="abrirModalItem('${item.id}', 'mochila')" 
+            <div class="eldora-item-slot" onclick="abrirModalItem('${item.id}', 'mochila')"
                  style="position: relative; width: 100%; aspect-ratio: 1; background: rgba(15, 23, 42, 0.8); border: 2px solid ${corBorda}; border-radius: 8px; display: flex; justify-content: center; align-items: center; cursor: pointer; box-shadow: inset 0 0 15px rgba(0,0,0,0.8), 0 2px 4px rgba(0,0,0,0.4); transition: transform 0.1s;">
                 
                 <img data-item-img="${item.id}" src="/static/assets/box.png" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-block';" style="max-width: 80%; max-height: 80%; object-fit: contain; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.9));">
                 <span style="display:none; font-size: 2em; opacity: 0.8;">${item.emoji || '📦'}</span>
                 
-                <div style="position: absolute; bottom: -5px; right: -5px; background: #000; color: #fff; font-size: 0.7em; font-weight: bold; padding: 2px 6px; border-radius: 10px; border: 1px solid #333; box-shadow: 0 2px 4px rgba(0,0,0,0.5);">
+                <div class="eldora-item-quantity" style="position: absolute; bottom: -5px; right: -5px; background: #000; color: #fff; font-size: 0.7em; font-weight: bold; padding: 2px 6px; border-radius: 10px; border: 1px solid #333; box-shadow: 0 2px 4px rgba(0,0,0,0.5);">
                     x${item.qtd || item.quantidade || 1}
                 </div>
                 
                 ${window.renderRuneSockets?.(item) || ''}
-                ${item.refino > 0 ? `<div style="position: absolute; top: -5px; left: -5px; background: #eab308; color: #000; font-size: 0.65em; font-weight: bold; padding: 2px 4px; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.5);">+${item.refino}</div>` : ''}
+                ${item.refino > 0 ? `<div class="eldora-item-refinement" style="position: absolute; top: -5px; left: -5px; background: #eab308; color: #000; font-size: 0.65em; font-weight: bold; padding: 2px 4px; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.5);">+${item.refino}</div>` : ''}
             </div>
         `;
         grid.innerHTML += slotHtml;

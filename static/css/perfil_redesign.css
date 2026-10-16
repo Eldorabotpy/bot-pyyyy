@@ -1,0 +1,496 @@
+/* Mochila & Perfil: visual responsivo isolado desta tela. */
+#aba-perfil {
+    --eldora-ink: #f7f2e8;
+    --eldora-muted: #a9b4c4;
+    --eldora-gold: #e6c574;
+    --eldora-gold-deep: #9c7432;
+    --eldora-panel: rgba(13, 22, 38, .96);
+    --eldora-panel-soft: rgba(21, 34, 53, .94);
+    --eldora-line: rgba(194, 164, 99, .28);
+    padding: clamp(10px, 2vw, 26px) !important;
+    color: var(--eldora-ink);
+}
+
+#aba-perfil #conteudo-perfil-wrapper {
+    width: min(100%, 1120px);
+    margin: 0 auto;
+}
+
+#aba-perfil #perfil-dados,
+#aba-perfil #perfil-dados * {
+    box-sizing: border-box;
+}
+
+#aba-perfil #perfil-dados {
+    width: 100%;
+    max-width: 1120px;
+    margin: 0 auto;
+    color: var(--eldora-ink);
+    font-family: Inter, "Segoe UI", system-ui, sans-serif;
+}
+
+#aba-perfil #perfil-carregando {
+    min-height: 180px;
+    display: grid;
+    place-items: center;
+    color: var(--eldora-muted);
+}
+
+#aba-perfil .eldora-profile-codex-button {
+    width: 46px !important;
+    height: 46px !important;
+    border: 1px solid rgba(230, 197, 116, .8) !important;
+    background: linear-gradient(145deg, #24354b, #111d2d) !important;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, .35), inset 0 1px rgba(255, 255, 255, .12) !important;
+}
+
+/* Cartão do herói */
+#aba-perfil .eldora-profile-hero {
+    height: clamp(230px, 32vw, 340px) !important;
+    margin: 0 0 14px !important;
+    border: 1px solid rgba(230, 197, 116, .68) !important;
+    border-radius: 22px !important;
+    background-color: #15233a;
+    box-shadow: 0 18px 42px rgba(0, 0, 0, .34), inset 0 1px rgba(255, 255, 255, .12) !important;
+    isolation: isolate;
+}
+
+#aba-perfil .eldora-profile-hero::after {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    content: "";
+    pointer-events: none;
+    background: linear-gradient(90deg, rgba(7, 14, 26, .1) 18%, rgba(7, 14, 26, .18) 48%, rgba(7, 14, 26, .82) 100%);
+}
+
+#aba-perfil .eldora-profile-hero-shade {
+    background: linear-gradient(0deg, rgba(5, 11, 21, .76), transparent 58%) !important;
+}
+
+#aba-perfil .eldora-profile-hero-avatar {
+    left: 7% !important;
+    bottom: 0 !important;
+    height: 94% !important;
+    max-width: 62%;
+    transform: none !important;
+    object-position: bottom center;
+    filter: drop-shadow(0 14px 16px rgba(0, 0, 0, .72)) !important;
+}
+
+#aba-perfil .eldora-profile-hero-info {
+    right: clamp(14px, 4vw, 42px) !important;
+    bottom: clamp(14px, 3vw, 30px) !important;
+    width: min(54%, 520px);
+    text-align: right;
+    text-shadow: 0 2px 12px rgba(0, 0, 0, .85);
+}
+
+#aba-perfil .eldora-profile-kicker {
+    margin: 0 0 5px;
+    color: var(--eldora-gold);
+    font-size: .66rem;
+    font-weight: 800;
+    letter-spacing: .2em;
+}
+
+#aba-perfil .eldora-profile-hero-info h2 {
+    margin: 0 0 8px !important;
+    color: #fff !important;
+    font-family: Cinzel, Georgia, serif;
+    font-size: clamp(1.45rem, 4.1vw, 2.65rem) !important;
+    line-height: 1.05;
+    letter-spacing: .015em;
+    overflow-wrap: anywhere;
+    text-shadow: 0 3px 14px rgba(0, 0, 0, .95) !important;
+}
+
+#aba-perfil .eldora-profile-classline {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 7px;
+}
+
+#aba-perfil .eldora-profile-class,
+#aba-perfil .eldora-profile-level {
+    display: inline-flex;
+    align-items: center;
+    min-height: 29px;
+    padding: 5px 10px;
+    border: 1px solid rgba(230, 197, 116, .52);
+    border-radius: 999px;
+    background: rgba(11, 20, 34, .72);
+    color: #f6deb0;
+    font-size: .78rem;
+    font-weight: 750;
+}
+
+#aba-perfil .eldora-profile-level {
+    border-color: rgba(135, 183, 255, .45);
+    color: #c9defe;
+}
+
+#aba-perfil .eldora-profile-edit {
+    min-height: 38px;
+    margin-top: 10px;
+    padding: 7px 13px;
+    border: 1px solid rgba(235, 212, 159, .56);
+    border-radius: 10px;
+    background: rgba(15, 27, 43, .82);
+    color: #fff3d5;
+    font-size: .78rem;
+    font-weight: 750;
+    cursor: pointer;
+    transition: background .18s ease, transform .18s ease;
+}
+
+#aba-perfil .eldora-profile-edit:hover { background: rgba(156, 116, 50, .78); }
+#aba-perfil .eldora-profile-edit:active { transform: scale(.97); }
+
+/* Vida, mana, moedas e experiência */
+#aba-perfil .eldora-profile-resources {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+    margin: 0 0 11px;
+}
+
+#aba-perfil .eldora-profile-resource {
+    min-width: 0;
+    min-height: 70px;
+    padding: 12px 14px;
+    border: 1px solid var(--eldora-line);
+    border-radius: 15px;
+    background: linear-gradient(145deg, rgba(26, 41, 62, .97), rgba(12, 21, 36, .98));
+    box-shadow: 0 8px 20px rgba(0, 0, 0, .16), inset 0 1px rgba(255, 255, 255, .045);
+}
+
+#aba-perfil .eldora-profile-resource > span {
+    display: block;
+    margin-bottom: 5px;
+    color: var(--eldora-muted);
+    font-size: .66rem;
+    font-weight: 800;
+    letter-spacing: .1em;
+}
+
+#aba-perfil .eldora-resource-heading,
+#aba-perfil .eldora-xp-heading {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 8px;
+    font-size: .72rem;
+    font-weight: 800;
+}
+
+#aba-perfil .eldora-resource-heading span { color: #cbd5e1; letter-spacing: .08em; }
+#aba-perfil .eldora-resource-heading b,
+#aba-perfil .eldora-profile-resource > b { color: #fff; font-size: 1rem; white-space: nowrap; }
+#aba-perfil .eldora-resource-heading small,
+#aba-perfil .eldora-xp-heading small { color: #9ba9ba; font-size: .78em; font-weight: 600; }
+#aba-perfil .resource-gold > b { color: #f2d078; }
+#aba-perfil .resource-gems > b { color: #d7a9ff; }
+
+#aba-perfil .eldora-resource-track,
+#aba-perfil .eldora-xp-track {
+    height: 8px;
+    overflow: hidden;
+    border: 1px solid rgba(0, 0, 0, .48);
+    border-radius: 999px;
+    background: rgba(3, 8, 16, .82);
+}
+
+#aba-perfil .eldora-resource-track i,
+#aba-perfil .eldora-xp-track i {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    transition: width .35s ease;
+}
+
+#aba-perfil .resource-hp .eldora-resource-track i { background: linear-gradient(90deg, #a83d47, #f17870); }
+#aba-perfil .resource-mp .eldora-resource-track i { background: linear-gradient(90deg, #2868a8, #62b8ef); }
+
+#aba-perfil .eldora-profile-xp {
+    margin-bottom: 13px;
+    padding: 12px 15px 13px;
+    border: 1px solid rgba(134, 112, 183, .42);
+    border-radius: 15px;
+    background: linear-gradient(110deg, rgba(35, 29, 60, .94), rgba(17, 25, 43, .98));
+}
+
+#aba-perfil .eldora-xp-heading { margin-bottom: 9px; color: #e5d7ff; }
+#aba-perfil .eldora-xp-heading b { color: #fff; white-space: nowrap; }
+#aba-perfil .eldora-xp-track { height: 10px; }
+#aba-perfil .eldora-xp-track i { background: linear-gradient(90deg, #7251bd, #bd8df5); box-shadow: 0 0 12px rgba(169, 123, 236, .44); }
+
+/* Profissões mantêm seus dados atuais, em um cartão consistente com o perfil. */
+#aba-perfil .eldora-profile-professions { margin-bottom: 13px; }
+#aba-perfil .eldora-profile-professions > div {
+    max-height: 230px !important;
+    overflow-y: auto;
+    gap: 8px !important;
+    padding: 10px !important;
+    border: 1px solid var(--eldora-line);
+    border-radius: 15px;
+    background: rgba(10, 19, 33, .66);
+}
+
+#aba-perfil .eldora-profile-professions > div > div {
+    border-color: rgba(194, 164, 99, .34) !important;
+    border-radius: 12px !important;
+    background: linear-gradient(120deg, rgba(28, 42, 61, .96), rgba(15, 25, 40, .98)) !important;
+    box-shadow: none !important;
+}
+
+/* Abas e painéis */
+#aba-perfil .eldora-profile-tabs {
+    display: flex;
+    gap: 7px;
+    margin: 0 0 11px;
+    padding: 5px;
+    overflow-x: auto;
+    border: 1px solid rgba(194, 164, 99, .28);
+    border-radius: 15px;
+    background: rgba(9, 17, 30, .9);
+    scrollbar-width: thin;
+    scrollbar-color: #806638 transparent;
+}
+
+#aba-perfil .eldora-profile-tab {
+    flex: 1 0 auto;
+    min-height: 43px;
+    padding: 9px 13px;
+    border: 1px solid transparent;
+    border-radius: 11px;
+    background: transparent !important;
+    color: #aab6c6 !important;
+    font-size: .8rem;
+    font-weight: 800;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: .18s ease;
+}
+
+#aba-perfil .eldora-profile-tab:hover { color: #fff !important; background: rgba(255, 255, 255, .055) !important; }
+#aba-perfil .eldora-profile-tab.is-active {
+    border-color: rgba(230, 197, 116, .56);
+    background: linear-gradient(135deg, #6d552b, #42361f) !important;
+    color: #fff0c8 !important;
+    box-shadow: inset 0 1px rgba(255, 255, 255, .12), 0 4px 12px rgba(0, 0, 0, .2);
+}
+
+#aba-perfil .eldora-points-badge {
+    display: inline-grid;
+    min-width: 19px;
+    height: 19px;
+    margin-left: 3px;
+    place-items: center;
+    border-radius: 999px;
+    background: #bd4d51;
+    color: #fff;
+    font-size: .7rem;
+}
+
+#aba-perfil .eldora-profile-pane {
+    margin: 0 0 16px;
+    padding: clamp(12px, 2vw, 20px);
+    border: 1px solid rgba(134, 157, 187, .2);
+    border-radius: 18px;
+    background: linear-gradient(145deg, rgba(17, 29, 47, .96), rgba(10, 19, 33, .97));
+    box-shadow: 0 14px 34px rgba(0, 0, 0, .18), inset 0 1px rgba(255, 255, 255, .035);
+}
+
+#aba-perfil .eldora-pane-heading { margin: 0 0 13px; }
+#aba-perfil .eldora-pane-heading span { color: var(--eldora-gold); font-size: .62rem; font-weight: 850; letter-spacing: .18em; }
+#aba-perfil .eldora-pane-heading h3 { margin: 3px 0 0; color: #f4ead4; font-family: Cinzel, Georgia, serif; font-size: clamp(1.05rem, 2.4vw, 1.35rem); }
+
+#aba-perfil .eldora-status-grid { gap: 9px !important; margin-top: 0 !important; }
+#aba-perfil .eldora-status-card {
+    min-height: 60px;
+    padding: 10px 12px !important;
+    border-color: rgba(134, 157, 187, .24) !important;
+    border-radius: 12px !important;
+    background: rgba(27, 42, 62, .84) !important;
+}
+
+#aba-perfil .eldora-status-card > div:first-child span:last-child { color: #c8d2e0 !important; font-size: .73rem !important; letter-spacing: .04em; }
+#aba-perfil .eldora-status-card strong { color: #fff1ce !important; }
+#aba-perfil .eldora-status-card button {
+    width: 29px !important;
+    height: 29px !important;
+    border: 1px solid #e6c574 !important;
+    border-radius: 9px !important;
+    background: linear-gradient(145deg, #e2c16e, #a57c37) !important;
+    color: #211b10 !important;
+}
+
+#aba-perfil .eldora-status-chances {
+    margin-top: 11px !important;
+    padding: 13px !important;
+    border-color: rgba(134, 157, 187, .22) !important;
+    border-radius: 13px !important;
+    background: rgba(21, 34, 53, .8) !important;
+}
+
+/* Equipamentos */
+#aba-perfil .eldora-equipment-panel { margin-top: 0 !important; }
+#aba-perfil .eldora-equipment-stage {
+    height: clamp(380px, 62vh, 520px) !important;
+    min-height: 380px;
+    border: 1px solid rgba(194, 164, 99, .42) !important;
+    border-radius: 16px !important;
+    background: radial-gradient(ellipse at 50% 40%, #243a50, #101b2a 68%, #0a1220) !important;
+    box-shadow: inset 0 0 55px rgba(0, 0, 0, .64) !important;
+}
+
+#aba-perfil .eldora-equipment-backdrop { opacity: .2 !important; }
+#aba-perfil .eldora-equipment-avatar { width: 56% !important; height: 91% !important; opacity: .88 !important; }
+#aba-perfil .eldora-equipment-slot {
+    width: clamp(43px, 6vw, 54px) !important;
+    height: clamp(43px, 6vw, 54px) !important;
+    border-radius: 13px !important;
+    background: rgba(12, 22, 36, .9) !important;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, .42), inset 0 1px rgba(255, 255, 255, .1) !important;
+    backdrop-filter: blur(5px);
+    transition: transform .16s ease, filter .16s ease;
+}
+
+#aba-perfil .eldora-equipment-slot[onclick]:not([onclick=""]):hover { transform: translate(-50%, -50%) scale(1.06); filter: brightness(1.14); }
+#aba-perfil .eldora-equipment-slot img,
+#aba-perfil .eldora-tool-slot img { max-width: 78% !important; max-height: 78% !important; }
+#aba-perfil .eldora-companion-button {
+    min-height: 64px !important;
+    margin: 11px 0 !important;
+    border-radius: 14px !important;
+    background: linear-gradient(110deg, rgba(35, 53, 72, .95), rgba(19, 31, 48, .98)) !important;
+    border-color: rgba(194, 164, 99, .45) !important;
+    color: #f2dca9 !important;
+}
+
+#aba-perfil .eldora-profession-tools {
+    border: 1px solid rgba(194, 164, 99, .31) !important;
+    border-radius: 15px !important;
+    background: rgba(11, 20, 34, .75) !important;
+    box-shadow: none !important;
+}
+
+#aba-perfil .eldora-profession-tools > div:last-of-type { gap: 9px !important; }
+#aba-perfil .eldora-tool-slot {
+    min-height: 64px;
+    border-radius: 12px !important;
+    background: rgba(27, 43, 62, .92) !important;
+    box-shadow: none !important;
+}
+
+/* Mochila */
+#aba-perfil .eldora-inventory-filters {
+    gap: 7px !important;
+    margin: 0 0 13px !important;
+    padding: 0 0 3px !important;
+    scrollbar-width: none;
+}
+
+#aba-perfil .eldora-inventory-filter {
+    flex: 1 0 auto !important;
+    min-height: 40px;
+    padding: 8px 13px !important;
+    border: 1px solid rgba(139, 159, 186, .25) !important;
+    border-radius: 11px !important;
+    background: rgba(27, 42, 62, .9) !important;
+    color: #b9c5d5 !important;
+    font-size: .76rem !important;
+    font-weight: 800 !important;
+}
+
+#aba-perfil .eldora-inventory-filter.is-active {
+    border-color: rgba(230, 197, 116, .64) !important;
+    background: linear-gradient(135deg, #6d552b, #42361f) !important;
+    color: #fff0c8 !important;
+}
+
+#aba-perfil .eldora-inventory-grid {
+    grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)) !important;
+    gap: 11px !important;
+}
+
+#aba-perfil .eldora-item-slot {
+    border-radius: 13px !important;
+    background: linear-gradient(145deg, rgba(35, 50, 69, .97), rgba(12, 22, 37, .98)) !important;
+    box-shadow: inset 0 1px rgba(255, 255, 255, .08), 0 7px 16px rgba(0, 0, 0, .25) !important;
+    transition: transform .15s ease, filter .15s ease;
+}
+
+#aba-perfil .eldora-item-slot:hover { transform: translateY(-2px); filter: brightness(1.13); }
+#aba-perfil .eldora-item-slot img { max-width: 76% !important; max-height: 76% !important; }
+#aba-perfil .eldora-item-quantity { right: -4px !important; bottom: -4px !important; border-color: #52647b !important; background: #111d2c !important; font-size: .65rem !important; }
+#aba-perfil .eldora-item-refinement { border-radius: 7px !important; }
+#aba-perfil .eldora-spells-pane > div { gap: 10px !important; }
+#aba-perfil .eldora-spells-pane > div > div { border-radius: 13px !important; }
+
+@media (max-width: 640px) {
+    #aba-perfil { padding: 10px !important; }
+    #aba-perfil .eldora-profile-hero {
+        height: clamp(226px, 68vw, 278px) !important;
+        border-radius: 18px !important;
+    }
+    #aba-perfil .eldora-profile-hero::after {
+        background: linear-gradient(90deg, rgba(7, 14, 26, .03) 10%, rgba(7, 14, 26, .24) 43%, rgba(7, 14, 26, .84) 100%);
+    }
+    #aba-perfil .eldora-profile-hero-avatar {
+        left: 0 !important;
+        height: 91% !important;
+        max-width: 59%;
+    }
+    #aba-perfil .eldora-profile-hero-info {
+        right: 12px !important;
+        bottom: 13px !important;
+        width: 61%;
+    }
+    #aba-perfil .eldora-profile-kicker { font-size: .55rem; letter-spacing: .14em; }
+    #aba-perfil .eldora-profile-hero-info h2 { font-size: clamp(1.2rem, 6vw, 1.7rem) !important; }
+    #aba-perfil .eldora-profile-class,
+    #aba-perfil .eldora-profile-level { min-height: 25px; padding: 4px 8px; font-size: .68rem; }
+    #aba-perfil .eldora-profile-edit { min-height: 34px; margin-top: 7px; font-size: .72rem; }
+    #aba-perfil .eldora-profile-resources { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    #aba-perfil .eldora-profile-resource { min-height: 65px; padding: 10px 11px; border-radius: 13px; }
+    #aba-perfil .eldora-resource-heading { font-size: .67rem; }
+    #aba-perfil .eldora-profile-resource > b { font-size: .93rem; }
+    #aba-perfil .eldora-profile-tabs { margin-inline: -1px; }
+    #aba-perfil .eldora-profile-tab { min-height: 41px; padding-inline: 11px; font-size: .74rem; }
+    #aba-perfil .eldora-profile-pane { padding: 12px; border-radius: 15px; }
+#aba-perfil .eldora-pane-heading { margin-bottom: 11px; }
+    #aba-perfil .eldora-status-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+    #aba-perfil .eldora-status-card { gap: 7px; padding: 9px !important; }
+    #aba-perfil .eldora-status-card > div:first-child span:last-child { font-size: .65rem !important; }
+    #aba-perfil .eldora-equipment-stage { height: clamp(375px, 112vw, 440px) !important; min-height: 375px; }
+    #aba-perfil .eldora-equipment-avatar { width: 55% !important; height: 88% !important; }
+    #aba-perfil .eldora-equipment-slot { width: 44px !important; height: 44px !important; }
+    #aba-perfil .eldora-inventory-grid { grid-template-columns: repeat(auto-fill, minmax(57px, 1fr)) !important; gap: 9px !important; }
+}
+
+@media (max-width: 360px) {
+    #aba-perfil .eldora-profile-hero { height: 220px !important; }
+    #aba-perfil .eldora-profile-hero-avatar { left: -3% !important; max-width: 57%; }
+    #aba-perfil .eldora-profile-hero-info { width: 63%; }
+    #aba-perfil .eldora-profile-hero-info h2 { font-size: 1.12rem !important; }
+    #aba-perfil .eldora-profile-resource { padding-inline: 9px; }
+    #aba-perfil .eldora-status-card { align-items: flex-start !important; flex-direction: column; }
+    #aba-perfil .eldora-status-card > div:last-child { width: 100%; justify-content: space-between; }
+}
+
+@media (min-width: 900px) {
+    #aba-perfil .eldora-profile-hero { height: 350px !important; }
+    #aba-perfil .eldora-status-grid { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+    #aba-perfil .eldora-profile-tab { min-height: 47px; font-size: .87rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #aba-perfil #perfil-dados *,
+    #aba-perfil #perfil-dados *::before,
+    #aba-perfil #perfil-dados *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; }
+}
