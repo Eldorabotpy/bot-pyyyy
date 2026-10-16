@@ -408,3 +408,541 @@ body.fora-do-mapa #eldora-controles-hub {
         transition: none;
     }
 }
+
+/* Nova direção visual: diário de aventura ilustrado, com resumo do herói. */
+#btn-abrir-menu {
+    display: grid;
+    place-items: center;
+    padding: 7px;
+    background: linear-gradient(145deg, #273b3a, #14232a 70%);
+    border: 1px solid rgba(226, 190, 107, .82);
+    border-radius: 16px;
+    box-shadow: 0 9px 28px rgba(0, 0, 0, .46), inset 0 1px rgba(255, 255, 255, .16);
+    transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+}
+
+#btn-abrir-menu:hover {
+    transform: translateY(-2px);
+    border-color: #ffe7a5;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, .5), 0 0 20px rgba(226, 190, 107, .22);
+}
+
+#btn-abrir-menu img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, .55));
+}
+
+#menu-overlay {
+    background: rgba(3, 8, 14, .72);
+    backdrop-filter: blur(6px) saturate(.75);
+    -webkit-backdrop-filter: blur(6px) saturate(.75);
+}
+
+#side-menu.eldora-menu {
+    width: min(420px, 92vw);
+    max-width: 420px;
+    color: #f4f0e6;
+    background:
+        radial-gradient(circle at 100% 1%, rgba(224, 188, 102, .15), transparent 230px),
+        radial-gradient(circle at 0 100%, rgba(64, 112, 97, .13), transparent 250px),
+        linear-gradient(180deg, #14222c 0%, #101b27 48%, #0d1722 100%);
+    border-left: 1px solid rgba(224, 188, 102, .72);
+    border-radius: 24px 0 0 24px;
+    box-shadow: -24px 0 72px rgba(0, 0, 0, .62), inset 1px 0 rgba(255, 247, 221, .06);
+}
+
+#side-menu.eldora-menu::before {
+    position: absolute;
+    z-index: 0;
+    inset: 9px 0 9px 9px;
+    border: 1px solid rgba(236, 211, 151, .12);
+    border-right: 0;
+    border-radius: 17px 0 0 17px;
+    content: "";
+    pointer-events: none;
+}
+
+#side-menu .eldora-menu-header,
+#side-menu .eldora-menu-resumo,
+#side-menu .eldora-menu-itens,
+#side-menu .eldora-menu-rodape {
+    position: relative;
+    z-index: 1;
+}
+
+#side-menu .eldora-menu-header {
+    min-height: 88px;
+    gap: 14px;
+    padding: calc(env(safe-area-inset-top, 0px) + 17px) 22px 14px;
+    background: linear-gradient(115deg, rgba(32, 48, 57, .92), rgba(17, 30, 41, .82));
+    border-bottom: 1px solid rgba(224, 188, 102, .28);
+}
+
+#side-menu .eldora-menu-brasao {
+    width: 49px;
+    height: 49px;
+    flex-basis: 49px;
+    color: #f6d88f;
+    font-size: 23px;
+    background: linear-gradient(145deg, #3c514d, #1a2d35);
+    border: 1px solid rgba(234, 199, 117, .66);
+    border-radius: 15px;
+    box-shadow: 0 5px 18px rgba(0, 0, 0, .3), inset 0 1px rgba(255, 255, 255, .12);
+}
+
+#side-menu .eldora-menu-titulo {
+    color: #f6dfa5;
+    font-size: 14px;
+    letter-spacing: 1.25px;
+    text-shadow: 0 2px 12px rgba(227, 190, 103, .2);
+}
+
+#side-menu .eldora-menu-subtitulo {
+    color: #aebbc2;
+    font-size: 11px;
+    letter-spacing: .3px;
+}
+
+#side-menu #btn-fechar-menu,
+#side-menu .eldora-menu-fechar {
+    color: #d4d9d2;
+    background: rgba(8, 17, 25, .56);
+    border-color: rgba(218, 226, 216, .17);
+    border-radius: 13px;
+}
+
+#side-menu #btn-fechar-menu:hover {
+    color: #ffe8ad;
+    background: rgba(73, 62, 39, .68);
+    border-color: rgba(235, 198, 109, .55);
+}
+
+#side-menu .eldora-menu-resumo {
+    flex: 0 0 auto;
+    margin: 16px 17px 4px;
+    padding: 13px 14px 14px;
+    overflow: hidden;
+    background:
+        linear-gradient(100deg, rgba(9, 18, 25, .93), rgba(14, 27, 34, .77)),
+        url("/static/assets/fundos/floresta.png") center 53% / cover;
+    border: 1px solid rgba(222, 188, 108, .42);
+    border-radius: 18px;
+    box-shadow: inset 0 1px rgba(255, 255, 255, .11), 0 10px 24px rgba(0, 0, 0, .2);
+}
+
+#side-menu .eldora-menu-resumo::after {
+    position: absolute;
+    top: -45px;
+    right: -45px;
+    width: 120px;
+    height: 120px;
+    border: 1px solid rgba(242, 211, 141, .14);
+    border-radius: 50%;
+    box-shadow: 0 0 0 12px rgba(242, 211, 141, .025), 0 0 0 26px rgba(242, 211, 141, .02);
+    content: "";
+    pointer-events: none;
+}
+
+#side-menu .eldora-menu-resumo-topo,
+#side-menu .eldora-menu-resumo-identidade,
+#side-menu .eldora-menu-recursos {
+    position: relative;
+    z-index: 1;
+}
+
+#side-menu .eldora-menu-resumo-topo {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    color: #b8c1bd;
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 1.35px;
+}
+
+#side-menu .eldora-menu-presenca {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: #bfd6bb;
+    font-size: 8px;
+    letter-spacing: .8px;
+}
+
+#side-menu .eldora-menu-presenca i {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #9dca88;
+    box-shadow: 0 0 9px rgba(157, 202, 136, .78);
+}
+
+#side-menu .eldora-menu-resumo-identidade {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 12px;
+}
+
+#side-menu .eldora-menu-avatar {
+    position: relative;
+    display: grid;
+    flex: 0 0 54px;
+    width: 54px;
+    height: 54px;
+    place-items: center;
+    overflow: hidden;
+    color: #f4d48d;
+    font-size: 24px;
+    background: linear-gradient(145deg, #354c47, #172931);
+    border: 1px solid rgba(245, 212, 138, .72);
+    border-radius: 17px;
+    box-shadow: 0 5px 16px rgba(0, 0, 0, .3), inset 0 1px rgba(255, 255, 255, .14);
+}
+
+#side-menu .eldora-menu-avatar img {
+    position: absolute;
+    inset: 0;
+    display: none;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+#side-menu .eldora-menu-avatar.tem-avatar img {
+    display: block;
+}
+
+#side-menu .eldora-menu-avatar-selo {
+    position: absolute;
+    right: -2px;
+    bottom: -2px;
+    z-index: 1;
+    display: grid;
+    width: 19px;
+    height: 19px;
+    place-items: center;
+    color: #18242a;
+    font-size: 10px;
+    background: #e9c879;
+    border: 2px solid #14232c;
+    border-radius: 50%;
+}
+
+#side-menu .eldora-menu-heroi-texto {
+    display: grid;
+    min-width: 0;
+    gap: 4px;
+}
+
+#side-menu .eldora-menu-heroi-texto strong {
+    overflow: hidden;
+    color: #fff3d7;
+    font-family: "Cinzel", Georgia, serif;
+    font-size: 15px;
+    font-weight: 700;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#side-menu .eldora-menu-heroi-texto span {
+    color: #b2c0bd;
+    font-size: 10px;
+    letter-spacing: .2px;
+}
+
+#side-menu .eldora-menu-recursos {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 14px;
+}
+
+#side-menu .eldora-menu-recurso {
+    display: grid;
+    min-width: 0;
+    gap: 6px;
+}
+
+#side-menu .eldora-menu-recurso-linha {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px;
+    color: #b9c5c1;
+    font-size: 8px;
+    font-weight: 800;
+    letter-spacing: .7px;
+}
+
+#side-menu .eldora-menu-recurso-linha b {
+    color: #edf1e9;
+    font-size: 9px;
+    letter-spacing: 0;
+}
+
+#side-menu .eldora-menu-recurso-trilho {
+    height: 4px;
+    overflow: hidden;
+    background: rgba(2, 9, 14, .8);
+    border: 1px solid rgba(255, 255, 255, .08);
+    border-radius: 999px;
+}
+
+#side-menu .eldora-menu-recurso-trilho i {
+    display: block;
+    width: 0;
+    height: 100%;
+    background: #d87461;
+    border-radius: inherit;
+    box-shadow: 0 0 8px rgba(216, 116, 97, .42);
+    transition: width .28s ease;
+}
+
+#side-menu .eldora-menu-recurso-mp .eldora-menu-recurso-trilho i {
+    background: #63b8d2;
+    box-shadow: 0 0 8px rgba(99, 184, 210, .42);
+}
+
+#side-menu .eldora-menu-recurso-xp .eldora-menu-recurso-trilho i {
+    background: #d8b96c;
+    box-shadow: 0 0 8px rgba(216, 185, 108, .42);
+}
+
+#side-menu .eldora-menu-itens {
+    gap: 8px;
+    padding: 6px 17px 14px;
+    scrollbar-color: #65736b transparent;
+}
+
+#side-menu .eldora-menu-itens::-webkit-scrollbar-thumb {
+    background: #65736b;
+}
+
+#side-menu .eldora-menu-grupo {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    margin: 13px 4px 2px;
+    color: #a3b0ae;
+    font-size: 9px;
+    letter-spacing: 1.65px;
+}
+
+#side-menu .eldora-menu-grupo::after {
+    width: 30px;
+    height: 1px;
+    background: linear-gradient(90deg, rgba(224, 188, 102, .48), transparent);
+    content: "";
+}
+
+#side-menu .eldora-menu-btn {
+    min-height: 53px;
+    gap: 11px;
+    padding: 7px 10px;
+    color: #e5e9e3;
+    background: linear-gradient(110deg, rgba(35, 50, 60, .87), rgba(24, 38, 49, .86));
+    border: 1px solid rgba(174, 190, 190, .15);
+    border-radius: 15px;
+    box-shadow: inset 0 1px rgba(255, 255, 255, .04), 0 3px 9px rgba(0, 0, 0, .13);
+    transition: color .17s ease, background .17s ease, border-color .17s ease, transform .17s ease, box-shadow .17s ease;
+}
+
+#side-menu .eldora-menu-btn:hover {
+    color: #fff7e5;
+    background: linear-gradient(110deg, rgba(52, 71, 75, .95), rgba(33, 50, 59, .95));
+    border-color: rgba(229, 194, 116, .55);
+    transform: translateX(-2px);
+    box-shadow: inset 0 1px rgba(255, 255, 255, .07), 0 7px 16px rgba(0, 0, 0, .2);
+}
+
+#side-menu .eldora-menu-btn .texto {
+    color: inherit;
+    font-size: 13px;
+    font-weight: 650;
+    letter-spacing: .1px;
+}
+
+#side-menu .eldora-menu-icone {
+    width: 38px;
+    height: 38px;
+    color: #d5dfd8;
+    font-size: 18px;
+    background: linear-gradient(145deg, #1d3039, #14252f);
+    border: 1px solid rgba(174, 190, 190, .17);
+    border-radius: 12px;
+}
+
+#side-menu .eldora-menu-btn.active {
+    color: #ffedbf;
+    background: linear-gradient(105deg, rgba(88, 75, 45, .8), rgba(38, 46, 43, .96) 74%);
+    border-color: rgba(237, 200, 119, .72);
+    box-shadow: inset 3px 0 0 #e9c879, inset 0 1px rgba(255, 255, 255, .07), 0 6px 17px rgba(0, 0, 0, .18);
+}
+
+#side-menu .eldora-menu-btn.active .eldora-menu-icone {
+    color: #ffe6a8;
+    background: linear-gradient(145deg, #574b30, #2e382f);
+    border-color: rgba(240, 211, 143, .48);
+}
+
+#side-menu .eldora-menu-central {
+    min-height: 59px;
+    margin: 1px 0 3px;
+    color: #fff2d1;
+    background:
+        radial-gradient(circle at 15% 50%, rgba(242, 210, 139, .22), transparent 135px),
+        linear-gradient(110deg, #65502b, #293530 86%);
+    border: 1px solid rgba(242, 210, 139, .68);
+    border-radius: 16px;
+    box-shadow: inset 0 1px rgba(255, 255, 255, .13), 0 7px 20px rgba(0, 0, 0, .22);
+}
+
+#side-menu .eldora-menu-central:hover {
+    color: #fff9e7;
+    background:
+        radial-gradient(circle at 15% 50%, rgba(255, 225, 158, .29), transparent 140px),
+        linear-gradient(110deg, #745d32, #34433a 86%);
+    border-color: #f2d28b;
+}
+
+#side-menu .eldora-central-icone {
+    color: #ffe6aa;
+    background: rgba(255, 228, 168, .13);
+    border-color: rgba(255, 228, 168, .35);
+}
+
+#side-menu .eldora-menu-em-breve {
+    min-width: 47px;
+    padding: 5px 8px;
+    color: #ffdf98;
+    font-size: 8px;
+    letter-spacing: .65px;
+    background: rgba(15, 27, 33, .64);
+    border-color: rgba(245, 212, 141, .25);
+}
+
+#side-menu .eldora-menu-sair {
+    color: #eab1a1;
+    background: linear-gradient(110deg, rgba(61, 40, 42, .6), rgba(30, 34, 42, .85));
+    border-color: rgba(222, 139, 121, .24);
+}
+
+#side-menu .eldora-menu-sair .eldora-menu-icone {
+    color: #eab1a1;
+    background: rgba(99, 55, 54, .32);
+    border-color: rgba(222, 139, 121, .23);
+}
+
+#side-menu .eldora-menu-rodape {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 9px;
+    min-height: 52px;
+    padding: 8px 22px calc(env(safe-area-inset-bottom, 0px) + 10px);
+    color: #9daaa7;
+    font-size: 10px;
+    letter-spacing: .2px;
+    background: linear-gradient(90deg, rgba(18, 31, 39, .95), rgba(13, 23, 33, .98));
+    border-top: 1px solid rgba(224, 188, 102, .19);
+}
+
+#side-menu .eldora-menu-rodape > span:first-child {
+    color: #e3c47b;
+    font-size: 14px;
+}
+
+#side-menu :focus-visible {
+    outline: 2px solid #f1d58f;
+    outline-offset: 3px;
+}
+
+@media (max-width: 480px) {
+    #side-menu.eldora-menu {
+        width: min(420px, 92vw);
+        border-radius: 22px 0 0 22px;
+    }
+
+    #side-menu .eldora-menu-header {
+        min-height: 82px;
+        padding-right: 18px;
+        padding-left: 18px;
+    }
+
+    #side-menu .eldora-menu-resumo {
+        margin: 13px 13px 3px;
+        padding: 12px;
+    }
+
+    #side-menu .eldora-menu-itens {
+        padding-right: 13px;
+        padding-left: 13px;
+    }
+
+    #side-menu .eldora-menu-btn {
+        min-height: 50px;
+    }
+}
+
+@media (max-height: 720px) {
+    #side-menu .eldora-menu-header {
+        min-height: 70px;
+        padding-top: calc(env(safe-area-inset-top, 0px) + 9px);
+        padding-bottom: 9px;
+    }
+
+    #side-menu .eldora-menu-brasao {
+        width: 42px;
+        height: 42px;
+        flex-basis: 42px;
+    }
+
+    #side-menu .eldora-menu-resumo {
+        margin-top: 10px;
+        padding-top: 10px;
+        padding-bottom: 10px;
+    }
+
+    #side-menu .eldora-menu-resumo-identidade {
+        margin-top: 8px;
+    }
+
+    #side-menu .eldora-menu-avatar {
+        width: 46px;
+        height: 46px;
+        flex-basis: 46px;
+    }
+
+    #side-menu .eldora-menu-recursos {
+        margin-top: 10px;
+    }
+
+    #side-menu .eldora-menu-itens {
+        gap: 6px;
+    }
+
+    #side-menu .eldora-menu-grupo {
+        margin-top: 8px;
+    }
+
+    #side-menu .eldora-menu-btn {
+        min-height: 46px;
+    }
+
+    #side-menu .eldora-menu-icone {
+        width: 34px;
+        height: 34px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #btn-abrir-menu,
+    #side-menu .eldora-menu-recurso-trilho i,
+    #side-menu .eldora-menu-btn {
+        transition: none;
+    }
+}

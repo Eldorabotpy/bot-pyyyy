@@ -18,125 +18,32 @@ character_bp = Blueprint('character_bp', __name__)
 # ==========================================
 @character_bp.route('/api/portal/login', methods=['POST'])
 def api_portal_login():
-    try:
-        dados = request.json
-        username = dados.get('username')
-        password = dados.get('password')
-        tg_id = dados.get('tg_id') # Opcional, do Telegram
-
-        if not username or not password:
-            return jsonify({"sucesso": False, "erro": "Preencha o usuário e a senha."}), 400
-
-        # Busca o jogador no banco ignorando maiúsculas/minúsculas
-        jogador = users_collection.find_one({"character_name": re.compile(f"^{username}$", re.IGNORECASE)})
-        
-        if not jogador:
-            return jsonify({"sucesso": False, "erro": "Este herói não existe nos registros."}), 404
-
-        # Verifica se a senha bate com o Hash salvo
-        senha_salva = jogador.get("password_hash")
-        if not senha_salva or not check_password_hash(senha_salva, password):
-            return jsonify({"sucesso": False, "erro": "Senha incorreta. Os deuses negaram seu acesso."}), 401
-
-        # 🛡️ VERIFICAÇÃO DE BANIMENTO / CONTA TRANCADA
-        ta_bloqueado, msg_bloqueio = check_account_lock(jogador)
-        if ta_bloqueado:
-            # Retorna o motivo exato do banimento que está no account_lock.py
-            return jsonify({"sucesso": False, "erro": msg_bloqueio}), 403
-
-        # (Opcional) Atualiza o ID do Telegram caso o jogador tenha logado por um aparelho novo
-        if tg_id and jogador.get("telegram_id") != tg_id:
-            users_collection.update_one({"_id": jogador["_id"]}, {"$set": {"telegram_id": tg_id}})
-
-        # Login aprovado! Devolve os dados essenciais para o frontend salvar
-        return jsonify({
-            "sucesso": True,
-            "jogador_id": str(jogador["_id"]),
-            "jogador_nome": jogador.get("character_name"),
-            "genero": jogador.get("gender", "masculino")
-        })
-
-    except Exception as e:
-        print(f"Erro no Login: {e}")
-        return jsonify({"sucesso": False, "erro": "Erro interno do servidor mágico."}), 500
+    return jsonify({"sucesso": False, "erro": "Use o login da conta Eldora."}), 410
 
 # ==========================================
 # 2. ROTA DE CRIAR CONTA / PERSONAGEM
 # ==========================================
 @character_bp.route('/api/portal/criar_personagem', methods=['POST'])
 def api_portal_criar():
-    try:
-        dados = request.json
-        nome = dados.get('nome')
-        senha = dados.get('senha')
-        genero = dados.get('genero', 'masculino')
-        tg_id = dados.get('tg_id')
+    return jsonify({"sucesso": False, "erro": "Entre na conta Eldora antes de criar um personagem."}), 410
 
-        if not nome or not senha or len(senha) < 6:
-            return jsonify({"sucesso": False, "erro": "Nome inválido ou senha muito curta (mín. 6 caracteres)."}), 400
-
-        # Verifica se o nome já está em uso
-        existe = users_collection.find_one({"character_name": re.compile(f"^{nome}$", re.IGNORECASE)})
-        if existe:
-            return jsonify({"sucesso": False, "erro": "Este nome já foi clamado por outro herói!"}), 409
-
-        # Criptografa a senha para salvar com segurança
-        senha_criptografada = generate_password_hash(senha)
-
-        # Monta a ficha base do novo jogador
-        novo_jogador = {
-            "character_name": nome,
-            "password_hash": senha_criptografada, # 👈 Salva a senha embaralhada
-            "gender": genero,
-            "telegram_id": tg_id,
-            "class": "aprendiz",
-            "level": 1,
-            "xp": 0,
-            "gold": 0,
-            "gems": 0,
-            "pvp_points": 0,
-            "pvp_wins": 0,
-            "pvp_losses": 0,
-            "current_hp": 100,
-            "max_hp": 100,
-            "current_mp": 50,
-            "max_mp": 50,
-            "energy": 20,
-            "current_location": "capital_eldora",
-            "created_at": datetime.now(timezone.utc).isoformat()
-        }
-
-        users_collection.insert_one(novo_jogador)
-        return jsonify({"sucesso": True})
-
-    except Exception as e:
-        print(f"Erro ao forjar herói: {e}")
-        return jsonify({"sucesso": False, "erro": "As forjas falharam. Tente novamente."}), 500
-        
 @character_bp.route('/api/meus_personagens/<telegram_id>')
 def listar_personagens(telegram_id):
-    try:
-        if not telegram_id or telegram_id in ["undefined", "null", ""]:
-            return jsonify([])
-        
-        cursor = users_collection.find({"telegram_id": int(telegram_id)})
-        personagens = []
-        for p in cursor:
-            personagens.append({
-                "id": str(p["_id"]),
-                "nome": p.get("character_name"),
-                "classe": str(p.get("class")).capitalize(),
-                "level": p.get("level", 1),
-                "gender": p.get("gender", "masculino")
-            })
-        return jsonify(personagens)
-    except Exception as e:
-        print(f"Erro ao listar personagens: {e}")
-        return jsonify([])
+    from modules.portal_auth import character_owner_query, current_account
+    account = current_account()
+    if not account:
+        return jsonify(erro='Entre na sua conta.'), 401
+    cursor = users_collection.find(character_owner_query(account))
+    personagens = []
+    for p in cursor:
+        personagens.append({"id": str(p["_id"]), "nome": p.get("character_name"), "classe": str(p.get("class", "aventureiro")).capitalize(), "level": p.get("level", 1), "gender": p.get("gender", "masculino")})
+    return jsonify(personagens)
 
 @character_bp.route('/api/perfil/atualizar', methods=['POST'])
 def atualizar_perfil_custom():
     try:
+        from modules.portal_auth import require_csrf
+        require_csrf()
         dados = request.json
         user_id = dados.get("user_id")
         if not user_id:

@@ -211,20 +211,29 @@
             
             <nav id="portal-entry-tabs" class="portal-entry-tabs" aria-label="Acesso"><button type="button" onclick="portalScreen('login')">Entrar</button><button type="button" onclick="portalScreen('create')">Criar conta</button></nav>
             <button id="portal-logout" type="button" class="portal-back" hidden>← Sair / trocar conta</button>
-            <section id="telegram-credentials" hidden style="width:100%">
-                <p class="portal-description">Guarde seu usuário e senha. Eles permitem acessar esta conta mesmo sem o Telegram.</p>
-                <div class="input-container"><label for="telegram-username">USUÁRIO DA CONTA</label><input id="telegram-username" maxlength="24" autocomplete="username" placeholder="De 3 a 24 letras ou números"></div>
-                <div class="input-container"><label for="telegram-password">SENHA</label><input id="telegram-password" type="password" minlength="6" maxlength="128" autocomplete="new-password" placeholder="Pelo menos 6 caracteres"></div>
-                <div class="input-container"><label for="telegram-password-confirm">CONFIRMAR SENHA</label><input id="telegram-password-confirm" type="password" maxlength="128" autocomplete="new-password"></div>
-                <button id="telegram-save-credentials" type="button" class="btn-new" hidden>Salvar meu acesso</button>
-                <p id="telegram-credentials-message" role="status"></p>
-            </section>
-            <details id="portal-identidade" open style="padding:14px;margin:8px 0 16px;border:1px solid #665a3b;border-radius:12px;background:#111c2c;color:#dce5f3;font:13px/1.5 Arial,sans-serif">
+            <details id="portal-identidade" style="padding:14px;margin:8px 0 16px;border:1px solid #665a3b;border-radius:12px;background:#111c2c;color:#dce5f3;font:13px/1.5 Arial,sans-serif">
                 <summary id="portal-account-summary">Acesse sua conta</summary><div class="portal-account-body">
                 <p id="portal-auth-state">Verificando sessão…</p>
+                <section id="telegram-credentials" hidden style="width:100%">
+                    <p class="portal-description">Configure ou atualize um usuário e uma senha para entrar nesta mesma conta sem depender de um único provedor.</p>
+                    <div class="input-container"><label for="telegram-username">USUÁRIO DA CONTA</label><input id="telegram-username" maxlength="24" autocomplete="username" placeholder="De 3 a 24 letras ou números"></div>
+                    <div id="account-current-password-container" class="input-container" hidden><label for="account-current-password">SENHA ATUAL</label><input id="account-current-password" type="password" autocomplete="current-password"></div>
+                    <div class="input-container"><label for="telegram-password">NOVA SENHA</label><input id="telegram-password" type="password" minlength="6" maxlength="128" autocomplete="new-password" placeholder="Pelo menos 6 caracteres"></div>
+                    <div class="input-container"><label for="telegram-password-confirm">CONFIRMAR NOVA SENHA</label><input id="telegram-password-confirm" type="password" maxlength="128" autocomplete="new-password"></div>
+                    <button id="telegram-save-credentials" type="button" class="btn-new" hidden>Adicionar acesso por senha</button>
+                    <p id="telegram-credentials-message" role="status"></p>
+                </section>
                 <select hidden id="portal-auth-mode" aria-label="Entrar, criar ou vincular conta" style="width:100%;min-height:44px;margin-bottom:12px"><option value="login">Entrar em conta vinculada</option></select>
                 <div id="portal-google" style="display:flex;justify-content:center"></div>
                 <p id="portal-google-note"></p>
+                <div id="portal-account-actions" hidden>
+                    <button id="portal-unlink-google" type="button" class="btn-new" hidden>Remover vínculo do Google</button>
+                    <button id="portal-unlink-telegram" type="button" class="btn-new" hidden>Remover vínculo do Telegram</button>
+                    <button id="portal-replace-google" type="button" class="btn-new" hidden>Trocar conta Google</button>
+                    <button id="portal-replace-telegram" type="button" class="btn-new" hidden>Trocar conta Telegram</button>
+                    <button id="portal-logout-all" type="button" class="btn-new">Encerrar sessões em outros dispositivos</button>
+                    <p id="portal-account-security-note" role="status"></p>
+                </div>
                 <p id="portal-auth-message" role="status" aria-live="polite"></p>
             </div></details>
             <p id="portal-telegram-hint" class="portal-divider" hidden></p>
@@ -574,6 +583,6 @@
         // A inicialização das telas pertence ao portal_auth.js.
     </script>
 <script src="/static/js/portal_controls.js?v=2"></script>
-<script src="/static/js/portal_auth.js?v=9"></script>
+<script src="/static/js/portal_auth.js?v=10"></script>
 </body>
 </html>

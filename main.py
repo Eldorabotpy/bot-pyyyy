@@ -7,7 +7,7 @@ import logging
 from datetime import datetime
 from threading import Thread, Lock
 from uuid import uuid4
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request, session
 from flask.json.provider import DefaultJSONProvider
 from flask_socketio import SocketIO, emit
 from bson import ObjectId, errors
@@ -63,6 +63,7 @@ from modules.cooldowns import iniciar_turno, aplicar_cooldown
 from modules.combat.combat_engine import processar_acao_combate
 from modules.game_data.items_consumables import CONSUMABLES_DATA
 from modules.player.combat_stats import get_combat_stats_sync, aplicar_combat_stats_no_player
+from modules.socket_invites import SocketInviteRegistry
 
 # ==============================================================================
 # 🏰 EVENTOS DE DUNGEON
@@ -131,6 +132,33 @@ app.register_blueprint(passe_bp)
 app.register_blueprint(character_bp)
 app.register_blueprint(npc_bp)
 app.register_blueprint(dungeon_events_bp)
+
+
+@app.before_request
+def enforce_selected_character_for_player_apis():
+    """Bind legacy player-ID API calls to the character selected in this account session."""
+    if not request.path.startswith('/api/') or request.path.startswith('/api/auth/'):
+        return None
+
+    payload = request.get_json(silent=True) or {}
+    candidates = []
+    sources = (request.view_args or {}, request.args, request.form, payload)
+    for source in sources:
+        for key in ('user_id', 'char_id', 'jogador_id', 'player_id', 'character_id', 'personagem_id', 'id_personagem', 'id_jogador'):
+            value = source.get(key) if hasattr(source, 'get') else None
+            if value not in (None, ''):
+                candidates.append(str(value))
+    if not candidates:
+        return None
+    if len(set(candidates)) != 1:
+        return jsonify(erro='A solicitação contém mais de um personagem.'), 403
+
+    from modules.portal_auth import PlayerSessionError, require_player_identity
+    try:
+        require_player_identity(candidates[0])
+    except PlayerSessionError as exc:
+        return jsonify(erro=str(exc)), exc.status_code
+    return None
 
 # --- INICIALIZAÇÃO SOCKET E MONGO ---
 socketio = SocketIO(
@@ -392,26 +420,6 @@ def escolher_classe():
         print(f"Erro na transmutação de classe: {str(e)}")
         return jsonify({"sucesso": False, "erro": "Falha na magia do servidor."})
         
-@app.route('/api/debug/iniciar_invasao_mapa')
-def admin_iniciar_invasao_mapa():
-    try:
-        sistema_invasao_mapa.iniciar_invasao(jogadores_online)
-        return jsonify({"msg": "Invasão iniciada com sucesso no mapa!"})
-    except Exception as e:
-        import traceback
-        erro_detalhado = traceback.format_exc()
-        return f"<h1 style='color:red;'>🚨 ERRO! 🚨</h1><pre>{erro_detalhado}</pre>"
-
-@app.route('/api/debug/reset_parties')
-def admin_reset_parties():
-    try:
-        # Destrói todos os registos da coleção de grupos no MongoDB
-        from modules.combat.party_engine import parties_collection
-        parties_collection.delete_many({})
-        return "<h1 style='color:#2ecc71; text-align:center; margin-top:50px;'>💥 BOOM! Todas as Parties Fantasmas foram destruídas! O Bastos está livre.</h1>"
-    except Exception as e:
-        return f"<h1 style='color:red;'>🚨 ERRO: {str(e)}</h1>"
-
 def _buscar_sids_por_char_ids(char_ids):
     encontrados = {}
     alvo_set = set(str(x) for x in char_ids)
@@ -1012,20 +1020,50 @@ def combate_grupo_pronto():
 # 3. MULTIPLAYER (SOCKET.IO)
 # ==============================================================================
 jogadores_online = {}
+socket_invites = SocketInviteRegistry(ttl_seconds=300)
+
+
+def revoke_account_sockets(account_id):
+    for sid, player in list(jogadores_online.items()):
+        if str(player.get('account_id') or '') != str(account_id):
+            continue
+        socket_invites.discard_socket(sid)
+        try:
+            socketio.server.disconnect(sid, namespace='/')
+        except Exception:
+            app.logger.exception('Falha ao desconectar sessão revogada')
+        if sid in jogadores_online:
+            jogadores_online.pop(sid, None)
+            socketio.emit('jogadorSaiu', sid, broadcast=True, include_self=False)
+
+
+app.config['REVOKE_ACCOUNT_SOCKETS'] = revoke_account_sockets
+
+
+def _authenticated_socket_player(requested_id=None):
+    player = jogadores_online.get(request.sid)
+    if not player:
+        return None
+    char_id = str(player.get('char_id') or '')
+    if requested_id is not None and str(requested_id) != char_id:
+        return None
+    try:
+        from modules.portal_auth import require_player_identity
+        require_player_identity(char_id)
+    except Exception:
+        return None
+    return player
 app.config['JOGADORES_ONLINE'] = jogadores_online
 registrar_loja_reino(socketio, db, jogadores_online)
 
 
 @socketio.on('jogador_morreu')
 def handle_jogador_morreu(data):
-    emit('mostrarLapide', data, broadcast=True, include_self=False)
-
-    player_sid = request.sid
-    jogador_info = jogadores_online.get(player_sid)
-
-    if not jogador_info or 'char_id' not in jogador_info:
+    jogador_info = _authenticated_socket_player()
+    if not jogador_info:
         return
 
+    emit('mostrarLapide', data, broadcast=True, include_self=False)
     char_id = jogador_info['char_id']
     player_data = users_collection.find_one({"_id": ObjectId(char_id)})
 
@@ -1208,6 +1246,10 @@ def handle_convite_grupo(dados):
             if str(info['char_id']) == str(alvo_id):
                 
                 # Dispara o Modal para o Bastos
+                socket_invites.issue(
+                    'grupo', sid, remetente_sid, lider_id, str(info['char_id']),
+                    context={'party_id': str(party_id)}
+                )
                 emit('receberConviteGrupo', {'party_id': party_id, 'remetente_id': lider_id, 'remetente_nome': remetente['nome']}, room=sid)
                 
                 # Confirma no chat do remetente
@@ -1241,10 +1283,18 @@ def handle_marcar_lidos(dados):
         
 @socketio.on('aceitarGrupo')
 def handle_aceitar_grupo(dados):
-    party_id = dados.get('party_id')
     sid = request.sid
-    jogador = jogadores_online.get(sid)
+    jogador = _authenticated_socket_player()
+    dados = dados if isinstance(dados, dict) else {}
+    party_id = str(dados.get('party_id') or '')
     if not jogador or not party_id: return
+
+    convite = socket_invites.consume(
+        'grupo', sid, jogador['char_id'], context={'party_id': party_id}
+    )
+    if not convite:
+        emit('novaMensagemChat', {'remetente': 'Sistema', 'texto': 'Convite de grupo inválido ou expirado.', 'tipo': 'erro'}, to=sid)
+        return
 
     sucesso, msg = adicionar_membro(party_id, str(jogador['char_id']), jogador['nome'])
 
@@ -1328,19 +1378,24 @@ def handle_sair_grupo(dados):
 @socketio.on('enviarConviteAmizade')
 def handle_convite_amizade(dados):
     remetente_sid = request.sid
-    if remetente_sid not in jogadores_online: return
+    remetente = _authenticated_socket_player()
+    dados = dados if isinstance(dados, dict) else {}
+    if not remetente: return
     
-    remetente_id = jogadores_online[remetente_sid]['char_id']
-    remetente_nome = jogadores_online[remetente_sid]['nome']
-    alvo_id = dados.get('alvo_id')
+    remetente_id = str(remetente['char_id'])
+    remetente_nome = remetente['nome']
+    alvo_id = str(dados.get('alvo_id') or '')
+    if not ObjectId.is_valid(alvo_id) or alvo_id == remetente_id:
+        return
     
     alvo_sid = None
     for sid, info in jogadores_online.items():
-        if info.get('char_id') == alvo_id:
+        if str(info.get('char_id')) == alvo_id:
             alvo_sid = sid
             break
             
     if alvo_sid:
+        socket_invites.issue('amizade', alvo_sid, remetente_sid, remetente_id, alvo_id)
         emit('receberConviteAmizade', {"remetente_id": remetente_id, "remetente_nome": remetente_nome}, to=alvo_sid)
         emit('novaMensagemChat', {"remetente": "Sistema", "texto": "Convite de amizade enviado!", "tipo": "privado"}, to=remetente_sid)
     else:
@@ -1349,21 +1404,35 @@ def handle_convite_amizade(dados):
 @socketio.on('aceitarAmizade')
 def handle_aceitar_amizade(dados):
     meu_sid = request.sid
-    if meu_sid not in jogadores_online: return
-    
-    meu_id = jogadores_online[meu_sid]['char_id']
-    meu_nome = jogadores_online[meu_sid]['nome']
-    amigo_id = dados.get('amigo_id')
-    amigo_nome = dados.get('amigo_nome')
-    
+    jogador = _authenticated_socket_player()
+    dados = dados if isinstance(dados, dict) else {}
+    if not jogador: return
+
+    meu_id = str(jogador['char_id'])
+    amigo_id = str(dados.get('amigo_id') or '')
+    convite = socket_invites.consume('amizade', meu_sid, meu_id, sender_char_id=amigo_id)
+    amigo_online = jogadores_online.get(convite.get('sender_sid')) if convite else None
+    if (
+        not convite
+        or not amigo_online
+        or str(amigo_online.get('char_id')) != amigo_id
+        or not ObjectId.is_valid(amigo_id)
+        or amigo_id == meu_id
+    ):
+        emit('novaMensagemChat', {"remetente": "Sistema", "texto": "Convite de amizade inválido ou expirado.", "tipo": "erro"}, to=meu_sid)
+        return
+
+    meu_db = users_collection.find_one({"_id": ObjectId(meu_id)})
+    amigo_db = users_collection.find_one({"_id": ObjectId(amigo_id)})
+    if not meu_db or not amigo_db:
+        return
+    meu_nome = meu_db.get('character_name', jogador.get('nome', 'Herói'))
+    amigo_nome = amigo_db.get('character_name', amigo_online.get('nome', 'Herói'))
+
     users_collection.update_one({"_id": ObjectId(meu_id)}, {"$addToSet": {"amigos": {"id": amigo_id, "nome": amigo_nome}}})
     users_collection.update_one({"_id": ObjectId(amigo_id)}, {"$addToSet": {"amigos": {"id": meu_id, "nome": meu_nome}}})
-    
-    for sid, info in jogadores_online.items():
-        if info.get('char_id') == amigo_id:
-            emit('novaMensagemChat', {"remetente": "Sistema", "texto": f"🤝 {meu_nome} aceitou o teu pedido de amizade!", "tipo": "privado"}, to=sid)
-            break
-            
+
+    emit('novaMensagemChat', {"remetente": "Sistema", "texto": f"🤝 {meu_nome} aceitou o teu pedido de amizade!", "tipo": "privado"}, to=convite['sender_sid'])
     emit('novaMensagemChat', {"remetente": "Sistema", "texto": f"🤝 Agora és amigo de {amigo_nome}!", "tipo": "privado"}, to=meu_sid)
 
 @socketio.on('pedirListaAmigos')
@@ -1423,14 +1492,42 @@ def handle_pedir_amigos():
 @socketio.on('entrarRegiao')
 def handle_entrar_regiao(data):
     player_sid = request.sid
+    data = data if isinstance(data, dict) else {}
     char_id = data.get('char_id')
 
+    def rejeitar_registro(codigo, mensagem):
+        previous_player = jogadores_online.pop(player_sid, None)
+        if previous_player:
+            emit('jogadorSaiu', player_sid, broadcast=True, include_self=False)
+        emit(
+            'registroRegiaoFalhou',
+            {'codigo': codigo, 'mensagem': mensagem},
+            to=player_sid
+        )
+
     if not char_id:
+        rejeitar_registro(
+            'personagem_ausente',
+            'Escolha um personagem na tela de entrada para conectar ao mundo.'
+        )
         return
 
     char_id = str(
         char_id
     )
+    from modules.portal_auth import PlayerSessionError, require_player_identity
+    try:
+        character = require_player_identity(char_id)
+    except PlayerSessionError as exc:
+        rejeitar_registro('sessao_invalida', str(exc))
+        return
+    except Exception:
+        app.logger.exception('Falha ao validar a sessão ao entrar no mapa')
+        rejeitar_registro(
+            'falha_validacao',
+            'Não foi possível validar sua conta agora. Reconecte ao jogo.'
+        )
+        return
 
     nova_regiao = str(
         data.get(
@@ -1542,11 +1639,9 @@ def handle_entrar_regiao(data):
 
     jogadores_online[player_sid] = {
         'id': player_sid,
+        'account_id': str(session.get('portal_account') or ''),
         'char_id': char_id,
-        'nome': data.get(
-            'nome',
-            'Herói'
-        ),
+        'nome': character.get('character_name', 'Herói'),
         'regiao': nova_regiao,
         'x': data.get(
             'x',
@@ -1563,6 +1658,11 @@ def handle_entrar_regiao(data):
     }
     
     emit('jogadoresAtuais', jogadores_online, to=player_sid)
+    emit(
+        'registroRegiaoConfirmado',
+        {'regiao': nova_regiao, 'total': len(jogadores_online)},
+        to=player_sid
+    )
     emit('novoJogador', jogadores_online[player_sid], broadcast=True, include_self=False)
     
     if sistema_invasao_mapa.evento_ativo:
@@ -1727,6 +1827,7 @@ def handle_atualizar_visual(dados):
         
 @socketio.on('disconnect')
 def handle_disconnect():
+    socket_invites.discard_socket(request.sid)
     _retirar_fila_coliseu(request.sid)
     _encerrar_duelo_coliseu_ao_desconectar(request.sid)
     if request.sid in jogadores_online:
@@ -1746,7 +1847,10 @@ def handle_disconnect():
 
 @socketio.on('pedirCuraCatedral')
 def curar_jogador_catedral(data):
-    player_id = data.get('player_id')
+    player = _authenticated_socket_player(data.get('player_id'))
+    if not player:
+        return
+    player_id = player['char_id']
     pdata = users_collection.find_one({"_id": ObjectId(player_id)})
     if pdata:
         users_collection.update_one({"_id": ObjectId(player_id)}, {"$set": {"current_hp": pdata.get('max_hp', 100)}})
@@ -1754,13 +1858,17 @@ def curar_jogador_catedral(data):
 
 @socketio.on('sofrerDanoInvasao')
 def handle_sofrer_dano_invasao(dados):
-    if dados.get('player_id'):
-        sistema_invasao_mapa.jogador_levou_dano_minion(dados.get('player_id'), "Herói", users_collection)
+    player = _authenticated_socket_player(dados.get('player_id'))
+    if player:
+        sistema_invasao_mapa.jogador_levou_dano_minion(player['char_id'], player.get('nome', 'Herói'), users_collection)
 
 @socketio.on('atacarMonstroInvasao')
 def handle_atacar_monstro(dados):
-    player_id = dados.get('player_id')
-    player_nome = dados.get('player_nome', 'Herói')
+    player = _authenticated_socket_player(dados.get('player_id'))
+    if not player:
+        return
+    player_id = player['char_id']
+    player_nome = player.get('nome', 'Herói')
     monstro_id = dados.get('monstro_id')
     
     # 1. Verifica se a invasão está ativa e se o monstro existe
@@ -1794,7 +1902,10 @@ def handle_usar_pocao(data):
     from modules.player.stats import get_player_total_stats
     import asyncio
     
-    player_id = data.get('player_id')
+    player = _authenticated_socket_player(data.get('player_id'))
+    if not player:
+        return
+    player_id = player['char_id']
     tipo_pocao = data.get('tipo') 
     jogador = users_collection.find_one({"_id": ObjectId(player_id)})
     if not jogador: return
@@ -1831,23 +1942,36 @@ def handle_usar_pocao(data):
         
 @socketio.on('jogadorSofreuDanoFatalInvasao')
 def handle_morte_jogador(data):
-    sistema_invasao_mapa.jogador_morreu(request.sid, data.get('player_nome', 'Herói'))
+    player = _authenticated_socket_player(data.get('player_id'))
+    if not player:
+        return
+    sistema_invasao_mapa.jogador_morreu(
+        player['char_id'], player.get('nome', 'Herói'), users_collection
+    )
 
 @socketio.on('jogadorLevouDanoMinion')
 def handle_dano_minion(data):
-    sistema_invasao_mapa.jogador_levou_dano_minion(data['player_id'], data['player_nome'], users_collection)
+    player = _authenticated_socket_player(data.get('player_id'))
+    if player:
+        sistema_invasao_mapa.jogador_levou_dano_minion(player['char_id'], player.get('nome', 'Herói'), users_collection)
         
 @socketio.on('jogadorLevouDanoBoss')
 def handle_dano_boss(data):
-    sistema_invasao_mapa.jogador_levou_dano_boss(data['player_id'], data['player_nome'], users_collection)
+    player = _authenticated_socket_player(data.get('player_id'))
+    if player:
+        sistema_invasao_mapa.jogador_levou_dano_boss(player['char_id'], player.get('nome', 'Herói'), users_collection)
 
 @socketio.on('enviarConviteDuelo')
 def handle_convite_duelo(dados):
     remetente_sid = request.sid
-    if remetente_sid not in jogadores_online: return
-    
-    remetente = jogadores_online[remetente_sid]
-    alvo_id = dados.get('alvo_id')
+    remetente = _authenticated_socket_player()
+    dados = dados if isinstance(dados, dict) else {}
+    if not remetente: return
+
+    remetente_id = str(remetente.get('char_id') or '')
+    alvo_id = str(dados.get('alvo_id') or '')
+    if not ObjectId.is_valid(alvo_id) or alvo_id == remetente_id:
+        return
     
     # 1. Procura o alvo online
     alvo_sid = None
@@ -1862,6 +1986,8 @@ def handle_convite_duelo(dados):
             emit('novaMensagemChat', {"remetente": "Sistema", "texto": "❌ Um dos jogadores já está em combate!", "tipo": "erro"}, to=remetente_sid)
             return
 
+        socket_invites.issue('duelo', alvo_sid, remetente_sid, remetente_id, alvo_id)
+
         emit('receberConviteDuelo', {
             "remetente_id": remetente['char_id'], 
             "remetente_nome": remetente['nome']
@@ -1874,34 +2000,37 @@ def handle_convite_duelo(dados):
 @socketio.on('recusarDuelo')
 def handle_recusar_duelo(dados):
     meu_sid = request.sid
-    desafiante_id = dados.get('desafiante_id')
-    meu_nome = jogadores_online.get(meu_sid, {}).get('nome', 'Herói')
-    
-    # Avisa o desafiante
-    for sid, info in jogadores_online.items():
-        if str(info.get('char_id')) == str(desafiante_id):
-            emit('novaMensagemChat', {"remetente": "Sistema", "texto": f"❌ {meu_nome} recusou o seu desafio.", "tipo": "erro"}, to=sid)
-            break
+    jogador = _authenticated_socket_player()
+    dados = dados if isinstance(dados, dict) else {}
+    if not jogador: return
+    desafiante_id = str(dados.get('desafiante_id') or '')
+    convite = socket_invites.consume('duelo', meu_sid, jogador['char_id'], sender_char_id=desafiante_id)
+    if not convite:
+        return
+    meu_nome = jogador.get('nome', 'Herói')
+    if convite['sender_sid'] in jogadores_online:
+        emit('novaMensagemChat', {"remetente": "Sistema", "texto": f"❌ {meu_nome} recusou o seu desafio.", "tipo": "erro"}, to=convite['sender_sid'])
 
 @socketio.on('aceitarDuelo')
 def handle_aceitar_duelo(dados):
     jogador_b_sid = request.sid
-    if jogador_b_sid not in jogadores_online: return
-    
-    jogador_b_info = jogadores_online[jogador_b_sid]
-    desafiante_id = dados.get('desafiante_id') # ID do Jogador A
-    
-    # Encontra o Jogador A (Desafiante)
-    jogador_a_sid = None
-    jogador_a_info = None
-    for sid, info in jogadores_online.items():
-        if str(info.get('char_id')) == str(desafiante_id):
-            jogador_a_sid = sid
-            jogador_a_info = info
-            break
-            
-    if not jogador_a_sid:
+    jogador_b_info = _authenticated_socket_player()
+    dados = dados if isinstance(dados, dict) else {}
+    if not jogador_b_info: return
+    desafiante_id = str(dados.get('desafiante_id') or '')
+    convite = socket_invites.consume('duelo', jogador_b_sid, jogador_b_info['char_id'], sender_char_id=desafiante_id)
+    jogador_a_sid = convite.get('sender_sid') if convite else None
+    jogador_a_info = jogadores_online.get(jogador_a_sid) if jogador_a_sid else None
+    if (
+        not convite
+        or not jogador_a_info
+        or str(jogador_a_info.get('char_id')) != desafiante_id
+    ):
         emit('novaMensagemChat', {"remetente": "Sistema", "texto": "❌ O desafiante fugiu ou desconectou.", "tipo": "erro"}, to=jogador_b_sid)
+        return
+
+    if jogador_a_info.get('em_combate') or jogador_b_info.get('em_combate'):
+        emit('novaMensagemChat', {"remetente": "Sistema", "texto": "❌ Um dos jogadores já está em combate!", "tipo": "erro"}, to=jogador_b_sid)
         return
 
     # 1. Trava os jogadores no mapa

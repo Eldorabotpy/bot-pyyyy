@@ -1,9 +1,13 @@
 // ==========================================
 // 🛡️ HUD DO GRUPO (BOTÃO FLUTUANTE)
 // ==========================================
+function obterCharIdAtivo() {
+    return String(window.eldoraCharacterId || localStorage.getItem('jogadorEldoraID') || '');
+}
+
 window.desenharMiniHudGrupo = function(grupo) {
     let hud = document.getElementById('eldora-party-hud');
-    const meuId = localStorage.getItem("jogadorEldoraID");
+    const meuId = obterCharIdAtivo();
     
     // Proteção: Se eu não estou na lista, apaga o HUD
     if (!grupo.membros.includes(meuId)) {
@@ -385,14 +389,22 @@ class MotorMultiplayer {
     constructor(scene, socket) {
         this.scene = scene; this.socket = socket; window.eldoraSocket = socket;
         this.scene.outrosJogadores = this.scene.add.group();
-        this.iniciarConexao(); this.iniciarEscutas();
+        this.iniciarEscutas();
+        if (this.socket.connected) this.iniciarConexao();
+    }
+
+    definirEstadoPilula(estado, texto, detalhe = '') {
+        const contador = document.getElementById('online-counter');
+        const textoContador = document.getElementById('online-count-text');
+        if (!contador || !textoContador) return;
+        contador.dataset.status = estado;
+        contador.title = detalhe;
+        textoContador.innerText = texto;
     }
     
     atualizarPilula() {
-        // 🌟 Agora usa a variável global em vez de contar os bonecos na tela
-        let total = window.totalJogadoresOnline || 1;
-        let textoContador = document.getElementById('online-count-text');
-        if (textoContador) textoContador.innerText = total + " Online";
+        const total = Number(window.totalJogadoresOnline) || 1;
+        this.definirEstadoPilula('online', total + ' Online');
     }
     
     // ==========================================
@@ -420,9 +432,33 @@ class MotorMultiplayer {
     }
 
     iniciarConexao() {
-        const meuIdDoBanco = localStorage.getItem("jogadorEldoraID");
-        const meuNome = localStorage.getItem("jogadorEldoraNome") || "Aventureiro";
+        if (!this.socket?.connected) {
+            this.definirEstadoPilula('sincronizando', 'Conectando...', 'Conectando ao servidor do jogo.');
+            return;
+        }
+        const meuIdDoBanco = obterCharIdAtivo();
+        const meuNome = window.eldoraCharacterName || localStorage.getItem("jogadorEldoraNome") || "Aventureiro";
+        if (!meuIdDoBanco) {
+            this.definirEstadoPilula(
+                'erro',
+                'Escolha um herói',
+                'Abra a conta e selecione um personagem para entrar no mundo.'
+            );
+            return;
+        }
+        this.definirEstadoPilula('sincronizando', 'Validando...', 'Aguardando validação da conta e do personagem.');
         this.socket.emit('entrarRegiao', { regiao: this.scene.regiaoAtual, x: this.scene.player.x, y: this.scene.player.y, nome: meuNome, skin: this.scene.skinResolvida || this.scene.skinAtiva, char_id: meuIdDoBanco });
+        clearTimeout(this.timeoutRegistroRegiao);
+        this.timeoutRegistroRegiao = setTimeout(() => {
+            const contador = document.getElementById('online-counter');
+            if (this.socket.connected && contador?.dataset.status === 'sincronizando') {
+                this.definirEstadoPilula(
+                    'erro',
+                    'Sem resposta',
+                    'O servidor não confirmou a entrada deste herói no mapa.'
+                );
+            }
+        }, 10000);
     }
 
     iniciarEscutas() {
@@ -432,11 +468,15 @@ class MotorMultiplayer {
         this.socket.off('receberConviteAmizade');
         this.socket.off('receberConviteGrupo');
         this.socket.off('connect');
+        this.socket.off('connect_error');
+        this.socket.off('disconnect');
         this.socket.off('solicitarRegistro');
         
         // 👇 ADICIONE ESTAS LINHAS AQUI PARA BLINDAR OS MONSTROS E JOGADORES:
         this.socket.off('carregarMobsMapa');
         this.socket.off('jogadoresAtuais');
+        this.socket.off('registroRegiaoConfirmado');
+        this.socket.off('registroRegiaoFalhou');
         this.socket.off('novoJogador');
         this.socket.off('jogadorMoveu');
         this.socket.off('jogadorSaiu');
@@ -466,7 +506,7 @@ class MotorMultiplayer {
 
             console.log("🎁 LOOT RECEBIDO:", dados);
 
-            const meuId = String(localStorage.getItem("jogadorEldoraID") || "");
+            const meuId = obterCharIdAtivo();
             const playerId = String(dados.player_id || dados.jogador_id || "");
    
             if (playerId && playerId !== meuId) return;
@@ -500,7 +540,7 @@ class MotorMultiplayer {
         this.socket.on('efeitoGlobalMapa', (dados) => {
             if (dados.efeito === 'despertar_classe') {
                 // Apenas os OUTROS jogadores rodam isso (para não duplicar a tela de quem já está vendo a luz da Selene)
-                if (dados.jogador_id !== localStorage.getItem("jogadorEldoraID")) {
+                if (String(dados.jogador_id) !== obterCharIdAtivo()) {
                     if (typeof window.tocarEfeitoGlobalDespertar === 'function') {
                         window.tocarEfeitoGlobalDespertar(dados.jogador_nome, dados.classe);
                     }
@@ -542,7 +582,24 @@ class MotorMultiplayer {
         // 🛡️ O SEGREDO DO TELEGRAM MINI APP: Reconectar automaticamente!
         this.socket.on('connect', () => {
             console.log("🔌 Conectado ao reino! Registrando o herói...");
+            this.definirEstadoPilula('sincronizando', 'Validando...', 'Aguardando validação da conta e do personagem.');
             chamarConexaoSegura(); // Usa a versão blindada!
+        });
+
+        this.socket.on('connect_error', () => {
+            this.definirEstadoPilula(
+                'erro',
+                'Sem conexão',
+                'Não foi possível conectar ao servidor. O jogo tentará novamente.'
+            );
+        });
+
+        this.socket.on('disconnect', () => {
+            this.definirEstadoPilula(
+                'sincronizando',
+                'Reconectando...',
+                'A conexão com o servidor caiu. Tentando reconectar.'
+            );
         });
 
         window.configurarOuvintesMercado?.(this.socket);
@@ -557,14 +614,36 @@ class MotorMultiplayer {
             chamarConexaoSegura(); // Usa a versão blindada!
         });
 
+        this.socket.on('registroRegiaoConfirmado', (dados) => {
+            clearTimeout(this.timeoutRegistroRegiao);
+            if (dados?.total) window.totalJogadoresOnline = Number(dados.total);
+            this.atualizarPilula();
+        });
+
+        this.socket.on('registroRegiaoFalhou', (dados) => {
+            clearTimeout(this.timeoutRegistroRegiao);
+            const mensagens = {
+                personagem_ausente: 'Escolha um herói',
+                sessao_invalida: 'Entre novamente',
+                falha_validacao: 'Falha ao sincronizar'
+            };
+            const detalhe = String(dados?.mensagem || 'Não foi possível registrar este personagem no mapa.');
+            this.definirEstadoPilula(
+                'erro',
+                mensagens[dados?.codigo] || 'Falha ao sincronizar',
+                detalhe
+            );
+        });
+
         this.socket.on('desconectarDuplicado', async () => { await window.avisoEldora("🚨 A tua conta foi conectada noutro dispositivo!"); window.location.reload(); });
-        this.socket.on('forcarTeletransporte', (dados) => { if (dados.player_id === localStorage.getItem("jogadorEldoraID")) this.scene.scene.restart({ regiao: dados.nova_regiao, skin: this.scene.skinAtiva, isRespawn: dados.is_respawn }); });
+        this.socket.on('forcarTeletransporte', (dados) => { if (String(dados.player_id) === obterCharIdAtivo()) this.scene.scene.restart({ regiao: dados.nova_regiao, skin: this.scene.skinAtiva, isRespawn: dados.is_respawn }); });
         
         // ==========================================
         // 🛡️ FILTROS EXORCISTAS (ANTI-FANTASMAS) 🛡️
         // ==========================================
 
         this.socket.on('jogadoresAtuais', (jogadores) => { 
+            clearTimeout(this.timeoutRegistroRegiao);
             // 👇 SALVA O TOTAL GLOBAL QUE O SERVIDOR MANDOU 👇
             window.totalJogadoresOnline = Object.keys(jogadores).length;
 
@@ -673,7 +752,7 @@ class MotorMultiplayer {
         // 💬 SISTEMA DE BALÕES NO MAPA E EMOJIS ANIMADOS 💬
         this.socket.on('acaoMapa', (dados) => {
             let alvo = null;
-            const meuIdBanco = String(localStorage.getItem("jogadorEldoraID"));
+            const meuIdBanco = obterCharIdAtivo();
 
             // 1. Sou eu? (Verifica pelo ID do Banco de Dados)
             if (String(dados.char_id) === meuIdBanco) {
@@ -768,7 +847,7 @@ class MotorMultiplayer {
             
             // 🛡️ O CADEADO DE PRIVACIDADE DO GRUPO (NOVO)
             if (msg.destinatarios) {
-                const meuId = localStorage.getItem("jogadorEldoraID");
+                const meuId = obterCharIdAtivo();
                 // Se eu não estiver na lista de destinatários, aborto a mensagem!
                 if (!msg.destinatarios.includes(meuId)) return; 
             }
@@ -1134,7 +1213,7 @@ class MotorMultiplayer {
             console.log("⚔️ ARENA INSTANCIADA!", estado_arena);
     
             // 👇 A MÁGICA QUE FALTAVA: Baixar magias e itens para a memória global!
-            const charId = localStorage.getItem("jogadorEldoraID");
+            const charId = obterCharIdAtivo();
             try {
                 const resPerfil = await fetch(`/api/personagem/${charId}?t=${new Date().getTime()}`);
                 window.perfilDadosGlobais = await resPerfil.json(); 

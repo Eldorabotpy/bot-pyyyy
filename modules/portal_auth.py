@@ -41,7 +41,66 @@ def accounts():
 
 def current_account():
     value = session.get('portal_account')
-    return accounts().find_one({'_id': ObjectId(value)}) if ObjectId.is_valid(str(value)) else None
+    if not ObjectId.is_valid(str(value)):
+        return None
+    account = accounts().find_one({'_id': ObjectId(value)})
+    if not account:
+        _clear_portal_session()
+        return None
+    try:
+        expected_version = int(account.get('session_version', 0))
+        session_version = int(session.get('portal_session_version', 0))
+    except (TypeError, ValueError):
+        _clear_portal_session()
+        return None
+    if session_version != expected_version:
+        _clear_portal_session()
+        return None
+    return account
+
+
+def _clear_portal_session():
+    for key in list(session):
+        if key.startswith('portal_'):
+            session.pop(key, None)
+
+
+def character_owner_query(account):
+    """Accept new immutable ownership IDs and legacy username ownership."""
+    account_id = account['_id']
+    return {'$or': [
+        {'conta_mestre_id': account_id},
+        {'conta_mestre_id': str(account_id)},
+        {'conta_mestre_id': {'$exists': False}, 'conta_mestre': account['username']},
+    ]}
+
+
+class PlayerSessionError(ValueError):
+    def __init__(self, message, status_code=403):
+        super().__init__(message)
+        self.status_code = status_code
+
+
+def require_player_identity(player_id):
+    """Require a request's player ID to match this account's selected character."""
+    account = current_account()
+    if not account:
+        raise PlayerSessionError('Entre na sua conta para continuar.', 401)
+    selected_id = str(session.get('portal_character') or '')
+    requested_id = str(player_id or '')
+    if not ObjectId.is_valid(selected_id):
+        raise PlayerSessionError('Selecione um personagem antes de jogar.', 401)
+    if requested_id != selected_id:
+        raise PlayerSessionError('O personagem solicitado não é o personagem ativo desta sessão.')
+    from modules.player.core import users_collection
+    query = {'_id': ObjectId(selected_id), **character_owner_query(account)}
+    player = users_collection.find_one(query)
+    if not player:
+        _clear_portal_session()
+        raise PlayerSessionError('Este personagem não pertence à conta conectada.', 403)
+    if player.get('conta_mestre_id') != account['_id']:
+        users_collection.update_one({'_id': player['_id']}, {'$set': {'conta_mestre_id': account['_id']}})
+    return player
 
 
 def require_csrf():
@@ -62,21 +121,31 @@ def limit_attempts():
         raise ValueError('Muitas tentativas. Aguarde alguns minutos para tentar novamente.')
 
 
-def start_session(account, remember=True):
+def start_session(account, remember=True, auth_method='unknown'):
+    previous_account_id = str(session.get('portal_account') or '')
+    if ObjectId.is_valid(previous_account_id):
+        revoke = current_app.config.get('REVOKE_ACCOUNT_SOCKETS')
+        if revoke:
+            revoke(previous_account_id)
     session.pop('portal_pending_identity', None)
     session.pop('portal_character', None)
     session['portal_account'] = str(account['_id'])
+    session['portal_session_version'] = int(account.get('session_version', 0))
     session['portal_csrf'] = secrets.token_urlsafe(32)
     session['portal_login_at'] = time.time()
+    session['portal_auth_method'] = auth_method
     session.permanent = remember
 
 
 def account_payload(account):
     from modules.player.core import users_collection
     characters = []
-    for p in users_collection.find({'conta_mestre': account['username']}):
+    for p in users_collection.find(character_owner_query(account)):
         characters.append({'id': str(p['_id']), 'nome': p.get('character_name','Herói'), 'genero': p.get('gender','masculino'), 'level': p.get('level',1), 'classe': str(p.get('class','aventureiro')).capitalize(), 'avatar_customizado': p.get('avatar_customizado','padrao')})
-    return {'sucesso': True, 'username': account['username'], 'personagens': characters, 'csrf': session['portal_csrf'], 'has_password': bool(account.get('password_hash')), 'display_name': account.get('login_alias',account['username']), 'google_linked': bool(account.get('google_sub')), 'telegram_linked': bool(account.get('telegram_verified_id'))}
+    has_password = bool(account.get('password_hash'))
+    google_linked = bool(account.get('google_sub'))
+    telegram_linked = bool(account.get('telegram_verified_id'))
+    return {'sucesso': True, 'username': account['username'], 'login_alias': account.get('login_alias'), 'personagens': characters, 'csrf': session['portal_csrf'], 'has_password': has_password, 'display_name': account.get('login_alias',account['username']), 'google_linked': google_linked, 'telegram_linked': telegram_linked, 'can_unlink_google': has_password or telegram_linked, 'can_unlink_telegram': has_password or google_linked, 'auth_method': session.get('portal_auth_method', 'unknown'), 'fresh_auth': time.time()-session.get('portal_login_at', 0) <= 600}
 
 
 def verify_telegram(raw, token, now=None):
@@ -113,10 +182,14 @@ def verify_google(credential):
 
 @portal_auth_bp.get('/api/auth/status')
 def auth_status():
-    session.setdefault('portal_csrf', secrets.token_urlsafe(32))
     account = current_account()
+    session.setdefault('portal_csrf', secrets.token_urlsafe(32))
     payload = account_payload(account) if account else {'sucesso': True, 'csrf': session['portal_csrf']}
-    payload.update({'authenticated': bool(account), 'google_client_id': google_client_id()})
+    payload.update({
+        'authenticated': bool(account),
+        'google_client_id': google_client_id(),
+        'selected_character_id': str(session.get('portal_character') or '') or None if account else None,
+    })
     response = jsonify(payload)
     response.headers['Cache-Control'] = 'no-store'
     return response
@@ -131,10 +204,10 @@ def provider_login(provider):
         limit_attempts()
         data = request.get_json(silent=True) or {}
         mode = data.get('mode', 'login')
-        if mode not in ('login','create','link'):
+        if mode not in ('login','create','link','replace'):
             raise ValueError('Ação inválida.')
-        account = current_account() if mode == 'link' else None
-        if mode == 'link' and (not account or time.time()-session.get('portal_login_at',0)>600):
+        account = current_account() if mode in ('link','replace') else None
+        if mode in ('link','replace') and (not account or time.time()-session.get('portal_login_at',0)>600):
             return jsonify(erro='Entre novamente na conta existente antes de vincular.'), 401
         if provider == 'google':
             identity = verify_google(str(data.get('credential','')))
@@ -154,6 +227,21 @@ def provider_login(provider):
             if result.matched_count != 1:
                 raise ValueError('Vinculação alterada. Entre novamente.')
             account = col.find_one({'_id': account['_id']})
+        elif mode == 'replace':
+            alternate_method = session.get('portal_auth_method')
+            alternate_available = (
+                (alternate_method == 'password' and bool(account.get('password_hash')))
+                or (alternate_method == 'google' and bool(account.get('google_sub')) and provider != 'google')
+                or (alternate_method == 'telegram' and bool(account.get('telegram_verified_id')) and provider != 'telegram')
+            )
+            if not alternate_available or not account.get(field):
+                return jsonify(erro='Entre por outro método já vinculado antes de trocar este provedor.'), 403
+            if owner and owner['_id'] != account['_id']:
+                raise ValueError('Esta identidade já está vinculada a outra conta. Nenhum personagem foi alterado.')
+            result = col.update_one({'_id': account['_id'], field: account.get(field)}, {'$set': {field: identity}})
+            if result.matched_count != 1:
+                raise ValueError('Vinculação alterada. Entre novamente.')
+            account = col.find_one({'_id': account['_id']})
         elif owner:
             if mode == 'create':
                 return jsonify(erro='Esta identidade já possui conta. Escolha Entrar em conta vinculada.'), 409
@@ -166,7 +254,7 @@ def provider_login(provider):
             col.insert_one(account)
         else:
             return jsonify(erro='Identidade ainda não vinculada. Entre na conta antiga e vincule, ou escolha Criar nova conta.'), 409
-        start_session(account)
+        start_session(account, auth_method=provider)
         return jsonify(account_payload(account))
     except ImportError:
         return jsonify(erro='Dependência de login não instalada no servidor.'), 503
@@ -189,10 +277,107 @@ def telegram_credentials(data, col, exclude_account_id=None):
         raise AccountInputError('A senha precisa ter de 6 a 128 caracteres.')
     conflict_query = {'$or':[{'username':alias},{'login_alias':alias}]}
     if exclude_account_id is not None:
-        conflict_query = {'$and':[conflict_query, {'_id':{'$ne':exclude_account_id}}]}
-    if col.find_one(conflict_query):
+        conflict = col.find_one(conflict_query)
+        if conflict and conflict.get('_id') != exclude_account_id:
+            raise AccountInputError('Este usuário já está em uso. Escolha outro nome.')
+    elif col.find_one(conflict_query):
         raise AccountInputError('Este usuário já está em uso. Escolha outro nome.')
     return {'login_alias':alias, 'password_hash':generate_password_hash(password)}
+
+
+@portal_auth_bp.post('/api/auth/credentials')
+def set_account_credentials():
+    """Add a password fallback to an authenticated provider account."""
+    try:
+        require_csrf()
+        limit_attempts()
+        account = current_account()
+        if not account:
+            return jsonify(erro='Entre na sua conta para configurar um acesso alternativo.'), 401
+        if time.time()-session.get('portal_login_at', 0) > 600:
+            return jsonify(erro='Por segurança, saia e entre novamente antes de configurar uma senha.'), 401
+        data = request.get_json(silent=True) or {}
+        method = session.get('portal_auth_method')
+        if method == 'password':
+            from werkzeug.security import check_password_hash
+            current_password = data.get('current_password', '')
+            if not account.get('password_hash') or not isinstance(current_password, str) or not check_password_hash(account['password_hash'], current_password):
+                return jsonify(erro='Confirme a senha atual para alterá-la.'), 403
+        elif not ((method == 'google' and account.get('google_sub')) or (method == 'telegram' and account.get('telegram_verified_id'))):
+            return jsonify(erro='Entre novamente por Google, Telegram ou senha antes de alterar este acesso.'), 403
+        col = accounts()
+        credentials = telegram_credentials(data, col, exclude_account_id=account['_id'])
+        query = {'_id': account['_id']}
+        if account.get('password_hash'):
+            query['password_hash'] = account['password_hash']
+        else:
+            query['password_hash'] = {'$exists': False}
+        updated = col.update_one(query, {'$set': credentials})
+        if updated.matched_count != 1:
+            return jsonify(erro='As credenciais mudaram. Atualize a página e tente novamente.'), 409
+        account.update(credentials)
+        return jsonify(account_payload(account))
+    except DuplicateKeyError:
+        return jsonify(erro='Este usuário já está em uso.'), 409
+    except ValueError as exc:
+        return jsonify(erro=str(exc)), 400
+
+
+@portal_auth_bp.post('/api/auth/unlink/<provider>')
+def unlink_provider(provider):
+    try:
+        require_csrf()
+        if provider not in ('google', 'telegram'):
+            return jsonify(erro='Provedor inválido.'), 404
+        account = current_account()
+        if not account:
+            return jsonify(erro='Entre na sua conta para gerenciar os acessos.'), 401
+        if time.time()-session.get('portal_login_at', 0) > 600:
+            return jsonify(erro='Por segurança, saia e entre novamente antes de remover um vínculo.'), 401
+        field = 'google_sub' if provider == 'google' else 'telegram_verified_id'
+        if not account.get(field):
+            return jsonify(erro='Este provedor não está vinculado à conta.'), 409
+        method = session.get('portal_auth_method')
+        alternate_available = (
+            (method == 'password' and bool(account.get('password_hash')))
+            or (method == 'google' and provider != 'google' and bool(account.get('google_sub')))
+            or (method == 'telegram' and provider != 'telegram' and bool(account.get('telegram_verified_id')))
+        )
+        if not alternate_available:
+            return jsonify(erro='Entre novamente usando outro acesso da conta antes de remover este vínculo.'), 403
+        remaining_login = bool(account.get('password_hash')) or bool(account.get('google_sub') if provider == 'telegram' else account.get('telegram_verified_id'))
+        if not remaining_login:
+            return jsonify(erro='Adicione uma senha ou outro provedor antes de remover o último acesso.'), 409
+        col = accounts()
+        result = col.update_one({'_id': account['_id'], field: account[field]}, {'$unset': {field: ''}, '$inc': {'session_version': 1}})
+        if result.matched_count != 1:
+            return jsonify(erro='O vínculo mudou. Atualize a página e tente novamente.'), 409
+        account.pop(field, None)
+        account['session_version'] = int(account.get('session_version', 0)) + 1
+        session['portal_session_version'] = account['session_version']
+        revoke = current_app.config.get('REVOKE_ACCOUNT_SOCKETS')
+        if callable(revoke):
+            revoke(str(account['_id']))
+        return jsonify(account_payload(account))
+    except ValueError as exc:
+        return jsonify(erro=str(exc)), 403
+
+
+@portal_auth_bp.post('/api/auth/logout-all')
+def logout_all_sessions():
+    try:
+        require_csrf()
+        account = current_account()
+        if not account:
+            return jsonify(erro='Entre na sua conta para continuar.'), 401
+        accounts().update_one({'_id': account['_id']}, {'$inc': {'session_version': 1}})
+        revoke = current_app.config.get('REVOKE_ACCOUNT_SOCKETS')
+        if callable(revoke):
+            revoke(str(account['_id']))
+        _clear_portal_session()
+        return jsonify(sucesso=True)
+    except ValueError as exc:
+        return jsonify(erro=str(exc)), 403
 
 
 @portal_auth_bp.post('/api/auth/telegram-credentials')
@@ -230,9 +415,15 @@ def select_character():
             return jsonify(erro='Entre na sua conta.'), 401
         from modules.player.core import users_collection
         value = (request.get_json(silent=True) or {}).get('character_id')
-        if not ObjectId.is_valid(str(value)) or not users_collection.find_one({'_id':ObjectId(value),'conta_mestre':account['username']}):
+        if not ObjectId.is_valid(str(value)) or not users_collection.find_one({'_id':ObjectId(value), **character_owner_query(account)}):
             return jsonify(erro='Este personagem não pertence à sua conta.'), 403
+        users_collection.update_one({'_id':ObjectId(value), **character_owner_query(account)}, {'$set': {'conta_mestre_id': account['_id']}})
+        previous_character_id = str(session.get('portal_character') or '')
         session['portal_character'] = str(value)
+        if previous_character_id and previous_character_id != str(value):
+            revoke = current_app.config.get('REVOKE_ACCOUNT_SOCKETS')
+            if revoke:
+                revoke(str(account['_id']))
         return jsonify(sucesso=True)
     except ValueError as exc:
         return jsonify(erro=str(exc)), 403
@@ -244,7 +435,10 @@ def logout():
         require_csrf()
     except ValueError as exc:
         return jsonify(erro=str(exc)), 403
-    for key in list(session):
-        if key.startswith('portal_'):
-            session.pop(key, None)
+    account_id = str(session.get('portal_account') or '')
+    _clear_portal_session()
+    if ObjectId.is_valid(account_id):
+        revoke = current_app.config.get('REVOKE_ACCOUNT_SOCKETS')
+        if revoke:
+            revoke(account_id)
     return jsonify(sucesso=True)

@@ -6,28 +6,29 @@ Instalar requirements.txt no ambiente do servidor. O Client ID público fornecid
 
 Registrar a origem HTTPS exata do jogo no Google Auth Platform (aplicativo Web). Este fluxo usa popup com callback JavaScript, sem rota de redirecionamento Google. Configurar público e informações de marca, além de usuários de teste quando aplicável. O login só ficará disponível após configurar o Client ID e reiniciar o backend.
 
-FLASK_SECRET_KEY continua obrigatória e deve ser secreta e estável. Cookies HttpOnly, SameSite=Lax, Secure por padrão e validade de sete dias. Somente em desenvolvimento HTTP local, usar ELDORA_COOKIE_SECURE=0; manter 1 na produção HTTPS. Sessão assinada do Flask: não é um cadastro central de sessões revogáveis.
+FLASK_SECRET_KEY continua obrigatória e deve ser secreta e estável. Cookies HttpOnly, SameSite=Lax, Secure por padrão e validade de sete dias. Somente em desenvolvimento HTTP local, usar ELDORA_COOKIE_SECURE=0; manter 1 na produção HTTPS. A sessão é assinada pelo Flask; `session_version` permite invalidar sessões antigas ao remover um provedor ou encerrar os outros dispositivos, sem manter uma lista de sessões por aparelho.
 
 ## Fluxos
 
-- Conta antiga: entrar com usuário/senha para estabelecer sessão; vincular Google ou Telegram no painel Conta Eldora.
+- Conta antiga: entrar com usuário/senha para estabelecer sessão; vincular ou trocar Google/Telegram no painel Conta Eldora. A senha continua funcionando depois de vincular Google.
 - Conta nova: selecionar explicitamente Criar nova conta e validar Google ou Telegram. Cadastro antigo sem validação retorna 403.
 - Telegram: apenas initData assinado pelo bot, com validade máxima de 10 minutos. Reabrir pelo bot se expirado. Não confia em initDataUnsafe ou telegram_id histórico do banco. Contas antigas não são adotadas por esse ID: autenticar com a senha antes de vincular.
 - Google: token validado com google-auth (assinatura, audiência, expiração, emissor e e-mail verificado), identidade pelo sub. Não une contas por e-mail.
 - Vinculação exige sessão autenticada há no máximo 10 minutos e identidade ainda livre. Sem transferência de personagem ou fusão de contas. Índices únicos parciais para google_sub e telegram_verified_id.
 - Perfil contém acesso a Conta. Vinculação também está disponível na seleção de personagens.
-- Criação/listagem/seleção de personagens no portal usa a conta da sessão; não aceita o nome da conta enviado no corpo como autoridade.
+- Criação/listagem/seleção de personagens no portal usa a conta da sessão; não aceita o nome da conta enviado no corpo como autoridade. Novos personagens recebem `conta_mestre_id` (ObjectId); personagens antigos continuam sendo localizados pelo nome legado e recebem o ID imutável quando selecionados.
+- As APIs HTTP que identificam o personagem por `user_id`, `char_id`, `jogador_id`, `player_id`, `character_id`, `personagem_id`, `id_personagem` ou `id_jogador` exigem que o ID seja o personagem escolhido na sessão. Isso também protege `/api/personagem/<personagem_id>`, que lê dados do personagem e pode corrigir habilidades antigas. A entrada no mapa valida a conta e o personagem; as ações Socket.IO usam o registro criado nessa validação. Aceitar amizade, grupo ou duelo exige convite emitido pelo servidor, ligado aos dois sockets e personagens, de uso único e com validade limitada. Logout, nova autenticação e troca de personagem desconectam os sockets da conta.
 - Senhas antigas salvas em localStorage são removidas ao abrir o portal. Senhas existentes no banco permanecem com hash, e os personagens são preservados.
 
 ## Publicação e testes
 
 Esta alteração precisa do backend, templates e JS juntos, além das novas dependências. Sem GOOGLE_CLIENT_ID, o botão Google fica indisponível: contas antigas usam senha e contas novas precisam do Telegram validado. Cadastros novos pelo navegador sem Telegram dependem da configuração do Google.
 
-`venv/Scripts/python.exe tools/check_portal_auth.py` testa isoladamente assinatura Telegram, expiração, CSRF, propriedade do personagem, vínculo e conflitos. Não acessa Mongo nem contas reais. Ainda falta testar com o Client ID real, Google em navegador e Telegram WebApp real (inclusive restrições de popup/webview).
+`venv/Scripts/python.exe tools/check_portal_auth.py` testa isoladamente assinatura Telegram, expiração, CSRF, propriedade e migração de personagem, cadastro, senha alternativa, login por senha após vincular Google, troca/remoção de provedor, revogação de sessão e conflitos. Não acessa Mongo nem contas reais. Ainda falta testar com o Client ID real, Google em navegador e Telegram WebApp real (inclusive restrições de popup/webview).
 
 ## Limites e próxima etapa
 
-Esta entrega protege o portal de autenticação e a vinculação. Endpoints legados de jogo e Socket.IO que ainda aceitam user_id precisam de migração para identidade da sessão antes de habilitar convites com gemas. Não considera o jogo inteiro protegido apenas pela adição deste login. Presença, missões de convite e pagamentos ainda não implementados nesta entrega.
+Auditoria da prioridade 2: os aliases de identidade HTTP foram revisados; o identificador `personagem_id` agora também é vinculado à sessão. Os eventos de aceite de amizade, grupo e duelo não confiam mais em IDs enviados pelo cliente sem convite pendente. Esta verificação cobre a identidade de conta nessas rotas e eventos, não é uma auditoria completa de todas as regras de jogo. Presença, missões de convite persistentes e pagamentos ainda não implementados nesta entrega.
 
 Limite de tentativas persistido por IP em janelas de 15 minutos (30 tentativas), expiração TTL. Atrás de proxy, verificar a configuração confiável de endereço remoto; não confiar diretamente em X-Forwarded-For informado pelo cliente. Várias identidades Google/Telegram não garantem pessoas distintas.
 
@@ -37,17 +38,17 @@ Origem principal informada: `https://eldora-rpg.modappmania.workers.dev`. O prox
 
 Conta nova: confirma Google (navegador) ou Telegram (Mini App), recebe identificador interno e vai à criação do personagem. Não pede nome de conta nem senha. A rota temporária /api/auth/register foi removida.
 
-Conta antiga sem Google: pode entrar com usuário/senha e vincular Google depois. Ao vincular, acesso posterior por senha é recusado no servidor; o hash antigo é preservado, sem ser usado para liberar acesso web. Google e Telegram verificado continuam válidos.
+Conta Google sem senha: depois de entrar, pode configurar usuário e senha como acesso alternativo. A criação ou troca exige uma autenticação recente; quem entrou por senha também confirma a senha atual. Contas antigas já vinculadas ao Google continuam aceitando a senha previamente cadastrada.
 
 Dentro do Telegram não carrega Google Identity Services. Entrar com usuário e senha não vincula automaticamente a identidade Telegram; o login nativo só entra na conta que já pertence àquele Telegram verificado. Nunca adota telegram_id legado sem essa prova. Contas já vinculadas ao Google usam Google no navegador ou a identidade Telegram previamente vinculada; não une contas automaticamente.
 
-Painel de vinculação some após vincular Google. Sair / trocar conta permanece visível. Sessões anteriormente abertas mantêm sua validade até sair/expirar.
+O painel de acessos mostra os provedores vinculados. Para remover um provedor, a sessão precisa ter sido autenticada recentemente por outro método que continuará ativo; o último método de entrada nunca pode ser removido. Trocar Google/Telegram também exige outro método e a prova da nova identidade. Encerrar sessões de outros dispositivos incrementa a versão da conta e desconecta os sockets ativos.
 
 ## Correção: credenciais próprias para contas Telegram
 
 Cadastro novo pelo Telegram exige usuário e senha (com confirmação na interface) antes de criar personagem. A assinatura Telegram continua validada no servidor. Google permanece sem senha adicional. O usuário escolhido fica em login_alias, com índice único, sem alterar a chave interna username que liga os personagens. Login por senha aceita esse alias no navegador mesmo sem Telegram, para contas ainda sem Google vinculado.
 
-Contas Telegram criadas anteriormente sem senha mostram formulário para Salvar meu acesso. Endpoint exige sessão, CSRF e prova Telegram assinada correspondente à conta. Só configura credenciais ausentes; não substitui senhas existentes. Reinstalar Telegram mantendo a mesma identidade não cria outra conta. Perder acesso ao Telegram antes de configurar credenciais ainda exige recuperação da conta; esta mudança não recupera automaticamente um número perdido.
+Contas antigas sem senha mostram um formulário para adicionar usuário e senha; contas com senha podem atualizá-la depois de reautenticar. Reinstalar Telegram mantendo a mesma identidade não cria outra conta. Sem uma senha alternativa ou outro provedor vinculado, perder acesso ao único provedor ainda exige suporte manual; o jogo não tem recuperação automática por e-mail.
 
 ## Ajustes do fluxo de entrada
 

@@ -8,6 +8,7 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js" crossorigin="anonymous"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.60.0/phaser.min.js" crossorigin="anonymous"></script>
+    <script src="/static/js/portal_session.js?v=1" defer></script>
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -15,7 +16,7 @@
     <link rel="stylesheet" href="/static/css/loja_aventureiro.css">
 
     <link rel="stylesheet" href="{{ url_for('static', filename='css/joystick.css') }}">
-    <link rel="stylesheet" href="/static/css/style.css?v=303">
+    <link rel="stylesheet" href="/static/css/style.css?v=304">
     <link rel="stylesheet" href="/static/css/perfil.css">
     <link rel="stylesheet" href="/static/css/perfil_moderno.css?v=1">
     <link rel="stylesheet" href="/static/css/ui_game.css">
@@ -572,8 +573,8 @@
     <script src="/static/js/dialogos_eldora.js?v=1"></script>
     <link rel="stylesheet" href="/static/css/runas.css?v=1">
     <script src="/static/js/runas.js?v=1"></script>
-<link rel="stylesheet" href="/static/css/menu_heroi.css?v=2">
-    <script defer src="/static/js/menu_heroi.js?v=2"></script>
+<link rel="stylesheet" href="/static/css/menu_heroi.css?v=3">
+    <script defer src="/static/js/menu_heroi.js?v=3"></script>
 </head>
 <body>
 
@@ -832,7 +833,7 @@
 
     <div id="menu-overlay" onclick="fecharMenu()"></div>
 
-    <nav id="side-menu" class="menu-rpg eldora-menu">
+    <nav id="side-menu" class="menu-rpg eldora-menu" aria-label="Menu principal do herói">
 
         <!-- CABEÇALHO -->
         <div class="eldora-menu-header">
@@ -864,6 +865,38 @@
 
         </div>
 
+
+        <section class="eldora-menu-resumo" aria-label="Resumo do herói">
+            <div class="eldora-menu-resumo-topo">
+                <span>HERÓI ATIVO</span>
+                <span class="eldora-menu-presenca"><i aria-hidden="true"></i> EM JORNADA</span>
+            </div>
+            <div class="eldora-menu-resumo-identidade">
+                <div class="eldora-menu-avatar" id="eldora-menu-avatar-wrap" aria-hidden="true">
+                    <span class="eldora-menu-avatar-fallback">⚔</span>
+                    <img id="eldora-menu-avatar" alt="">
+                    <span class="eldora-menu-avatar-selo">✦</span>
+                </div>
+                <div class="eldora-menu-heroi-texto">
+                    <strong id="eldora-menu-nome-heroi">Aventureiro</strong>
+                    <span>Uma lenda em construção</span>
+                </div>
+            </div>
+            <div class="eldora-menu-recursos" aria-label="Recursos do herói">
+                <div class="eldora-menu-recurso eldora-menu-recurso-hp">
+                    <div class="eldora-menu-recurso-linha"><span>VIDA</span><b id="eldora-menu-hp-valor">--</b></div>
+                    <div class="eldora-menu-recurso-trilho"><i id="eldora-menu-hp-barra"></i></div>
+                </div>
+                <div class="eldora-menu-recurso eldora-menu-recurso-mp">
+                    <div class="eldora-menu-recurso-linha"><span>MANA</span><b id="eldora-menu-mp-valor">--</b></div>
+                    <div class="eldora-menu-recurso-trilho"><i id="eldora-menu-mp-barra"></i></div>
+                </div>
+                <div class="eldora-menu-recurso eldora-menu-recurso-xp">
+                    <div class="eldora-menu-recurso-linha"><span>JORNADA</span><b id="eldora-menu-xp-valor">--</b></div>
+                    <div class="eldora-menu-recurso-trilho"><i id="eldora-menu-xp-barra"></i></div>
+                </div>
+            </div>
+        </section>
 
         <div class="menu-itens eldora-menu-itens">
 
@@ -913,17 +946,6 @@
                     Explorar Reino
                 </span>
             </button>
-
-            <button
-                type="button"
-                class="menu-btn eldora-menu-btn"
-                id="nav-btn-coliseu-pvp"
-                onclick="fecharMenu(); if(typeof window.abrirColiseuPvP === 'function') window.abrirColiseuPvP()"
-            >
-                <span class="eldora-menu-icone">⚔️</span>
-                <span class="texto">PvP & Coliseu</span>
-            </button>
-
 
             <button
                 onclick="navegarMenuHeroi('aba-perfil')"
@@ -1033,6 +1055,11 @@
   
         </div>
 
+        <div class="eldora-menu-rodape">
+            <span aria-hidden="true">✦</span>
+            <span>O reino aguarda sua próxima jornada.</span>
+        </div>
+
     </nav>
 
     <div id="aba-reino" class="tab-content active">
@@ -1068,9 +1095,9 @@
             <div id="label-xp" class="hud-info-box">XP: 0%</div>
         </div>
     
-        <div id="online-counter">
+        <div id="online-counter" data-status="sincronizando" title="Conectando ao servidor do jogo.">
             <div class="dot-green"></div>
-            <span id="online-count-text">Sincronizando...</span>
+            <span id="online-count-text">Conectando...</span>
         </div>
 
         <button id="btn-chat-mapa" class="btn-social-mapa" style="transition: transform 0.2s;" onclick="document.getElementById('hub-social').style.display='flex'; document.querySelectorAll('.btn-passe-mapa, .btn-social-mapa').forEach(b => b.style.display='none'); let badge = document.getElementById('badge-chat-mapa'); if(badge) badge.remove(); window.totalNotificacoesMapa = 0;">
@@ -1140,8 +1167,6 @@
     </div>
     
     <div id="aba-perfil" class="tab-content" style="background: transparent;">
-        <a href="/login?conta=1" style="display:inline-block;margin:12px;padding:12px;border:1px solid #a68c51;border-radius:8px;color:#ecd08c;background:#152133">Conta · Vincular Google ou Telegram</a>
-
         <div style="position: absolute; top: 75px; right: 8px; z-index: 30;">
             <button onclick="if(window.abrirCodiceHunter) window.abrirCodiceHunter()" 
                     style="background: #2b1d12; border: 2px solid #d4af37; border-radius: 50%; width: 50px; height: 50px; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; font-size: 24px; transition: transform 0.2s;"
@@ -1187,7 +1212,7 @@
     <script src="/static/js/hud_invasao.js"></script>
     <script src="/static/js/mapa_invasao.js?v=1"></script>
     <script src="/static/js/mapa_interativo.js?v=12"></script>
-    <script src="/static/js/mapa_multiplayer.js?v=26"></script>
+    <script src="/static/js/mapa_multiplayer.js?v=27"></script>
     <script src="/static/js/mercado.js?v=1258"></script>
     <script src="/static/js/central_eldora.js?v=4"></script>
     <script src="/static/js/cla.js?v=8"></script>
@@ -1312,14 +1337,76 @@
         // 2. TRAVA DE SEGURANÇA
         // ==========================================
         window.verificarAcessoEldora = async function() {
-            window.atualizarCarregamento(10, "Lendo memórias do jogador...");
+            window.atualizarCarregamento(10, "Verificando sua conta...");
 
-            const charId = localStorage.getItem("jogadorEldoraID");
-            
-            if (!charId || charId === "undefined" || charId === "null") {
-                window.location.replace('/login');
-                return false; 
+            let statusConta;
+            try {
+                const respostaStatus = await fetch(`/api/auth/status?t=${Date.now()}`, { cache: 'no-store' });
+                if (!respostaStatus.ok) throw new Error('Sessão indisponível.');
+                statusConta = await respostaStatus.json();
+            } catch (erro) {
+                console.error('Falha ao verificar a conta:', erro);
+                window.atualizarCarregamento(10, "Não foi possível validar a conta.");
+                return false;
             }
+
+            if (!statusConta.authenticated) {
+                window.location.replace('/login');
+                return false;
+            }
+
+            const personagens = Array.isArray(statusConta.personagens) ? statusConta.personagens : [];
+            const personagemDaSessao = personagens.find(p => String(p.id) === String(statusConta.selected_character_id || ''));
+            let personagem = personagemDaSessao;
+
+            if (!personagem) {
+                const heroiDaConta = localStorage.getItem(`eldora_ultimo_heroi_${statusConta.username || ''}`);
+                const heroiEmCache = localStorage.getItem('jogadorEldoraID');
+                personagem = personagens.find(p => String(p.id) === String(heroiDaConta || ''))
+                    || personagens.find(p => String(p.id) === String(heroiEmCache || ''));
+            }
+
+            if (!personagem) {
+                window.location.replace('/login');
+                return false;
+            }
+
+            const charId = String(personagem.id);
+            const charIdSelecionado = String(statusConta.selected_character_id || '');
+            if (charIdSelecionado !== charId) {
+                const chaveRecarga = 'eldora_socket_session_recarregada';
+                const tentativa = `${statusConta.username || ''}:${charId}`;
+                if (sessionStorage.getItem(chaveRecarga) === tentativa) {
+                    sessionStorage.removeItem(chaveRecarga);
+                    window.location.replace('/login');
+                    return false;
+                }
+
+                try {
+                    const respostaSelecao = await fetch('/api/auth/select', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Eldora-CSRF': statusConta.csrf || ''
+                        },
+                        body: JSON.stringify({ character_id: charId })
+                    });
+                    if (!respostaSelecao.ok) throw new Error('Não foi possível selecionar este personagem.');
+                    sessionStorage.setItem(chaveRecarga, tentativa);
+                    window.location.reload();
+                    return false;
+                } catch (erro) {
+                    console.error('Falha ao selecionar o personagem da conta:', erro);
+                    window.location.replace('/login');
+                    return false;
+                }
+            }
+
+            sessionStorage.removeItem('eldora_socket_session_recarregada');
+            window.eldoraCharacterId = charId;
+            window.eldoraCharacterName = personagem.nome || localStorage.getItem('jogadorEldoraNome') || 'Aventureiro';
+            localStorage.setItem('jogadorEldoraID', charId);
+            localStorage.setItem('jogadorEldoraNome', window.eldoraCharacterName);
 
             try {
                 window.atualizarCarregamento(30, "Consultando os Deuses de Eldora...");
@@ -1329,6 +1416,8 @@
                     console.error("🚨 404: Personagem não encontrado!");
                     localStorage.removeItem("jogadorEldoraID");
                     localStorage.removeItem("jogadorEldoraNome");
+                    window.eldoraCharacterId = null;
+                    window.eldoraCharacterName = null;
                     window.location.replace('/login');
                     return false;
                 }

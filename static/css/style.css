@@ -142,6 +142,14 @@ th { background-color: #2c3e50; color: #f39c12; padding: 15px 12px; text-align: 
     transition: all 0.3s ease;
 }
 
+#online-counter[data-status="sincronizando"] {
+    border-color: #f5b942;
+}
+
+#online-counter[data-status="erro"] {
+    border-color: #ef4444;
+}
+
 /* A bolinha verde com brilho */
 .dot-green {
     width: 10px;
@@ -150,6 +158,17 @@ th { background-color: #2c3e50; color: #f39c12; padding: 15px 12px; text-align: 
     border-radius: 50%;
     box-shadow: 0 0 8px #2ecc71, 0 0 15px #0af81e;
     animation: pulse-green 2s infinite; /* Chama a animação abaixo */
+}
+
+#online-counter[data-status="sincronizando"] .dot-green {
+    background-color: #f5b942;
+    box-shadow: 0 0 8px #f5b942;
+}
+
+#online-counter[data-status="erro"] .dot-green {
+    background-color: #ef4444;
+    box-shadow: 0 0 8px #ef4444;
+    animation: none;
 }
 
 /* Animação de radar/piscar da bolinha */

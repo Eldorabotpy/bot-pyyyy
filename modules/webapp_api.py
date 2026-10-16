@@ -1709,14 +1709,8 @@ def api_login_conta():
         if not conta or not conta.get("password_hash") or not check_password_hash(conta["password_hash"], password):
             return jsonify({"sucesso": False, "erro": "Usuário ou senha incorretos."})
 
-        if conta.get('google_sub'):
-            # Depois de vincular, a senha antiga deixa de autenticar pelo navegador.
-            return jsonify(sucesso=False, erro='Esta conta já está vinculada. Entre com Google ou pelo Telegram vinculado.'), 403
-        # Senha válida autentica a conta. Vinculação Telegram é uma ação separada,
-        # nunca um efeito colateral que possa bloquear contas antigas.
-
         # Se logou com sucesso, busca todos os personagens vinculados a essa conta!
-        start_session(conta, remember=data.get('remember', True) is True)
+        start_session(conta, remember=data.get('remember', True) is True, auth_method='password')
         return jsonify(account_payload(conta))
     except ValueError as e:
         return jsonify(sucesso=False, erro=str(e)), 400
@@ -2575,12 +2569,14 @@ def api_criar_personagem():
             {"_id": novo_id}, 
             {"$set": {
                 "gender": genero,
-                "conta_mestre": conta_mestre # <--- VINCULA À CONTA MESTRA
+                "conta_mestre": conta_mestre,
+                "conta_mestre_id": account["_id"]
             }}
         )
         
         # Após criar o personagem, devolvemos a lista de personagens atualizada para o Lobby do Javascript
-        personagens_db = list(users_collection.find({"conta_mestre": conta_mestre}))
+        from modules.portal_auth import character_owner_query
+        personagens_db = list(users_collection.find(character_owner_query(account)))
         lista_atualizada = []
         for p in personagens_db:
             lista_atualizada.append({
@@ -2607,7 +2603,8 @@ def api_meus_personagens(tg_id_recebido):
         account = current_account()
         if not account:
             return jsonify(erro='Entre na sua conta.'), 401
-        cursor = users_collection.find({'conta_mestre': account['username']})
+        from modules.portal_auth import character_owner_query
+        cursor = users_collection.find(character_owner_query(account))
         personagens = []
         
         for p in cursor:
@@ -2778,6 +2775,8 @@ def atualizar_perfil_visual():
     try:
         from modules.player.core import users_collection
         from bson.objectid import ObjectId
+        from modules.portal_auth import require_csrf
+        require_csrf()
         
         dados = request.json
         user_id = dados.get('user_id')
@@ -3814,30 +3813,6 @@ def api_dimensional_status():
         }), 500
 
 
-@webapp_bp.route('/api/dimensional/criar_debug', methods=['POST'])
-def api_dimensional_criar_debug():
-    try:
-        from modules.events import dimensional_boss_manager as dbm
-
-        dados = request.json or {}
-        mapa = dados.get("mapa") or dados.get("regiao")
-
-        evento = dbm.criar_evento_debug(mapa=mapa)
-
-        return jsonify({
-            "success": True,
-            "evento": evento
-        })
-
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 500
-
-
 @webapp_bp.route('/api/dimensional/entrar', methods=['POST'])
 def api_dimensional_entrar():
     try:
@@ -3961,134 +3936,6 @@ def api_dimensional_acao():
         }), 500        
 
 # ==========================================
-# 🌌 DEBUG — INICIAR FENDA DIMENSIONAL NO MAPA
-# ==========================================
-
-@webapp_bp.route('/api/debug/iniciar_dimensional_mapa', methods=['GET'])
-def api_debug_iniciar_dimensional_mapa():
-    try:
-        from modules.events import dimensional_boss_manager as dbm
-
-        mapa = (
-            request.args.get("mapa") or
-            request.args.get("regiao") or
-            None
-        )
-
-        evento = dbm.criar_evento_debug(mapa=mapa)
-
-        try:
-            from flask import current_app
-            from datetime import datetime
-
-            mapa_evento = evento.get("mapa") or evento.get("regiao") or "mapa_desconhecido"
-
-            nomes_mapas = {
-                "capital_eldora": "Capital de Eldora",
-                "pradaria_inicial": "Pradaria Inicial",
-                "floresta_sombria": "Floresta Sombria",
-                "pedreira_granito": "Pedreira de Granito"
-            }
-
-            mapa_nome = nomes_mapas.get(mapa_evento, str(mapa_evento).replace("_", " ").title())
-
-            payload_socket = {
-                "evento": evento,
-                "evento_id": evento.get("evento_id"),
-                "mapa": mapa_evento,
-                "regiao": mapa_evento,
-                "mapa_nome": mapa_nome,
-                "entrada_encerra_em": evento.get("entrada_encerra_em"),
-                "tempo_entrada_restante": evento.get("tempo_entrada_restante"),
-                "max_jogadores": evento.get("max_jogadores"),
-                "mensagem": f"🌌 Uma Fenda Dimensional surgiu em {mapa_nome}!"
-            }
-
-            sio = current_app.extensions.get("socketio")
-
-            if sio:
-                sio.emit("fendaDimensionalSurgiu", payload_socket)
-                sio.emit("novaMensagemChat", {
-                    "remetente": "Sistema",
-                    "texto": payload_socket["mensagem"],
-                    "tipo": "evento"
-                })
-
-            try:
-                db["chat_historico"].insert_one({
-                    "remetente": "Sistema",
-                    "texto": payload_socket["mensagem"],
-                    "alvo": "global",
-                    "tipo": "evento",
-                    "data_envio": datetime.utcnow()
-                })
-            except Exception as e:
-                print(f"⚠️ [DIMENSIONAL CHAT] Não salvou aviso da Fenda no chat: {e}")
-
-        except Exception as e:
-            print(f"⚠️ [DIMENSIONAL SOCKET] Falha ao emitir nascimento da Fenda: {e}")
-
-        return jsonify({
-            "success": True,
-            "message": "Fenda Dimensional iniciada no mapa.",
-            "evento_id": evento.get("evento_id"),
-            "mapa": evento.get("mapa"),
-            "status": evento.get("status"),
-            "qtd_jogadores": evento.get("qtd_jogadores"),
-            "max_jogadores": evento.get("max_jogadores"),
-            "tempo_entrada_restante": evento.get("tempo_entrada_restante"),
-            "evento": evento
-        })
-
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 500        
-    
-# ==========================================
-# 🌌 DEBUG — ENCERRAR FENDA DIMENSIONAL
-# ==========================================
-
-@webapp_bp.route('/api/debug/encerrar_dimensional_mapa', methods=['GET'])
-def api_debug_encerrar_dimensional_mapa():
-    try:
-        from modules.events import dimensional_boss_manager as dbm
-
-        resultado = dbm.encerrar_evento_debug()
-
-        try:
-            from flask import current_app
-
-            sio = current_app.extensions.get("socketio")
-
-            if sio:
-                sio.emit("fendaDimensionalEncerrada", {
-                    "evento_id": resultado.get("evento_id"),
-                    "mensagem": "🌌 A Fenda Dimensional se fechou."
-                })
-
-                sio.emit("novaMensagemChat", {
-                    "remetente": "Sistema",
-                    "texto": "🌌 A Fenda Dimensional se fechou.",
-                    "tipo": "evento"
-                })
-
-        except Exception as e:
-            print(f"⚠️ [DIMENSIONAL SOCKET] Falha ao emitir encerramento da Fenda: {e}")
-
-        return jsonify(resultado)
-
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 500    
-    
 # ==========================================
 # 🛡️ ROTAS COMPLETAS DOS CLÃS
 # ==========================================

@@ -235,9 +235,12 @@ window.salvarCustomizacaoPerfil = async function() {
     if (btnSalvar) btnSalvar.innerText = "A GUARDAR... ⏳";
 
     try {
+        const headers = window.portalSessionHeaders
+            ? await window.portalSessionHeaders({'Content-Type': 'application/json'})
+            : {'Content-Type': 'application/json'};
         const resposta = await fetch('/api/perfil/atualizar', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers,
             body: JSON.stringify({
                 user_id: userId,
                 avatar: idAvatar,

@@ -7,7 +7,38 @@
         const style = getComputedStyle(el);
         return !el.hidden && style.display !== 'none' && style.visibility !== 'hidden' && Number(style.opacity) !== 0 && el.getClientRects().length > 0;
     };
+    function syncResumoHeroi() {
+        const nome = window.eldoraCharacterName || localStorage.getItem('jogadorEldoraNome') || 'Aventureiro';
+        const nomeEl = document.getElementById('eldora-menu-nome-heroi');
+        if (nomeEl && nomeEl.textContent !== nome) nomeEl.textContent = nome;
+
+        const hudAvatar = document.getElementById('hud-img-avatar');
+        const menuAvatar = document.getElementById('eldora-menu-avatar');
+        const avatarWrap = document.getElementById('eldora-menu-avatar-wrap');
+        if (hudAvatar?.src && menuAvatar && !hudAvatar.src.includes('placehold.co') && menuAvatar.src !== hudAvatar.src) {
+            menuAvatar.src = hudAvatar.src;
+            menuAvatar.onload = () => avatarWrap?.classList.add('tem-avatar');
+            menuAvatar.onerror = () => avatarWrap?.classList.remove('tem-avatar');
+        }
+
+        [
+            ['label-hp', 'eldora-menu-hp-barra', 'eldora-menu-hp-valor'],
+            ['label-mp', 'eldora-menu-mp-barra', 'eldora-menu-mp-valor'],
+            ['label-xp', 'eldora-menu-xp-barra', 'eldora-menu-xp-valor']
+        ].forEach(([origemId, barraId, valorId]) => {
+            const texto = document.getElementById(origemId)?.textContent || '';
+            const valor = document.getElementById(valorId);
+            const barra = document.getElementById(barraId);
+            const match = texto.match(/(\d+(?:[.,]\d+)?)\s*%/);
+            const percentual = match ? Math.max(0, Math.min(100, Number(match[1].replace(',', '.')))) : null;
+            const textoValor = percentual === null ? '--' : `${Math.round(percentual)}%`;
+            const largura = percentual === null ? '0%' : `${percentual}%`;
+            if (valor && valor.textContent !== textoValor) valor.textContent = textoValor;
+            if (barra && barra.style.width !== largura) barra.style.width = largura;
+        });
+    }
     function sync() {
+        syncResumoHeroi();
         const blocked = [...document.querySelectorAll(blockers)].some(el => el !== menu && !menu.contains(el) && visible(el));
         document.body.classList.toggle('game-overlay-active', blocked);
         document.body.classList.toggle('fora-do-mapa', !document.getElementById('aba-reino')?.classList.contains('active'));
@@ -63,5 +94,7 @@
         scheduled = true;
         requestAnimationFrame(() => { scheduled = false; sync(); });
     }).observe(document.body, {subtree:true, childList:true, attributes:true, attributeFilter:['style','class','hidden','open']});
+    const hudAvatar = document.getElementById('hud-img-avatar');
+    if (hudAvatar) new MutationObserver(syncResumoHeroi).observe(hudAvatar, {attributes:true, attributeFilter:['src']});
     sync();
 })();

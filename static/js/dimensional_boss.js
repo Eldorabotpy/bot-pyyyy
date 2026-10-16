@@ -3361,30 +3361,6 @@
             window.avisoEldora("Erro ao atacar: " + e.message);
         }
     };
-    window.criarBossDimensionalDebug = async function (mapa = null) {
-        const body = mapa ? { mapa } : {};
-
-        const res = await fetch("/api/dimensional/criar_debug", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(body)
-        });
-
-        const dados = await res.json();
-
-        if (dados.success) {
-            window.eventoDimensionalAtual = dados.evento;
-            atualizarBotaoDimensional();
-
-            if (typeof window.mostrarNotificacaoRPG === "function") {
-                window.mostrarNotificacaoRPG("Fenda Dimensional criada para teste.", "🌌");
-            }
-        }
-    
-        console.log("DEBUG DIMENSIONAL:", dados);
-        return dados;
-    };
-
     document.addEventListener("DOMContentLoaded", () => {
         criarBotaoDimensional();
         criarBotaoTesteDimensional();
