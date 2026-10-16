@@ -3,7 +3,6 @@
 import unicodedata
 import re
 import math
-from modules import file_ids
 from .pvp_config import ELO_THRESHOLDS, ELO_DISPLAY
 
 
@@ -26,7 +25,15 @@ def get_player_class_media(player_data: dict):
     Regra:
     - Se o personagem tiver classe (class_key ou class), tenta buscar a mídia da classe.
     - Se não encontrar (ou não tiver classe), retorna SEMPRE 'classe_default_media' (fallback obrigatório).
+    - Se o catálogo opcional de mídia não existir, retorna None sem quebrar o Elo.
     """
+    # O módulo de mídia é opcional neste checkout e não deve impedir o uso
+    # das funções de Elo deste arquivo.
+    try:
+        from modules import file_ids
+    except ImportError:
+        return None
+
     # Aceita 'class_key' (novo) ou 'class' (legado)
     raw_cls = (player_data.get("class_key") or player_data.get("class") or "").strip()
     cls = _slugify(raw_cls)
