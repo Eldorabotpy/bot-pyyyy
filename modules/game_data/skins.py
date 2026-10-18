@@ -473,3 +473,39 @@ def get_skin_avatar_costas(skin_id: str, gender: str = "masculino") -> str:
     avatar_data = SKIN_AVATARS_COSTA.get(skin_id, {})
     safe_gender = "female" if gender == "feminino" else "male"
     return avatar_data.get(safe_gender, avatar_data.get("male", ""))
+
+
+# Loja permanente de skins. A classe catalogada descreve o tema visual,
+# sem restringir quem pode equipá-lo. Skins de evento ficam no passe.
+SKIN_SHOP_COSTS = {
+    "guerreiro_armadura_negra": 200,
+    "guerreiro_armadura_jade": 300,
+    "guerreiro_placas_douradas": 400,
+    "mago_traje_arcano": 200,
+    "mago_arquimago_caos": 400,
+    "assassino_manto_espectral": 300,
+    "cacador_patrulheiro_elfico": 200,
+    "cacador_cacador_dragoes": 400,
+    "berserker_pele_urso": 200,
+    "berserker_infernal": 400,
+    "monge_quimono_dragao": 300,
+    "monge_aspecto_asura": 500,
+    "bardo_traje_maestro": 200,
+    "bardo_requiem_sombrio": 400,
+    "samurai_armadura_shogun": 300,
+    "samurai_armadura_demoniaca": 400,
+    "samurai_encarnacao_sangrenta": 500,
+    "samurai_guardiao_celestial": 500,
+    "samurai_chama_aniquiladora": 500,
+}
+SKIN_SHOP_CATALOG = {
+    skin_id: {
+        "id": skin_id,
+        "display_name": data["display_name"],
+        "description": data.get("description", "Visual cosmético para qualquer classe."),
+        "cost": SKIN_SHOP_COSTS.get(skin_id, 300),
+        "gender_variants": {"masculino": f"{skin_id}_m", "feminino": f"{skin_id}_f"},
+    }
+    for skin_id, data in SKIN_CATALOG.items()
+    if skin_id not in event_skins
+}

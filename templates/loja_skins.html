@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Ateliê de Skins - Eldora</title>
+    <link rel="stylesheet" href="/static/css/loja_skins.css?v=1">
+</head>
+<body>
+    <main class="skin-shop">
+        <header class="shop-header">
+            <div>
+                <p class="eyebrow">ATELIÊ DA CAPITAL</p>
+                <h1>Loja de Skins</h1>
+                <p class="shop-intro">A aparência acompanha seu herói, qualquer que seja sua classe.</p>
+            </div>
+            <div class="fragment-wallet"><span>✨</span><div><small>FRAGMENTOS DE SKIN</small><strong id="skin-fragments">—</strong></div></div>
+        </header>
+        <section class="shop-note"><span>✨</span><p>Por temporada: a faixa grátis concede 25 fragmentos. A faixa paga acrescenta 60, totalizando 85 para quem tem Premium. O saldo acumula entre temporadas e resgata skins diretamente.</p></section>
+        <div id="skin-shop-message" class="shop-message" role="status" hidden></div>
+        <section id="skin-grid" class="skin-grid" aria-live="polite">
+            <div class="loading-card">Carregando o catálogo…</div>
+        </section>
+        <footer><button class="back-button" onclick="window.history.back()">← Voltar ao mapa</button></footer>
+    </main>
+    <script src="/static/js/portal_session.js?v=1"></script>
+    <script src="/static/js/loja_skins.js?v=1"></script>
+</body>
+</html>

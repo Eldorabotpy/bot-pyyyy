@@ -1,4 +1,7 @@
 // static/js/season_pass.js
+const NIVEIS_POR_PAGINA = 20;
+let paginaPasseAtual = 0;
+let totalNiveisPasse = 0;
 
 async function carregarPasse() {
     let userId = localStorage.getItem('jogadorEldoraID');
@@ -17,6 +20,8 @@ async function carregarPasse() {
 
         const passe = data.status;
         const catalogo = data.catalogo;
+        const fragmentosSkin = document.getElementById('fragmentos-skin-passe');
+        if (fragmentosSkin) fragmentosSkin.innerText = Number(passe.skin_fragments || 0).toLocaleString('pt-BR');
 
         // Atualiza cabeçalho e XP
         document.getElementById('display-nivel-atual').innerText = `NÍVEL ${passe.level}`;
@@ -45,7 +50,11 @@ async function carregarPasse() {
         const lista = document.getElementById('lista-recompensas');
         lista.innerHTML = ''; 
 
-        Object.keys(catalogo).forEach(nivelStr => {
+        const niveis = Object.keys(catalogo).sort((a, b) => Number(a) - Number(b));
+        totalNiveisPasse = niveis.length;
+        paginaPasseAtual = Math.min(paginaPasseAtual, Math.max(0, Math.ceil(totalNiveisPasse / NIVEIS_POR_PAGINA) - 1));
+        const inicio = paginaPasseAtual * NIVEIS_POR_PAGINA;
+        niveis.slice(inicio, inicio + NIVEIS_POR_PAGINA).forEach(nivelStr => {
             const nivel = parseInt(nivelStr);
             const recompensa = catalogo[nivel];
             
@@ -66,6 +75,7 @@ async function carregarPasse() {
                 <div class="reward-box reward-free ${classFree}" onclick="resgatarPremio(${nivel}, 'free')">
                     <small>GRÁTIS</small>
                     ${jaResgatouFree ? "✔️ Resgatado" : recompensa.free.label}
+                    ${(recompensa.fragmentos_skin?.free || 0) > 0 ? `<span class="pass-fragment-reward">+${recompensa.fragmentos_skin.free} Fragmento de Skin ✨</span>` : ''}
                 </div>
 
                 <div class="reward-level-center">
@@ -77,14 +87,30 @@ async function carregarPasse() {
                 <div class="reward-box reward-premium ${classPremium}" onclick="resgatarPremio(${nivel}, 'premium')">
                     <small>PREMIUM</small>
                     ${jaResgatouPremium ? "✔️ Resgatado" : recompensa.premium.label}
+                    ${(recompensa.fragmentos_skin?.premium || 0) > 0 ? `<span class="pass-fragment-reward">+${recompensa.fragmentos_skin.premium} Fragmentos de Skin ✨</span>` : ''}
                 </div>
             `;
             lista.appendChild(row);
         });
 
+        const controles = document.getElementById('controles-pagina-passe');
+        const totalPaginas = Math.max(1, Math.ceil(niveis.length / NIVEIS_POR_PAGINA));
+        const primeiroNivel = inicio + 1;
+        const ultimoNivel = Math.min(inicio + NIVEIS_POR_PAGINA, niveis.length);
+        controles.innerHTML = `
+            <button ${paginaPasseAtual === 0 ? 'disabled' : ''} onclick="mudarPaginaPasse(-1)">← Anteriores</button>
+            <span>Níveis ${primeiroNivel}–${ultimoNivel} de ${niveis.length}</span>
+            <button ${paginaPasseAtual >= totalPaginas - 1 ? 'disabled' : ''} onclick="mudarPaginaPasse(1)">Próximos →</button>`;
+
     } catch (err) {
         console.error("Falha na conexão com a API do Passe:", err);
     }
+}
+
+function mudarPaginaPasse(delta) {
+    const totalPaginas = Math.ceil(totalNiveisPasse / NIVEIS_POR_PAGINA);
+    paginaPasseAtual = Math.max(0, Math.min(totalPaginas - 1, paginaPasseAtual + delta));
+    carregarPasse();
 }
 
 // 🔥 A NOVA FUNÇÃO DE RESGATE (Clica na caixa e envia pro Python) 🔥

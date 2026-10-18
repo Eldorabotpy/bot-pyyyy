@@ -1617,14 +1617,28 @@ def api_equipar_skin():
                 "erro": "A aparência de Aventureiro não pode mais ser usada após escolher uma classe."
             }), 400
 
-        if (
-            skin_id and
-            skin_id not in pdata.get("unlocked_skins", [])
-        ):
+        if skin_id and skin_id not in (pdata.get("unlocked_skins", []) or []):
             return jsonify({
                 "sucesso": False,
                 "erro": "Você não possui esta aparência."
             }), 400
+
+        # Cada visual pode ter uma variante masculina e feminina. A classe do
+        # personagem não participa da validação: a propriedade é suficiente.
+        if skin_id:
+            from modules.game_data.skins import SKIN_SHOP_CATALOG
+            genero_skin = next((
+                genero
+                for item in SKIN_SHOP_CATALOG.values()
+                for genero, variante in item["gender_variants"].items()
+                if variante == skin_id
+            ), None)
+            genero_jogador = str(pdata.get("gender", "masculino")).lower()
+            genero_jogador = "feminino" if genero_jogador in {"f", "feminino", "female", "mulher"} else "masculino"
+            if not genero_skin and str(skin_id).endswith(("_m", "_f")):
+                genero_skin = "masculino" if str(skin_id).endswith("_m") else "feminino"
+            if genero_skin and genero_skin != genero_jogador:
+                return jsonify({"sucesso": False, "erro": "Esta variante não é compatível com o gênero do personagem."}), 400
 
         pdata["equipped_skin"] = skin_id
 
@@ -1647,10 +1661,10 @@ def api_mapa_objetos(regiao_id):
             "capital_eldora": [
                 {
                     "id": "entrada_coliseu_pvp",
-                    # Portão do Coliseu, próximo ao bloco (4, 35) do mapa 60x60.
-                    "x": 4 * 32,
+                    # Centro do portão do Coliseu, no bloco (6, 35) do mapa 60x60.
+                    "x": 6 * 32,
                     "y": 35 * 32,
-                    "icone_x": 4 * 32 + 16,
+                    "icone_x": 6 * 32,
                     "icone_y": 35 * 32 - 28,
                     "texto_botao": "⚔️",
                     "acao": "abrir_coliseu_pvp",
@@ -1890,6 +1904,10 @@ def api_usar_item_direto():
             
         item_obj = inventario[item_uid]
         base_id = item_obj.get("base_id", item_uid) if isinstance(item_obj, dict) else item_uid
+        if base_id in {"ticket_arena", "ticket_de_arena"}:
+            return jsonify({
+                "erro": "O ingresso antigo da Arena foi encerrado. Use os Tickets do Coliseu PvP, disponíveis na Loja.",
+            }), 410
         if base_id == 'carta_recomendacao':
             return jsonify({'erro': 'Apresente esta carta à recepcionista da Guilda. Ela será recolhida no seu registro.'}), 400
         quantidade = item_obj.get("quantity", item_obj) if isinstance(item_obj, dict) else item_obj
@@ -2657,7 +2675,8 @@ def status_passe(user_id):
                     "is_premium": passe.get("is_premium", False),
                     # 👇 ADICIONE ESTAS DUAS LINHAS 👇
                     "resgatados_free": passe.get("resgatados_free", []), 
-                    "resgatados_premium": passe.get("resgatados_premium", [])
+                    "resgatados_premium": passe.get("resgatados_premium", []),
+                    "skin_fragments": max(0, int(pdata.get("skin_fragments", 0) or 0))
                 },
                 "catalogo": RECOMPENSAS_PASSE
             })
@@ -2708,6 +2727,7 @@ def resgatar_passe():
         r_tipo = recompensa.get("tipo")
         genero = pdata.get("gender", "masculino").lower()
         inventario = pdata.get("inventory", {})
+        fragmentos_skin = int((RECOMPENSAS_PASSE.get(nivel_pedido, {}).get("fragmentos_skin", {}) or {}).get(tipo_pedido, 0) or 0)
 
         # 4. LÓGICA DE ENTREGA REAL
         if r_tipo == "gold":
@@ -2748,6 +2768,8 @@ def resgatar_passe():
             if id_correto not in unlocked_av: unlocked_av.append(id_correto)
             pdata["unlocked_avatars"] = unlocked_av
 
+        pdata["skin_fragments"] = max(0, int(pdata.get("skin_fragments", 0) or 0)) + fragmentos_skin
+
         # 5. Salva o progresso e o resgate
         lista_resgatados.append(nivel_pedido)
         passe[f"resgatados_{tipo_pedido}"] = lista_resgatados
@@ -2761,10 +2783,11 @@ def resgatar_passe():
                 "inventory": pdata.get("inventory", {}),
                 "unlocked_skins": pdata.get("unlocked_skins", []),
                 "unlocked_avatars": pdata.get("unlocked_avatars", []),
-                "unlocked_banners": pdata.get("unlocked_banners", [])
+                "unlocked_banners": pdata.get("unlocked_banners", []),
+                "skin_fragments": pdata["skin_fragments"]
             }}
         )
-        return jsonify({"status": "success", "message": f"Recebeu: {recompensa.get('label')}!"})
+        return jsonify({"status": "success", "message": f"Recebeu: {recompensa.get('label')} e {fragmentos_skin} Fragmento(s) de Skin!"})
         
     except Exception as e: 
         print(f"ERRO NO PASSE: {e}")

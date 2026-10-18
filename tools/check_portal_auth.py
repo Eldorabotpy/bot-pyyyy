@@ -65,9 +65,17 @@ assert client.post('/api/auth/google',json={'credential':'fake'}).status_code==4
 csrf=client.get('/api/auth/status').json['csrf']
 headers={'X-Eldora-CSRF':csrf}
 auth.verify_google=lambda token: {'one':'google-1','two':'google-2','three':'google-3'}[token]
-assert client.post('/api/auth/google',headers=headers,json={'credential':'one'}).status_code==409
+result=client.post('/api/auth/google',headers=headers,json={'credential':'one'})
+assert result.status_code==409 and 'Não crie outra conta para recuperar seus personagens.' in result.json['erro']
 result=client.post('/api/auth/google',headers=headers,json={'credential':'one','mode':'create'})
 assert result.status_code==200 and len(accounts.docs)==1
+master_id=accounts.docs[0]['_id']
+headers={'X-Eldora-CSRF':result.json['csrf']}
+# The same Google subject can never create a second master account.
+result=client.post('/api/auth/google',headers=headers,json={'credential':'one','mode':'create'})
+assert result.status_code==409 and len(accounts.docs)==1
+result=client.post('/api/auth/google',headers=headers,json={'credential':'one','mode':'login'})
+assert result.status_code==200 and accounts.docs[0]['_id']==master_id and len(accounts.docs)==1
 assert 'password_hash' not in accounts.docs[0]
 account=accounts.docs[0];oid=ObjectId();players.docs=[{'_id':oid,'conta_mestre':account['username'],'character_name':'Existente'}]
 csrf=result.json['csrf'];headers={'X-Eldora-CSRF':csrf}

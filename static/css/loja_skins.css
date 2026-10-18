@@ -1,0 +1,24 @@
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap');
+
+:root { color-scheme: dark; font-family: Inter, Arial, sans-serif; background: #080d16; color: #f5f0df; }
+* { box-sizing: border-box; }
+body { min-height: 100vh; margin: 0; background: radial-gradient(ellipse at 50% -15%, #25314a 0, #101827 40%, #080d16 78%); }
+.skin-shop { width: min(1120px, 100%); margin: auto; padding: 34px 24px 48px; }
+.shop-header { display: flex; justify-content: space-between; align-items: center; gap: 20px; padding: 20px 4px 28px; border-bottom: 1px solid #b88a3a55; }
+.eyebrow { margin: 0 0 8px; color: #dfb95f; letter-spacing: .2em; font-size: 11px; font-weight: 800; }
+h1 { margin: 0; color: #f4d78a; font: 700 clamp(30px, 6vw, 48px) Cinzel, Georgia, serif; text-shadow: 0 3px 20px #e5b74e33; }
+.shop-intro { margin: 10px 0 0; color: #b6c0cf; }
+.fragment-wallet { display: flex; align-items: center; gap: 13px; min-width: 192px; padding: 13px 17px; border: 1px solid #e3b95666; border-radius: 14px; background: #171d27dd; box-shadow: inset 0 0 22px #d9a63112; }
+.fragment-wallet>span { font-size: 30px; }.fragment-wallet small { display: block; color: #aeb8c6; font-size: 9px; letter-spacing: .11em; }.fragment-wallet strong { display: block; margin-top: 3px; color: #ffe39a; font-size: 22px; }
+.shop-note { display: flex; gap: 12px; align-items: center; margin: 22px 0; padding: 13px 16px; border: 1px solid #dfb95f33; border-radius: 12px; background: #d8a8330c; color: #d2d7df; }.shop-note span { font-size: 22px; }.shop-note p { margin: 0; line-height: 1.5; }
+.skin-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 17px; }
+.skin-card { display: flex; flex-direction: column; overflow: hidden; min-height: 380px; border: 1px solid #d4ad5b4f; border-radius: 15px; background: linear-gradient(155deg, #1c2635, #101620 75%); box-shadow: 0 12px 24px #0005; }
+.skin-art { display: grid; place-items: center; position: relative; height: 190px; overflow: hidden; background: radial-gradient(ellipse at 50% 70%, #b7893a3b, transparent 62%), #0b111a; }
+.skin-art img,.skin-art .fallback-art { position: absolute; inset: 0; display: grid; place-items: center; }.skin-art img { width: 100%; height: 100%; object-fit: contain; }.skin-art .fallback-art { color: #d9b866; font-size: 76px; text-shadow: 0 0 24px #d9b86655; }.skin-art .fallback-art[hidden] { display: none; }
+.skin-info { padding: 15px 15px 12px; flex: 1; }.skin-info h2 { margin: 0 0 8px; color: #f3d78e; font: 700 18px Cinzel, Georgia, serif; }.skin-info p { min-height: 46px; margin: 0; color: #aeb8c6; font-size: 12px; line-height: 1.5; }
+.skin-progress { margin: 0 15px 13px; display: flex; justify-content: space-between; color: #c8d0dc; font-size: 12px; }.skin-progress strong { color: #f3d78e; }.progress-track { height: 5px; margin: 0 15px 14px; overflow: hidden; border-radius: 6px; background: #ffffff14; }.progress-track i { display: block; height: 100%; background: linear-gradient(90deg, #a97829, #ffe28c); }
+.skin-action { margin: 0 15px 15px; min-height: 41px; border: 1px solid #e0b452; border-radius: 9px; background: linear-gradient(180deg, #b98936, #79551f); color: #fff5d6; font-weight: 800; cursor: pointer; }.skin-action:hover:enabled { filter: brightness(1.15); }.skin-action:disabled { border-color: #ffffff15; background: #ffffff0d; color: #808b99; cursor: default; }
+.loading-card,.empty-state { grid-column: 1/-1; padding: 42px 20px; border: 1px dashed #b88a3a55; border-radius: 14px; color: #aeb8c6; text-align: center; }
+.shop-message { margin: 0 0 17px; padding: 12px 15px; border: 1px solid #62c89166; border-radius: 10px; background: #225b3c44; color: #b8f2ce; }.shop-message.error { border-color: #ff777766; background: #6d272744; color: #ffd0d0; }
+footer { display: flex; justify-content: center; margin-top: 30px; }.back-button { padding: 11px 22px; border: 1px solid #758196; border-radius: 9px; background: #111a28; color: #dde4ee; font-weight: 700; cursor: pointer; }
+@media (max-width: 620px) { .skin-shop { padding: 20px 14px 36px; }.shop-header { align-items: flex-start; flex-direction: column; }.fragment-wallet { width: 100%; }.skin-grid { grid-template-columns: repeat(auto-fill, minmax(155px, 1fr)); gap: 11px; }.skin-card { min-height: 360px; }.skin-art { height: 150px; }.skin-info { padding: 12px; }.skin-info h2 { font-size: 15px; }.skin-info p { font-size: 11px; }.skin-progress,.progress-track { margin-left: 12px; margin-right: 12px; }.skin-action { margin-left: 12px; margin-right: 12px; } }

@@ -1,0 +1,290 @@
+/* Eldora — editor visual do perfil v2.
+   Escopo exclusivo do modal Customizar Perfil; não altera dados nem ações. */
+
+#modal-editar-perfil.modal-moderno {
+    box-sizing: border-box;
+    width: 100%;
+    height: 100%;
+    max-height: 100dvh;
+    padding: max(12px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom));
+    overflow: hidden;
+    overscroll-behavior: contain;
+    background: rgba(3, 7, 12, .82);
+    -webkit-backdrop-filter: blur(9px);
+    backdrop-filter: blur(9px);
+}
+
+#modal-editar-perfil .perfil-container-moderno {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    width: min(100%, 560px);
+    max-width: 560px;
+    max-height: min(92dvh, 820px);
+    padding: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border: 1px solid rgba(221, 177, 82, .64);
+    border-radius: 22px;
+    background:
+        radial-gradient(ellipse at 50% -12%, rgba(128, 83, 31, .23), transparent 48%),
+        linear-gradient(155deg, #18232c 0%, #0c141b 58%, #101820 100%);
+    color: #f4eee0;
+    box-shadow: 0 24px 70px rgba(0, 0, 0, .72),
+        inset 0 1px rgba(255, 255, 255, .09),
+        0 0 0 1px rgba(0, 0, 0, .35);
+    scrollbar-color: rgba(202, 160, 75, .55) rgba(255, 255, 255, .04);
+    scrollbar-width: thin;
+    -webkit-overflow-scrolling: touch;
+}
+
+#modal-editar-perfil .perfil-header {
+    position: sticky;
+    z-index: 4;
+    top: 0;
+    flex: 0 0 auto;
+    padding: 20px 18px 16px;
+    border-bottom: 1px solid rgba(221, 177, 82, .24);
+    background: linear-gradient(155deg, rgba(24, 35, 44, .98), rgba(15, 24, 31, .98));
+    box-shadow: 0 8px 18px rgba(0, 0, 0, .16);
+}
+
+#modal-editar-perfil .perfil-header h2 {
+    margin: 0 0 5px;
+    color: #f1ce7b;
+    font: 900 clamp(17px, 4.8vw, 21px)/1.25 "Cinzel", Georgia, serif;
+    letter-spacing: .075em;
+    text-shadow: 0 2px 10px rgba(222, 171, 66, .18);
+}
+
+#modal-editar-perfil .perfil-header p {
+    margin: 0;
+    color: #aeb9bf !important;
+    font: 500 11px/1.45 "Segoe UI", Arial, sans-serif !important;
+    letter-spacing: .04em;
+}
+
+#modal-editar-perfil .secao-cosmetico {
+    flex: 0 0 auto;
+    margin: 0;
+    padding: 15px 16px 17px;
+    border-bottom: 1px solid rgba(195, 211, 215, .1);
+}
+
+#modal-editar-perfil .secao-cosmetico label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 12px;
+    color: #d9c58e;
+    font: 800 11px/1.35 "Segoe UI", Arial, sans-serif;
+    letter-spacing: .085em;
+}
+
+#modal-editar-perfil .grid-selecao {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 9px;
+}
+
+#modal-editar-perfil .card-opcao {
+    position: relative;
+    display: flex;
+    min-width: 0;
+    min-height: 112px;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    box-sizing: border-box;
+    padding: 10px 7px 9px;
+    border: 1px solid rgba(174, 190, 200, .19);
+    border-radius: 14px;
+    background: linear-gradient(145deg, rgba(37, 51, 61, .82), rgba(19, 30, 38, .94));
+    text-align: center;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: border-color .18s ease, background .18s ease, transform .18s ease, box-shadow .18s ease;
+}
+
+#modal-editar-perfil .card-opcao img {
+    display: block;
+    width: 56px;
+    height: 56px;
+    flex: 0 0 auto;
+    margin: 0;
+    border: 1px solid rgba(228, 194, 118, .52);
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(221, 177, 82, .16), rgba(8, 14, 19, .9) 70%);
+    object-fit: cover;
+    filter: none;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, .38);
+}
+
+#modal-editar-perfil .card-opcao[id^="sk-"] {
+    min-height: 132px;
+}
+
+#modal-editar-perfil .card-opcao[id^="sk-"] img {
+    width: 52px;
+    height: 78px;
+    border-radius: 9px;
+    background: radial-gradient(ellipse, rgba(221, 177, 82, .14), rgba(8, 14, 19, .94) 72%);
+    object-fit: contain;
+}
+
+#modal-editar-perfil .card-opcao span {
+    display: -webkit-box;
+    max-width: 100%;
+    min-height: 2.35em;
+    overflow: hidden;
+    color: #c7d0d4;
+    font: 700 10px/1.18 "Segoe UI", Arial, sans-serif;
+    overflow-wrap: anywhere;
+    text-overflow: ellipsis;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+}
+
+#modal-editar-perfil .card-opcao.selecionado {
+    border-color: #e7bb4d;
+    background: linear-gradient(145deg, rgba(113, 82, 27, .38), rgba(34, 38, 31, .96));
+    box-shadow: inset 0 0 0 1px rgba(244, 207, 111, .2), 0 0 18px rgba(225, 174, 58, .22);
+}
+
+#modal-editar-perfil .card-opcao.selecionado::after {
+    position: absolute;
+    top: 6px;
+    right: 7px;
+    display: grid;
+    width: 18px;
+    height: 18px;
+    place-items: center;
+    border: 1px solid rgba(255, 236, 173, .8);
+    border-radius: 50%;
+    background: linear-gradient(145deg, #f6d779, #b7852c);
+    color: #20190b;
+    content: "✓";
+    font: 900 11px/1 Arial, sans-serif;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, .45);
+}
+
+#modal-editar-perfil .card-opcao.selecionado span {
+    color: #ffe5a0;
+}
+
+#modal-editar-perfil .card-opcao-banner {
+    position: relative;
+    min-width: 0;
+    min-height: 72px;
+    box-sizing: border-box;
+    overflow: hidden;
+    padding: 8px;
+    border: 1px solid rgba(174, 190, 200, .25);
+    border-radius: 12px;
+    color: #fff7e4;
+    font: 800 10px/1.2 "Segoe UI", Arial, sans-serif;
+    text-align: center;
+    text-shadow: 0 2px 6px rgba(0, 0, 0, .9);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    box-shadow: inset 0 0 0 1000px rgba(4, 9, 13, .22), 0 5px 12px rgba(0, 0, 0, .2);
+    transition: border-color .18s ease, transform .18s ease, box-shadow .18s ease;
+}
+
+#modal-editar-perfil .card-opcao-banner.selecionado {
+    border: 2px solid #f0cb65;
+    box-shadow: inset 0 0 0 1000px rgba(4, 9, 13, .16), 0 0 16px rgba(235, 190, 78, .3);
+}
+
+#modal-editar-perfil .perfil-container-moderno > div[style*="display: flex"] {
+    position: sticky;
+    z-index: 5;
+    bottom: 0;
+    flex: 0 0 auto;
+    gap: 9px;
+    margin-top: auto !important;
+    padding: 12px 16px max(12px, env(safe-area-inset-bottom));
+    border-top: 1px solid rgba(221, 177, 82, .2);
+    background: linear-gradient(180deg, rgba(16, 25, 32, .96), rgba(10, 17, 23, .99));
+}
+
+#modal-editar-perfil .btn-salvar-moderno {
+    min-width: 0;
+    min-height: 46px;
+    flex: 1 1 0;
+    padding: 10px 12px;
+    border: 1px solid rgba(255, 225, 143, .4);
+    border-radius: 11px !important;
+    color: #281d08;
+    font: 900 11px/1.2 "Cinzel", Georgia, serif;
+    letter-spacing: .08em;
+    text-shadow: none;
+    box-shadow: 0 5px 12px rgba(0, 0, 0, .27), inset 0 1px rgba(255, 255, 255, .34);
+    touch-action: manipulation;
+}
+
+#modal-editar-perfil .btn-salvar-moderno:first-child {
+    background: linear-gradient(180deg, #f2d45f, #c28b19) !important;
+    color: #211803 !important;
+}
+
+#modal-editar-perfil .btn-salvar-moderno:last-child {
+    border-color: rgba(192, 207, 216, .2);
+    background: linear-gradient(180deg, #394852, #202c34) !important;
+    color: #e7edf0 !important;
+}
+
+#modal-editar-perfil .btn-salvar-moderno:active,
+#modal-editar-perfil .card-opcao:active,
+#modal-editar-perfil .card-opcao-banner:active {
+    transform: scale(.98);
+}
+
+@media (hover: hover) {
+    #modal-editar-perfil .card-opcao:hover,
+    #modal-editar-perfil .card-opcao-banner:hover {
+        border-color: rgba(231, 187, 77, .74);
+    }
+
+    #modal-editar-perfil .btn-salvar-moderno:hover {
+        filter: brightness(1.08);
+    }
+}
+
+@media (max-width: 390px) {
+    #modal-editar-perfil.modal-moderno {
+        padding-right: 9px;
+        padding-left: 9px;
+    }
+
+    #modal-editar-perfil .secao-cosmetico {
+        padding-right: 12px;
+        padding-left: 12px;
+    }
+
+    #modal-editar-perfil .grid-selecao {
+        gap: 7px;
+    }
+
+    #modal-editar-perfil .card-opcao {
+        min-height: 106px;
+        padding-right: 5px;
+        padding-left: 5px;
+    }
+
+    #modal-editar-perfil .card-opcao[id^="sk-"] {
+        min-height: 126px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #modal-editar-perfil *,
+    #modal-editar-perfil *::before,
+    #modal-editar-perfil *::after {
+        scroll-behavior: auto !important;
+        transition-duration: .01ms !important;
+        animation-duration: .01ms !important;
+    }
+}

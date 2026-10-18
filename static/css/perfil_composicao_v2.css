@@ -1,0 +1,156 @@
+/* Perfil Eldora v2: identidade no canto inferior esquerdo e edição à direita. */
+#perfil-dados .perfil-v2-hero { position:relative !important; isolation:isolate; width:100%; height:clamp(340px,96vw,410px); min-height:340px; margin:0 0 14px !important; overflow:hidden; border:1px solid rgba(201,153,67,.72) !important; border-radius:13px !important; background-size:cover !important; background-position:center !important; box-shadow:0 10px 26px rgba(0,0,0,.38), inset 0 0 36px rgba(0,0,0,.45) !important; }
+#perfil-dados .perfil-v2-sombra { position:absolute; z-index:1; inset:0; pointer-events:none; background:linear-gradient(180deg,rgba(5,8,13,.08) 38%,rgba(6,7,11,.35) 58%,rgba(5,6,9,.94) 100%); }
+#perfil-dados .perfil-v2-personagem { position:absolute !important; z-index:0 !important; left:50% !important; bottom:-6px !important; width:auto !important; height:96% !important; max-width:96% !important; object-fit:contain !important; transform:translateX(-50%) !important; filter:drop-shadow(0 8px 13px rgba(0,0,0,.68)) !important; pointer-events:none !important; }
+#perfil-dados .perfil-v2-identidade { position:absolute; z-index:3; left:13px; bottom:12px; display:flex; flex-direction:column; align-items:flex-start; max-width:calc(100% - 164px); text-align:left; }
+#perfil-dados .perfil-v2-nome { margin:0 0 1px !important; color:#f7dfad !important; font-family:'Cinzel',Georgia,serif !important; font-size:clamp(22px,7.3vw,30px) !important; font-weight:900 !important; line-height:1.04 !important; letter-spacing:.035em; text-transform:uppercase; text-shadow:0 2px 1px #190a06,0 4px 9px rgba(0,0,0,.95),1px 0 #8c4f18 !important; }
+#perfil-dados .perfil-v2-emblema-classe { display:block; width:min(154px,100%); height:48px; margin:-1px 0 0 -4px; object-fit:contain; object-position:left center; filter:drop-shadow(0 3px 5px rgba(0,0,0,.8)); }
+#perfil-dados .perfil-v2-nivel { display:inline-flex; align-items:center; justify-content:center; min-width:132px; height:31px; margin-top:0; padding:0 16px; box-sizing:border-box; border:2px solid #d5a33d; border-radius:14px; background:linear-gradient(180deg,rgba(24,15,10,.96),rgba(51,26,12,.98)); color:#f6d777; font-family:'Cinzel',Georgia,serif; font-size:13px; font-weight:900; line-height:1; text-shadow:0 1px 2px #000; box-shadow:inset 0 0 0 1px rgba(255,221,127,.3),0 3px 8px rgba(0,0,0,.6); }
+#perfil-dados .perfil-v2-editar { position:absolute; z-index:4; right:12px; bottom:13px; display:inline-flex; align-items:center; justify-content:center; gap:6px; min-width:137px; min-height:38px; padding:0 10px; border:1px solid rgba(133,163,188,.75); border-radius:8px; background:rgba(13,26,39,.94); color:#edf3f8; font-family:'Cinzel',Georgia,serif; font-size:10px; font-weight:800; letter-spacing:.03em; cursor:pointer; box-shadow:0 4px 12px rgba(0,0,0,.45); }
+#perfil-dados .perfil-v2-editar span { color:#d1a94f; font-size:15px; }
+#perfil-dados .perfil-v2-recursos { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin:0 0 13px; }
+#perfil-dados .perfil-v2-recurso { display:flex; align-items:center; gap:9px; min-width:0; min-height:58px; box-sizing:border-box; padding:7px 10px; border:1px solid rgba(255,255,255,.08); border-left:3px solid var(--perfil-recurso-cor); border-radius:9px; background:linear-gradient(135deg,#1d2025,#14171b); }
+#perfil-dados .perfil-v2-recurso img { flex:0 0 32px; width:32px; height:32px; object-fit:contain; }
+#perfil-dados .perfil-v2-recurso div { display:flex; flex-direction:column; min-width:0; gap:2px; }
+#perfil-dados .perfil-v2-recurso span { color:var(--perfil-recurso-cor); font-size:10px; font-weight:800; letter-spacing:.06em; }
+#perfil-dados .perfil-v2-recurso strong { color:#f5f5f5; font-size:15px; line-height:1.1; white-space:nowrap; }
+#perfil-dados .perfil-v2-recurso small { color:#9da3ad; font-size:10px; font-weight:500; }
+#perfil-dados .perfil-v2-hp { --perfil-recurso-cor:#e45450; } #perfil-dados .perfil-v2-mana { --perfil-recurso-cor:#4db4e8; } #perfil-dados .perfil-v2-ouro { --perfil-recurso-cor:#e3b63a; } #perfil-dados .perfil-v2-gemas { --perfil-recurso-cor:#b26bc5; }
+#perfil-dados .perfil-v2-experiencia { display:flex; align-items:center; gap:11px; margin:0 0 17px; padding:12px; border:1px solid #353941; border-radius:11px; background:linear-gradient(135deg,#1c1f24,#14171b); }
+#perfil-dados .perfil-v2-icone-exp { flex:0 0 46px; display:flex; align-items:center; justify-content:center; width:46px; height:46px; box-sizing:border-box; border:2px solid #a74be1; border-radius:50%; background:radial-gradient(circle,#6727a3,#250d3d 68%); color:#f0d6ff; font-family:'Cinzel',Georgia,serif; font-size:10px; font-weight:900; text-shadow:0 0 8px #d47cff; box-shadow:0 0 12px rgba(173,66,234,.38),inset 0 0 8px rgba(230,180,255,.3); }
+#perfil-dados .perfil-v2-exp-conteudo { flex:1; min-width:0; }
+#perfil-dados .perfil-v2-exp-cabecalho { display:flex; justify-content:space-between; gap:8px; margin-bottom:7px; color:#e7e8eb; font-size:11px; }
+#perfil-dados .perfil-v2-exp-cabecalho strong { color:#c4c7cd; }
+#perfil-dados .perfil-v2-exp-trilho { height:10px; overflow:hidden; border:1px solid #51405d; border-radius:8px; background:#090a0d; }
+#perfil-dados .perfil-v2-exp-trilho i { display:block; height:100%; border-radius:inherit; background:linear-gradient(90deg,#792eb4,#c05be9); box-shadow:0 0 8px rgba(179,72,226,.55); }
+@media (max-width:380px) { #perfil-dados .perfil-v2-hero { height:350px; min-height:350px; } #perfil-dados .perfil-v2-identidade { left:9px; bottom:10px; max-width:calc(100% - 144px); } #perfil-dados .perfil-v2-nome { font-size:21px !important; } #perfil-dados .perfil-v2-emblema-classe { width:132px; height:42px; } #perfil-dados .perfil-v2-nivel { min-width:118px; height:29px; font-size:12px; } #perfil-dados .perfil-v2-editar { right:8px; bottom:11px; min-width:126px; font-size:9px; } #perfil-dados .perfil-v2-recurso { gap:6px; padding:6px 7px; } #perfil-dados .perfil-v2-recurso img { flex-basis:28px; width:28px; height:28px; } #perfil-dados .perfil-v2-recurso strong { font-size:13px; } }
+
+
+/* Integração com o DOM semântico atual, mantendo handlers e painéis existentes. */
+#aba-perfil #perfil-dados .perfil-v2-hero {
+    background-image: var(--eldora-profile-banner, none) !important;
+    background-position: center !important;
+}
+#aba-perfil #perfil-dados .perfil-v2-hero::after { background: none !important; }
+#aba-perfil #perfil-dados .perfil-v2-sombra { z-index: 1 !important; }
+#aba-perfil #perfil-dados .perfil-v2-personagem { z-index: 0 !important; }
+#aba-perfil #perfil-dados .perfil-v2-identidade {
+    position: absolute !important;
+    top: auto !important;
+    left: 13px !important;
+    right: auto !important;
+    bottom: 12px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    width: auto !important;
+    max-width: calc(100% - 164px) !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    text-align: left !important;
+    text-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+#aba-perfil #perfil-dados .perfil-v2-emblema-classe[hidden] { display: none !important; }
+#aba-perfil #perfil-dados .perfil-v2-classe-fallback {
+    align-items: center;
+    min-height: 24px;
+    color: #f6d777;
+    font-family: 'Cinzel', Georgia, serif;
+    font-size: 12px;
+    font-weight: 900;
+    text-shadow: 0 2px 5px #000;
+}
+#aba-perfil #perfil-dados .perfil-v2-editar {
+    position: absolute !important;
+    z-index: 4 !important;
+    top: auto !important;
+    right: 12px !important;
+    bottom: 13px !important;
+    margin: 0 !important;
+}
+#aba-perfil #perfil-dados .perfil-v2-recursos { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+#aba-perfil #perfil-dados .perfil-v2-recurso {
+    min-height: 58px !important;
+    padding: 7px 10px !important;
+}
+#aba-perfil #perfil-dados .perfil-v2-recurso > img { width: 32px !important; height: 32px !important; }
+#aba-perfil #perfil-dados .perfil-v2-recurso > div { display: flex !important; flex-direction: column !important; }
+#aba-perfil #perfil-dados .perfil-v2-exp-percentual {
+    display: block;
+    margin-top: 5px;
+    color: #9da3ad;
+    font-size: 10px;
+}
+@media (min-width: 820px) {
+    #aba-perfil #perfil-dados .perfil-v2-recursos { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
+}
+@media (max-width: 380px) {
+    #aba-perfil #perfil-dados .perfil-v2-identidade { left: 9px !important; bottom: 10px !important; }
+    #aba-perfil #perfil-dados .perfil-v2-editar { right: 8px !important; bottom: 11px !important; }
+}
+
+
+/* Bloco de identidade ancorado como na referência: nome, classe e nível na mesma coluna. */
+#aba-perfil #perfil-dados .perfil-v2-identidade {
+    left: 8px !important;
+    bottom: 8px !important;
+    align-items: flex-start !important;
+    text-align: left !important;
+    max-width: calc(100% - 148px) !important;
+}
+#aba-perfil #perfil-dados .perfil-v2-nome {
+    margin: 0 0 1px !important;
+    font-size: clamp(20px, 5.7vw, 28px) !important;
+    text-align: left !important;
+}
+#aba-perfil #perfil-dados .perfil-v2-emblema-classe {
+    width: min(132px, 100%) !important;
+    height: 42px !important;
+    margin: -1px 0 0 -4px !important;
+    object-position: left center !important;
+}
+#aba-perfil #perfil-dados .perfil-v2-nivel {
+    min-width: 132px !important;
+    height: 31px !important;
+    margin-top: 0 !important;
+}
+@media (max-width: 380px) {
+    #aba-perfil #perfil-dados .perfil-v2-identidade {
+        left: 6px !important;
+        bottom: 6px !important;
+        max-width: calc(100% - 138px) !important;
+    }
+    #aba-perfil #perfil-dados .perfil-v2-emblema-classe {
+        width: min(118px, 100%) !important;
+        height: 38px !important;
+    }
+    #aba-perfil #perfil-dados .perfil-v2-nivel {
+        min-width: 118px !important;
+        height: 29px !important;
+        font-size: 12px !important;
+    }
+}
+
+
+/* O nome acompanha a linha do texto no emblema de classe. */
+#aba-perfil #perfil-dados .perfil-v2-identidade {
+    width: min(220px, calc(100% - 164px)) !important;
+    max-width: calc(100% - 164px) !important;
+}
+#aba-perfil #perfil-dados .perfil-v2-nome {
+    margin-left: 28px !important;
+    max-width: calc(100% - 42px) !important;
+    position: relative !important;
+    top: 16px !important;
+}
+@media (max-width: 380px) {
+    #aba-perfil #perfil-dados .perfil-v2-identidade {
+        width: min(220px, calc(100% - 146px)) !important;
+        max-width: calc(100% - 146px) !important;
+    }
+}

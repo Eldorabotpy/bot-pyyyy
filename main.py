@@ -23,6 +23,7 @@ from pvp.coliseum_rewards import (
     isoformat_utc,
     season_is_expired,
 )
+from pvp.entry_quota import DAILY_FREE_ENTRIES, consume_daily_entries, get_daily_entry_quota
 from modules.webapp_api import webapp_bp
 from modules.game_data.skills import SKILL_DATA
 from modules.game_data.monsters import MONSTERS_DATA
@@ -32,6 +33,7 @@ from modules.mob_engine import GerenciadorCacada
 from modules import player_manager
 from modules.combat.party_engine import obter_grupo_do_jogador, sair_ou_desfazer_grupo
 from modules.combat import group_combat_manager as gcm
+from modules.social_chat import classificar_destino_mensagem, sids_online_do_cla
 # from modules.combat.web_battle_manager import WebBattleManager
 # pyrefly: ignore [missing-import]
 from telegram.ext import Application, CommandHandler
@@ -212,22 +214,48 @@ def status_coliseu_pvp():
     finalizar_eventos_encerrados(users_collection, duelos_ativos)
     temporada = ensure_active_season(users_collection, duelos_ativos)
     ranking = []
+    elos_temporada = []
+    participantes_temporada = 0
+    registros = []
     placar_evento = []
     try:
-        from pvp.pvp_utils import get_player_elo
+        from pvp.season_ranking import build_elo_standings
 
-        jogadores = users_collection.find(
-            {"$or": [{"character_name": {"$type": "string", "$ne": ""}}, {"name": {"$type": "string", "$ne": ""}}, {"nome": {"$type": "string", "$ne": ""}}]},
-            {"character_name": 1, "name": 1, "nome": 1, "pvp_points": 1},
-        ).sort("pvp_points", -1).limit(limite)
-        for posicao, jogador in enumerate(jogadores, 1):
-            pontos = _elo_points(jogador)
-            ranking.append({
-                "posicao": posicao,
+        numero_temporada = int(temporada.get("numero", 0)) if temporada else 0
+        filtro_temporada = {
+            "pvp_season_number": numero_temporada,
+            "pvp_season_matches": {"$gt": 0},
+            "$or": [
+                {"character_name": {"$type": "string", "$ne": ""}},
+                {"name": {"$type": "string", "$ne": ""}},
+                {"nome": {"$type": "string", "$ne": ""}},
+            ],
+        }
+        jogadores_db = users_collection.find(
+            filtro_temporada,
+            {
+                "character_name": 1,
+                "name": 1,
+                "nome": 1,
+                "level": 1,
+                "pvp_points": 1,
+                "pvp_season_wins": 1,
+                "pvp_season_losses": 1,
+            },
+        )
+
+        registros = [
+            {
                 "nome": _nome_personagem_db(jogador),
-                "pontos": pontos,
-                "elo": get_player_elo(pontos),
-            })
+                "id": str(jogador.get("_id") or ""),
+                "nivel": _safe_int(jogador.get("level"), 1),
+                "pontos": _elo_points(jogador),
+                "vitorias": _safe_int(jogador.get("pvp_season_wins"), 0),
+                "derrotas": _safe_int(jogador.get("pvp_season_losses"), 0),
+            }
+            for jogador in jogadores_db
+        ]
+        elos_temporada, ranking, participantes_temporada = build_elo_standings(registros, ranking_limit=limite)
 
         placar_event_id = agenda.get("event_id")
         if not agenda.get("active"):
@@ -254,6 +282,48 @@ def status_coliseu_pvp():
     except Exception:
         app.logger.exception("Não foi possível carregar os placares do Coliseu")
 
+    minha_patente = None
+    historico_pessoal = None
+    personagem_selecionado = str(session.get('portal_character') or '')
+    if temporada and ObjectId.is_valid(personagem_selecionado):
+        try:
+            from modules.portal_auth import PlayerSessionError, require_player_identity
+            jogador_atual = require_player_identity(personagem_selecionado)
+            numero_temporada = int(temporada.get('numero', 0))
+            participou = (
+                _safe_int(jogador_atual.get('pvp_season_number'), 0) == numero_temporada
+                and _safe_int(jogador_atual.get('pvp_season_matches'), 0) > 0
+            )
+            from pvp.season_history import build_player_match_history
+            try:
+                partidas = users_collection.database['coliseu_pvp_partidas'].find(
+                    {'jogadores': str(jogador_atual['_id'])},
+                    {'jogadores': 1, 'nomes': 1, 'vencedor': 1, 'alteracoes': 1, 'temporada': 1, 'criado_em': 1},
+                ).sort('criado_em', -1).limit(10)
+                historico_pessoal = build_player_match_history(jogador_atual['_id'], partidas)
+                for partida in historico_pessoal:
+                    partida['data'] = isoformat_utc(partida.get('data'))
+            except Exception:
+                app.logger.exception('Não foi possível carregar o histórico pessoal do Coliseu')
+
+            minha_patente = {"participou": participou, "temporada": numero_temporada}
+            if participou:
+                from pvp.season_ranking import build_player_season_rank, find_player_season_position
+                posicao = find_player_season_position(registros, jogador_atual["_id"])
+                if posicao:
+                    minha_patente.update(posicao)
+                minha_patente["patente"] = build_player_season_rank({
+                    "nome": _nome_personagem_db(jogador_atual),
+                    "nivel": _safe_int(jogador_atual.get("level"), 1),
+                    "pontos": _elo_points(jogador_atual),
+                    "vitorias": _safe_int(jogador_atual.get("pvp_season_wins"), 0),
+                    "derrotas": _safe_int(jogador_atual.get("pvp_season_losses"), 0),
+                })
+        except PlayerSessionError:
+            # O placar público continua disponível mesmo sem uma sessão válida.
+            minha_patente = None
+            historico_pessoal = None
+
     return jsonify({
         "evento": agenda,
         "event_id_placar": placar_event_id if "placar_event_id" in locals() else agenda.get("event_id"),
@@ -266,6 +336,10 @@ def status_coliseu_pvp():
             "recompensas": {"1": 50, "2": 20, "3": 5},
         } if temporada else None,
         "ranking": ranking,
+        "elos_temporada": elos_temporada,
+        "participantes_temporada": participantes_temporada,
+        "minha_patente": minha_patente,
+        "historico_pessoal": historico_pessoal,
         "placar_evento": placar_evento,
     })
 
@@ -1168,21 +1242,94 @@ def handle_chat_message(dados):
             
             return
 
-        # 2. VERIFICA GRUPO
-        if mensagem.startswith('/g '):
-            texto_real = mensagem[3:].strip()
-            if texto_real:
+        canal_chat, texto_chat = classificar_destino_mensagem(mensagem)
+        if canal_chat == 'comando_invalido':
+            emit('novaMensagemChat', {
+                "remetente": "Sistema",
+                "texto": "Comando de chat inválido.",
+                "tipo": "erro",
+            }, to=player_sid)
+            return
+
+        # 2. Mensagens de grupo ficam restritas aos membros da party.
+        if canal_chat == 'grupo':
+            if texto_chat:
                 grupo = obter_grupo_do_jogador(char_id)
                 if grupo:
                     for membro_id in grupo.get('membros', []):
                         for sid, info in jogadores_online.items():
                             if str(info['char_id']) == str(membro_id):
-                                emit('novaMensagemChat', {"remetente": remetente, "texto": texto_real, "tipo": "grupo", "avatar": avatar_real}, to=sid)
+                                emit('novaMensagemChat', {
+                                    "remetente": remetente,
+                                    "texto": texto_chat,
+                                    "tipo": "grupo",
+                                    "canal": "grupo",
+                                    "avatar": avatar_real,
+                                }, to=sid)
                 else:
-                     emit('novaMensagemChat', {"remetente": "Sistema", "texto": "Você não está em um grupo.", "tipo": "erro"}, to=player_sid)
+                    emit('novaMensagemChat', {
+                        "remetente": "Sistema",
+                        "texto": "Você não está em um grupo.",
+                        "tipo": "erro",
+                        "canal": "grupo",
+                    }, to=player_sid)
             return
 
-        # 3. SE CHEGOU AQUI É MENSAGEM GLOBAL!
+        # 3. Mensagens de clã usam o vínculo oficial de membro do sistema de clãs.
+        if canal_chat == 'cla':
+            if not texto_chat:
+                return
+
+            try:
+                from modules.clan.clan_manager import obter_cla_do_jogador
+
+                cla = obter_cla_do_jogador(char_id, reparar_vinculo=False)
+            except Exception:
+                app.logger.exception("Falha ao validar o clã para o chat")
+                emit('novaMensagemChat', {
+                    "remetente": "Sistema",
+                    "texto": "Não foi possível carregar o chat do clã agora.",
+                    "tipo": "erro",
+                    "canal": "guilda",
+                }, to=player_sid)
+                return
+
+            membros_cla = {
+                str(membro.get("user_id"))
+                for membro in (cla or {}).get("membros", [])
+                if isinstance(membro, dict) and membro.get("user_id") is not None
+            }
+            if not cla or str(char_id) not in membros_cla:
+                emit('novaMensagemChat', {
+                    "remetente": "Sistema",
+                    "texto": "Você não participa de um clã ativo.",
+                    "tipo": "erro",
+                    "canal": "guilda",
+                }, to=player_sid)
+                return
+
+            pacote_cla = {
+                "remetente": remetente,
+                "texto": texto_chat,
+                "alvo": "cla",
+                "clan_id": str(cla.get("_id")),
+                "tipo": "cla",
+                "data_envio": datetime.utcnow(),
+                "avatar": avatar_real,
+            }
+            chat_collection.insert_one(pacote_cla)
+            for sid in sids_online_do_cla(cla, jogadores_online):
+                emit('novaMensagemChat', {
+                    "remetente": remetente,
+                    "texto": texto_chat,
+                    "tipo": "cla",
+                    "canal": "guilda",
+                    "avatar": avatar_real,
+                }, to=sid)
+            return
+
+        # 4. Texto comum é global; comandos desconhecidos nunca chegam aqui.
+        mensagem = texto_chat
         # Salva o Global COM O AVATAR no banco
         pacote_global = {
             "remetente": remetente, "texto": mensagem,
@@ -1463,10 +1610,12 @@ def handle_pedir_amigos():
             amigo_db = users_collection.find_one({"_id": ObjectId(amigo_id)})
             
             level_real = 1
+            pontos_pvp = 0
             avatar_real = "avatar_padrao_m"
             
             if amigo_db:
                 level_real = amigo_db.get("level", 1)
+                pontos_pvp = max(0, _safe_int(amigo_db.get("pvp_points"), 0))
                 ac = amigo_db.get("avatar_customizado")
                 if ac and ac != "padrao":
                     avatar_real = ac.get("path", ac) if isinstance(ac, dict) else ac
@@ -1486,6 +1635,7 @@ def handle_pedir_amigos():
                 "nome": amg.get("nome", "Desconhecido"),
                 "online": ta_online,
                 "level": level_real,
+                "pvp_points": pontos_pvp,
                 "avatar": avatar_real
             })
             
@@ -1763,6 +1913,28 @@ def handle_entrar_regiao(data):
             "historico": True,
             "avatar": msg.get("avatar", "") 
         }, to=player_sid)
+
+    # Carrega somente o histórico do clã do personagem atual.
+    try:
+        from modules.clan.clan_manager import obter_cla_do_jogador
+
+        cla_atual = obter_cla_do_jogador(char_id, reparar_vinculo=False)
+        if cla_atual:
+            hist_cla = list(chat_collection.find({
+                "alvo": "cla",
+                "clan_id": str(cla_atual.get("_id")),
+            }).sort("data_envio", -1).limit(30))
+            for msg in reversed(hist_cla):
+                emit('novaMensagemChat', {
+                    "remetente": msg.get("remetente", "Herói"),
+                    "texto": msg.get("texto", ""),
+                    "tipo": "cla",
+                    "canal": "guilda",
+                    "historico": True,
+                    "avatar": msg.get("avatar", ""),
+                }, to=player_sid)
+    except Exception:
+        app.logger.exception("Falha ao carregar histórico do chat do clã")
         
     hist_privado = list(mensagens_offline_col.find({
         "$or": [{"destinatario": nome_jogador}, {"remetente": nome_jogador}]
@@ -2235,9 +2407,42 @@ duelo_espelho_coliseu_lock = Lock()
 espelhos_coliseu_ativos = set()
 fila_coliseu_evento_id = None
 fila_coliseu_entrada = {}
+COLISEU_ENTRADAS_DIARIAS = DAILY_FREE_ENTRIES
 COLISEU_ENTRADA_X = 4 * 32
 COLISEU_ENTRADA_Y = 35 * 32
 COLISEU_RAIO_FILA = 150
+
+
+def _resumo_cota_coliseu(char_id):
+    return get_daily_entry_quota(users_collection, char_id)
+
+
+def _consumir_entradas_coliseu(char_ids):
+    return consume_daily_entries(users_collection, char_ids)
+
+
+def _mensagem_sem_entrada_coliseu(char_id):
+    resumo = _resumo_cota_coliseu(char_id) or {}
+    if resumo.get("tickets", 0) > 0:
+        return "Não foi possível usar o Ticket de Entrada. Atualize o Coliseu e tente novamente."
+    return "Você usou as 10 entradas gratuitas de hoje. Compre um Ticket do Coliseu na Loja da Flora por 10 💎 para continuar."
+
+
+def _emitir_cota_coliseu(sid):
+    info = jogadores_online.get(sid) or {}
+    resumo = _resumo_cota_coliseu(info.get("char_id", ""))
+    if resumo:
+        socketio.emit("coliseuCota", resumo, to=sid)
+    return resumo
+
+
+@socketio.on("consultarCotaColiseu")
+def handle_consultar_cota_coliseu(_data=None):
+    sid = request.sid
+    if not jogadores_online.get(sid):
+        socketio.emit("coliseuCota", {"erro": "Entre no jogo para consultar suas entradas."}, to=sid)
+        return
+    _emitir_cota_coliseu(sid)
 
 
 def _esta_no_portao_coliseu(info):
@@ -2294,6 +2499,18 @@ def _iniciar_duelo_coliseu(sid_a, sid_b, modo, event_id=None, season_number=None
 
     hp_a = int(stats_a.get("current_hp", stats_a.get("max_hp", 1)))
     hp_b = int(stats_b.get("current_hp", stats_b.get("max_hp", 1)))
+    consumo = _consumir_entradas_coliseu([info_a.get("char_id"), info_b.get("char_id")])
+    if not consumo.get("sucesso"):
+        bloqueado = str(consumo.get("bloqueado_id", ""))
+        for sid, info in ((sid_a, info_a), (sid_b, info_b)):
+            if str(info.get("char_id", "")) == bloqueado:
+                _emitir_fila_coliseu(sid, "erro", _mensagem_sem_entrada_coliseu(bloqueado), modo)
+            else:
+                _emitir_fila_coliseu(sid, "erro", "O adversário não tem entradas disponíveis para esta luta.", modo)
+            _emitir_cota_coliseu(sid)
+        return "cota_esgotada" if consumo.get("quota") is not None else False
+    _emitir_cota_coliseu(sid_a)
+    _emitir_cota_coliseu(sid_b)
     duelo_id = f"coliseu_{uuid4().hex}"
     jogadores_online[sid_a]["em_combate"] = True
     jogadores_online[sid_b]["em_combate"] = True
@@ -2518,10 +2735,10 @@ def handle_buscar_adversarios_coliseu(_data=None):
 
     my_points = _elo_points(player)
     try:
-        from pvp.pvp_utils import get_player_elo
+        from pvp.season_ranking import build_player_season_rank, current_season_points
         candidates = list(users_collection.find(
             {"_id": {"$ne": ObjectId(char_id)}},
-            {"character_name": 1, "name": 1, "nome": 1, "username": 1, "telegram_username": 1, "tg_username": 1, "level": 1, "pvp_points": 1, "pvp_season_number": 1},
+            {"character_name": 1, "name": 1, "nome": 1, "username": 1, "telegram_username": 1, "tg_username": 1, "level": 1, "pvp_points": 1, "pvp_season_number": 1, "pvp_season_matches": 1},
         ))
         docs_candidatos_encontrados = len(candidates)
         candidates = [candidate for candidate in candidates if ObjectId.is_valid(str(candidate.get("_id", "")))]
@@ -2530,27 +2747,38 @@ def handle_buscar_adversarios_coliseu(_data=None):
             espelhos_ocupados = set(espelhos_coliseu_ativos)
         candidates = [candidate for candidate in candidates if str(candidate.get("_id")) not in espelhos_ocupados]
         espelhos_ocupados_count = candidates_encontrados - len(candidates)
+        for candidate in candidates:
+            candidate["_elo_temporada"] = current_season_points(candidate, season_number)
         candidates.sort(key=lambda candidate: (
-            abs(_elo_points(candidate) - my_points),
+            abs(candidate["_elo_temporada"] - my_points),
             _nome_adversario_coliseu(candidate).casefold(),
         ))
         if candidates:
             closest = candidates[:min(20, len(candidates))]
-            pool = [candidate for candidate in closest if abs(_elo_points(candidate) - my_points) <= 400]
+            pool = [candidate for candidate in closest if abs(candidate["_elo_temporada"] - my_points) <= 400]
             if len(pool) < min(5, len(closest)):
-                pool = [candidate for candidate in closest if abs(_elo_points(candidate) - my_points) <= 1000]
+                pool = [candidate for candidate in closest if abs(candidate["_elo_temporada"] - my_points) <= 1000]
             if len(pool) < min(5, len(closest)):
                 pool = closest
             chosen = random.sample(pool, min(5, len(pool)))
         else:
             chosen = []
-        adversarios = [{
-            "id": str(candidate["_id"]),
-            "nome": _nome_adversario_coliseu(candidate),
-            "level": max(1, _safe_int(candidate.get("level"), 1)),
-            "pontos": _elo_points(candidate),
-            "elo": get_player_elo(_elo_points(candidate)),
-        } for candidate in chosen]
+        adversarios = []
+        for candidate in chosen:
+            rank = build_player_season_rank({
+                "nome": _nome_adversario_coliseu(candidate),
+                "nivel": max(1, _safe_int(candidate.get("level"), 1)),
+                "pontos": candidate["_elo_temporada"],
+            })
+            adversarios.append({
+                "id": str(candidate["_id"]),
+                "nome": _nome_adversario_coliseu(candidate),
+                "level": max(1, _safe_int(candidate.get("level"), 1)),
+                "pontos": candidate["_elo_temporada"],
+                "elo": rank["elo"],
+                "elo_completo": rank["elo_completo"],
+                "icone": rank["icone"],
+            })
         if not adversarios:
             app.logger.warning(
                 "Busca do Coliseu sem adversários: documentos=%d, fichas_validas=%d, espelhos_ocupados=%d",
@@ -2623,7 +2851,12 @@ def handle_atacar_espelho_coliseu(data):
         with duelo_espelho_coliseu_lock:
             info_atual = jogadores_online.get(sid)
             if not info_atual or info_atual.get("em_combate") or target_id in espelhos_coliseu_ativos:
-                socketio.emit("coliseuErro", {"mensagem": "Esse espelho acabou de entrar em outra batalha. Busque adversários novamente."}, to=sid)
+                socketio.emit("coliseuErro", {"mensagem": "Esse guerreiro já foi convocado para outra batalha. Escolha outro rival."}, to=sid)
+                return
+            consumo = _consumir_entradas_coliseu([my_id])
+            if not consumo.get("sucesso"):
+                socketio.emit("coliseuErro", {"mensagem": _mensagem_sem_entrada_coliseu(my_id)}, to=sid)
+                _emitir_cota_coliseu(sid)
                 return
             info_atual["em_combate"] = True
             espelhos_coliseu_ativos.add(target_id)
@@ -2636,6 +2869,7 @@ def handle_atacar_espelho_coliseu(data):
                 "jogador_b": {"sid": mirror_sid, "db": player_b, "stats": stats_b, "hp": hp_b, "mp": stats_b.get("current_mp", stats_b.get("max_mana", 50)), "espelho": True},
                 "turno_de": sid,
             }
+        _emitir_cota_coliseu(sid)
         socketio.emit("iniciarArenaPvP", {
             "duelo_id": duel_id,
             "regiao": info.get("regiao", "capital_eldora"),
@@ -2671,7 +2905,7 @@ def handle_buscar_fila_coliseu(data):
     modo = (data or {}).get("modo")
     if modo != "evento":
         if modo == "ranqueado":
-            _emitir_fila_coliseu(sid, "erro", "O PvP ranqueado usa espelhos de personagens salvos. A fila existe apenas no evento.", modo)
+            _emitir_fila_coliseu(sid, "erro", "O ranqueado acontece por desafios diretos. A fila abre somente durante os eventos.", modo)
             return
         _emitir_fila_coliseu(sid, "erro", "Modalidade inválida.")
         return
@@ -2691,6 +2925,12 @@ def handle_buscar_fila_coliseu(data):
     jogador = users_collection.find_one({"_id": ObjectId(str(info["char_id"]))}, {"pvp_points": 1})
     if not jogador:
         _emitir_fila_coliseu(sid, "erro", "Personagem não encontrado.", modo)
+        return
+
+    cota = _resumo_cota_coliseu(info.get("char_id"))
+    if cota and cota["restantes"] <= 0 and cota["tickets"] <= 0:
+        _emitir_fila_coliseu(sid, "erro", _mensagem_sem_entrada_coliseu(info.get("char_id")), modo)
+        _emitir_cota_coliseu(sid)
         return
 
     agenda = get_event_status()
@@ -2745,7 +2985,10 @@ def handle_buscar_fila_coliseu(data):
             _emitir_fila_coliseu(sid_antigo, "erro", "A edição anterior do evento terminou. Entre novamente na próxima abertura.", "evento")
 
     if candidato:
-        if not _iniciar_duelo_coliseu(candidato, sid, modo, event_id):
+        resultado = _iniciar_duelo_coliseu(candidato, sid, modo, event_id)
+        if resultado == "cota_esgotada":
+            return
+        if not resultado:
             _emitir_fila_coliseu(sid, "erro", "Não foi possível preparar a partida. Tente novamente.", modo)
             _emitir_fila_coliseu(candidato, "erro", "O adversário não pôde entrar na partida.", modo)
         return
@@ -2869,7 +3112,7 @@ def handle_acao_pvp(dados):
                 loop_espelho.close()
         except Exception:
             app.logger.exception("Falha na ação automática do espelho do Coliseu")
-            log_turno.append({"autor_sid": espelho["sid"], "texto": "O espelho perdeu a concentração e não conseguiu atacar.", "dano": 0, "tipo_skill": "info", "anim_effect": ""})
+            log_turno.append({"autor_sid": espelho["sid"], "texto": "O adversário perdeu a concentração e não conseguiu atacar.", "dano": 0, "tipo_skill": "info", "anim_effect": ""})
             resultado_espelho = {"total_damage": 0, "log_messages": [], "attacker_mp_left": espelho["mp"]}
 
         dano_espelho = max(0, int(resultado_espelho.get("total_damage", 0) or 0))

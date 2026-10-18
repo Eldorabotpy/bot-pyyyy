@@ -4,7 +4,7 @@
     let active = null;
     const icons = {
         aviso: '<path d="M12 3 2 21h20L12 3Z"/><path d="M12 9v5m0 3v1"/>',
-        sucesso: '<path d="m5 12 4 4L19 6"/><circle cx="12" cy="12" r="10"/>',
+        sucesso: '<circle cx="12" cy="12" r="10.2" fill="#bd9448" stroke="#f4d88f" stroke-width="1"/><circle cx="12" cy="12" r="8.1" fill="#183b2c" stroke="#80602e" stroke-width=".7"/><path d="M12 5.7 17.2 7.8v3.1c0 3.3-1.9 5.6-5.2 7.7-3.3-2.1-5.2-4.4-5.2-7.7V7.8L12 5.7Z" fill="#2c6343" stroke="#d8bd78" stroke-width=".7"/><path d="m9.3 11.7 1.8 1.8 3.7-3.9" fill="none" stroke="#fff0c2" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>',
         erro: '<circle cx="12" cy="12" r="10"/><path d="m8 8 8 8m0-8-8 8"/>',
         confirmar: '<path d="m12 2 9 4v6c0 5-9 10-9 10S3 17 3 12V6l9-4Z"/><path d="m8 12 3 3 5-6"/>',
         texto: '<path d="M5 4h14v16H5zM8 8h8M8 12h8M8 16h4"/>',

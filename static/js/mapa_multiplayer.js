@@ -855,7 +855,8 @@ class MotorMultiplayer {
             // 🛡️ O DESTRUIDOR DE CLONES: Garante que nenhuma mensagem repetida apareça
             if (msg.historico) {
                 // Cria uma "identidade" para a mensagem
-                const idMensagem = msg.remetente + "_" + msg.texto;
+                const canalMensagem = msg.canal || msg.tipo || 'global';
+                const idMensagem = canalMensagem + "_" + msg.remetente + "_" + msg.texto;
                 window.historicoRecebido = window.historicoRecebido || new Set();
                 
                 // Se essa mensagem já foi desenhada na tela, ABORTA!
@@ -873,10 +874,12 @@ class MotorMultiplayer {
 
             const linha = document.createElement('div');
             
-            let canalDaMsg = 'global'; 
-            if (msg.tipo === 'grupo' || msg.tipo === 'loot') canalDaMsg = 'grupo';
-            else if (msg.tipo === 'privado') canalDaMsg = 'amigos';
-            else if (msg.tipo === 'guilda' || msg.tipo === 'cla') canalDaMsg = 'guilda';
+            let canalDaMsg = msg.canal || 'global';
+            if (!msg.canal) {
+                if (msg.tipo === 'grupo' || msg.tipo === 'loot') canalDaMsg = 'grupo';
+                else if (msg.tipo === 'privado') canalDaMsg = 'amigos';
+                else if (msg.tipo === 'guilda' || msg.tipo === 'cla') canalDaMsg = 'guilda';
+            }
             
             linha.dataset.canal = canalDaMsg;
 
@@ -1035,7 +1038,8 @@ class MotorMultiplayer {
 
                     if (canalDaMsg === 'amigos' && textoBotao.includes('amigos')) abaAlvo = true;
                     if (canalDaMsg === 'grupo' && textoBotao.includes('grupo')) abaAlvo = true;
-                    if (canalDaMsg === 'guilda' && textoBotao.includes('guilda')) abaAlvo = true;
+                    const nomeAba = textoBotao.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                    if (canalDaMsg === 'guilda' && (nomeAba.includes('guilda') || nomeAba.includes('cla'))) abaAlvo = true;
                     if (canalDaMsg === 'global' && textoBotao.includes('chat')) abaAlvo = true;
 
                     if (abaAlvo) {
@@ -1107,7 +1111,7 @@ class MotorMultiplayer {
                 amigos.forEach(amigo => {
                     let avatarFinal = amigo.avatar || 'https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/avatares/avatar_padrao_m.png';
                     let isOnline = amigo.online !== undefined ? amigo.online : true; 
-                    let trofeusLevel = amigo.level || amigo.trofeus || 1;
+                    let pontosPvp = Math.max(0, Number.parseInt(amigo.pvp_points, 10) || 0);
 
                     // 🎯 Verifica se esse amigo tem mensagens não lidas
                     window.notificacoesPrivadas = window.notificacoesPrivadas || {};
@@ -1129,7 +1133,7 @@ class MotorMultiplayer {
                                 <span style="color: #0f172a; font-weight: 900; font-size: 1em; text-shadow: 0 1px 0 rgba(255,255,255,0.5); margin-bottom: 2px; font-family: Arial, sans-serif;">${amigo.nome}</span>
                                 <div style="display: flex; align-items: center; gap: 4px;">
                                     <span style="font-size: 0.8em; filter: drop-shadow(0 1px 1px rgba(0,0,0,0.3));">🏆</span>
-                                    <span style="color: #334155; font-weight: 900; font-size: 0.75em;">${trofeusLevel}</span>
+                                    <span title="Pontos PvP ranqueados" style="color: #334155; font-weight: 900; font-size: 0.75em;">${pontosPvp}</span>
                                 </div>
                             </div>
 

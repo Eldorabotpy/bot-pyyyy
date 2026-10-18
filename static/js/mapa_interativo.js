@@ -47,19 +47,47 @@ class MapaInterativo {
                 botao.bloqueado = false;
                 botao.aberto = false;
                 botao.tweenPulso = null;
+                botao.tweenBrilho = null;
+                botao.eEntradaColiseu = obj.acao === 'abrir_coliseu_pvp';
 
                 // Fundo gráfico do balão
                 const fundo = this.scene.add.graphics();
 
-                // Símbolo inicial
-                const simbolo = this.scene.add.text(0, -18, obj.texto_botao || '❗', {
-                    fontFamily: 'Arial',
-                    fontSize: '18px',
-                    fontStyle: 'bold',
-                    color: '#ff4d4d',
-                    stroke: '#000000',
-                    strokeThickness: 3
-                }).setOrigin(0.5);
+                const eEntradaColiseu = botao.eEntradaColiseu;
+                const temImagemEspadas = eEntradaColiseu
+                    && this.scene.textures.exists('icone_espadas_coliseu');
+                const brilho = eEntradaColiseu
+                    ? this.scene.add.graphics()
+                    : null;
+                let iconeImagem = null;
+                let simbolo = null;
+
+                if (brilho) {
+                    brilho.fillStyle(0xffd36b, 0.12);
+                    brilho.fillCircle(0, -18, 27);
+                    brilho.fillStyle(0xffe7a3, 0.1);
+                    brilho.fillCircle(0, -18, 21);
+                    brilho.setAlpha(0);
+                }
+
+                if (temImagemEspadas) {
+                    iconeImagem = this.scene.add.image(
+                        0,
+                        -18,
+                        'icone_espadas_coliseu'
+                    )
+                        .setOrigin(0.5)
+                        .setDisplaySize(28, 28);
+                } else {
+                    simbolo = this.scene.add.text(0, -18, obj.texto_botao || '❗', {
+                        fontFamily: 'Arial',
+                        fontSize: '18px',
+                        fontStyle: 'bold',
+                        color: '#ff4d4d',
+                        stroke: '#000000',
+                        strokeThickness: 3
+                    }).setOrigin(0.5);
+                }
 
                 // Texto da mensagem dentro do balão
                 const textoMensagem = this.scene.add.text(0, -40, '', {
@@ -80,14 +108,16 @@ class MapaInterativo {
                 // ==========================================
 
                 botao.fundo = fundo;
+                botao.brilho = brilho;
+                botao.iconeImagem = iconeImagem;
                 botao.simbolo = simbolo;
                 botao.textoMensagem = textoMensagem;
 
-                botao.add([
-                    fundo,
-                    simbolo,
-                    textoMensagem
-                ]);
+                const elementosBotao = [];
+                if (brilho) elementosBotao.push(brilho);
+                elementosBotao.push(fundo);
+                elementosBotao.push(iconeImagem || simbolo, textoMensagem);
+                botao.add(elementosBotao);
                 // Desenha o balão pequeno inicial
                 this.redesenharBalao(botao, 38, 34);
 
@@ -140,6 +170,51 @@ class MapaInterativo {
         if (!fundo) return;
 
         fundo.clear();
+
+        if (botao.eEntradaColiseu) {
+            const centroY = -18;
+
+            // Medalhão escuro com aro dourado para destacar as espadas na entrada.
+            fundo.fillStyle(0x080e16, 0.7);
+            fundo.fillCircle(1, centroY + 2, 22);
+
+            fundo.fillStyle(0x392714, 1);
+            fundo.fillCircle(0, centroY, 21);
+            fundo.lineStyle(2, 0xf1c75b, 1);
+            fundo.strokeCircle(0, centroY, 20);
+
+            fundo.fillStyle(0x182638, 1);
+            fundo.fillCircle(0, centroY, 17.5);
+            fundo.lineStyle(1, 0xa77d2e, 0.95);
+            fundo.strokeCircle(0, centroY, 16.5);
+
+            fundo.fillStyle(0x23364a, 0.9);
+            fundo.fillCircle(0, centroY, 14.5);
+
+            // Rebites discretos completam o aro sem competir com o ícone.
+            fundo.fillStyle(0xffdf82, 0.95);
+            fundo.fillCircle(0, centroY - 18, 1.15);
+            fundo.fillCircle(0, centroY + 18, 1.15);
+
+            if (botao.simbolo) botao.simbolo.setPosition(0, centroY);
+            if (botao.iconeImagem) botao.iconeImagem.setPosition(0, centroY);
+            if (botao.textoMensagem) {
+                botao.textoMensagem.setPosition(0, centroY + 22);
+                botao.textoMensagem.setWordWrapWidth(largura - 30);
+                botao.textoMensagem.setLineSpacing(2);
+            }
+
+            botao.setSize(42, 44);
+
+            if (
+                botao.input &&
+                botao.input.hitArea &&
+                typeof botao.input.hitArea.setTo === 'function'
+            ) {
+                botao.input.hitArea.setTo(-21, -40, 42, 44);
+            }
+            return;
+        }
 
         const corFundo = 0x243248;
         const corBorda = 0xd4a72c;
@@ -334,6 +409,13 @@ class MapaInterativo {
                     botao.tweenPulso = null;
                 }
 
+                if (botao.tweenBrilho) {
+                    botao.tweenBrilho.stop();
+                    botao.tweenBrilho = null;
+                }
+
+                if (botao.brilho) botao.brilho.setAlpha(0);
+
                 botao.setScale(1);
 
                 return;
@@ -350,6 +432,13 @@ class MapaInterativo {
                     botao.tweenPulso.stop();
                     botao.tweenPulso = null;
                 }
+
+                if (botao.tweenBrilho) {
+                    botao.tweenBrilho.stop();
+                    botao.tweenBrilho = null;
+                }
+
+                if (botao.brilho) botao.brilho.setAlpha(0);
 
                 botao.setScale(1);
 
@@ -372,16 +461,28 @@ class MapaInterativo {
 
                             targets: botao,
 
-                            scaleX: 1.18,
-                            scaleY: 1.18,
+                            scaleX: 1.08,
+                            scaleY: 1.08,
 
-                            duration: 450,
+                            duration: 700,
 
                             yoyo: true,
                             repeat: -1,
 
                             ease: 'Sine.easeInOut'
                         });
+                }
+
+                if (botao.brilho && !botao.tweenBrilho) {
+                    botao.brilho.setAlpha(0.18);
+                    botao.tweenBrilho = this.scene.tweens.add({
+                        targets: botao.brilho,
+                        alpha: 0.42,
+                        duration: 850,
+                        yoyo: true,
+                        repeat: -1,
+                        ease: 'Sine.easeInOut'
+                    });
                 }
 
             }
@@ -398,6 +499,13 @@ class MapaInterativo {
                     botao.tweenPulso.stop();
                     botao.tweenPulso = null;
                 }
+
+                if (botao.tweenBrilho) {
+                    botao.tweenBrilho.stop();
+                    botao.tweenBrilho = null;
+                }
+
+                if (botao.brilho) botao.brilho.setAlpha(0);
 
                 botao.setScale(1);
             }

@@ -13,7 +13,7 @@
   await inFlight;
   if(dialog?.open){dialog.close();dialog.remove();window.__oficinaRunasAberta=false;}
  };
- const icon=r=>r?.icon?`<img src="${esc(r.icon)}" alt="" width="32" height="32">`:'<span class="rune-empty">◇</span>';
+ const icon=r=>{if(!r?.icon)return '<span class="rune-empty">◇</span>';const src=String(r.icon).startsWith('/static/assets/runas/')?String(r.icon)+'?v=2':r.icon;return '<img src="'+esc(src)+'" alt="" width="32" height="32">';};
  window.renderRuneSockets = item => {
   const slots=item?.rune_slots;
   if(!slots?.length)return '';

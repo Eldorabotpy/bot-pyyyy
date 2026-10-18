@@ -31,6 +31,7 @@ window.configurarOuvintesLojaReino = function(socket) {
             window.avisoEldora("👑 SUCESSO: " + dados.mensagem);
             // Atualiza a tela de perfil se ela estiver aberta pra mostrar as gemas sumindo
             if (typeof carregarMeuPerfil === 'function') carregarMeuPerfil(); 
+            if (window.eldoraSocket?.connected) window.eldoraSocket.emit('consultarCotaColiseu', {});
         } else {
             window.avisoEldora("❌ ERRO: " + dados.mensagem);
         }

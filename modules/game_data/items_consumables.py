@@ -129,15 +129,6 @@ CONSUMABLES_DATA = {
         "stackable": True,
         "tradable": False # 🔴 BLOQUEADO
     },
-    "ticket_de_arena": {
-        "display_name": "Entrada da Arena", "emoji": "🎟️", 
-        "type": "event_ticket", "category": "evento", 
-        "description": "Entrada extra para Arena PvP.", 
-        "stackable": True,
-        "on_use": {"effect": "add_pvp_entries", "value": 1},
-        "tradable": False # 🔴 BLOQUEADO
-    },
-
     # ============================================================
     # 📜 ITEM DE HISTÓRIA — GUILDA DOS AVENTUREIROS
     # ============================================================

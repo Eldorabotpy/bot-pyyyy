@@ -296,23 +296,6 @@ async def try_finalize_timed_action_for_user(user_id: str) -> tuple[bool, str | 
         logger.error(f"Erro finalizar ação: {e}")
         return False, None
 
-def get_pvp_entries(player_data: dict) -> int:
-    today = utcnow().date().isoformat()
-    if player_data.get("last_pvp_entry_reset") != today:
-        player_data["pvp_entries_left"] = 10
-        player_data["last_pvp_entry_reset"] = today
-    return player_data.get("pvp_entries_left", 10)
-
-def use_pvp_entry(player_data: dict) -> bool:
-    current = get_pvp_entries(player_data)
-    if current > 0:
-        player_data["pvp_entries_left"] = current - 1
-        return True
-    return False
-
-def add_pvp_entries(player_data: dict, amount: int):
-    player_data["pvp_entries_left"] = get_pvp_entries(player_data) + amount
-
 def get_pvp_points(player_data: dict) -> int:
     return _ival(player_data.get("pvp_points"), 0)
 

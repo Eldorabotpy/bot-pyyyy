@@ -1,0 +1,284 @@
+/* Abas do perfil e lista vertical de atributos. Os handlers continuam no JS atual. */
+#aba-perfil #perfil-dados .eldora-profile-tabs {
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 5px !important;
+    margin: 0 0 13px !important;
+    padding: 5px !important;
+    overflow: hidden;
+    border: 1px solid rgba(228, 194, 118, .3) !important;
+    border-radius: 14px !important;
+    background: linear-gradient(145deg, #19272f, #101920) !important;
+    box-shadow: 0 7px 16px rgba(0, 0, 0, .22);
+}
+
+#aba-perfil #perfil-dados .eldora-profile-tab {
+    position: relative;
+    box-sizing: border-box;
+    display: flex !important;
+    min-width: 0;
+    min-height: 54px !important;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    padding: 5px 2px !important;
+    overflow: hidden;
+    border: 1px solid rgba(125, 149, 163, .18) !important;
+    border-radius: 9px !important;
+    background: linear-gradient(145deg, rgba(255, 255, 255, .04), rgba(255, 255, 255, .015)) !important;
+    color: #b8c4ca !important;
+    font: 800 clamp(8px, 2.6vw, 10px)/1.05 "Segoe UI", Arial, sans-serif !important;
+    text-align: center;
+    white-space: nowrap;
+    cursor: pointer;
+    touch-action: manipulation;
+    transition: background .18s ease, border-color .18s ease, color .18s ease, transform .18s ease;
+}
+
+#aba-perfil #perfil-dados .eldora-profile-tab > img {
+    display: block;
+    width: 23px;
+    height: 23px;
+    flex: 0 0 23px;
+    object-fit: contain;
+    filter: drop-shadow(0 2px 3px rgba(0, 0, 0, .45));
+    pointer-events: none;
+}
+
+#aba-perfil #perfil-dados .eldora-profile-tab.is-active {
+    border-color: #f0d27b !important;
+    background: linear-gradient(145deg, #f2d57f 0%, #d2a64e 60%, #b88330 100%) !important;
+    color: #201807 !important;
+    box-shadow: inset 0 1px rgba(255, 255, 255, .52), 0 3px 9px rgba(0, 0, 0, .24) !important;
+}
+
+#aba-perfil #perfil-dados .eldora-profile-tab:hover { border-color: rgba(240, 210, 123, .65) !important; }
+#aba-perfil #perfil-dados .eldora-profile-tab:active { transform: scale(.97); }
+#aba-perfil #perfil-dados .eldora-profile-tab:focus-visible { outline: 2px solid #f0d27b; outline-offset: 2px; }
+
+#aba-perfil #perfil-dados .eldora-points-badge {
+    position: absolute;
+    top: 1px;
+    right: 2px;
+    z-index: 1;
+    display: flex;
+    min-width: 14px;
+    height: 14px;
+    box-sizing: border-box;
+    align-items: center;
+    justify-content: center;
+    padding: 0 3px;
+    border: 1px solid rgba(255, 226, 220, .38);
+    border-radius: 999px;
+    background: linear-gradient(180deg, #d9564e, #a9302c);
+    color: #fff;
+    font: 900 7px/1 "Segoe UI", Arial, sans-serif;
+    white-space: nowrap;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, .32);
+}
+
+#aba-perfil #conteudo-perf-status > .eldora-status-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 7px !important;
+    margin-top: 0 !important;
+}
+
+#aba-perfil #conteudo-perf-status .eldora-status-card {
+    display: flex !important;
+    min-height: 40px !important;
+    box-sizing: border-box;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 10px !important;
+    padding: 5px 9px !important;
+    border: 1px solid rgba(149, 176, 184, .2) !important;
+    border-radius: 10px !important;
+    background: linear-gradient(140deg, #172630, #101b24) !important;
+    box-shadow: inset 0 1px rgba(255, 255, 255, .045), 0 4px 10px rgba(0, 0, 0, .18) !important;
+}
+
+#aba-perfil #conteudo-perf-status .perfil-v2-status-identidade {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 8px;
+}
+
+#aba-perfil #conteudo-perf-status .perfil-status-icone {
+    display: inline-flex;
+    width: 24px;
+    height: 24px;
+    flex: 0 0 24px;
+    align-items: center;
+    justify-content: center;
+    color: #e9c56d;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, .35));
+}
+
+#aba-perfil #conteudo-perf-status .perfil-status-icone img,
+#aba-perfil #conteudo-perf-status .perfil-status-icone svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+#aba-perfil #conteudo-perf-status .perfil-v2-status-nome {
+    overflow: hidden;
+    color: #e5dfd1 !important;
+    font-size: 11px !important;
+    font-weight: 800;
+    letter-spacing: .035em;
+    text-overflow: ellipsis;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+#aba-perfil #conteudo-perf-status .perfil-v2-status-valor { gap: 9px !important; }
+#aba-perfil #conteudo-perf-status .perfil-v2-status-valor strong {
+    color: #f4e7c8 !important;
+    font-size: 13px !important;
+    font-variant-numeric: tabular-nums;
+}
+
+#aba-perfil #conteudo-perf-status button[onclick^="distribuirPonto"] {
+    width: 25px !important;
+    height: 25px !important;
+    border: 1px solid #d9ac58 !important;
+    border-radius: 8px !important;
+    background: linear-gradient(145deg, #1b2a34, #111b23) !important;
+    color: #f2cf7a !important;
+    font-size: 16px !important;
+    line-height: 1 !important;
+    box-shadow: inset 0 1px rgba(255, 255, 255, .07), 0 2px 5px rgba(0, 0, 0, .25) !important;
+}
+
+#aba-perfil #conteudo-perf-status button[onclick^="distribuirPonto"]:active { transform: scale(.94); }
+
+#aba-perfil #conteudo-perf-status .perfil-v2-chances {
+    box-sizing: border-box;
+    margin-top: 7px !important;
+    padding: 7px !important;
+    border: 1px solid rgba(100, 178, 189, .28) !important;
+    border-radius: 13px !important;
+    background: linear-gradient(145deg, #10232b, #0c1821) !important;
+}
+
+#aba-perfil #conteudo-perf-status .perfil-v2-chances-titulo {
+    margin: 0 0 5px;
+    color: #d8c796;
+    font: 800 8px/1.2 "Segoe UI", Arial, sans-serif;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+}
+
+#aba-perfil #conteudo-perf-status .perfil-v2-chances-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+}
+
+#aba-perfil #conteudo-perf-status .perfil-v2-chance-card {
+    --chance-color: #49c7d5;
+    box-sizing: border-box;
+    display: grid;
+    min-width: 0;
+    min-height: 64px;
+    grid-template-columns: 27px minmax(0, 1fr);
+    align-items: center;
+    gap: 5px;
+    padding: 5px;
+    overflow: hidden;
+    border: 1px solid color-mix(in srgb, var(--chance-color) 45%, transparent);
+    border-radius: 9px;
+    background: linear-gradient(145deg, rgba(20, 44, 52, .96), rgba(12, 26, 33, .98));
+    box-shadow: inset 0 1px rgba(255, 255, 255, .035), 0 3px 8px rgba(0, 0, 0, .17);
+}
+
+#aba-perfil #conteudo-perf-status .perfil-v2-chance-card.is-double {
+    --chance-color: #f06b53;
+    background: linear-gradient(145deg, rgba(47, 34, 34, .94), rgba(23, 23, 28, .98));
+}
+
+#aba-perfil #conteudo-perf-status .perfil-v2-chance-icone {
+    display: block;
+    width: 27px;
+    height: 31px;
+    object-fit: contain;
+    filter: drop-shadow(0 2px 3px rgba(0, 0, 0, .42));
+}
+
+#aba-perfil #conteudo-perf-status .perfil-v2-chance-conteudo {
+    display: grid;
+    min-width: 0;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: 4px;
+}
+
+#aba-perfil #conteudo-perf-status .perfil-v2-chance-nome {
+    grid-column: 1 / -1;
+    overflow: hidden;
+    color: #e7e9e5;
+    font: 800 7px/1.2 "Segoe UI", Arial, sans-serif;
+    text-overflow: ellipsis;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+#aba-perfil #conteudo-perf-status .perfil-v2-chance-descricao {
+    grid-column: 1 / -1;
+    min-height: 13px;
+    margin-top: 1px;
+    color: #9eafb4;
+    font: 500 6px/1.15 "Segoe UI", Arial, sans-serif;
+}
+
+#aba-perfil #conteudo-perf-status .perfil-v2-chance-valor {
+    grid-column: 1 / -1;
+    margin-top: 1px;
+    color: var(--chance-color);
+    font: 900 13px/1 "Segoe UI", Arial, sans-serif;
+    font-variant-numeric: tabular-nums;
+}
+
+#aba-perfil #conteudo-perf-status .perfil-v2-chance-trilho {
+    display: block;
+    height: 3px;
+    grid-column: 1 / -1;
+    margin-top: 3px;
+    overflow: hidden;
+    border-radius: 99px;
+    background: rgba(178, 202, 201, .15);
+}
+
+#aba-perfil #conteudo-perf-status .perfil-v2-chance-trilho > span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--chance-color);
+    box-shadow: 0 0 7px color-mix(in srgb, var(--chance-color) 50%, transparent);
+}
+
+@media (max-width: 360px) {
+    #aba-perfil #conteudo-perf-status .perfil-v2-chances { padding: 6px !important; }
+    #aba-perfil #conteudo-perf-status .perfil-v2-chances-grid { gap: 4px; }
+    #aba-perfil #conteudo-perf-status .perfil-v2-chance-card {
+        min-height: 60px;
+        grid-template-columns: 24px minmax(0, 1fr);
+        gap: 3px;
+        padding: 4px;
+    }
+    #aba-perfil #conteudo-perf-status .perfil-v2-chance-icone { width: 24px; height: 28px; }
+}
+
+@media (max-width: 340px) {
+    #aba-perfil #perfil-dados .eldora-profile-tabs { gap: 3px !important; padding: 4px !important; }
+    #aba-perfil #perfil-dados .eldora-profile-tab { min-height: 50px !important; font-size: 8px !important; }
+    #aba-perfil #perfil-dados .eldora-profile-tab > img { width: 21px; height: 21px; flex-basis: 21px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #aba-perfil #perfil-dados .eldora-profile-tab { transition: none; }
+}

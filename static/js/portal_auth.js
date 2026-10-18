@@ -2,7 +2,52 @@
     let status=null,busy=false,googleLoaded=false,screen='login';
     const inTelegram=!!window.Telegram?.WebApp?.initData;
     const box=document.getElementById('portal-identidade');
-    const note=text=>{document.getElementById('portal-auth-message').textContent=text;};
+    const linksTrigger=document.getElementById('portal-links-trigger');
+    const linksDrawer=document.getElementById('portal-links-drawer');
+    const linksOverlay=document.getElementById('portal-links-overlay');
+    const confirmOverlay=document.getElementById('portal-confirm-overlay');
+    const confirmDialog=document.getElementById('portal-confirm-dialog');
+    let resolveConfirm=null,focusBeforeConfirm=null;
+    const accountHome=document.getElementById('portal-account-home');
+    const accountSettingsSlot=document.getElementById('portal-account-settings-slot');
+    const googleControls=document.getElementById('portal-google-controls');
+    const googleHome=document.getElementById('portal-google-home');
+    const telegramButton=document.getElementById('portal-telegram');
+    const telegramHome=document.getElementById('portal-telegram-home');
+    function setLinksMenu(open,returnFocus=true){
+        linksDrawer.hidden=!open;
+        linksOverlay.hidden=!open;
+        linksTrigger.setAttribute('aria-expanded',String(open));
+        document.body.classList.toggle('portal-links-open',open);
+        if(open)document.getElementById('portal-links-close').focus();
+        else if(returnFocus&&!linksTrigger.hidden)linksTrigger.focus();
+    }
+    function finishConfirm(accepted){
+        if(!resolveConfirm)return;
+        confirmOverlay.hidden=true;
+        document.body.classList.remove('portal-confirm-open');
+        const resolve=resolveConfirm,restore=focusBeforeConfirm;
+        resolveConfirm=null;focusBeforeConfirm=null;
+        if(restore?.isConnected)restore.focus();
+        resolve(accepted);
+    }
+    function confirmAction({title,message,confirmText='Confirmar',danger=false}){
+        if(resolveConfirm)return Promise.resolve(false);
+        return new Promise(resolve=>{
+            resolveConfirm=resolve;
+            focusBeforeConfirm=document.activeElement;
+            document.getElementById('portal-confirm-title').textContent=title;
+            document.getElementById('portal-confirm-message').textContent=message;
+            document.getElementById('portal-confirm-accept').textContent=confirmText;
+            confirmDialog.dataset.variant=danger?'danger':'normal';
+            confirmOverlay.hidden=false;
+            document.body.classList.add('portal-confirm-open');
+            document.getElementById('portal-confirm-cancel').focus();
+        });
+    }
+    const note=text=>{
+        document.getElementById(status?.authenticated?'portal-links-message':'portal-auth-message').textContent=text;
+    };
     window.portalAuthHeaders=()=>({'Content-Type':'application/json','X-Eldora-CSRF':status?.csrf||''});
     async function post(path,data){
         const response=await fetch(path,{method:'POST',headers:window.portalAuthHeaders(),body:JSON.stringify(data)});
@@ -13,7 +58,9 @@
     window.portalRefresh=async()=>{
         const response=await fetch('/api/auth/status',{cache:'no-store'});
         if(!response.ok)throw new Error('Não foi possível verificar sua sessão.');
+        const wasAuthenticated=!!status?.authenticated;
         status=await response.json();
+        if(status.authenticated&&!wasAuthenticated)box.open=false;
         document.getElementById('telegram-credentials').hidden=!status.authenticated;
         document.getElementById('telegram-save-credentials').hidden=!status.authenticated;
         document.getElementById('telegram-save-credentials').disabled=!status.fresh_auth;
@@ -25,6 +72,12 @@
         document.getElementById('portal-entry-tabs').hidden=!!status.authenticated;
         document.getElementById('portal-auth-mode').innerHTML='<option value="login">Entrar</option><option value="create">Criar</option><option value="link">Vincular</option><option value="replace">Trocar</option>';
         box.classList.toggle('portal-provider-simple',!status.authenticated);
+        (status.authenticated?accountSettingsSlot:accountHome).appendChild(box);
+        const googleSlot=document.getElementById('portal-google-slot');
+        const telegramSlot=document.getElementById('portal-telegram-slot');
+        (status.authenticated?googleSlot:googleHome).appendChild(googleControls);
+        (status.authenticated?telegramSlot:telegramHome).appendChild(telegramButton);
+        linksTrigger.hidden=!status.authenticated;
         const actions=document.getElementById('portal-account-actions');
         if(status.authenticated){
             document.getElementById('portal-auth-mode').value='link';
@@ -38,11 +91,21 @@
             document.getElementById('portal-replace-google').disabled=!status.fresh_auth||status.auth_method==='google';
             document.getElementById('portal-replace-telegram').hidden=!(inTelegram&&status.telegram_linked&&status.can_unlink_telegram);
             document.getElementById('portal-replace-telegram').disabled=!status.fresh_auth||status.auth_method==='telegram';
-            document.getElementById('portal-account-summary').textContent='⚙️ Conta e segurança';
+            document.getElementById('portal-account-summary').textContent='Acesso por senha';
             document.getElementById('portal-auth-state').textContent=`Conta ${status.display_name||status.username} · Google: ${status.google_linked?'vinculado':'não vinculado'} · Telegram: ${status.telegram_linked?'vinculado':'não vinculado'}`;
-            document.getElementById('portal-account-security-note').textContent=status.auth_method==='unknown'?'Para remover ou trocar um provedor, entre novamente usando outro acesso da conta.':'';
+            document.getElementById('portal-links-account').textContent=`Conta ${status.display_name||status.username}`;
+            const googleState=document.getElementById('portal-google-link-state');
+            googleState.textContent=status.google_linked?'Vinculado a esta conta':'Ainda não vinculado';
+            googleState.dataset.linked=String(!!status.google_linked);
+            const telegramState=document.getElementById('portal-telegram-link-state');
+            telegramState.textContent=status.telegram_linked?'Vinculado a esta conta':'Ainda não vinculado';
+            telegramState.dataset.linked=String(!!status.telegram_linked);
+            document.getElementById('portal-account-security-note').textContent=
+                (status.auth_method==='unknown'?'Para trocar um provedor, entre novamente usando outro acesso da conta. ':'')+
+                'Remover um vínculo libera aquele provedor para outra conta; os personagens permanecem nesta conta-mestre.';
         }else{
             actions.hidden=true;
+            setLinksMenu(false,false);
             window.portalScreen(screen);
         }
         const telegram=window.Telegram?.WebApp?.initData;
@@ -50,10 +113,17 @@
         document.getElementById('portal-telegram').hidden=!telegramActionVisible;
         document.getElementById('portal-telegram').textContent=status.authenticated?'Vincular Telegram a esta conta':(screen==='create'?'Criar conta pelo Telegram':'Entrar com Telegram');
         document.getElementById('portal-telegram-hint').hidden=!(telegram&&!status.authenticated);
-        document.getElementById('portal-google-note').textContent=(inTelegram||status.google_client_id)?'':'Login Google aguardando configuração. Contas existentes podem entrar com senha; novas contas podem ser criadas pelo Telegram.';
+        const googleNote=document.getElementById('portal-google-note');
+        googleNote.classList.toggle('portal-link-hint',!!(status.authenticated&&!status.google_linked));
+        googleNote.textContent=status.authenticated&&!status.google_linked
+            ?(inTelegram
+                ?'O Google ainda não está vinculado a esta conta-mestre. Abra o Eldora no navegador e entre nesta mesma conta para conectar o Google; seus personagens permanecem aqui.'
+                :'O Google ainda não está vinculado a esta conta-mestre. Selecione sua conta Google abaixo para vinculá-la a esta conta; seus personagens permanecem aqui.')
+            :(inTelegram||status.google_client_id)?'':'Login Google aguardando configuração. Contas existentes podem entrar com senha; novas contas podem ser criadas pelo Telegram.';
         const providerMode=document.getElementById('portal-auth-mode').value;
         document.getElementById('portal-google').hidden=inTelegram||!!(status.authenticated&&status.google_linked&&providerMode!=='replace');
         if(status.authenticated&&status.google_linked&&providerMode==='replace'){
+            googleNote.classList.remove('portal-link-hint');
             document.getElementById('portal-google-note').textContent='Clique no botão Google para confirmar a nova conta. Os personagens continuam nesta conta Eldora.';
         }
         if(!inTelegram&&status.google_client_id&&!googleLoaded){
@@ -61,7 +131,7 @@
             const script=document.createElement('script');script.src='https://accounts.google.com/gsi/client';script.async=true;
             script.onload=()=>{
                 google.accounts.id.initialize({client_id:status.google_client_id,callback:r=>authenticate('google',{credential:r.credential})});
-                google.accounts.id.renderButton(document.getElementById('portal-google'),{type:'standard',theme:'outline',size:'large',text:'continue_with',width:240});
+                google.accounts.id.renderButton(document.getElementById('portal-google'),{type:'standard',theme:'outline',size:'large',text:'signin_with',width:240});
             };
             script.onerror=()=>{googleLoaded=false;note('Não foi possível carregar o Google. Tente novamente.');};
             document.head.appendChild(script);
@@ -80,7 +150,12 @@
         try{
             const result=await post('/api/auth/'+provider,{mode,...credentials});
             document.getElementById('telegram-password').value='';document.getElementById('telegram-password-confirm').value='';
-            await window.portalRefresh();window.portalAccept(result);
+            const refreshed=await window.portalRefresh();
+            if(mode==='link'){
+                const linked=provider==='google'?refreshed.google_linked:refreshed.telegram_linked;
+                if(!linked)throw new Error('O servidor não confirmou o vínculo. Esta conta continua sem o provedor; tente novamente.');
+            }
+            window.portalAccept(result);
             if(!(result.personagens||[]).length)window.mostrarCriacao();
             note(mode==='link'?'Vinculação concluída. Seus personagens continuam na mesma conta.':'Conta conectada. Escolha seu personagem.');
         }catch(error){note(error.message);}finally{busy=false;}
@@ -91,21 +166,25 @@
         const create=next==='create',provider=next==='google'||create;
         document.getElementById('telegram-credentials').hidden=!(inTelegram&&create);
         document.getElementById('telegram-save-credentials').hidden=true;
-        document.getElementById('titulo-caixa').textContent=create?(inTelegram?'CRIAR SUA CONTA':'CONFIRME SUA IDENTIDADE'):'ENTRAR NO REINO';
+        document.getElementById('titulo-caixa').textContent=create?'CRIAR CONTA-MESTRE':'ENTRAR NO REINO';
         document.getElementById('tela-login').style.display=provider?'none':'block';
         document.getElementById('tela-registro-conta').style.display='none';
         document.getElementById('portal-auth-mode').value=create?'create':'login';
         document.getElementById('portal-account-actions').hidden=true;
         box.hidden=!provider;box.open=true;
         document.getElementById('portal-account-summary').textContent=create?(inTelegram?'Criar conta pelo Telegram':'Criar conta com Google'):(inTelegram?'Entrar pelo Telegram':'Entrar com Google');
-        document.getElementById('portal-auth-state').textContent=create&&inTelegram?'Defina seu usuário e senha e confirme pelo Telegram.':create?'Confirme sua identidade e crie seu personagem. Não é necessário criar outra senha.':'Use a identidade já vinculada à sua conta Eldora.';
+        document.getElementById('portal-auth-state').textContent=create&&inTelegram
+            ?'Isso cria uma nova conta-mestre. Se seus personagens estão em uma conta antiga, entre nela com usuário e senha e vincule o Telegram em Conta Eldora.'
+            :create
+                ?'Isso cria uma nova conta-mestre. Se seus personagens estão em uma conta antiga, entre nela com usuário e senha e vincule o Google em Conta Eldora. Não crie outra conta para tentar recuperar personagens.'
+                :'Use a identidade já vinculada à sua conta Eldora. Se aparecer “não vinculada”, entre primeiro com usuário e senha para conectar o Google à conta que guarda seus personagens.';
         const telegramButton=document.getElementById('portal-telegram');
         const telegramHint=document.getElementById('portal-telegram-hint');
         telegramButton.hidden=!(inTelegram&&!status?.authenticated);
         telegramButton.textContent=create?'Criar conta pelo Telegram':'Entrar com Telegram';
         telegramHint.hidden=!(inTelegram&&!status?.authenticated);
         telegramHint.textContent=create?'Depois de preencher usuário e senha, confirme a criação pelo Telegram.':'Entre automaticamente com a identidade Telegram deste aplicativo.';
-        document.querySelectorAll('#portal-entry-tabs button').forEach((el,index)=>el.setAttribute('aria-pressed',String(create?index===1:index===0)));
+        document.querySelectorAll('#portal-entry-tabs button').forEach((el,index)=>el.setAttribute('aria-pressed',String(index===1?create:next==='login')));
     };
     document.getElementById('telegram-save-credentials').onclick=async()=>{
         if(busy)return;
@@ -122,6 +201,9 @@
     };
     async function unlink(provider){
         if(busy)return;
+        const providerName=provider==='google'?'Google':'Telegram';
+        const fallback=provider==='google'?'senha ou Telegram':'senha ou Google';
+        if(!await confirmAction({title:`Remover vínculo do ${providerName}?`,message:`Seus personagens continuarão nesta conta-mestre. Depois, você poderá entrar por ${fallback}.`,confirmText:'Remover vínculo',danger:true}))return;
         busy=true;
         try{
             await post('/api/auth/unlink/'+provider,{});
@@ -132,26 +214,59 @@
     document.getElementById('portal-unlink-google').onclick=()=>unlink('google');
     document.getElementById('portal-unlink-telegram').onclick=()=>unlink('telegram');
     document.getElementById('portal-logout-all').onclick=async()=>{
-        if(busy||!window.confirm('Encerrar a conta em todos os dispositivos? Você precisará entrar novamente.'))return;
+        if(busy||!await confirmAction({title:'Encerrar todas as sessões?',message:'Isso inclui esta sessão. Seus vínculos e personagens serão mantidos, mas você precisará entrar novamente.',confirmText:'Encerrar sessões',danger:true}))return;
         busy=true;
         try{await post('/api/auth/logout-all',{});location.href='/login';}
         catch(e){note(e.message);}finally{busy=false;}
     };
-    document.getElementById('portal-replace-google').onclick=()=>{
+    document.getElementById('portal-replace-google').onclick=async()=>{
         if(!status?.fresh_auth){note('Saia e entre novamente por senha ou Telegram antes de trocar o Google.');return;}
+        if(!await confirmAction({title:'Trocar Google vinculado?',message:'Na próxima etapa, escolha a nova conta Google. Seus personagens permanecem nesta conta-mestre.',confirmText:'Continuar'}))return;
         document.getElementById('portal-auth-mode').value='replace';
         document.getElementById('portal-google').hidden=inTelegram;
-        document.getElementById('portal-google-note').textContent='Clique no botão Google para confirmar a nova conta. Os personagens permanecem nesta conta.';
+        document.getElementById('portal-google-note').textContent='Clique no botão Google para trocar o vínculo desta conta-mestre. Os personagens permanecem aqui.';
     };
-    document.getElementById('portal-replace-telegram').onclick=()=>{
+    document.getElementById('portal-replace-telegram').onclick=async()=>{
         if(!status?.fresh_auth){note('Saia e entre novamente por senha ou Google antes de trocar o Telegram.');return;}
+        if(!await confirmAction({title:'Trocar Telegram vinculado?',message:'Na próxima etapa, confirme a nova conta Telegram. Seus personagens permanecem nesta conta-mestre.',confirmText:'Continuar'}))return;
         document.getElementById('portal-auth-mode').value='replace';
         document.getElementById('portal-telegram').hidden=false;
         document.getElementById('portal-telegram').textContent='Confirmar nova conta Telegram';
         document.getElementById('portal-account-security-note').textContent='Toque em “Confirmar nova conta Telegram” para validar a identidade que substituirá o vínculo.';
     };
     document.getElementById('portal-telegram').onclick=()=>authenticate('telegram',{init_data:window.Telegram?.WebApp?.initData||''});
-    document.getElementById('portal-logout').onclick=async()=>{try{await post('/api/auth/logout',{});location.reload();}catch(e){note(e.message);}};
+    linksTrigger.onclick=()=>setLinksMenu(true);
+    document.getElementById('portal-links-close').onclick=()=>setLinksMenu(false);
+    linksOverlay.onclick=()=>setLinksMenu(false);
+    document.getElementById('portal-confirm-cancel').onclick=()=>finishConfirm(false);
+    document.getElementById('portal-confirm-accept').onclick=()=>finishConfirm(true);
+    confirmOverlay.onclick=event=>{if(event.target===confirmOverlay)finishConfirm(false);};
+    document.addEventListener('keydown',event=>{
+        if(!confirmOverlay.hidden){
+            if(event.key==='Escape'){finishConfirm(false);return;}
+            if(event.key!=='Tab')return;
+            const focusable=[...confirmDialog.querySelectorAll('button:not([hidden]):not(:disabled),[href],input:not([hidden]):not(:disabled),select:not([hidden]):not(:disabled),[tabindex]:not([tabindex="-1"])')].filter(element=>element.getClientRects().length);
+            if(!focusable.length){event.preventDefault();confirmDialog.focus();return;}
+            const first=focusable[0],last=focusable[focusable.length-1];
+            if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus();}
+            else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}
+            return;
+        }
+        if(linksDrawer.hidden)return;
+        if(event.key==='Escape'){setLinksMenu(false);return;}
+        if(event.key!=='Tab')return;
+        const focusable=[...linksDrawer.querySelectorAll('button:not([hidden]):not(:disabled),[href],input:not([hidden]):not(:disabled),select:not([hidden]):not(:disabled),[tabindex]:not([tabindex="-1"])')].filter(element=>element.getClientRects().length);
+        if(!focusable.length){event.preventDefault();linksDrawer.focus();return;}
+        const first=focusable[0],last=focusable[focusable.length-1];
+        if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus();}
+        else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}
+    });
+    document.getElementById('portal-logout').onclick=async()=>{
+        if(busy||!await confirmAction({title:'Sair desta conta?',message:'Você sairá desta sessão neste dispositivo. Os vínculos e personagens serão mantidos.',confirmText:'Sair da conta',danger:true}))return;
+        busy=true;
+        try{await post('/api/auth/logout',{});location.reload();}
+        catch(e){note(e.message);}finally{busy=false;}
+    };
     window.portalSelect=id=>post('/api/auth/select',{character_id:id});
     // Remove cópias antigas de senhas, preservando os dados dos personagens no servidor.
     try{localStorage.removeItem('eldora_contas_salvas');}catch(_){}

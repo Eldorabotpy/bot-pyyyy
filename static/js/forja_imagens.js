@@ -70,9 +70,6 @@ window.FORJA_IMAGENS = {
   "sigilo_de_protecao": [
     "consumiveis/sigilo_de_protecao.png"
   ],
-  "ticket_de_arena": [
-    "consumiveis/ticket_de_arena.png"
-  ],
   "craft_martelo_armeiro_t1": [
     "equipamentos/craft_martelo_armeiro_t1.png"
   ],

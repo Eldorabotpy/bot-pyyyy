@@ -1,0 +1,173 @@
+/* Visual do menu de equipamentos adaptado à estrutura atual do perfil.
+   Mantém os slots, ações, dados e chamadas do servidor no perfil.js. */
+#aba-perfil #conteudo-perf-equips .eldora-equipment-panel {
+    margin-top: 7px !important;
+}
+
+#aba-perfil #conteudo-perf-equips .eldora-equipment-stage {
+    height: clamp(340px, 92vw, 380px) !important;
+    min-height: 340px !important;
+    overflow: hidden !important;
+    border: 1px solid rgba(220, 190, 116, .4) !important;
+    border-radius: 19px !important;
+    background:
+        radial-gradient(ellipse at 50% 43%, rgba(91, 112, 99, .2), transparent 49%),
+        linear-gradient(155deg, #101e27 0%, #0a141d 58%, #0d171f 100%) !important;
+    box-shadow: inset 0 0 34px rgba(0, 0, 0, .58), 0 8px 20px rgba(0, 0, 0, .25) !important;
+}
+
+#aba-perfil #conteudo-perf-equips .eldora-equipment-backdrop {
+    display: none !important;
+    pointer-events: none !important;
+}
+
+#aba-perfil #conteudo-perf-equips .eldora-equipment-avatar {
+    width: 68% !important;
+    height: 91% !important;
+    opacity: 1 !important;
+}
+
+#aba-perfil #conteudo-perf-equips .eldora-equipment-avatar img {
+    filter: drop-shadow(0 9px 15px rgba(0, 0, 0, .68)) saturate(1.04) !important;
+}
+
+#aba-perfil #conteudo-perf-equips .eldora-equipment-slots {
+    z-index: 3 !important;
+    pointer-events: none;
+}
+
+#aba-perfil #conteudo-perf-equips .eldora-equipment-slots > .eldora-equipment-slot {
+    box-sizing: border-box !important;
+    width: 52px !important;
+    height: 52px !important;
+    border-radius: 14px !important;
+    transition: transform .16s ease, box-shadow .16s ease, filter .16s ease !important;
+    -webkit-tap-highlight-color: transparent;
+    pointer-events: auto;
+}
+
+#aba-perfil #conteudo-perf-equips .eldora-equipment-slot[data-empty="false"] {
+    border-color: #d6aa4b !important;
+    background: linear-gradient(145deg, rgba(91, 67, 29, .58), rgba(18, 27, 32, .97)) !important;
+    box-shadow: inset 0 1px rgba(255, 239, 191, .18), 0 5px 12px rgba(0, 0, 0, .4), 0 0 10px rgba(214, 170, 75, .12) !important;
+}
+
+#aba-perfil #conteudo-perf-equips .eldora-equipment-slot[data-empty="true"] {
+    border-color: #496273 !important;
+    background: linear-gradient(145deg, rgba(25, 43, 53, .96), rgba(10, 19, 27, .97)) !important;
+    box-shadow: inset 0 1px rgba(255, 255, 255, .08), 0 4px 10px rgba(0, 0, 0, .36) !important;
+}
+
+#aba-perfil #conteudo-perf-equips .eldora-equipment-slot:active {
+    transform: translate(-50%, -50%) scale(.94) !important;
+    filter: brightness(1.12);
+}
+
+#aba-perfil #conteudo-perf-equips .eldora-equipment-slot img {
+    max-width: 80% !important;
+    max-height: 80% !important;
+    filter: drop-shadow(0 3px 5px rgba(0, 0, 0, .72)) !important;
+}
+
+#aba-perfil #conteudo-perf-equips button.eldora-companion-button {
+    display: block !important;
+    min-height: 66px !important;
+    margin: 11px 0 !important;
+    padding: 12px 15px !important;
+    border: 1px solid rgba(210, 180, 106, .43) !important;
+    border-radius: 15px !important;
+    background: linear-gradient(135deg, #162b34, #101a23) !important;
+    color: #e7cb8c !important;
+    line-height: 1.55 !important;
+    text-align: left !important;
+    box-shadow: inset 0 1px rgba(255, 255, 255, .06), 0 5px 12px rgba(0, 0, 0, .22) !important;
+}
+
+#aba-perfil #conteudo-perf-equips .eldora-companion-button span {
+    color: #d3dce0 !important;
+}
+
+#aba-perfil #conteudo-perf-equips .eldora-profession-tools {
+    margin-top: 12px !important;
+    padding: 13px 11px !important;
+    border: 1px solid rgba(93, 119, 120, .45) !important;
+    border-radius: 17px !important;
+    background: linear-gradient(155deg, #101f29, #0a141d) !important;
+    box-shadow: inset 0 1px rgba(255, 255, 255, .05), 0 7px 17px rgba(0, 0, 0, .24) !important;
+}
+
+#aba-perfil #conteudo-perf-equips .eldora-profession-tools > div:first-child {
+    margin: 0 2px 11px !important;
+    color: #e8ca82 !important;
+    font-size: .86em !important;
+    letter-spacing: .07em !important;
+    text-align: left !important;
+}
+
+#aba-perfil #conteudo-perf-equips .eldora-profession-tools > div:last-child {
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 9px !important;
+}
+
+#aba-perfil #conteudo-perf-equips .eldora-tool-slot {
+    box-sizing: border-box !important;
+    height: 74px !important;
+    min-width: 0 !important;
+    min-height: 74px !important;
+    border: 1px solid rgba(63, 169, 116, .82) !important;
+    border-radius: 13px !important;
+    background: linear-gradient(145deg, rgba(19, 49, 43, .96), rgba(11, 27, 30, .98)) !important;
+    box-shadow: inset 0 1px rgba(255, 255, 255, .08), 0 4px 9px rgba(0, 0, 0, .28) !important;
+    transition: transform .16s ease, filter .16s ease !important;
+}
+
+#aba-perfil #conteudo-perf-equips .eldora-tool-slot[data-empty="true"] {
+    border-color: rgba(79, 121, 104, .6) !important;
+}
+
+#aba-perfil #conteudo-perf-equips .eldora-tool-slot:active {
+    transform: scale(.95) !important;
+    filter: brightness(1.12);
+}
+
+#aba-perfil #conteudo-perf-equips .eldora-tool-slot img {
+    max-width: 78% !important;
+    max-height: 74% !important;
+    filter: drop-shadow(0 4px 6px rgba(0, 0, 0, .68)) !important;
+}
+
+#aba-perfil #conteudo-perf-equips .eldora-tool-slot > .eldora-profile-style-adecf77c {
+    top: -5px !important;
+    right: -4px !important;
+    padding: 2px 5px !important;
+    border: 1px solid rgba(129, 198, 151, .55) !important;
+    border-radius: 7px !important;
+    background: #0b171d !important;
+    color: #a8e2ba !important;
+    font-size: .62em !important;
+}
+
+#aba-perfil #conteudo-perf-equips .eldora-tool-slot > .eldora-profile-style-b5fecb8f {
+    left: 7px !important;
+    right: 7px !important;
+    bottom: 5px !important;
+}
+
+@media (max-width: 355px) {
+    #aba-perfil #conteudo-perf-equips .eldora-profession-tools > div:last-child {
+        grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    }
+
+    #aba-perfil #conteudo-perf-equips .eldora-equipment-slots > .eldora-equipment-slot {
+        width: 48px !important;
+        height: 48px !important;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #aba-perfil #conteudo-perf-equips .eldora-equipment-slot,
+    #aba-perfil #conteudo-perf-equips .eldora-tool-slot {
+        transition: none !important;
+    }
+}

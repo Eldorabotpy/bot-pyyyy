@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="shield" x1="12" y1="7" x2="52" y2="58" gradientUnits="userSpaceOnUse"><stop stop-color="#a8f5ff"/><stop offset=".48" stop-color="#3ba9c2"/><stop offset="1" stop-color="#173b59"/></linearGradient>
+    <linearGradient id="crystal" x1="22" y1="17" x2="43" y2="44" gradientUnits="userSpaceOnUse"><stop stop-color="#f2ffff"/><stop offset=".45" stop-color="#7df2ff"/><stop offset="1" stop-color="#2487bc"/></linearGradient>
+  </defs>
+  <path d="M32 4 53 12v19c0 13-8 22-21 29C19 53 11 44 11 31V12L32 4Z" fill="#090f19" stroke="#9ef5ff" stroke-width="2"/>
+  <path d="M32 8 49 14v17c0 10-6 18-17 24-11-6-17-14-17-24V14l17-6Z" fill="url(#shield)" stroke="#24657b" stroke-width="1.5"/>
+  <path d="m32 15 11 12-11 19-11-19 11-12Z" fill="url(#crystal)" stroke="#e2ffff" stroke-width="1.5" stroke-linejoin="round"/>
+  <path d="m21 27 11 4 11-4M32 15v16m0 15V31" stroke="#287c9d" stroke-width="1.5"/>
+  <path d="m17 18 3 2m27-2-3 2" stroke="#e3ffff" stroke-width="2" stroke-linecap="round"/>
+</svg>

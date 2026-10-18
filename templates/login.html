@@ -179,9 +179,10 @@
         #portal-identidade [hidden]{display:none!important}
         #portal-identidade p:empty{display:none}
         #portal-auth-state,#portal-google-note,#portal-auth-message{font:13px/1.5 Arial,sans-serif;color:#bdc9dc;margin:8px 0 12px}
+        #portal-google-note.portal-link-hint{padding:10px 12px;border:1px solid #a78a4b88;border-radius:8px;background:#171f2e;color:#f0d99f}
         #portal-auth-mode{background:#101a29;color:#e6d5a9;border:1px solid #665a3b;border-radius:8px;padding:8px;font:13px Arial,sans-serif}
         #portal-identidade .btn-new{width:100%;height:auto;min-height:44px;padding:10px 12px;background:#20344a;border:1px solid #4d6681;border-radius:8px;color:#e5edf8;font:600 13px Arial,sans-serif;text-transform:none;white-space:normal}
-        #portal-identidade #portal-logout{background:transparent;border-color:#665a3b;color:#dcc58b}
+        #portal-identidade #portal-logout{background:#38262e;border-color:#8a5962;color:#f6dfe2}
         #portal-google{min-width:0;max-width:100%;overflow:hidden}
         #tela-login{padding-top:4px}
         @media(max-width:360px){.login-box{padding:20px 14px}body{padding:12px 8px}}
@@ -189,7 +190,7 @@
     
     <link rel="stylesheet" href="/static/css/dialogos_eldora.css?v=1">
     <script src="/static/js/dialogos_eldora.js?v=1"></script>
-<link rel="stylesheet" href="/static/css/portal.css?v=4">
+<link rel="stylesheet" href="/static/css/portal.css?v=7">
 </head>
 <body>
     
@@ -204,14 +205,27 @@
         </div>
     </div>
 
+    <div id="portal-confirm-overlay" class="portal-confirm-overlay" hidden>
+        <section id="portal-confirm-dialog" class="portal-confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="portal-confirm-title" aria-describedby="portal-confirm-message" tabindex="-1">
+            <header class="portal-confirm-header">
+                <div class="portal-confirm-icon" aria-hidden="true">✦</div>
+                <div><p>ELDORA RPG</p><h2 id="portal-confirm-title">Confirmar ação</h2></div>
+            </header>
+            <p id="portal-confirm-message" class="portal-confirm-message"></p>
+            <div class="portal-confirm-actions">
+                <button id="portal-confirm-cancel" type="button" class="portal-confirm-cancel">Cancelar</button>
+                <button id="portal-confirm-accept" type="button" class="portal-confirm-accept">Confirmar</button>
+            </div>
+        </section>
+    </div>
+
     <div class="portal-main-container">
         <div class="logo-eldora" role="img" aria-label="Eldora RPG"></div><button id="portal-sound" type="button" class="portal-back" aria-pressed="false">Ativar música</button><p class="portal-eyebrow">MUNDO DE ELDORA</p>
         <div class="login-box">
             <div class="titulo-secao" id="titulo-caixa" style="margin-bottom: 10px; color: #d4af37; font-size: 0.9em; font-weight: bold;">ENTRAR NO REINO</div>
             
-            <nav id="portal-entry-tabs" class="portal-entry-tabs" aria-label="Acesso"><button type="button" onclick="portalScreen('login')">Entrar</button><button type="button" onclick="portalScreen('create')">Criar conta</button></nav>
-            <button id="portal-logout" type="button" class="portal-back" hidden>← Sair / trocar conta</button>
-            <details id="portal-identidade" style="padding:14px;margin:8px 0 16px;border:1px solid #665a3b;border-radius:12px;background:#111c2c;color:#dce5f3;font:13px/1.5 Arial,sans-serif">
+            <nav id="portal-entry-tabs" class="portal-entry-tabs" aria-label="Acesso"><button type="button" onclick="portalScreen('login')">Entrar com senha</button><button type="button" onclick="portalScreen('create')">Criar conta</button></nav>
+            <div id="portal-account-home"><details id="portal-identidade" style="padding:14px;margin:8px 0 16px;border:1px solid #665a3b;border-radius:12px;background:#111c2c;color:#dce5f3;font:13px/1.5 Arial,sans-serif">
                 <summary id="portal-account-summary">Acesse sua conta</summary><div class="portal-account-body">
                 <p id="portal-auth-state">Verificando sessão…</p>
                 <section id="telegram-credentials" hidden style="width:100%">
@@ -224,20 +238,10 @@
                     <p id="telegram-credentials-message" role="status"></p>
                 </section>
                 <select hidden id="portal-auth-mode" aria-label="Entrar, criar ou vincular conta" style="width:100%;min-height:44px;margin-bottom:12px"><option value="login">Entrar em conta vinculada</option></select>
-                <div id="portal-google" style="display:flex;justify-content:center"></div>
-                <p id="portal-google-note"></p>
-                <div id="portal-account-actions" hidden>
-                    <button id="portal-unlink-google" type="button" class="btn-new" hidden>Remover vínculo do Google</button>
-                    <button id="portal-unlink-telegram" type="button" class="btn-new" hidden>Remover vínculo do Telegram</button>
-                    <button id="portal-replace-google" type="button" class="btn-new" hidden>Trocar conta Google</button>
-                    <button id="portal-replace-telegram" type="button" class="btn-new" hidden>Trocar conta Telegram</button>
-                    <button id="portal-logout-all" type="button" class="btn-new">Encerrar sessões em outros dispositivos</button>
-                    <p id="portal-account-security-note" role="status"></p>
-                </div>
-                <p id="portal-auth-message" role="status" aria-live="polite"></p>
-            </div></details>
-            <p id="portal-telegram-hint" class="portal-divider" hidden></p>
-            <button id="portal-telegram" type="button" class="btn-new" hidden>Continuar com Telegram</button>
+                <div id="portal-google-home"><div id="portal-google-controls"><p id="portal-google-note"></p><div id="portal-google" style="display:flex;justify-content:center"></div></div></div>
+                <div id="portal-auth-message" role="status" aria-live="polite"></div>
+            </div></details></div>
+            <div id="portal-telegram-home"><p id="portal-telegram-hint" class="portal-divider" hidden></p><button id="portal-telegram" type="button" class="btn-new" hidden>Continuar com Telegram</button></div>
             <!-- ETAPA 1: TELA LOGIN DA CONTA MESTRA -->
             <div id="tela-login" style="width: 100%;"><p class="portal-divider">Já tem uma conta? Entre com sua senha</p>
 
@@ -265,7 +269,7 @@
                     <input type="checkbox" id="login-salvar-conta" checked>
                     Manter minha conta conectada neste dispositivo
                 </label>
-                <button class="btn-new" type="button" id="btn-logar">ACESSAR CONTA</button><button type="button" class="portal-back" onclick="portalScreen('google')">Já vinculou? Entrar com Google ou Telegram</button>
+                <button class="btn-new" type="button" id="btn-logar">ACESSAR COM SENHA</button><button type="button" class="portal-back" onclick="portalScreen('google')">Já vinculou? Entrar com Google ou Telegram</button>
             </div>
             
             <!-- ETAPA 1.5: TELA DE CRIAR CONTA MESTRA -->
@@ -303,8 +307,42 @@
                 </div>
             </div>
         </div>
-
     </div>
+
+        <button id="portal-links-trigger" type="button" aria-label="Abrir vínculos e acesso da conta" title="Vínculos e acesso da conta" aria-controls="portal-links-drawer" aria-expanded="false" hidden><span class="portal-trigger-icon" aria-hidden="true">⚙</span></button>
+        <div id="portal-links-overlay" hidden></div>
+        <aside id="portal-links-drawer" role="dialog" aria-modal="true" aria-labelledby="portal-links-title" tabindex="-1" hidden>
+            <header class="portal-links-header">
+                <div class="portal-links-heading-icon" aria-hidden="true">✦</div>
+                <div><p>CONTA-MESTRE</p><h2 id="portal-links-title">Acessos e vínculos</h2></div>
+                <button id="portal-links-close" type="button" aria-label="Fechar menu de vínculos">×</button>
+            </header>
+            <div class="portal-links-scroll">
+                <p id="portal-links-account" class="portal-links-account"></p>
+                <div id="portal-account-settings-slot"></div>
+                <div id="portal-account-actions" class="portal-links-content" hidden>
+                    <section class="portal-provider-card">
+                        <div class="portal-provider-heading"><span class="portal-provider-mark portal-google-mark" aria-hidden="true">G</span><div><h3>Google</h3><p id="portal-google-link-state">Verificando vínculo…</p></div></div>
+                        <div id="portal-google-slot" class="portal-provider-controls"></div>
+                        <button id="portal-unlink-google" type="button" class="btn-new portal-action-button portal-unlink-button" hidden>Remover vínculo do Google</button>
+                        <button id="portal-replace-google" type="button" class="btn-new portal-action-button" hidden>Substituir vínculo do Google</button>
+                    </section>
+                    <section class="portal-provider-card">
+                        <div class="portal-provider-heading"><span class="portal-provider-mark portal-telegram-mark" aria-hidden="true">➤</span><div><h3>Telegram</h3><p id="portal-telegram-link-state">Verificando vínculo…</p></div></div>
+                        <div id="portal-telegram-slot" class="portal-provider-controls"></div>
+                        <button id="portal-unlink-telegram" type="button" class="btn-new portal-action-button portal-unlink-button" hidden>Remover vínculo do Telegram</button>
+                        <button id="portal-replace-telegram" type="button" class="btn-new portal-action-button" hidden>Substituir vínculo do Telegram</button>
+                    </section>
+                    <section class="portal-session-card">
+                        <div><h3>Sessão deste dispositivo</h3><p>Sair fecha esta sessão e mantém os vínculos e personagens.</p></div>
+                        <button id="portal-logout" type="button" class="btn-new portal-action-button portal-logout-button" hidden>Sair desta conta</button>
+                    </section>
+                    <button id="portal-logout-all" type="button" class="btn-new portal-action-button portal-logout-all-button">Encerrar todas as sessões</button>
+                    <p id="portal-account-security-note" role="status" class="portal-links-note"></p>
+                    <p id="portal-links-message" role="status" aria-live="polite"></p>
+                </div>
+            </div>
+        </aside>
 
     <script>
         window.Telegram?.WebApp?.ready();
@@ -583,6 +621,6 @@
         // A inicialização das telas pertence ao portal_auth.js.
     </script>
 <script src="/static/js/portal_controls.js?v=2"></script>
-<script src="/static/js/portal_auth.js?v=10"></script>
+<script src="/static/js/portal_auth.js?v=20"></script>
 </body>
 </html>

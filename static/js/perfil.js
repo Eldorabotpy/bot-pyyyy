@@ -8,7 +8,7 @@ window.obterPastaItem = function(dado) {
     // Pega o tipo seja lá como ele vier (se mandarem o objeto inteiro ou só o texto)
     let tipo = typeof dado === 'object' ? (dado.tipo || dado.type || "") : (dado || "");
     const t = tipo.toLowerCase();
-    
+
     // 1. Ferramentas de Profissão
     const tiposFerramenta = ['tool', 'ferramenta', 'lenhador', 'minerador', 'colhedor', 'esfolador', 'ferreiro', 'armeiro', 'alfaiate', 'joalheiro', 'curtidor'];
     if (tiposFerramenta.includes(t)) return 'ferramentas';
@@ -16,13 +16,13 @@ window.obterPastaItem = function(dado) {
     // 2. Equipamentos (Armas e Armaduras)
     const tiposEquipamento = ['weapon', 'armor', 'helmet', 'boots', 'bota', 'ring', 'necklace', 'earring', 'equipamento', 'arma', 'armadura', 'elmo', 'anel', 'colar', 'brinco'];
     if (tiposEquipamento.includes(t)) return 'equipamentos';
-    
+
     // 3. Consumíveis e itens especiais
     const tiposUsaveis = ['potion', 'pocao', 'consumable', 'scroll', 'pergaminho', 'chest', 'box', 'consumivel', 'reagent', 'especial', 'event_ticket'];
     if (tiposUsaveis.includes(t)) return 'consumiveis';
-    
+
     // Fallback absoluto
-    return 'materiais'; 
+    return 'materiais';
 };
 
 window.getCaminhosImagemItemEldora = function(item) {
@@ -73,7 +73,7 @@ window.aplicarImagemItemEldora = function(imgEl, item) {
     if (!imgEl) return;
 
     const runeFamily = String(item?.base_id || item?.id || '').match(/^runa_(crueldade|precisao|vampiro|rocha|mente|eco|midas|sabio)_/);
-    if (runeFamily) { imgEl.src = `/static/assets/runas/${runeFamily[1]}.svg`; return; }
+    if (runeFamily) { imgEl.src = `/static/assets/runas/${runeFamily[1]}.svg?v=2`; return; }
     const caminhos = window.getCaminhosImagemItemEldora(item);
     let index = 0;
 
@@ -89,6 +89,93 @@ window.aplicarImagemItemEldora = function(imgEl, item) {
     };
 
     imgEl.src = caminhos[0];
+};
+
+
+// Resolve as artes da mochila apenas nesta tela, usando os nomes reais do catálogo público.
+window.getCaminhosImagemPerfilEldora = function(item) {
+    const base = "https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/itens/";
+    const cacheVersion = "1122";
+    const bruto = String(item?.base_id || item?.item_id || item?.uid || item?.id || "").trim();
+    if (!bruto) return [];
+
+    const idSemWork = bruto.replace(/^work_/i, "");
+    const ids = [...new Set([bruto, idSemWork, "work_" + idSemWork].filter(Boolean))];
+    const caminhos = [];
+    const urlIcone = typeof item?.icon_url === "string" ? item.icon_url.trim() : "";
+    const iconePlaceholder = /(?:seuusuario|seurepositorio|example\.com|placeholder)/i.test(urlIcone);
+    if (!iconePlaceholder && /^(https?:\/\/|\/static\/)/i.test(urlIcone)) caminhos.push(urlIcone);
+
+    // Os itens de forja têm chaves "work_*" no índice, embora o base_id não tenha esse prefixo.
+    for (const id of ids) {
+        const cadastrados = window.FORJA_IMAGENS?.[id];
+        if (!Array.isArray(cadastrados)) continue;
+        for (const caminho of cadastrados) {
+            if (typeof caminho === "string" && caminho) {
+                caminhos.push(base + caminho.replace(/^\/?(?:assets\/)?itens\//, "") + "?v=" + cacheVersion);
+            }
+        }
+    }
+
+    const tipo = String(item?.tipo || item?.type || item?.categoria || item?.category || "")
+        .trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const tiposEquipamento = new Set([
+        "weapon", "armor", "helmet", "boots", "bota", "botas", "ring", "necklace", "earring",
+        "equipamento", "arma", "armadura", "elmo", "anel", "colar", "brinco", "calca", "calcas",
+        "luva", "luvas", "peitoral", "capuz", "chapeu", "capacete", "tunica", "manto", "escudo",
+        "adaga", "espada", "arco", "cajado", "equipment"
+    ]);
+    const idPareceEquipamento = /^(?:work_)?(?:espada|adaga|arco|cajado|machado|peitoral|armadura|calca|calcas|bota|botas|luva|luvas|anel|colar|brinco|capuz|chapeu|elmo|capacete|tunica|manto|escudo|capa)(?:_|$)/i.test(bruto);
+    const temMapaEquipamento = ids.some(id => (window.FORJA_IMAGENS?.[id] || []).some(path => /^equipamentos\//i.test(path)));
+    const equipamento = tiposEquipamento.has(tipo) || tipo === "equipamentos" || idPareceEquipamento || temMapaEquipamento;
+    const tiposFerramenta = new Set(["tool", "ferramenta", "lenhador", "minerador", "colhedor", "esfolador", "ferreiro", "armeiro", "alfaiate", "joalheiro", "curtidor"]);
+    const tiposUsaveis = new Set(["potion", "pocao", "consumable", "consumivel", "scroll", "pergaminho", "chest", "box", "reagent", "especial", "event_ticket"]);
+    const pastas = equipamento ? ["equipamentos"] : tiposFerramenta.has(tipo) ? ["ferramentas", "equipamentos"] : tiposUsaveis.has(tipo) ? ["consumiveis", "materiais"] : ["materiais"];
+
+    for (const pasta of pastas) {
+        for (const id of ids) caminhos.push(base + pasta + "/" + id + ".png?v=" + cacheVersion);
+    }
+    if (equipamento) {
+        for (const id of ids) {
+            const nomeArquivo = /^work_/i.test(id) ? id : "work_" + id;
+            caminhos.push(base + "equipamentos/" + nomeArquivo + ".png?v=" + cacheVersion);
+        }
+    }
+
+    return [...new Set(caminhos)];
+};
+
+window.aplicarImagemPerfilEldora = function(imgEl, item) {
+    if (!imgEl) return;
+    const runeFamily = String(item?.base_id || item?.id || "").match(/^runa_(crueldade|precisao|vampiro|rocha|mente|eco|midas|sabio)_/);
+    const caminhos = window.getCaminhosImagemPerfilEldora(item);
+    if (runeFamily) caminhos.unshift("/static/assets/runas/" + runeFamily[1] + ".svg?v=2");
+    let index = 0;
+
+    imgEl.alt = item?.nome || item?.display_name || item?.base_id || "Item";
+    imgEl.onload = function() {
+        this.hidden = false;
+        if (this.nextElementSibling) {
+            this.nextElementSibling.classList.add("eldora-image-fallback");
+            this.nextElementSibling.classList.remove("is-visible");
+        }
+    };
+    imgEl.onerror = function() {
+        index++;
+        if (index < caminhos.length) {
+            this.src = caminhos[index];
+            return;
+        }
+        this.onerror = null;
+        this.onload = null;
+        this.hidden = true;
+        if (this.nextElementSibling) {
+            this.nextElementSibling.classList.add("eldora-image-fallback", "is-visible");
+        }
+    };
+
+    if (caminhos.length) imgEl.src = caminhos[0];
+    else imgEl.onerror();
 };
 
 const CLASSES_INFO = {
@@ -272,68 +359,43 @@ function gerarHtmlBonusTempoFerramentaPerfil(itemData) {
         "#94a3b8";
 
     return `
-        <div style="
-            width:100%;
-            margin-top:8px;
-            padding:10px;
-            border-radius:10px;
-            border:1px solid rgba(250,204,21,.35);
-            background:linear-gradient(180deg, rgba(120,53,15,.35), rgba(15,23,42,.75));
-            text-align:left;
-            box-shadow: inset 0 0 14px rgba(0,0,0,.35);
-        ">
-            <div style="
-                font-family:'Cinzel',serif;
-                font-weight:900;
-                color:#facc15;
-                font-size:.82em;
-                margin-bottom:7px;
-                text-align:center;
-                letter-spacing:.4px;
-            ">
+        <div class="eldora-profile-style-96492c5f">
+            <div class="eldora-profile-style-7d747603">
                 ⏱️ BÔNUS DE TEMPO
             </div>
 
-            <div style="display:grid; gap:5px; font-size:.78em; color:#cbd5e1;">
-                <div style="display:flex; justify-content:space-between; gap:8px;">
+            <div class="eldora-profile-style-f1c6317c">
+                <div class="eldora-profile-style-665bd398">
                     <span>Profissão</span>
-                    <b style="color:#fff;">${nomeProf} Nv. ${profNivel}</b>
+                    <b class="eldora-profile-style-0d75823b">${nomeProf} Nv. ${profNivel}</b>
                 </div>
 
-                <div style="display:flex; justify-content:space-between; gap:8px;">
+                <div class="eldora-profile-style-665bd398">
                     <span>Redução da profissão</span>
-                    <b style="color:#93c5fd;">-${bonusProf.toFixed(1)}%</b>
+                    <b class="eldora-profile-style-4560323b">-${bonusProf.toFixed(1)}%</b>
                 </div>
 
-                <div style="display:flex; justify-content:space-between; gap:8px;">
+                <div class="eldora-profile-style-665bd398">
                     <span>Tier da ferramenta</span>
-                    <b style="color:#fff;">T${tier} / -${bonusTier.toFixed(1)}%</b>
+                    <b class="eldora-profile-style-0d75823b">T${tier} / -${bonusTier.toFixed(1)}%</b>
                 </div>
 
-                <div style="display:flex; justify-content:space-between; gap:8px;">
+                <div class="eldora-profile-style-665bd398">
                     <span>Melhoria da ferramenta</span>
-                    <b style="color:#fff;">+${upgrade} / -${bonusUpgrade.toFixed(1)}%</b>
+                    <b class="eldora-profile-style-0d75823b">+${upgrade} / -${bonusUpgrade.toFixed(1)}%</b>
                 </div>
 
-                <div style="display:flex; justify-content:space-between; gap:8px;">
+                <div class="eldora-profile-style-665bd398">
                     <span>⚡ Velocidade de Trabalho</span>
-                    <b style="color:#67e8f9;">
+                    <b class="eldora-profile-style-1a0fc93d">
                         +${velocidadePontos}
                         / -${bonusVelocidade.toFixed(1)}%
                     </b>
                 </div>
 
-                <div style="
-                    margin-top:6px;
-                    padding-top:7px;
-                    border-top:1px solid rgba(255,255,255,.1);
-                    display:flex;
-                    justify-content:space-between;
-                    gap:8px;
-                    font-size:1.05em;
-                ">
-                    <span style="color:#f8fafc; font-weight:800;">Total aplicado</span>
-                    <b style="color:${corTotal};">-${totalAplicado.toFixed(1)}%</b>
+                <div class="eldora-profile-style-4681584a">
+                    <span class="eldora-profile-style-52e2d98a">Total aplicado</span>
+                    <b class="eldora-profession-total" style="--total-color:${corTotal}">-${totalAplicado.toFixed(1)}%</b>
                 </div>
             </div>
         </div>
@@ -424,7 +486,7 @@ async function carregarMeuPerfil() {
     const conteudo = document.getElementById('perfil-dados');
 
     if (!charId) {
-        document.getElementById('perfil-msg-carregando').innerHTML = "<span style='color: #e74c3c;'>Nenhum herói selecionado.</span>";
+        document.getElementById('perfil-msg-carregando').innerHTML = "<span class='eldora-profile-style-984655ef'>Nenhum herói selecionado.</span>";
         return;
     }
 
@@ -432,16 +494,16 @@ async function carregarMeuPerfil() {
         // 1. 🔥 ROTA CORRIGIDA (Puxa todos os dados do inventário e status)
         const resposta = await fetch(`/perfil/${charId}?t=${new Date().getTime()}`, { cache: 'no-store' });
         const p = await resposta.json();
-        
-        if (p.erro) { 
-            document.getElementById('perfil-msg-carregando').innerText = "⚠️ " + p.erro; 
-            return; 
+
+        if (p.erro) {
+            document.getElementById('perfil-msg-carregando').innerText = "⚠️ " + p.erro;
+            return;
         }
 
         // 2. BLINDAGEM ANTI-CRASH (Evita erros se faltar algum dado)
         p.status = p.status || {};
         p.equipamentos = p.equipamentos || [];
-        p.inventario = p.inventario || []; 
+        p.inventario = p.inventario || [];
         p.pontos_livres = p.pontos_livres || 0;
         p.hp_atual = p.hp_atual || 0; p.hp_max = p.hp_max || 100;
         p.mp_atual = p.mp_atual || 0; p.mp_max = p.mp_max || 50;
@@ -462,7 +524,7 @@ async function carregarMeuPerfil() {
                 // Se o backend não mandou o tipo, a gente descobre pelo nome do ID!
                 if (!item.tipo || item.tipo === "") {
                     const tempId = (item.base_id || item.id || "").toLowerCase();
-                    
+
                     if (tempId.includes('pocao') || tempId.includes('potion')) item.tipo = 'potion';
                     else if (tempId.includes('pergaminho') || tempId.includes('scroll')) item.tipo = 'scroll';
                     else if (tempId.includes('espada') || tempId.includes('arco') || tempId.includes('cajado')) item.tipo = 'weapon';
@@ -477,7 +539,7 @@ async function carregarMeuPerfil() {
 
         window.perfilDadosGlobais = p;
         window.dispatchEvent(new CustomEvent("eldora:xp-boost", { detail: p }));
-        
+
         const classeKey = (p.classe || "aprendiz").toLowerCase();
         const infoClasse = CLASSES_INFO[classeKey] || CLASSES_INFO['aprendiz'];
         let percentXP = Math.min((p.xp / p.xp_max) * 100, 100);
@@ -488,7 +550,7 @@ async function carregarMeuPerfil() {
         // 🌟 NOVO: MULTI-PROFISSÕES (LISTA COM SCROLL E BÔNUS)
         // ==========================================
         let htmlProfissao = '';
-        
+
         // Junta a profissão atual com as aprendidas (caso o backend não tenha sincronizado 100%)
         let profsAprendidas = p.learned_professions || {};
         if (p.profession && (p.profession.key || p.profession.type)) {
@@ -498,133 +560,122 @@ async function carregarMeuPerfil() {
 
         const listaProfs = Object.values(profsAprendidas);
 
-        if (listaProfs.length > 0) { 
-            // Cria a caixa com scroll para caber várias profissões
-            htmlProfissao = `<div style="max-height: 250px; overflow-y: auto; padding-right: 5px; margin-bottom: 20px; display: flex; flex-direction: column; gap: 12px; scrollbar-width: thin; scrollbar-color: #ca8a04 #0f172a;">`;
-            
+        if (listaProfs.length > 0) {
+            // Cartões responsivos de profissão; os dados e cálculos permanecem os mesmos.
+            htmlProfissao = `<section class="perfil-v2-profissoes" aria-label="Profissões do personagem">
+                <header class="perfil-v2-prof-cabecalho"><h3>Profissões</h3><span>${listaProfs.length} ${listaProfs.length === 1 ? 'ofício' : 'ofícios'}</span></header>
+                <div class="perfil-v2-profissoes-lista">`;
+
             // Ordena pelo maior nível
             listaProfs.sort((a, b) => (b.level || 1) - (a.level || 1));
 
             listaProfs.forEach(profInfo => {
                 let profNivel = profInfo.level || 1;
                 let profXp = profInfo.xp || 0;
-                
+
                 let xpNecessarioProf = 40 + (25 * (profNivel - 1)) + (8 * Math.pow(profNivel - 1, 2));
                 let percentProfXP = Math.min((profXp / xpNecessarioProf) * 100, 100);
-                
+
                 let nomeProf = profInfo.display_name || profInfo.nome || profInfo.type || "Aprendiz";
-                
+
                 let keyword = "";
-                let iconeProfFall = "⚒️";
-                let imgGenerica = ""; 
+                let imgGenerica = "martelo_ferreiro";
                 let isCrafting = false;
-                
+
                 const profStr = (profInfo.key || profInfo.type || "").toLowerCase();
-                
+
                 // 🌿 PROFISSÕES DE COLETA
-                if (profStr.includes('lenhador')) { keyword = "machado"; iconeProfFall = "🪓"; imgGenerica = "machado"; }
-                else if (profStr.includes('minerador')) { keyword = "picareta"; iconeProfFall = "⛏️"; imgGenerica = "picareta"; }
-                else if (profStr.includes('colhedor')) { keyword = "foice"; iconeProfFall = "🌿"; imgGenerica = "foice"; }
-                else if (profStr.includes('esfolador')) { keyword = "faca"; iconeProfFall = "🔪"; imgGenerica = "faca"; }
-                else if (profStr.includes('alquimista')) { keyword = "frasco"; iconeProfFall = "🧪"; imgGenerica = "frasco"; }
-                
+                if (profStr.includes('lenhador')) { keyword = "machado"; imgGenerica = "machado"; }
+                else if (profStr.includes('minerador')) { keyword = "picareta"; imgGenerica = "picareta"; }
+                else if (profStr.includes('colhedor')) { keyword = "foice"; imgGenerica = "foice"; }
+                else if (profStr.includes('esfolador')) { keyword = "faca"; imgGenerica = "faca"; }
+                else if (profStr.includes('alquimista')) { keyword = "frasco"; imgGenerica = "frasco"; }
+
                 // 🔨 PROFISSÕES DE PRODUÇÃO
-                else if (profStr.includes('ferreiro')) { keyword = "martelo_ferreiro"; iconeProfFall = "🔨"; imgGenerica = "martelo_ferreiro"; isCrafting = true; }
-                else if (profStr.includes('armeiro')) { keyword = "martelo_armeiro"; iconeProfFall = "⚔️"; imgGenerica = "martelo_armeiro"; isCrafting = true; }
-                else if (profStr.includes('alfaiate')) { keyword = "alfaiate"; iconeProfFall = "🧵"; imgGenerica = "kit_alfaiate"; isCrafting = true; }
-                else if (profStr.includes('joalheiro')) { keyword = "joalheiro"; iconeProfFall = "💎"; imgGenerica = "kit_joalheiro"; isCrafting = true; }
-                else if (profStr.includes('curtidor')) { keyword = "curtidor"; iconeProfFall = "👞"; imgGenerica = "kit_curtidor"; isCrafting = true; }
-                
+                else if (profStr.includes('ferreiro')) { keyword = "martelo_ferreiro"; imgGenerica = "martelo_ferreiro"; isCrafting = true; }
+                else if (profStr.includes('armeiro')) { keyword = "martelo_armeiro"; imgGenerica = "martelo_armeiro"; isCrafting = true; }
+                else if (profStr.includes('alfaiate')) { keyword = "alfaiate"; imgGenerica = "kit_alfaiate"; isCrafting = true; }
+                else if (profStr.includes('joalheiro')) { keyword = "joalheiro"; imgGenerica = "kit_joalheiro"; isCrafting = true; }
+                else if (profStr.includes('curtidor')) { keyword = "curtidor"; imgGenerica = "kit_curtidor"; isCrafting = true; }
+
                 // 🔥 CÁLCULO DOS BÔNUS 🔥
                 let bonusTexto = "";
                 if (isCrafting) {
-                    bonusTexto = `⏱️ Tempo de Forja: -${(profNivel * 0.5).toFixed(1)}%`;
+                    bonusTexto = `Tempo de forja: -${(profNivel * 0.5).toFixed(1)}%`;
                 } else {
-                    bonusTexto = `🎯 Drop Fixo: +${Math.floor(profNivel / 10)} | ✨ Chance Duplo: ${(profNivel * 0.5).toFixed(1)}%`;
+                    bonusTexto = `Drop fixo: +${Math.floor(profNivel / 10)} | Chance dupla: ${(profNivel * 0.5).toFixed(1)}%`;
                 }
-                
-                let imgFerramentaHtml = `<span style="font-size: 1.6em;">${iconeProfFall}</span>`;
-                
+
+                let imgFerramentaHtml = '';
+
                 // CORES PADRÃO (Tier 1)
-                let corBordaT = "#475569"; 
+                let corBordaT = "#475569";
                 let corFundoT = "#0f172a";
                 let glowT = "rgba(0,0,0,0.5)";
                 let tierTxt = "T1";
 
                 if (keyword) {
-                    const ferramentaUser = p.inventario.find(i => i.base_id && i.base_id.toLowerCase().includes(keyword));
+                    const inventario = Array.isArray(p.inventario) ? p.inventario : [];
+                    const ferramentaUser = inventario.find(i => i.base_id && i.base_id.toLowerCase().includes(keyword));
                     if (ferramentaUser) {
                         const idItem = ferramentaUser.base_id.toLowerCase();
-                        
+
                         if (idItem.includes('ferro') || idItem.includes('ceramica') || idItem.includes('_t2')) {
                             corBordaT = "#22c55e"; corFundoT = "rgba(34, 197, 94, 0.1)"; glowT = "rgba(34, 197, 94, 0.4)"; tierTxt = "T2";
-                        } 
+                        }
                         else if (idItem.includes('aco') || idItem.includes('cristal') || idItem.includes('_t3')) {
                             corBordaT = "#3b82f6"; corFundoT = "rgba(59, 130, 246, 0.1)"; glowT = "rgba(59, 130, 246, 0.4)"; tierTxt = "T3";
-                        } 
+                        }
                         else if (idItem.includes('mithril') || idItem.includes('obsidiana') || idItem.includes('runico') || idItem.includes('_t4')) {
                             corBordaT = "#a855f7"; corFundoT = "rgba(168, 85, 247, 0.1)"; glowT = "rgba(168, 85, 247, 0.4)"; tierTxt = "T4";
-                        } 
+                        }
                         else if (idItem.includes('adamantio') || idItem.includes('vorpal') || idItem.includes('vazio') || idItem.includes('druidica') || idItem.includes('_t5')) {
                             corBordaT = "#eab308"; corFundoT = "rgba(234, 179, 8, 0.1)"; glowT = "rgba(234, 179, 8, 0.4)"; tierTxt = "T5";
                         }
-
-                        const linkBaseNuvem = window.CATALOGO_SISTEMA ? "https://raw.githubusercontent.com/Eldorabotpy/static-img/refs/heads/main/assets/" : "/static/assets/";
-                        const imgPath = `${linkBaseNuvem}itens/equipamentos/${imgGenerica}.png`;
-                        
-                        imgFerramentaHtml = `<img src="${imgPath}" onerror="this.outerHTML='<span style=\\'font-size:1.6em;\\'>${iconeProfFall}</span>'" style="width: 32px; height: 32px; object-fit: contain; filter: drop-shadow(0px 2px 3px rgba(0,0,0,0.8));">`;
                     }
                 }
 
+                // Cada profissão usa a arte genérica correspondente hospedada no GitHub,
+                // mesmo antes de o personagem obter uma ferramenta.
+                const imgPath = `https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/itens/equipamentos/${imgGenerica}.png`;
+                imgFerramentaHtml = `<img src="${imgPath}" alt="Ferramenta de ${nomeProf}" loading="lazy" decoding="async" class="perfil-v2-prof-ferramenta">`;
+
                 htmlProfissao += `
-                <div style="background: rgba(30, 41, 59, 0.8); padding: 12px; border-radius: 10px; border: 1px solid #ca8a04; box-shadow: inset 0 0 15px rgba(202, 138, 4, 0.1); position: relative;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                        <div style="display: flex; align-items: center; gap: 10px;">
-                            
-                            <span style="background: ${corFundoT}; width: 48px; height: 48px; display: flex; justify-content: center; align-items: center; border-radius: 8px; border: 2px solid ${corBordaT}; box-shadow: 0 0 10px ${glowT}; position: relative;">
+                <article class="perfil-v2-prof-card" style="--prof-cor:${corBordaT}; --prof-fundo:${corFundoT}; --prof-glow:${glowT};">
+                    <div class="perfil-v2-prof-topo">
+                        <div class="perfil-v2-prof-identidade">
+                            <span class="perfil-v2-prof-icone">
                                 ${imgFerramentaHtml}
-                                <div style="position: absolute; bottom: -6px; right: -6px; background: ${corBordaT}; color: #fff; font-size: 0.6em; font-weight: bold; padding: 2px 5px; border-radius: 6px; text-shadow: 1px 1px 1px #000;">${tierTxt}</div>
+                                <span class="perfil-v2-prof-tier">${tierTxt}</span>
                             </span>
-                            <div>
-                                <div style="color: #facc15; font-weight: 900; font-family: 'Cinzel', serif; text-transform: uppercase; text-shadow: 1px 1px 2px #000; letter-spacing: 1px;">${nomeProf}</div>
-                                <div style="color: #cbd5e1; font-size: 0.8em; font-weight: bold;">Nível ${profNivel}</div>
-                            </div>
+                            <span class="perfil-v2-prof-nome-nivel"><strong>${nomeProf}</strong><small>Nível ${profNivel}</small></span>
                         </div>
-                        <div style="text-align: right;">
-                            <span style="color: #fff; font-size: 0.75em; font-weight: bold; background: #000; padding: 4px 8px; border-radius: 6px; border: 1px solid #333;">${profXp.toLocaleString('pt-BR')} / ${xpNecessarioProf.toLocaleString('pt-BR')} XP</span>
-                        </div>
+                        <span class="perfil-v2-prof-xp">${profXp.toLocaleString('pt-BR')} <small>/ ${xpNecessarioProf.toLocaleString('pt-BR')} XP</small></span>
                     </div>
-                    
-                    <div style="width: 100%; height: 8px; background: #020617; border-radius: 4px; border: 1px solid #000; overflow: hidden; margin-bottom: 8px;">
-                        <div style="width: ${percentProfXP}%; height: 100%; background: linear-gradient(90deg, #a16207, #facc15); border-radius: 4px; box-shadow: 0 0 8px rgba(250, 204, 21, 0.6); transition: width 0.5s ease-in-out;"></div>
-                    </div>
-                    
-                    <div style="text-align: right; color: #6ee7b7; font-size: 0.75em; font-weight: bold; text-shadow: 1px 1px 2px #000; background: rgba(0,0,0,0.4); padding: 4px 8px; border-radius: 4px; border: 1px dashed #059669; display: inline-block; float: right;">
-                        ${bonusTexto}
-                    </div>
-                    <div style="clear: both;"></div>
-                </div>`;
+                    <div class="perfil-v2-prof-trilho"><i style="width:${percentProfXP}%;"></i></div>
+                    <div class="perfil-v2-prof-bonus">${bonusTexto}</div>
+                </article>`;
             });
-            
-            htmlProfissao += `</div>`;
+
+            htmlProfissao += `</div></section>`;
         } else {
             // 👇 SE NÃO TIVER PROFISSÃO, MOSTRA ISTO 👇
             htmlProfissao = `
-            <div style="background: rgba(15, 23, 42, 0.6); padding: 12px; border-radius: 10px; border: 1px dashed #475569; margin-bottom: 20px; text-align: center;">
-                <div style="color: #94a3b8; font-size: 0.9em; font-weight: bold; margin-bottom: 4px;">Nenhum Ofício Aprendido</div>
-                <div style="color: #64748b; font-size: 0.75em; font-style: italic;">Encontra um Mestre de Guilda para aprenderes uma profissão.</div>
-            </div>`;
+            <section class="perfil-v2-profissoes perfil-v2-profissoes-vazio" aria-label="Profissões do personagem">
+                <header class="perfil-v2-prof-cabecalho"><h3>Profissões</h3><span>0 ofícios</span></header>
+                <div class="perfil-v2-prof-vazio"><strong>Nenhum ofício aprendido</strong><span>Encontre um Mestre de Guilda para aprender uma profissão.</span></div>
+            </section>`;
         }
         // ==========================================
         // 3. O TRADUTOR DO GITHUB E CORPO COMPLETO
         // ==========================================
-        
+
         // --- BANNER ---
         let bannerCaminho = p.banner_customizado;
         if (typeof bannerCaminho === 'object' && bannerCaminho !== null) bannerCaminho = bannerCaminho.path;
-        
-        let bannerImgCss = 'linear-gradient(135deg, #2c3e50, #1a1a1a)'; 
-        let bannerRawUrl = ''; 
+
+        let bannerImgCss = 'linear-gradient(135deg, #2c3e50, #1a1a1a)';
+        let bannerRawUrl = '';
         if (bannerCaminho && bannerCaminho !== 'padrao' && bannerCaminho !== '') {
             if (window.CATALOGO_SISTEMA && window.CATALOGO_SISTEMA.banners[bannerCaminho]) {
                 bannerRawUrl = window.CATALOGO_SISTEMA.banners[bannerCaminho].path;
@@ -638,7 +689,7 @@ async function carregarMeuPerfil() {
         // --- AVATAR (ROSTO PARA O HUD) ---
         let avatarCaminho = p.avatar_customizado;
         if (typeof avatarCaminho === 'object' && avatarCaminho !== null) avatarCaminho = avatarCaminho.path;
-        
+
         let avatarFinalRosto = p.avatar || 'https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/avatares/avatar_padrao_m.png';
 
         if (avatarCaminho && avatarCaminho !== 'padrao' && avatarCaminho !== '') {
@@ -659,58 +710,77 @@ async function carregarMeuPerfil() {
         // --- AVATAR CORPO COMPLETO (MOSTRA A SKIN EQUIPADA!) ---
         const generoCurto = (p.gender && p.gender.toLowerCase() === 'feminino') ? 'f' : 'm';
         const linkBaseNuvem = window.CATALOGO_SISTEMA ? "https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/" : "/static/assets/";
-        
+
         // 1. Descobre qual é a Skin atual (Se não tiver nenhuma, usa a classe base do jogador)
         let skinDoCorpo = p.equipped_skin;
         if (!skinDoCorpo || skinDoCorpo === 'padrao') {
-            skinDoCorpo = `${classeKey}_${generoCurto}`; 
+            skinDoCorpo = `${classeKey}_${generoCurto}`;
         }
-        
+
         // 👇 ADICIONE ESTA LINHA: Garante que o mapa sempre saiba a skin que veio do Banco de Dados!
         localStorage.setItem("skinEquipada", skinDoCorpo);
 
         // 2. Constrói a URL para puxar a arte de corpo inteiro na pasta 'corpo_completo'
         const fullBodyImgUrl = `${linkBaseNuvem}corpo_completo/${skinDoCorpo}_full.png`;
         const fallbackFullBody = `${linkBaseNuvem}corpo_completo/aventureiro_m_full.png`;
-        
+
+        const urlPerfilAssets = 'https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/perfil/';
+        const slugEmblemaClasse = ({ cacador: 'arqueiro', aprendiz: 'guerreiro' })[infoClasse.base] || infoClasse.base;
+        const emblemaClasseUrl = `${urlPerfilAssets}classes/${slugEmblemaClasse}.png`;
+
         // ==========================================
         // 4. CONSTRUÇÃO DO HTML DAS ABAS
         // ==========================================
 
         // --- Status ---
-        let htmlStatus = `<div class="eldora-status-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px;">`;
+        const imagensStatusGitHub = {
+            attack: 'atributo_forca.png',
+            defense: 'atributo_defesa.png',
+            initiative: 'atributo_agilidade.png',
+            luck: 'atributo_sorte.png'
+        };
+        let htmlStatus = `<div class="eldora-status-grid eldora-profile-style-0ae0d5ee" >`;
         for (const key in p.status) {
             const st = p.status[key];
-            const podeUpar = p.pontos_livres > 0 ? `<button onclick="distribuirPonto('${key}')" style="background:#2ecc71; color:#000; border:none; border-radius:4px; width:24px; height:24px; font-weight:bold; cursor:pointer;">+</button>` : '';
+            const podeUpar = p.pontos_livres > 0 ? `<button onclick="distribuirPonto('${key}')" class="eldora-profile-style-72bf51c5">+</button>` : '';
+            const imagemStatus = imagensStatusGitHub[key];
+            const iconeStatus = imagemStatus
+                ? `<img src="${urlPerfilAssets}${imagemStatus}?v=20261016-2" alt="" loading="lazy">`
+                : `<svg viewBox="0 0 32 32" aria-hidden="true" focusable="false"><path d="M16 2 19.7 12.3 30 16l-10.3 3.7L16 30l-3.7-10.3L2 16l10.3-3.7L16 2Z" fill="currentColor"/></svg>`;
             htmlStatus += `
-                <div class="eldora-status-card" style="background: #1e293b; border: 1px solid #334155; padding: 10px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center;">
-                    <div><span style="font-size: 1.2em;">${st.emoji}</span> <span style="color: #cbd5e1; font-size: 0.8em; text-transform: uppercase; font-weight: bold;">${st.nome}</span></div>
-                    <div style="display: flex; align-items: center; gap: 8px;"><strong style="color: #f8fafc; font-size: 1.2em;">${st.valor}</strong>${podeUpar}</div>
+                <div class="eldora-status-card perfil-v2-status-card eldora-profile-style-31e41829" >
+                    <div class="perfil-v2-status-identidade"><span class="perfil-status-icone" aria-hidden="true">${iconeStatus}</span><span class="perfil-v2-status-nome eldora-profile-style-b3871c39">${st.nome}</span></div>
+                    <div class="eldora-profile-style-3088da11 perfil-v2-status-valor"><strong class="eldora-profile-style-51cfd0f1">${st.valor}</strong>${podeUpar}</div>
                 </div>`;
         }
+        const percentualEsquiva = Math.max(0, Math.min(100, Number(p.esquiva) || 0));
+        const percentualAtkDuplo = Math.max(0, Math.min(100, Number(p.atk_duplo) || 0));
         htmlStatus += `</div>
-            <div class="eldora-status-chances" style="margin-top: 15px; background: #1e293b; border: 1px solid #334155; padding: 10px; border-radius: 8px;">
-                <div style="color: #94a3b8; font-size: 0.7em; font-weight: bold; text-transform: uppercase; margin-bottom: 8px;">🎲 Chances Secundárias</div>
-                <div style="display: flex; justify-content: space-around; font-size: 0.9em;">
-                    <div><span style="font-size: 1.2em;">💨</span> Esquiva: <strong style="color: #38bdf8;">${p.esquiva || 0}%</strong></div>
-                    <div><span style="font-size: 1.2em;">⚔️</span> Atk Duplo: <strong style="color: #f87171;">${p.atk_duplo || 0}%</strong></div>
+            <section class="eldora-status-chances perfil-v2-chances" aria-label="Chances secundárias">
+                <div class="perfil-v2-chances-titulo">Chances secundárias</div>
+                <div class="perfil-v2-chances-grid">
+                    <article class="perfil-v2-chance-card is-dodge" aria-label="Esquiva: ${percentualEsquiva}%">
+                        <img class="perfil-v2-chance-icone" src="${urlPerfilAssets}atributo_atk_duplo.png?v=20261016-3" alt="" loading="lazy">
+                        <div class="perfil-v2-chance-conteudo">
+                            <span class="perfil-v2-chance-nome">Esquiva</span>
+                            <span class="perfil-v2-chance-descricao">Evita um golpe recebido</span>
+                            <strong class="perfil-v2-chance-valor">${percentualEsquiva}%</strong>
+                            <span class="perfil-v2-chance-trilho" aria-hidden="true"><span style="width:${percentualEsquiva}%"></span></span>
+                        </div>
+                    </article>
+                    <article class="perfil-v2-chance-card is-double" aria-label="Ataque duplo: ${percentualAtkDuplo}%">
+                        <img class="perfil-v2-chance-icone" src="${urlPerfilAssets}atribito_esquiva.png?v=20261016-3" alt="" loading="lazy">
+                        <div class="perfil-v2-chance-conteudo">
+                            <span class="perfil-v2-chance-nome">Ataque duplo</span>
+                            <span class="perfil-v2-chance-descricao">Repete o ataque</span>
+                            <strong class="perfil-v2-chance-valor">${percentualAtkDuplo}%</strong>
+                            <span class="perfil-v2-chance-trilho" aria-hidden="true"><span style="width:${percentualAtkDuplo}%"></span></span>
+                        </div>
+                    </article>
                 </div>
-            </div>`;
+            </section>`;
 
         // --- Equipamentos e Slots ---
-        const POSICOES_SLOTS = {
-            'elmo':     { top: '12%', left: '12%', transform: 'translate(-50%, -50%)' },
-            'arma':     { top: '31%', left: '12%', transform: 'translate(-50%, -50%)' },
-            'armadura': { top: '50%', left: '12%', transform: 'translate(-50%, -50%)' },
-            'luvas':    { top: '69%', left: '12%', transform: 'translate(-50%, -50%)' },
-            'tool':     { top: '88%', left: '12%', transform: 'translate(-50%, -50%)' },
-            'colar':    { top: '12%', left: '88%', transform: 'translate(-50%, -50%)' },
-            'brinco':   { top: '31%', left: '88%', transform: 'translate(-50%, -50%)' },
-            'calca':    { top: '50%', left: '88%', transform: 'translate(-50%, -50%)' },
-            'anel':     { top: '69%', left: '88%', transform: 'translate(-50%, -50%)' },
-            'botas':    { top: '88%', left: '88%', transform: 'translate(-50%, -50%)' }
-        };
-
         let htmlSlots = '';
         let htmlFerramentas = '';
 
@@ -725,20 +795,17 @@ async function carregarMeuPerfil() {
         });
 
         equipamentosCorpo.forEach(eq => {
-            const pos = POSICOES_SLOTS[eq.slot] || { top: '50%', left: '50%' };
+
             const corBorda = eq.vazio ? "#334155" : "#f59e0b";
             const corFundo = eq.vazio ? "rgba(15, 23, 42, 0.8)" : "rgba(245, 158, 11, 0.15)";
 
-            let visualItem = eq.vazio ? `<span style="font-size: 1.4em; opacity: 0.3;">${eq.emoji}</span>` : 
-            `<img data-equip-img="${eq.uid || eq.id || eq.slot}" src="/static/assets/box.png" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-block';" style="max-width: 85%; max-height: 85%; object-fit: contain; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.8));">
-            <span style="display:none; font-size: 1.8em;">${eq.icon || eq.emoji || '📦'}</span>`;
+            let visualItem = eq.vazio ? `<span class="eldora-profile-style-21853e97">${eq.emoji}</span>` :
+            `<img data-equip-img="${eq.uid || eq.id || eq.slot}" src="/static/assets/box.png" onerror="this.hidden=true; if(this.nextElementSibling){this.nextElementSibling.classList.add('eldora-image-fallback','is-visible')}" class="eldora-profile-style-008017cb">
+            <span class="eldora-profile-style-b7f7a8e4">${eq.icon || eq.emoji || '📦'}</span>`;
 
             htmlSlots += `
-                <div class="eldora-equipment-slot" data-slot="${eq.slot}" onclick="${!eq.vazio ? `abrirModalItem('${eq.slot}', 'equipado')` : ''}"
-                     style="position: absolute; ${Object.entries(pos).map(([k, v]) => `${k}:${v};`).join('')} 
-                            width: 50px; height: 50px; background: ${corFundo}; border: 2px solid ${corBorda}; 
-                            border-radius: 8px; display: flex; justify-content: center; align-items: center; 
-                            cursor: ${eq.vazio ? 'default' : 'pointer'}; box-shadow: 0 4px 8px rgba(0,0,0,0.6);">
+                <div class="eldora-equipment-slot" data-empty="${eq.vazio}" data-slot="${eq.slot}" onclick="${!eq.vazio ? `abrirModalItem('${eq.slot}', 'equipado')` : ''}"
+                     >
                     ${visualItem}
                     ${window.renderRuneSockets?.(eq) || ''}
                 </div>`;
@@ -746,12 +813,12 @@ async function carregarMeuPerfil() {
 
         if (ferramentasProfissao.length > 0) {
             htmlFerramentas = `
-                <div class="eldora-profession-tools" style="margin-top: 12px; background: #020617; border: 2px solid #334155; border-radius: 12px; padding: 10px; box-shadow: inset 0 0 20px rgba(0,0,0,0.8);">
-                    <div style="color: #facc15; font-family: 'Cinzel', serif; font-size: 0.8em; font-weight: 900; text-transform: uppercase; margin-bottom: 8px; text-align: center; letter-spacing: 1px;">
+                <div class="eldora-profession-tools eldora-profile-style-841f7e3a" >
+                    <div class="eldora-profile-style-be0a0ad8">
                         🛠️ Ferramentas de Profissão
                     </div>
 
-                    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(62px, 1fr)); gap: 8px;">
+                    <div class="eldora-profile-style-c25e3c96">
             `;
 
             ferramentasProfissao.forEach(eq => {
@@ -771,25 +838,25 @@ async function carregarMeuPerfil() {
                     const corDur = porc > 50 ? "#22c55e" : (porc > 20 ? "#eab308" : "#ef4444");
 
                     durBadge = `
-                        <div style="position:absolute; left:5px; right:5px; bottom:4px; height:4px; background:#020617; border-radius:4px; overflow:hidden; border:1px solid #111827;">
-                            <div style="width:${Math.max(0, Math.min(100, porc))}%; height:100%; background:${corDur};"></div>
+                        <div class="eldora-profile-style-b5fecb8f">
+                            <div style="--progress:${Math.max(0, Math.min(100, porc))}%;--durability-color:${corDur}"></div>
                         </div>
                     `;
                 }
 
                 const visualTool = eq.vazio
-                    ? `<span style="font-size: 1.7em; opacity: 0.35;">${eq.emoji || '🛠️'}</span>`
-                    : `<img data-equip-img="${eq.uid || eq.id || eq.slot}" src="/static/assets/box.png" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-block';" style="max-width: 78%; max-height: 72%; object-fit: contain; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.8));">
-                       <span style="display:none; font-size: 1.7em;">${eq.icon || eq.emoji || '🛠️'}</span>`;
+                    ? `<span class="eldora-profile-style-cf178804">${eq.emoji || '🛠️'}</span>`
+                    : `<img data-equip-img="${eq.uid || eq.id || eq.slot}" src="/static/assets/box.png" onerror="this.hidden=true; if(this.nextElementSibling){this.nextElementSibling.classList.add('eldora-image-fallback','is-visible')}" class="eldora-profile-style-30188eda">
+                       <span class="eldora-profile-style-950dd573">${eq.icon || eq.emoji || '🛠️'}</span>`;
 
                 htmlFerramentas += `
-                    <div class="eldora-tool-slot" onclick="${!eq.vazio ? `abrirModalItem('${eq.slot}', 'equipado')` : ''}"
+                    <div class="eldora-tool-slot" data-empty="${eq.vazio}" onclick="${!eq.vazio ? `abrirModalItem('${eq.slot}', 'equipado')` : ''}"
                          title="${eq.nome || nomeProf}"
-                         style="position: relative; height: 62px; background: ${corFundo}; border: 2px solid ${corBorda}; border-radius: 9px; display: flex; justify-content: center; align-items: center; cursor: ${eq.vazio ? 'default' : 'pointer'}; box-shadow: 0 4px 8px rgba(0,0,0,0.5);">
-                        
+                         >
+
                         ${visualTool}
 
-                        <div style="position:absolute; top:-6px; right:-6px; background:#0f172a; color:#facc15; border:1px solid #475569; border-radius:7px; padding:1px 4px; font-size:0.55em; font-weight:900;">
+                        <div class="eldora-profile-style-adecf77c">
                             ${nomeProf.substring(0, 3)}
                         </div>
 
@@ -806,94 +873,107 @@ async function carregarMeuPerfil() {
 
         // Aba Equipamentos Visual com Corpo Completo no Fundo
         const htmlEquips = `
-            <div class="eldora-equipment-panel" style="margin-top: 15px;">
-                <div class="eldora-equipment-stage" style="position: relative; width: 100%; height: 420px; background: #020617; border-radius: 12px; border: 2px solid #334155; overflow: hidden; box-shadow: inset 0 0 30px rgba(0,0,0,0.9);">
-                    <div class="eldora-equipment-backdrop" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; opacity: 0.4;">
-                        <img src="${bannerRawUrl}" onerror="this.style.display='none'" style="width: 100%; height: 100%; object-fit: cover;">
+            <div class="eldora-equipment-panel eldora-profile-style-b62ee557" >
+                <div class="eldora-equipment-stage eldora-profile-style-ff9781f7" >
+                    <div class="eldora-equipment-backdrop eldora-profile-style-83ad1f84" >
+                        <img src="${bannerRawUrl}" onerror="this.hidden=true" class="eldora-profile-style-4a466668">
                     </div>
-                    <div class="eldora-equipment-avatar" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 70%; height: 95%; z-index: 1; display: flex; justify-content: center; align-items: center; opacity: 0.7;">
-                        <img src="${fullBodyImgUrl}" onerror="this.src='${fallbackFullBody}'; this.onerror=null;" style="width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0px 10px 15px rgba(0,0,0,0.9)); pointer-events: none;">
+                    <div class="eldora-equipment-avatar eldora-profile-style-4ec5f851" >
+                        <img src="${fullBodyImgUrl}" onerror="this.src='${fallbackFullBody}'; this.onerror=null;" class="eldora-profile-style-918da39f">
                     </div>
-                    <div class="eldora-equipment-slots" style="position: relative; width: 100%; height: 100%; z-index: 2;">${htmlSlots}</div>
+                    <div class="eldora-equipment-slots eldora-profile-style-d9b56f37" >${htmlSlots}</div>
                 </div>
 
-                <button class="eldora-companion-button" type="button" onclick="window.abrirCodiceHunter().then(() => window.abrirCompanheiros())" style="display:block;width:100%;min-height:60px;margin:12px 0;padding:12px;background:#172231;border:1px solid #b99752;border-radius:12px;color:#ecd08c;text-align:left;cursor:pointer;">
-                    🐾 Companheiro<br><span style="font-size:12px;color:#cbd5e1;">${p.companion ? `${p.companion.icon} ${p.companion.name} · ${p.companion.form} · Nv. ${p.companion.level}` : 'Nenhum equipado · Abrir Bestiário'}</span>
+                <button class="eldora-companion-button eldora-profile-style-ca6eb74e" type="button" onclick="window.abrirCodiceHunter().then(() => window.abrirCompanheiros())" >
+                    🐾 Companheiro<br><span class="eldora-profile-style-e18a3df1">${p.companion ? `${p.companion.icon} ${p.companion.name} · ${p.companion.form} · Nv. ${p.companion.level}` : 'Nenhum equipado · Abrir Bestiário'}</span>
                 </button>
                 ${htmlFerramentas}
             </div>`;
 
         // --- Inventário ---
         let htmlInv = `
-            <div class="eldora-inventory-filters" style="display: flex; gap: 5px; margin-top: 15px; margin-bottom: 15px; overflow-x: auto; padding-bottom: 5px;">
-                <button class="eldora-inventory-filter active" onclick="filtrarMochila('todos')" id="btn-filtro-todos" style="flex: 1; padding: 6px; background: #3b82f6; color: #fff; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 0.75em;">Todos</button>
-                <button class="eldora-inventory-filter" onclick="filtrarMochila('equips')" id="btn-filtro-equips" style="flex: 1; padding: 6px; background: #1e293b; color: #94a3b8; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 0.75em;">Equips</button>
-                <button class="eldora-inventory-filter" onclick="filtrarMochila('materiais')" id="btn-filtro-materiais" style="flex: 1; padding: 6px; background: #1e293b; color: #94a3b8; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 0.75em;">Materiais</button>
-                <button class="eldora-inventory-filter" onclick="filtrarMochila('usaveis')" id="btn-filtro-usaveis" style="flex: 1; padding: 6px; background: #1e293b; color: #94a3b8; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 0.75em;">Usáveis</button>
+            <div class="eldora-inventory-filters eldora-profile-style-494596d6" >
+                <button class="eldora-inventory-filter active eldora-profile-style-2cadcdff" onclick="filtrarMochila('todos')" id="btn-filtro-todos" >Todos</button>
+                <button class="eldora-inventory-filter eldora-profile-style-9b604a42" onclick="filtrarMochila('equips')" id="btn-filtro-equips" >Equips</button>
+                <button class="eldora-inventory-filter eldora-profile-style-9b604a42" onclick="filtrarMochila('materiais')" id="btn-filtro-materiais" >Materiais</button>
+                <button class="eldora-inventory-filter eldora-profile-style-9b604a42" onclick="filtrarMochila('usaveis')" id="btn-filtro-usaveis" >Usáveis</button>
             </div>
-            <div id="grid-mochila" class="eldora-inventory-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); gap: 8px;"></div>
+            <div id="grid-mochila" class="eldora-inventory-grid eldora-profile-style-5bf71092" ></div>
         `;
 
         // ==========================================
         // 5. INJEÇÃO FINAL NO ECRÃ
         // ==========================================
         conteudo.innerHTML = `
-            <section class="eldora-profile-hero" style="background-image: ${bannerImgCss}; background-size: cover; background-position: center; position: relative; width: 100%; height: 350px; border-radius: 12px; border: 2px solid #334155; overflow: hidden; box-shadow: inset 0 0 50px rgba(0,0,0,0.9); margin-bottom: 15px;">
-                <div class="eldora-profile-hero-shade" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(0deg, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.4) 50%, rgba(0,0,0,0.6) 100%); z-index: 1;"></div>
-                <img class="eldora-profile-hero-avatar" src="${fullBodyImgUrl}" onerror="this.src='${fallbackFullBody}'; this.onerror=null;" style="position: absolute; bottom: -5px; left: 50%; transform: translateX(-50%); height: 95%; width: auto; object-fit: contain; z-index: 2; filter: drop-shadow(0 0 15px rgba(0,0,0,0.9)); pointer-events: none;">
-                <div class="eldora-profile-hero-info" style="position: absolute; bottom: 20px; right: 20px; z-index: 3; text-align: right;">
-                    <p class="eldora-profile-kicker">HERÓI DE ELDORA</p>
-                    <h2>${p.nome}</h2>
-                    <div class="eldora-profile-classline">
-                        <span class="eldora-profile-class">${infoClasse.emoji} ${p.classe || infoClasse.nome}</span>
-                        <span class="eldora-profile-level">Nível ${p.level}</span>
-                    </div>
-                    <button class="eldora-profile-edit" onclick="window.perfilVisual.renderizarEdicao()">⚙️ Editar visual</button>
+            <section class="eldora-profile-hero perfil-v2-hero" aria-label="Perfil do herói">
+                <div class="eldora-profile-hero-shade perfil-v2-sombra eldora-profile-style-c58de097" aria-hidden="true"></div>
+                <img class="eldora-profile-hero-avatar perfil-v2-personagem eldora-profile-style-4ffcc85c" src="${fullBodyImgUrl}" alt="${p.classe || infoClasse.nome}" onerror="this.src='${fallbackFullBody}'; this.onerror=null;">
+                <div class="eldora-profile-hero-info perfil-v2-identidade eldora-profile-style-93b71188">
+                    <h2 class="perfil-v2-nome">${p.nome}</h2>
+                    <img class="perfil-v2-emblema-classe" src="${emblemaClasseUrl}" alt="${p.classe || infoClasse.nome}" onerror="this.hidden=true;this.nextElementSibling.style.display='inline-flex';">
+                    <span class="perfil-v2-classe-fallback" style="display:none">${infoClasse.emoji} ${p.classe || infoClasse.nome}</span>
+                    <span class="perfil-v2-nivel">NÍVEL ${p.level}</span>
+                </div>
+                <button class="eldora-profile-edit perfil-v2-editar" type="button" onclick="window.perfilVisual.renderizarEdicao()">
+                    <span aria-hidden="true">⚙</span> EDITAR VISUAL
+                </button>
+            </section>
+
+            <section class="eldora-profile-resources perfil-v2-recursos" aria-label="Recursos do personagem">
+                <div class="eldora-profile-resource resource-hp perfil-v2-recurso perfil-v2-hp">
+                    <img src="${urlPerfilAssets}hp.png" alt="">
+                    <div><span>HP</span><strong>${p.hp_atual}<small> / ${p.hp_max}</small></strong></div>
+                </div>
+                <div class="eldora-profile-resource resource-mp perfil-v2-recurso perfil-v2-mana">
+                    <img src="${urlPerfilAssets}mana.png" alt="">
+                    <div><span>MP</span><strong>${p.mp_atual}<small> / ${p.mp_max}</small></strong></div>
+                </div>
+                <div class="eldora-profile-resource resource-gold perfil-v2-recurso perfil-v2-ouro">
+                    <img src="${urlPerfilAssets}ouro.png" alt="">
+                    <div><span>OURO</span><strong>${p.gold.toLocaleString('pt-BR')}</strong></div>
+                </div>
+                <div class="eldora-profile-resource resource-gems perfil-v2-recurso perfil-v2-gemas">
+                    <img src="${urlPerfilAssets}gemas.png" alt="">
+                    <div><span>GEMAS</span><strong>${p.gems.toLocaleString('pt-BR')}</strong></div>
                 </div>
             </section>
 
-            <section class="eldora-profile-resources" aria-label="Recursos do personagem">
-                <div class="eldora-profile-resource resource-hp">
-                    <div class="eldora-resource-heading"><span>❤️ VIDA</span><b>${p.hp_atual} <small>/ ${p.hp_max}</small></b></div>
-                    <div class="eldora-resource-track"><i style="width:${percentHP}%"></i></div>
+            <section class="eldora-profile-xp perfil-v2-experiencia" aria-label="Experiência do personagem">
+                <span class="perfil-v2-icone-exp" aria-label="EXP">EXP</span>
+                <div class="perfil-v2-exp-conteudo">
+                    <div class="perfil-v2-exp-cabecalho"><strong>Experiência</strong><span>${p.xp.toLocaleString('pt-BR')} / ${p.xp_max.toLocaleString('pt-BR')}</span></div>
+                    <div class="perfil-v2-exp-trilho"><i style="width:${percentXP}%;"></i></div>
+                    <small class="perfil-v2-exp-percentual">${Math.floor(percentXP)}% até o próximo nível</small>
                 </div>
-                <div class="eldora-profile-resource resource-mp">
-                    <div class="eldora-resource-heading"><span>💧 MANA</span><b>${p.mp_atual} <small>/ ${p.mp_max}</small></b></div>
-                    <div class="eldora-resource-track"><i style="width:${percentMP}%"></i></div>
-                </div>
-                <div class="eldora-profile-resource resource-gold"><span>💰 OURO</span><b>${p.gold.toLocaleString('pt-BR')}</b></div>
-                <div class="eldora-profile-resource resource-gems"><span>💎 GEMAS</span><b>${p.gems.toLocaleString('pt-BR')}</b></div>
-            </section>
-
-            <section class="eldora-profile-xp">
-                <div class="eldora-xp-heading"><span>✦ Experiência</span><b>${p.xp.toLocaleString('pt-BR')} <small>/ ${p.xp_max.toLocaleString('pt-BR')} XP</small></b></div>
-                <div class="eldora-xp-track"><i style="width:${percentXP}%"></i></div>
             </section>
 
             <div class="eldora-profile-professions">${htmlProfissao}</div>
             <nav class="eldora-profile-tabs" aria-label="Abas do perfil">
-                <button onclick="alternarAbaPerfil('status')" id="btn-perf-status" class="eldora-profile-tab is-active">⚔️ Atributos ${p.pontos_livres > 0 ? `<span class="eldora-points-badge">${p.pontos_livres}</span>` : ''}</button>
-                <button onclick="alternarAbaPerfil('equips')" id="btn-perf-equips" class="eldora-profile-tab">🛡️ Equipamentos</button>
-                <button onclick="alternarAbaPerfil('inv')" id="btn-perf-inv" class="eldora-profile-tab">🎒 Mochila</button>
-                <button onclick="alternarAbaPerfil('magias')" id="btn-perf-magias" class="eldora-profile-tab">✨ Magias</button>
+                <button onclick="alternarAbaPerfil('status')" id="btn-perf-status" class="eldora-profile-tab is-active"><img src="${urlPerfilAssets}aba_atributos.png?v=20261016-1" alt="" loading="lazy"><span>Atributos</span>${p.pontos_livres > 0 ? `<span class="eldora-points-badge">${p.pontos_livres}</span>` : ''}</button>
+                <button onclick="alternarAbaPerfil('equips')" id="btn-perf-equips" class="eldora-profile-tab"><img src="${urlPerfilAssets}aba_equipamentos.png?v=20261016-1" alt="" loading="lazy"><span>Equips</span></button>
+                <button onclick="alternarAbaPerfil('inv')" id="btn-perf-inv" class="eldora-profile-tab"><img src="${urlPerfilAssets}aba_mochila.png?v=20261016-1" alt="" loading="lazy"><span>Mochila</span></button>
+                <button onclick="alternarAbaPerfil('magias')" id="btn-perf-magias" class="eldora-profile-tab"><img src="${urlPerfilAssets}aba_magias.png?v=20261016-1" alt="" loading="lazy"><span>Magias</span></button>
             </nav>
 
-            <section id="conteudo-perf-status" class="eldora-profile-pane eldora-status-pane" style="display: block;">
+            <section id="conteudo-perf-status" class="eldora-profile-pane eldora-status-pane eldora-profile-style-048b9a2b" >
                 <header class="eldora-pane-heading"><span>PERSONAGEM</span><h3>Atributos do herói</h3></header>
                 ${htmlStatus}
             </section>
-            <section id="conteudo-perf-equips" class="eldora-profile-pane eldora-equipment-pane" style="display: none;">
+            <section id="conteudo-perf-equips" class="eldora-profile-pane eldora-equipment-pane eldora-profile-style-f2892a2e" >
                 <header class="eldora-pane-heading"><span>PREPARAÇÃO</span><h3>Equipamentos</h3></header>
                 ${htmlEquips}
             </section>
-            <section id="conteudo-perf-inv" class="eldora-profile-pane eldora-inventory-pane" style="display: none;">
+            <section id="conteudo-perf-inv" class="eldora-profile-pane eldora-inventory-pane eldora-profile-style-f2892a2e" >
                 <header class="eldora-pane-heading"><span>ITENS DO HERÓI</span><h3>Mochila</h3></header>
                 ${htmlInv}
             </section>
-            <section id="conteudo-perf-magias" class="eldora-profile-pane eldora-spells-pane" style="display: none;">
+            <section id="conteudo-perf-magias" class="eldora-profile-pane eldora-spells-pane eldora-profile-style-f2892a2e" >
                 <header class="eldora-pane-heading"><span>GRIMÓRIO</span><h3>Magias</h3></header>
             </section>
         `;
+        const heroProfile = conteudo.querySelector(".eldora-profile-hero");
+        if (heroProfile) heroProfile.style.setProperty("--eldora-profile-banner", bannerImgCss);
+
         setTimeout(() => {
             document.querySelectorAll("[data-equip-img]").forEach(img => {
                 const uid = img.getAttribute("data-equip-img");
@@ -903,14 +983,14 @@ async function carregarMeuPerfil() {
                 );
 
                 if (eq && typeof window.aplicarImagemItemEldora === "function") {
-                    window.aplicarImagemItemEldora(img, eq);
+                    window.aplicarImagemPerfilEldora(img, eq);
                 }
             });
         }, 0);
-        
+
         document.getElementById('perfil-carregando').style.display = 'none';
         conteudo.style.display = 'block';
-        
+
         // Mantém a aba atual. Se for primeira abertura, começa em Atributos.
         const abaInicialPerfil = window.perfilAbaAtual || 'status';
         alternarAbaPerfil(abaInicialPerfil);
@@ -929,36 +1009,31 @@ async function carregarMeuPerfil() {
 window.alternarAbaPerfil = function(abaID) {
     window.perfilAbaAtual = abaID || 'status';
 
-    document.getElementById('conteudo-perf-status').style.display = 'none';
-    document.getElementById('conteudo-perf-equips').style.display = 'none';
-    document.getElementById('conteudo-perf-inv').style.display = 'none';
-    if(document.getElementById('conteudo-perf-skins')) document.getElementById('conteudo-perf-skins').style.display = 'none';
-    if(document.getElementById('conteudo-perf-magias')) document.getElementById('conteudo-perf-magias').style.display = 'none';
-    
+    ['status', 'equips', 'inv', 'skins', 'magias'].forEach(id => {
+        const pane = document.getElementById('conteudo-perf-' + id);
+        if (pane) pane.classList.remove('is-active');
+    });
+
     ['btn-perf-status', 'btn-perf-equips', 'btn-perf-inv', 'btn-perf-skins', 'btn-perf-magias'].forEach(b => {
         let btn = document.getElementById(b);
         if(btn) {
             btn.classList.remove('is-active');
-            btn.style.background = 'transparent';
-            btn.style.color = '#94a3b8';
         }
     });
 
     let abaConteudo = document.getElementById(`conteudo-perf-${abaID}`);
-    if(abaConteudo) abaConteudo.style.display = 'block';
-    
+    if (abaConteudo) abaConteudo.classList.add('is-active');
+
     let abaBotao = document.getElementById(`btn-perf-${abaID}`);
     if(abaBotao) {
         abaBotao.classList.add('is-active');
-        abaBotao.style.background = '#1e293b';
-        abaBotao.style.color = '#fff';
     }
 
     if (abaID === 'equips' && window._avatarAtualEldora) {
         const imgCentro = document.getElementById('avatar-equip-tab');
         if (imgCentro) imgCentro.src = window._avatarAtualEldora;
     }
-    
+
     if (abaID === 'skins') carregarMenuSkins();
     if (abaID === 'magias') carregarMenuMagias();
     if (abaID === 'inv') filtrarMochila(window.perfilFiltroMochilaAtual || 'todos');
@@ -970,25 +1045,25 @@ window.carregarMenuSkins = function() {
     const container = document.getElementById('conteudo-perf-skins');
     if (!p || !container) return;
 
-    let html = `<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">`;
+    let html = `<div class="eldora-profile-style-90d64983">`;
     const isEquipadaPadrao = !p.equipped_skin;
     html += `
-        <div onclick="equiparNovaSkin(null)" style="background:#1e293b; padding:10px; border-radius:8px; border:1px solid ${isEquipadaPadrao ? '#f1c40f' : '#334155'}; text-align:center; cursor:pointer;">
-            <div style="font-size:1.5em; margin-bottom:5px;">👤</div>
-            <div style="font-size:0.7em; color:#fff;">Padrão</div>
+        <div onclick="equiparNovaSkin(null)" class="eldora-skin-card ${isEquipadaPadrao ? 'is-equipped' : ''}">
+            <div class="eldora-profile-style-c11effc7">👤</div>
+            <div class="eldora-profile-style-c1b8e467">Padrão</div>
         </div>`;
 
     if (p.skins_disponiveis && p.skins_disponiveis.length > 0) {
         p.skins_disponiveis.forEach(skin => {
             const isEquipada = p.equipped_skin === skin.id;
             html += `
-                <div onclick="equiparNovaSkin('${skin.id}')" style="background:#1e293b; padding:10px; border-radius:8px; border:1px solid ${isEquipada ? '#f1c40f' : '#334155'}; text-align:center; cursor:pointer;">
-                    <div style="font-size:1.5em; margin-bottom:5px;">🎨</div>
-                    <div style="font-size:0.7em; color:#fff;">${skin.nome}</div>
+                <div onclick="equiparNovaSkin('${skin.id}')" class="eldora-skin-card ${isEquipada ? 'is-equipped' : ''}">
+                    <div class="eldora-profile-style-c11effc7">🎨</div>
+                    <div class="eldora-profile-style-c1b8e467">${skin.nome}</div>
                 </div>`;
         });
     } else {
-        html += `<div style="grid-column: 1/-1; text-align: center; color: #64748b; font-size: 0.8em; margin-top: 10px;">Nenhuma aparência extra encontrada.</div>`;
+        html += `<div class="eldora-profile-style-ad7f0944">Nenhuma aparência extra encontrada.</div>`;
     }
     container.innerHTML = html + `</div>`;
 }
@@ -1004,7 +1079,7 @@ window.equiparNovaSkin = async function(skinId) {
         });
         const data = await res.json();
         if (data.sucesso) {
-            await carregarMeuPerfil(); 
+            await carregarMeuPerfil();
             setTimeout(() => alternarAbaPerfil('skins'), 200);
         } else {
             window.avisoEldora("Erro: " + data.erro);
@@ -1018,9 +1093,9 @@ window.equiparNovaSkin = async function(skinId) {
 window.carregarMenuMagias = async function() {
     const charId = localStorage.getItem("jogadorEldoraID");
     const container = document.getElementById('conteudo-perf-magias');
-    
+
     if (!container) return;
-    container.innerHTML = `<p style="text-align: center; color: #94a3b8; padding: 20px;">A abrir o Grimório...</p>`;
+    container.innerHTML = `<p class="eldora-profile-style-28886218">A abrir o Grimório...</p>`;
 
     try {
         const res = await fetch(`/api/personagem/${charId}?t=${new Date().getTime()}`);
@@ -1030,22 +1105,22 @@ window.carregarMenuMagias = async function() {
         window._skillsEquipadasTemp = pdata.skills_equipadas || {};
         const skillsPossuidas = pdata.skills_desbloqueadas || {};
 
-        let html = `<div style="padding: 10px;">
-                        <h4 style="color:#facc15; text-align:center; margin-bottom:15px; font-family: 'Cinzel', serif; text-shadow: 0 0 10px rgba(250, 204, 21, 0.3);">Grimório de Eldora</h4>`;
+        let html = `<div class="eldora-profile-style-801160c3">
+                        <h4 class="eldora-profile-style-593914d0">Grimório de Eldora</h4>`;
 
         if (Object.keys(skillsPossuidas).length === 0) {
-            html += `<p style="text-align: center; color: #64748b; font-style: italic; margin-top: 30px;">Nenhuma habilidade aprendida ainda. Fale com a Arquimaga Selene no nível 17.</p>`;
+            html += `<p class="eldora-profile-style-111cc8c9">Nenhuma habilidade aprendida ainda. Fale com a Arquimaga Selene no nível 17.</p>`;
         } else {
-            html += `<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(65px, 1fr)); gap: 12px;">`;
-            
+            html += `<div class="eldora-profile-style-6b96c2c2">`;
+
             for (const [skillId, skillInst] of Object.entries(skillsPossuidas)) {
                 const infoBase = window._skillsDataTemp[skillId] || {};
                 const nomeIcone = infoBase.icon || 'default_skill';
-                
+
                 // 🌐 CAMINHO EXATO DO GITHUB ATUALIZADO
                 const iconPath = `https://raw.githubusercontent.com/Eldorabotpy/static-img/refs/heads/main/assets/sprites/skills/${nomeIcone}.png`;
                 const fallbackIcon = `https://raw.githubusercontent.com/Eldorabotpy/static-img/refs/heads/main/assets/sprites/skills/default_skill.png`;
-                
+
                 let slotEquipado = null;
                 for (let i = 1; i <= 5; i++) {
                     if (window._skillsEquipadasTemp[`slot_${i}`] === skillId) slotEquipado = i;
@@ -1055,23 +1130,23 @@ window.carregarMenuMagias = async function() {
                 const sombra = slotEquipado ? '0 0 12px rgba(139, 92, 246, 0.5)' : 'none';
 
                 html += `
-                    <div onclick="window.abrirModalSkillDetalhes('${skillId}', window._skillsDataTemp['${skillId}'], ${slotEquipado || 'null'})" 
-                         style="background: rgba(15, 23, 42, 0.9); border: 2px solid ${corBorda}; border-radius: 10px; aspect-ratio: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; cursor: pointer; position: relative; box-shadow: ${sombra}; transition: transform 0.1s;">
-                        
-                        ${slotEquipado ? `<span style="position: absolute; bottom: -5px; right: -5px; background: #8b5cf6; color: #fff; font-size: 0.7em; padding: 2px 6px; border-radius: 8px; font-weight: bold; border: 2px solid #0f172a; z-index: 5;">S${slotEquipado}</span>` : ""}
-                        
-                        <div style="width: 42px; height: 42px; border-radius: 50%; overflow: hidden; background: #000; border: 1px solid #1e293b;">
-                            <img src="${iconPath}" onerror="this.src='${fallbackIcon}'" style="width: 100%; height: 100%; object-fit: cover;">
+                    <div onclick="window.abrirModalSkillDetalhes('${skillId}', window._skillsDataTemp['${skillId}'], ${slotEquipado || 'null'})"
+                         class="eldora-spell-card ${slotEquipado ? 'is-equipped' : ''}">
+
+                        ${slotEquipado ? `<span class="eldora-profile-style-15475bc2">S${slotEquipado}</span>` : ""}
+
+                        <div class="eldora-profile-style-29af6337">
+                            <img src="${iconPath}" onerror="this.src='${fallbackIcon}'" class="eldora-profile-style-4a466668">
                         </div>
                     </div>`;
             }
             html += `</div>
-                     <p style="text-align:center; font-size:0.7em; color:#94a3b8; margin-top:20px; letter-spacing: 0.5px;">Clique para equipar nos slots de combate</p>`;
+                     <p class="eldora-profile-style-84043008">Clique para equipar nos slots de combate</p>`;
         }
-        
+
         container.innerHTML = html + `</div>`;
     } catch (e) {
-        container.innerHTML = `<p style="text-align: center; color: #ef4444;">Erro ao canalizar o Grimório.</p>`;
+        container.innerHTML = `<p class="eldora-profile-style-f48620d5">Erro ao canalizar o Grimório.</p>`;
     }
 }
 
@@ -1082,12 +1157,12 @@ window.abrirModalSkillDetalhes = function(skillId, infoDb, slotAtual) {
 
     modal = document.createElement('div');
     modal.id = 'modal-skill-detalhes';
-    modal.style = "position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:rgba(15, 23, 42, 0.98); border:2px solid #8b5cf6; border-radius:12px; padding:20px; z-index:100000; width:320px; box-shadow:0 0 30px rgba(0,0,0,0.8); display:flex; flex-direction:column; gap:15px; color:#fff;";
+    modal.classList.add('eldora-skill-modal');
     document.body.appendChild(modal);
 
     const magiaExiste = infoDb && infoDb.display_name;
     const nome = magiaExiste ? infoDb.display_name : '⚠️ Magia Não Encontrada';
-    
+
     let desc = magiaExiste ? infoDb.description : `ID "${skillId}" não encontrado no arquivo skills.py.`;
     let mana = 0;
     let cooldown = 0;
@@ -1095,7 +1170,7 @@ window.abrirModalSkillDetalhes = function(skillId, infoDb, slotAtual) {
     if (magiaExiste) {
         mana = infoDb.mana_cost || infoDb.mp_cost || 0;
         cooldown = infoDb.cooldown_turns || 0;
-        
+
         if (infoDb.rarity_effects && infoDb.rarity_effects.comum) {
             mana = infoDb.rarity_effects.comum.mana_cost || infoDb.rarity_effects.comum.mp_cost || mana;
             if (infoDb.rarity_effects.comum.effects && infoDb.rarity_effects.comum.effects.cooldown_turns !== undefined) {
@@ -1109,32 +1184,32 @@ window.abrirModalSkillDetalhes = function(skillId, infoDb, slotAtual) {
 
     // 🛠️ O SEGREDO ESTAVA AQUI: Puxando o nome igualzinho ao primeiro menu
     const nomeIconeModal = magiaExiste && infoDb.icon ? infoDb.icon : 'default_skill';
-    
+
     // 🌐 CAMINHO EXATO DO GITHUB
     const imgUrlModal = `https://raw.githubusercontent.com/Eldorabotpy/static-img/refs/heads/main/assets/sprites/skills/${nomeIconeModal}.png`;
     const fallbackIconModal = `https://raw.githubusercontent.com/Eldorabotpy/static-img/refs/heads/main/assets/sprites/skills/default_skill.png`;
 
     let areaBotoes = '';
-    
+
     if (slotAtual) {
-        areaBotoes = `<button onclick="window.processarEquiparSkill('', ${slotAtual})" style="width:100%; padding:10px; background:#ef4444; color:white; border:none; border-radius:8px; font-weight:bold; cursor:pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">Desequipar (Slot ${slotAtual})</button>`;
+        areaBotoes = `<button class="eldora-skill-action is-remove" onclick="window.processarEquiparSkill('', ${slotAtual})">Desequipar (Slot ${slotAtual})</button>`;
     } else {
-        areaBotoes = `<button onclick="window.iniciarEquiparSkill('${skillId}')" style="width:100%; padding:10px; background:#10b981; color:white; border:none; border-radius:8px; font-weight:bold; cursor:pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.3);" ${!magiaExiste ? 'disabled style="opacity:0.5;"' : ''}>Equipar</button>`;
+        areaBotoes = `<button class="eldora-skill-action is-equip" onclick="window.iniciarEquiparSkill('${skillId}')" ${!magiaExiste ? 'disabled' : ''}>Equipar</button>`;
     }
 
     // Adicionei this.onerror=null para evitar que ele quebre de vez se o fallback também falhar
     modal.innerHTML = `
-        <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-            <div style="display:flex; gap:12px; align-items:center;">
-                <img src="${imgUrlModal}" onerror="this.onerror=null; this.src='${fallbackIconModal}'" style="width:54px; height:54px; border-radius:50%; border:2px solid #8b5cf6; object-fit:cover; background: #000;">
+        <div class="eldora-profile-style-3395e2db">
+            <div class="eldora-profile-style-8894607e">
+                <img src="${imgUrlModal}" onerror="this.onerror=null; this.src='${fallbackIconModal}'" class="eldora-profile-style-2dbd2893">
                 <div>
-                    <h3 style="margin:0; font-size:16px; color:${magiaExiste ? '#c4b5fd' : '#ef4444'}; font-family:'Cinzel', serif;">${nome}</h3>
-                    <div style="font-size:12px; color:#94a3b8; margin-top:4px;">Mana: <span style="color:#60a5fa">${mana}</span> | Recarga: <span style="color:#f87171">${cooldown} turnos</span></div>
+                    <h3 class="eldora-skill-modal-title ${magiaExiste ? '' : 'is-unavailable'}">${nome}</h3>
+                    <div class="eldora-profile-style-2ed4b0fd">Mana: <span class="eldora-profile-style-c73cb885">${mana}</span> | Recarga: <span class="eldora-profile-style-e85027a3">${cooldown} turnos</span></div>
                 </div>
             </div>
-            <div onclick="document.getElementById('modal-skill-detalhes').remove()" style="cursor:pointer; color:#ef4444; font-weight:bold; font-size:20px; line-height:1;">×</div>
+            <div onclick="document.getElementById('modal-skill-detalhes').remove()" class="eldora-profile-style-bc4392d5">×</div>
         </div>
-        <div style="font-size:13px; color:#cbd5e1; background:#1e293b; padding:12px; border-radius:8px; border:1px solid #334155;">
+        <div class="eldora-profile-style-bf3d6245">
             ${desc}
         </div>
         <div id="area-botoes-skill">
@@ -1154,7 +1229,7 @@ window.equiparSkillPerfil = async function(skillId, slotNum) {
             body: JSON.stringify({ user_id: charId, skill_id: skillId, slot: slotNum })
         });
         const data = await res.json();
-        if (data.sucesso) { carregarMenuMagias(); } 
+        if (data.sucesso) { carregarMenuMagias(); }
         else { window.avisoEldora("Erro: " + data.erro); }
     } catch(e) {}
 }
@@ -1166,7 +1241,7 @@ window.filtrarMochila = function(filtro) {
     filtro = window.perfilFiltroMochilaAtual;
 
     if (!window.perfilDadosGlobais || !window.perfilDadosGlobais.inventario) return;
-    
+
     const inv = window.perfilDadosGlobais.inventario;
     const grid = document.getElementById('grid-mochila');
     if (!grid) return;
@@ -1176,18 +1251,16 @@ window.filtrarMochila = function(filtro) {
         const btn = document.getElementById(`btn-filtro-${f}`);
         if (btn) {
             btn.classList.toggle('is-active', f === filtro);
-            btn.style.background = (f === filtro) ? '#3b82f6' : '#1e293b';
-            btn.style.color = (f === filtro) ? '#fff' : '#94a3b8';
         }
     });
 
     // 🛡️ Filtro Robusto (lendo a propriedade padronizada que criamos)
     let filtrados = inv;
-    
+
     if (filtro === 'equips') {
         filtrados = inv.filter(i => [
-            'equipamento', 'weapon', 'armor', 'helmet', 'boots', 'bota', 'ring', 'anel', 'necklace', 'colar', 'earring', 'brinco', 
-            'tool', 'ferramenta', 'arma', 'armadura', 'elmo', 'lenhador', 'minerador', 'colhedor', 'esfolador', 
+            'equipamento', 'weapon', 'armor', 'helmet', 'boots', 'bota', 'ring', 'anel', 'necklace', 'colar', 'earring', 'brinco',
+            'tool', 'ferramenta', 'arma', 'armadura', 'elmo', 'lenhador', 'minerador', 'colhedor', 'esfolador',
             'ferreiro', 'armeiro', 'alfaiate', 'joalheiro', 'curtidor'
         ].includes((i.tipo || i.type || '').toLowerCase()));
 
@@ -1207,38 +1280,48 @@ window.filtrarMochila = function(filtro) {
     grid.innerHTML = '';
 
     if (filtrados.length === 0) {
-        grid.innerHTML = `<div style="grid-column: 1 / -1; text-align: center; padding: 20px; color: #64748b;">Mochila vazia nesta categoria.</div>`;
+        grid.innerHTML = `<div class="eldora-profile-style-21776fc0">Mochila vazia nesta categoria.</div>`;
         return;
     }
 
     // Pega o caminho base do GitHub
     const linkBaseNuvem = window.CATALOGO_SISTEMA ? "https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/" : "/static/assets/";
+    const coresRaridade = {
+        comum: '#94a3b8', common: '#94a3b8',
+        incomum: '#22c55e', uncommon: '#22c55e',
+        raro: '#3b82f6', rare: '#3b82f6',
+        epico: '#a855f7', epic: '#a855f7',
+        lendario: '#eab308', legendary: '#eab308',
+        mitico: '#ef4444', mythic: '#ef4444',
+        divino: '#f0d48e', divine: '#f0d48e'
+    };
 
     filtrados.forEach(item => {
         // Envia o item inteiro para a bússola decidir
 
-        
-        const coresRaridade = {'comum': '#94a3b8', 'incomum': '#22c55e', 'raro': '#3b82f6', 'epico': '#a855f7', 'lendario': '#eab308', 'mitico': '#ef4444'};
-        const corBorda = coresRaridade[(item.raridade || 'comum').toLowerCase()] || '#334155';
-        
+
+        const raridade = String(item.raridade || 'comum').trim().toLowerCase()
+            .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        const corBorda = coresRaridade[raridade] || '#334155';
+
         const slotHtml = `
             <div class="eldora-item-slot" onclick="abrirModalItem('${item.id}', 'mochila')"
-                 style="position: relative; width: 100%; aspect-ratio: 1; background: rgba(15, 23, 42, 0.8); border: 2px solid ${corBorda}; border-radius: 8px; display: flex; justify-content: center; align-items: center; cursor: pointer; box-shadow: inset 0 0 15px rgba(0,0,0,0.8), 0 2px 4px rgba(0,0,0,0.4); transition: transform 0.1s;">
-                
-                <img data-item-img="${item.id}" src="/static/assets/box.png" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-block';" style="max-width: 80%; max-height: 80%; object-fit: contain; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.9));">
-                <span style="display:none; font-size: 2em; opacity: 0.8;">${item.emoji || '📦'}</span>
-                
-                <div class="eldora-item-quantity" style="position: absolute; bottom: -5px; right: -5px; background: #000; color: #fff; font-size: 0.7em; font-weight: bold; padding: 2px 6px; border-radius: 10px; border: 1px solid #333; box-shadow: 0 2px 4px rgba(0,0,0,0.5);">
+                 style="--rarity-border:${corBorda}">
+
+                <img data-item-img="${item.id}" src="/static/assets/box.png" onerror="this.hidden=true; if(this.nextElementSibling){this.nextElementSibling.classList.add('eldora-image-fallback','is-visible')}" class="eldora-profile-style-c8590c2b">
+                <span class="eldora-profile-style-e6b19889">${item.emoji || '📦'}</span>
+
+                <div class="eldora-item-quantity eldora-profile-style-6a5a7d0d" >
                     x${item.qtd || item.quantidade || 1}
                 </div>
-                
+
                 ${window.renderRuneSockets?.(item) || ''}
-                ${item.refino > 0 ? `<div class="eldora-item-refinement" style="position: absolute; top: -5px; left: -5px; background: #eab308; color: #000; font-size: 0.65em; font-weight: bold; padding: 2px 4px; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.5);">+${item.refino}</div>` : ''}
+                ${item.refino > 0 ? `<div class="eldora-item-refinement eldora-profile-style-7acfd725" >+${item.refino}</div>` : ''}
             </div>
         `;
         grid.innerHTML += slotHtml;
         const imgEl = grid.querySelector(`img[data-item-img="${item.id}"]`);
-        window.aplicarImagemItemEldora(imgEl, item);
+        window.aplicarImagemPerfilEldora(imgEl, item);
     });
 };
 
@@ -1262,61 +1345,16 @@ window.abrirModalItem = function(idAlvo, origem) {
 
     if (!document.getElementById('modal-item')) {
         const modalHtml = `
-            <div id="modal-item" style="
-                display:none;
-                position:fixed;
-                top:0;
-                left:0;
-                width:100%;
-                height:100vh;
-                height:100dvh;
-                padding:12px;
-                box-sizing:border-box;
-                background:rgba(0,0,0,0.85);
-                z-index:99999;
-                justify-content:center;
-                align-items:center;
-                backdrop-filter:blur(4px);
-            ">
-                <div style="
-                    background:linear-gradient(135deg, #1e293b, #0f172a);
-                    width:100%;
-                    max-width:320px;
-                    max-height:calc(100dvh - 24px);
-                    overflow-y:auto;
-                    overscroll-behavior:contain;
-                    box-sizing:border-box;
-                    border-radius:12px;
-                    border:2px solid #3b82f6;
-                    padding:15px;
-                    text-align:center;
-                    position:relative;
-                ">
-                    <span onclick="fecharModalItem()" style="position: absolute; top: 10px; right: 15px; font-size: 1.5em; color: #ef4444; cursor: pointer; font-weight:bold;">&times;</span>
-                    <div id="modal-item-icon" style="
-                        width:110px;
-                        height:110px;
-                        margin:0 auto 8px auto;
-                        display:flex;
-                        justify-content:center;
-                        align-items:center;
-                    "></div>
+            <div id="modal-item" class="eldora-profile-style-a210d4af">
+                <div class="eldora-profile-style-1d2f3eda">
+                    <span onclick="fecharModalItem()" class="eldora-profile-style-84ab6d66">&times;</span>
+                    <div id="modal-item-icon" class="eldora-profile-style-4132a818"></div>
 
-                    <h3 id="modal-item-nome" style="margin: 0 0 5px 0; color: #fff; font-size: 1.2em; font-family:'Cinzel',serif;">Nome</h3>
-                    <div id="modal-item-raridade" style="font-size: 0.8em; font-weight: bold; margin-bottom: 10px; text-transform: uppercase;"></div>
-                    <p id="modal-item-desc" style="color: #94a3b8; font-size: 0.85em; margin: 10px 0; border-top: 1px solid #334155; padding-top: 10px;">Descrição</p>
-                    <div id="modal-item-stats" style="display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; margin-bottom: 15px;"></div>
-                    <div id="modal-item-acoes" style="
-                        display:flex;
-                        gap:8px;
-                        justify-content:center;
-                        flex-wrap:wrap;
-                        position:sticky;
-                        bottom:-15px;
-                        z-index:5;
-                        background:linear-gradient(180deg, rgba(15,23,42,0), #0f172a 30%);
-                        padding:14px 0 4px 0;
-                    "></div>
+                    <h3 id="modal-item-nome" class="eldora-profile-style-f3fd4aeb">Nome</h3>
+                    <div id="modal-item-raridade" class="eldora-profile-style-df5f89ff"></div>
+                    <p id="modal-item-desc" class="eldora-profile-style-d4d63d08">Descrição</p>
+                    <div id="modal-item-stats" class="eldora-profile-style-eeef0f29"></div>
+                    <div id="modal-item-acoes" class="eldora-profile-style-7e45cc0e"></div>
                 </div>
             </div>`;
         document.body.insertAdjacentHTML('beforeend', modalHtml);
@@ -1324,12 +1362,12 @@ window.abrirModalItem = function(idAlvo, origem) {
 
     const refinoTxt = (itemData.refino && itemData.refino > 0) ? ` [+${itemData.refino}]` : '';
     const qtdValor = itemData.qtd || itemData.quantidade || 1;
-    const qtdTxt = (origem === 'mochila' || origem === 'inventario') && qtdValor > 1 
-        ? ` <span style="color: #fbbf24; font-size: 0.8em;">(x${qtdValor})</span>` 
+    const qtdTxt = (origem === 'mochila' || origem === 'inventario') && qtdValor > 1
+        ? ` <span class="eldora-profile-style-1b346c3f">(x${qtdValor})</span>`
         : '';
-    
+
     document.getElementById('modal-item-nome').innerHTML = itemData.nome + refinoTxt + qtdTxt;
-    
+
     // 👇 MÁGICA 1: BLINDAGEM DE INGLÊS/PORTUGUÊS E IDs 👇
     const t = (itemData.tipo || itemData.type || "").toLowerCase();
     const idReal = itemData.base_id || itemData.item_id || itemData.id || "indefinido";
@@ -1340,24 +1378,19 @@ window.abrirModalItem = function(idAlvo, origem) {
     document.getElementById('modal-item-icon').innerHTML = `
         <img id="modal-img-item-real"
              src="${imgUrl}"
-             onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-block';"
-             style="
-                width:100%;
-                height:100%;
-                object-fit:contain;
-                filter:drop-shadow(0 4px 10px rgba(0,0,0,0.9));
-             ">
-        <span style="display:none; font-size: 2.5em; text-shadow: 0 0 10px rgba(255,255,255,0.2);">${itemData.emoji || itemData.icon || '📦'}</span>
+             onerror="this.hidden=true; if(this.nextElementSibling){this.nextElementSibling.classList.add('eldora-image-fallback','is-visible')}"
+             class="eldora-profile-style-f47716cb">
+        <span class="eldora-profile-style-6e6fc52f">${itemData.emoji || itemData.icon || '📦'}</span>
     `;
 
-    window.aplicarImagemItemEldora(document.getElementById("modal-img-item-real"), itemData);
+    window.aplicarImagemPerfilEldora(document.getElementById("modal-img-item-real"), itemData);
 
     document.getElementById('modal-item-desc').innerText = itemData.desc || "Sem descrição.";
-    
+
     const rari = document.getElementById('modal-item-raridade');
     rari.innerText = itemData.raridade || "Comum";
-    const coresRaridade = {'comum': '#94a3b8', 'incomum': '#22c55e', 'bom': '#22c55e', 'raro': '#3b82f6', 'epico': '#a855f7', 'lendario': '#eab308', 'unico': '#ef4444', 'mitico': '#00f2fe'};
-    rari.style.color = coresRaridade[(itemData.raridade||'comum').toLowerCase()] || '#cbd5e1';
+    const raridadeClasse = String(itemData.raridade || 'comum').toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').replace(/[^a-z0-9_-]/g, '') || 'comum';
+    rari.classList.add('is-rarity-' + raridadeClasse);
 
     let statsHtml = '';
 
@@ -1495,13 +1528,13 @@ window.abrirModalItem = function(idAlvo, origem) {
             const prefixo = String(val).includes('-') ? '' : '+';
 
             statsHtml += `
-                <span style="background: #020617; padding: 4px 8px; border-radius: 6px; font-size: 0.8em; color: #fff; border: 1px solid #3f3f46; box-shadow: 0 2px 4px rgba(0,0,0,0.5);">
+                <span class="eldora-profile-style-6f0e3ff5">
                     ${emoji} ${nomeStat}: ${prefixo}${val}
                 </span>
             `;
         }
     } else if (['weapon', 'armor', 'helmet', 'boots', 'ring', 'necklace', 'earring', 'equipamento', 'tool', 'arma', 'armadura', 'lenhador', 'minerador', 'colhedor', 'esfolador', 'ferreiro', 'armeiro', 'alfaiate', 'joalheiro', 'curtidor'].includes(t)) {
-        statsHtml = `<span style="color: #64748b; font-size: 0.8em;">Sem atributos base</span>`;
+        statsHtml = `<span class="eldora-profile-style-775e837e">Sem atributos base</span>`;
     }
 
     if (
@@ -1530,14 +1563,7 @@ window.abrirModalItem = function(idAlvo, origem) {
 
         statsHtml =
             `
-            <span style="
-                background:#020617;
-                padding:4px 8px;
-                border-radius:6px;
-                font-size:.8em;
-                color:#facc15;
-                border:1px solid #854d0e;
-            ">
+            <span class="eldora-profile-style-3849b30a">
                 🛠️ T${tierTool} • ${profNome}
             </span>
             `
@@ -1592,13 +1618,13 @@ window.abrirModalItem = function(idAlvo, origem) {
         const corBarra = porc > 50 ? '#2ecc71' : (porc > 20 ? '#f1c40f' : '#e74c3c');
 
         const durHtml = `
-            <div style="width: 100%; margin-top: 10px; margin-bottom: 10px; text-align: left;">
-                <div style="display: flex; justify-content: space-between; font-size: 0.75em; color: #94a3b8; margin-bottom: 3px; font-weight: bold;">
+            <div class="eldora-profile-style-f0547d36">
+                <div class="eldora-profile-style-7ae2014d">
                     <span>DURABILIDADE</span>
                     <span>${atual} / ${maximo}</span>
                 </div>
-                <div style="width: 100%; height: 6px; background: #020617; border-radius: 3px; border: 1px solid #334155;">
-                    <div style="width: ${porc}%; height: 100%; background: ${corBarra}; border-radius: 3px; transition: width 0.3s;"></div>
+                <div class="eldora-profile-style-1b874464">
+                    <div style="--progress:${porc}%;--durability-color:${corBarra}"></div>
                 </div>
             </div>
         `;
@@ -1607,41 +1633,30 @@ window.abrirModalItem = function(idAlvo, origem) {
 
     document.getElementById('modal-item-stats').innerHTML = statsHtml;
 
-    
+
     // 👇 BOTÃO DE CONSERTAR (Aparece se o item estiver gasto e o jogador tiver o pergaminho) 👇
     // 👇 MÁGICA 2: RECONHECIMENTO INFALÍVEL DE POÇÕES 👇
     if (origem === 'mochila' || origem === 'inventario') {
-        
+
         if (['weapon', 'armor', 'helmet', 'boots', 'ring', 'necklace', 'earring', 'equipamento', 'tool', 'arma', 'armadura', 'lenhador', 'minerador', 'colhedor', 'esfolador', 'ferreiro', 'armeiro', 'alfaiate', 'joalheiro', 'curtidor'].includes(t)) {
-            botoesHtml = `<button onclick="usarOuEquiparItem('${itemData.id}')" style="flex:1; padding:10px; background: linear-gradient(180deg, #27ae60 0%, #1e8449 100%); color:white; border:1px solid #2ecc71; border-radius:4px; font-weight:bold; cursor:pointer;">Equipar</button>`;
-        } 
+            botoesHtml = `<button onclick="usarOuEquiparItem('${itemData.id}')" class="eldora-profile-style-7c693876">Equipar</button>`;
+        }
         else if (itemData.on_use?.effect === 'xp_boost' || ['pocao_xp_boost', 'pocao_xp_boost_g', 'elixir_xp_dobrado_10m', 'elixir_xp_dobrado_30m'].includes(idReal)) {
-            botoesHtml = `<button onclick="consumirItemDireto('${itemData.id}', '${idReal}')" style="flex:1; min-height:44px; padding:10px; background:linear-gradient(180deg,#8e44ad,#732d91); color:white; border:1px solid #9b59b6; border-radius:4px; font-weight:bold; cursor:pointer;">Usar · XP ×2</button>`;
+            botoesHtml = `<button onclick="consumirItemDireto('${itemData.id}', '${idReal}')" class="eldora-profile-style-038e3ada">Usar · XP ×2</button>`;
         }
         else if (idReal.includes('pocao') || nomeLower.includes('poção') || ['potion'].includes(t)) {
             botoesHtml = `
-                <button onclick="equiparPocaoAtalho('${idReal}', 'hp')" style="flex:1; padding:10px; background: linear-gradient(180deg, #c0392b 0%, #922b21 100%); color:white; border:1px solid #e74c3c; border-radius:4px; font-weight:bold; cursor:pointer;">Slot ❤️</button>
-                <button onclick="equiparPocaoAtalho('${idReal}', 'mp')" style="flex:1; padding:10px; background: linear-gradient(180deg, #2980b9 0%, #1f618d 100%); color:white; border:1px solid #3498db; border-radius:4px; font-weight:bold; cursor:pointer;">Slot 💧</button>
+                <button onclick="equiparPocaoAtalho('${idReal}', 'hp')" class="eldora-profile-style-e9e08d6a">Slot ❤️</button>
+                <button onclick="equiparPocaoAtalho('${idReal}', 'mp')" class="eldora-profile-style-43efeeaf">Slot 💧</button>
             `;
         }
         else if (idReal === 'carta_recomendacao') {
-            botoesHtml = '<div style="padding:12px;color:#e6d2a6;">📜 Apresente esta carta à recepcionista da Guilda dos Aventureiros. Ela será recolhida automaticamente no seu registro.</div>';
+            botoesHtml = '<div class="eldora-profile-style-3198545b">📜 Apresente esta carta à recepcionista da Guilda dos Aventureiros. Ela será recolhida automaticamente no seu registro.</div>';
         }
         else if (t === 'reagent') {
 
             botoesHtml = `
-                <div style="
-                    width:100%;
-                    padding:10px;
-                    margin-bottom:8px;
-                    background:rgba(59,130,246,0.08);
-                    border:1px dashed #3b82f6;
-                    color:#93c5fd;
-                    font-size:0.85em;
-                    border-radius:4px;
-                    font-weight:bold;
-                    text-align:center;
-                ">
+                <div class="eldora-profile-style-f1ce6332">
                     🧪 Ingrediente de receita.
                     Use este item em Alquimia ou fabricação.
                 </div>
@@ -1662,28 +1677,19 @@ window.abrirModalItem = function(idAlvo, origem) {
             botoesHtml = `
                 <button
                     onclick="consumirItemDireto('${itemData.id}', '${idReal}')"
-                    style="
-                        flex:1;
-                        padding:10px;
-                        background:linear-gradient(180deg,#8e44ad 0%,#732d91 100%);
-                        color:white;
-                        border:1px solid #9b59b6;
-                        border-radius:4px;
-                        font-weight:bold;
-                        cursor:pointer;
-                    "
+                    class="eldora-profile-style-873b2342"
                 >
                     Usar Item
                 </button>
             `;
         }
         else {
-            botoesHtml = `<div style="width: 100%; padding: 10px; margin-bottom: 8px; background: rgba(241, 196, 15, 0.1); border: 1px dashed #f1c40f; color: #f1c40f; font-size: 0.85em; border-radius: 4px; font-weight: bold; text-align: center;">🛠️ Leve este item a um NPC (Ferreiro, Alquimista...) para utilizá-lo.</div>`;
+            botoesHtml = `<div class="eldora-profile-style-3a71e7e3">🛠️ Leve este item a um NPC (Ferreiro, Alquimista...) para utilizá-lo.</div>`;
         }
     } else if (origem === 'equipado') {
-        botoesHtml = `<button onclick="desequiparItem('${itemData.slot}')" style="flex:1; padding:10px; background: linear-gradient(180deg, #c0392b 0%, #922b21 100%); color:white; border:1px solid #e74c3c; border-radius:4px; font-weight:bold; cursor:pointer;">Remover</button>`;
+        botoesHtml = `<button onclick="desequiparItem('${itemData.slot}')" class="eldora-profile-style-e9e08d6a">Remover</button>`;
     }
-    
+
     const temPergaminho = window.perfilDadosGlobais.inventario.some(i => ['pergaminho_durabilidade', 'pergaminho_de_reparo'].includes(i.base_id || i.id));
     if (
         [
@@ -1715,11 +1721,11 @@ window.abrirModalItem = function(idAlvo, origem) {
         &&
         temPergaminho
     ) {
-        botoesHtml += `<button onclick="repararFerramentaAPI('${itemData.id}')" style="width: 100%; padding:10px; background: #ca8a04; color:black; border:none; border-radius:4px; font-weight:bold; cursor:pointer; margin-bottom: 8px;">CONSERTAR (1x 📜)</button>`;
+        botoesHtml += `<button onclick="repararFerramentaAPI('${itemData.id}')" class="eldora-profile-style-50b8d325">CONSERTAR (1x 📜)</button>`;
     }
 
-    botoesHtml += `<button onclick="fecharModalItem()" style="flex:1; padding:10px; background: linear-gradient(180deg, #334155 0%, #1e293b 100%); color:white; border:1px solid #475569; border-radius:4px; font-weight:bold; cursor:pointer;">Fechar</button>`;
-    
+    botoesHtml += `<button onclick="fecharModalItem()" class="eldora-profile-style-e4b50000">Fechar</button>`;
+
     if (itemData.rune_slots?.length) {
         document.getElementById('modal-item-stats').insertAdjacentHTML('beforeend', window.renderRuneDetails(itemData));
     }
@@ -1730,11 +1736,11 @@ window.abrirModalItem = function(idAlvo, origem) {
         manage.onclick = () => window.abrirOficinaRunas(itemData.uid || itemData.id);
         document.getElementById('modal-item-acoes').appendChild(manage);
     }
-    document.getElementById('modal-item').style.display = 'flex';
+    document.getElementById('modal-item').classList.add('is-open');
 }
 
 window.fecharModalItem = function() {
-    document.getElementById('modal-item').style.display = 'none';
+    document.getElementById('modal-item').classList.remove('is-open');
 }
 
 window.distribuirPonto = async function(stat) {
@@ -1795,9 +1801,9 @@ window.desequiparItem = async function(slot) {
         const data = await res.json();
         if(data.sucesso) {
             if (data.xp_boost) window.dispatchEvent(new CustomEvent("eldora:xp-boost", { detail: data }));
-            carregarMeuPerfil(); 
-            setTimeout(() => alternarAbaPerfil('equips'), 200); 
-            
+            carregarMeuPerfil();
+            setTimeout(() => alternarAbaPerfil('equips'), 200);
+
             // ⚡ SINCRONIA FINA: Força a atualização imediata dos HUDs
             if (window.atualizarHudCircular) window.atualizarHudCircular();
             if (window.carregarDadosDoHUD && document.getElementById('hud-status-flutuante').style.display === 'block') {
@@ -1814,10 +1820,10 @@ window.usarOuEquiparItem = async function(itemId) {
     try {
         const res = await fetch('/api/personagem/equipar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_id: charId, item_id: itemId }) });
         const data = await res.json();
-        if(data.sucesso) { 
-            carregarMeuPerfil(); 
-            setTimeout(() => alternarAbaPerfil('equips'), 300); 
-            
+        if(data.sucesso) {
+            carregarMeuPerfil();
+            setTimeout(() => alternarAbaPerfil('equips'), 300);
+
             // ⚡ SINCRONIA FINA: Força a atualização imediata dos HUDs
             if (window.atualizarHudCircular) window.atualizarHudCircular();
             if (window.carregarDadosDoHUD && document.getElementById('hud-status-flutuante').style.display === 'block') {
@@ -1836,16 +1842,16 @@ window.consumirItemDireto = async function(itemId, baseId) {
     fecharModalItem();
     const charId = localStorage.getItem("jogadorEldoraID");
     try {
-        const res = await fetch('/api/personagem/usar_item', { 
-            method: 'POST', headers: { 'Content-Type': 'application/json' }, 
-            body: JSON.stringify({ user_id: charId, item_id: itemId, base_id: baseId }) 
+        const res = await fetch('/api/personagem/usar_item', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: charId, item_id: itemId, base_id: baseId })
         });
         const data = await res.json();
-        if(data.sucesso) { 
-            carregarMeuPerfil(); 
+        if(data.sucesso) {
+            carregarMeuPerfil();
             if(window.alertaEldora) window.alertaEldora("Magia Libertada!", data.msg || "Item usado com sucesso!", "sucesso");
-        } else { 
-            if(window.alertaEldora) window.alertaEldora("Aviso", data.erro, "erro"); 
+        } else {
+            if(window.alertaEldora) window.alertaEldora("Aviso", data.erro, "erro");
         }
     } catch(e) { console.error(e); }
 }
@@ -1856,20 +1862,20 @@ window.usarPocaoRapida = async function(tipoSlot) {
     if (!charId) return;
 
     try {
-        const res = await fetch('/api/personagem/usar_pocao_rapida', { 
-            method: 'POST', 
-            headers: { 'Content-Type': 'application/json' }, 
-            body: JSON.stringify({ user_id: charId, tipo: tipoSlot }) 
+        const res = await fetch('/api/personagem/usar_pocao_rapida', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: charId, tipo: tipoSlot })
         });
         const data = await res.json();
-        
+
         if (data.sucesso) {
             // Se estiver no mapa, faz o texto verde/azul flutuar!
             if (window.jogoEldora) {
                 const cena = window.jogoEldora.scene.getScene('MapaScene');
                 if (cena && cena.player) {
                     let textoCura = cena.add.text(cena.player.x, cena.player.y - 40, `+${data.cura}`, {
-                        fontFamily: 'Cinzel, Arial', fontSize: '20px', color: data.cor, 
+                        fontFamily: 'Cinzel, Arial', fontSize: '20px', color: data.cor,
                         stroke: '#000', strokeThickness: 4, fontStyle: 'bold'
                     }).setOrigin(0.5).setDepth(200);
 
@@ -1919,14 +1925,11 @@ window.renderizarAbaMagias = function() {
     if (!p) return;
 
     // Assumindo que tens uma div principal onde os itens do inventário aparecem
-    const container = document.getElementById('grid-inventario-conteudo'); 
+    const container = document.getElementById('grid-inventario-conteudo');
     if (!container) return;
 
     container.innerHTML = '';
-    container.style.display = 'grid';
-    container.style.gridTemplateColumns = 'repeat(auto-fill, minmax(65px, 1fr))';
-    container.style.gap = '12px';
-    container.style.padding = '15px';
+    container.classList.add('eldora-combat-skill-slots');
 
     const dbSkills = p.database_skills || {};
     const minhasSkills = p.skills_desbloqueadas || {};
@@ -1951,24 +1954,17 @@ window.renderizarAbaMagias = function() {
 
         // O Quadrado Base
         const quadrado = document.createElement('div');
-        quadrado.style = "width:65px; height:65px; background:#0f172a; border:2px solid #334155; border-radius:8px; display:flex; align-items:center; justify-content:center; cursor:pointer; position:relative; transition: transform 0.1s;";
-        
-        quadrado.onmouseover = () => quadrado.style.transform = "scale(1.05)";
-        quadrado.onmouseout = () => quadrado.style.transform = "scale(1)";
+        quadrado.className = "eldora-combat-skill-slot" + (slotEquipado ? " is-equipped" : "");
 
         // Se estiver equipada, o quadrado ganha uma aura mágica (roxa)
-        if (slotEquipado) {
-            quadrado.style.borderColor = "#8b5cf6";
-            quadrado.style.boxShadow = "0 0 12px rgba(139, 92, 246, 0.4)";
-        }
 
         // A Imagem Redonda no centro
         const imgContainer = document.createElement('div');
-        imgContainer.style = "width:50px; height:50px; border-radius:50%; overflow:hidden; border:2px solid #1e293b; background:#000;";
+        imgContainer.className = "eldora-combat-skill-icon";
 
         const img = document.createElement('img');
         img.src = imgUrl;
-        img.style = "width:100%; height:100%; object-fit:cover;";
+        img.className = "eldora-combat-skill-image";
         imgContainer.appendChild(img);
         quadrado.appendChild(imgContainer);
 
@@ -1976,7 +1972,7 @@ window.renderizarAbaMagias = function() {
         if (slotEquipado) {
             const badge = document.createElement('div');
             badge.innerHTML = `S${slotEquipado}`;
-            badge.style = "position:absolute; bottom:-6px; right:-6px; background:#8b5cf6; color:white; font-size:11px; font-weight:bold; padding:2px 6px; border-radius:8px; border:2px solid #0f172a;";
+            badge.className = "eldora-combat-skill-badge";
             quadrado.appendChild(badge);
         }
 
@@ -1985,7 +1981,7 @@ window.renderizarAbaMagias = function() {
     }
 
     if (!encontrouSkill) {
-        container.innerHTML = `<div style="color:#94a3b8; font-style:italic; grid-column: 1 / -1; text-align:center; padding-top:30px; font-family:'Cinzel', serif;">O teu grimório está vazio.</div>`;
+        container.innerHTML = `<div class="eldora-profile-style-3442af12">O teu grimório está vazio.</div>`;
     }
 };
 
@@ -1993,7 +1989,7 @@ window.renderizarAbaMagias = function() {
 window.iniciarEquiparSkill = function(skillId) {
     const p = window.perfilDadosGlobais;
     const equipadas = p.skills_equipadas || {};
-    
+
     let slotLivre = null;
     for (let i = 1; i <= 5; i++) {
         if (!equipadas[`slot_${i}`] || equipadas[`slot_${i}`] === "") {
@@ -2008,8 +2004,8 @@ window.iniciarEquiparSkill = function(skillId) {
     } else {
         // Se está tudo cheio, transforma a área de botões numa seleção de substituição
         const areaBotoes = document.getElementById('area-botoes-skill');
-        let htmlSlots = `<div style="font-size:12px; margin-bottom:10px; text-align:center; color:#fbbf24; font-weight:bold;">Sem espaço livre. Qual magia queres substituir?</div><div style="display:flex; justify-content:space-between;">`;
-        
+        let htmlSlots = `<div class="eldora-profile-style-98b031ef">Sem espaço livre. Qual magia queres substituir?</div><div class="eldora-profile-style-d6e5fed8">`;
+
         for (let i = 1; i <= 5; i++) {
             const idEquipada = equipadas[`slot_${i}`];
             const db = p.database_skills || {};
@@ -2018,9 +2014,9 @@ window.iniciarEquiparSkill = function(skillId) {
             const url = `/static/assets/sprites/skills/${iconeInfo}.png`;
 
             htmlSlots += `
-                <div onclick="window.processarEquiparSkill('${skillId}', ${i})" style="width:45px; height:45px; border-radius:50%; background:#0f172a; border:2px solid #ef4444; cursor:pointer; display:flex; justify-content:center; align-items:center; position:relative; transition: transform 0.1s;" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'" title="${info.display_name || 'Substituir'}">
-                    <img src="${url}" style="width:35px; height:35px; border-radius:50%; object-fit:cover;">
-                    <span style="position:absolute; bottom:-8px; background:#000; font-size:10px; border-radius:6px; padding:1px 5px; border:1px solid #475569;">S${i}</span>
+                <div onclick="window.processarEquiparSkill('${skillId}', ${i})" class="eldora-profile-style-847ec13b" title="${info.display_name || 'Substituir'}">
+                    <img src="${url}" class="eldora-profile-style-f369cd95">
+                    <span class="eldora-profile-style-bba53f06">S${i}</span>
                 </div>
             `;
         }
@@ -2038,18 +2034,18 @@ window.processarEquiparSkill = async function(skillIdOuVazio, slot) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ user_id: user_id, skill_id: skillIdOuVazio, slot: slot })
         });
-        
+
         const data = await res.json();
         if(data.sucesso) {
             // Fecha a janela
             const modal = document.getElementById('modal-skill-detalhes');
             if (modal) modal.remove();
-            
+
             // Recarrega o perfil inteiro para atualizar a UI
             if (typeof window.carregarMeuPerfil === 'function') {
                 await window.carregarMeuPerfil();
             }
-            
+
             // Se tiveres um sistema de alertas
             if (window.alertaEldora) {
                 const acaoTxt = skillIdOuVazio ? "equipada no" : "removida do";
@@ -2066,7 +2062,7 @@ window.processarEquiparSkill = async function(skillIdOuVazio, slot) {
 // ==========================================
 window.repararFerramentaAPI = async function(itemUuid) {
     const charId = localStorage.getItem("jogadorEldoraID");
-    
+
     const btn = event.currentTarget;
     const textoOriginal = btn.innerText;
     btn.innerText = "A CONSERTAR... ⏳";
@@ -2078,13 +2074,13 @@ window.repararFerramentaAPI = async function(itemUuid) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ user_id: charId, item_id: itemUuid })
         });
-        
+
         const data = await res.json();
-        
+
         if (data.success) {
             fecharModalItem();
             if (typeof window.carregarMeuPerfil === 'function') window.carregarMeuPerfil();
-            
+
             if (window.alertaEldora) {
                 window.alertaEldora("Reparo Concluído!", data.msg, "sucesso");
             } else {

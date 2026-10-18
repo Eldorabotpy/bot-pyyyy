@@ -46,6 +46,8 @@
 
 /* Cartão do herói */
 #aba-perfil .eldora-profile-hero {
+    position: relative !important;
+    overflow: hidden !important;
     height: clamp(230px, 32vw, 340px) !important;
     margin: 0 0 14px !important;
     border: 1px solid rgba(230, 197, 116, .68) !important;
@@ -66,6 +68,7 @@
 
 #aba-perfil .eldora-profile-hero-shade {
     background: linear-gradient(0deg, rgba(5, 11, 21, .76), transparent 58%) !important;
+    pointer-events: none;
 }
 
 #aba-perfil .eldora-profile-hero-avatar {
@@ -305,7 +308,16 @@
     box-shadow: 0 14px 34px rgba(0, 0, 0, .18), inset 0 1px rgba(255, 255, 255, .035);
 }
 
-#aba-perfil .eldora-pane-heading { margin: 0 0 13px; }
+#aba-perfil .eldora-pane-heading {
+    margin: 0 0 13px !important;
+    padding: 9px 12px !important;
+    border: 1px solid rgba(230, 197, 116, .24) !important;
+    border-left: 3px solid var(--eldora-gold-deep) !important;
+    border-radius: 10px !important;
+    background: linear-gradient(105deg, rgba(31, 45, 64, .98), rgba(14, 23, 37, .98)) !important;
+    box-shadow: inset 0 1px rgba(255, 255, 255, .04) !important;
+    text-align: left !important;
+}
 #aba-perfil .eldora-pane-heading span { color: var(--eldora-gold); font-size: .62rem; font-weight: 850; letter-spacing: .18em; }
 #aba-perfil .eldora-pane-heading h3 { margin: 3px 0 0; color: #f4ead4; font-family: Cinzel, Georgia, serif; font-size: clamp(1.05rem, 2.4vw, 1.35rem); }
 
@@ -351,8 +363,14 @@
 #aba-perfil .eldora-equipment-backdrop { opacity: .2 !important; }
 #aba-perfil .eldora-equipment-avatar { width: 56% !important; height: 91% !important; opacity: .88 !important; }
 #aba-perfil .eldora-equipment-slot {
+    position: absolute;
+    display: flex;
     width: clamp(43px, 6vw, 54px) !important;
     height: clamp(43px, 6vw, 54px) !important;
+    align-items: center;
+    justify-content: center;
+    transform: translate(-50%, -50%);
+    border: 2px solid #334155 !important;
     border-radius: 13px !important;
     background: rgba(12, 22, 36, .9) !important;
     box-shadow: 0 6px 18px rgba(0, 0, 0, .42), inset 0 1px rgba(255, 255, 255, .1) !important;
@@ -493,4 +511,468 @@
     #aba-perfil #perfil-dados *,
     #aba-perfil #perfil-dados *::before,
     #aba-perfil #perfil-dados *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; }
+}
+
+
+/* Declarações de apresentação migradas de perfil.js. */
+.eldora-profile-style-96492c5f{width:100%;
+            margin-top:8px;
+            padding:10px;
+            border-radius:10px;
+            border:1px solid rgba(250,204,21,.35);
+            background:linear-gradient(180deg, rgba(120,53,15,.35), rgba(15,23,42,.75));
+            text-align:left;
+            box-shadow: inset 0 0 14px rgba(0,0,0,.35)}
+.eldora-profile-style-7d747603{font-family:'Cinzel',serif;
+                font-weight:900;
+                color:#facc15;
+                font-size:.82em;
+                margin-bottom:7px;
+                text-align:center;
+                letter-spacing:.4px}
+.eldora-profile-style-f1c6317c{display:grid; gap:5px; font-size:.78em; color:#cbd5e1}
+.eldora-profile-style-665bd398{display:flex; justify-content:space-between; gap:8px}
+.eldora-profile-style-0d75823b{color:#fff}
+.eldora-profile-style-4560323b{color:#93c5fd}
+.eldora-profile-style-1a0fc93d{color:#67e8f9}
+.eldora-profile-style-4681584a{margin-top:6px;
+                    padding-top:7px;
+                    border-top:1px solid rgba(255,255,255,.1);
+                    display:flex;
+                    justify-content:space-between;
+                    gap:8px;
+                    font-size:1.05em}
+.eldora-profile-style-52e2d98a{color:#f8fafc; font-weight:800}
+.eldora-profile-style-984655ef{color: #e74c3c}
+.eldora-profile-style-071baf9a{max-height: 250px; overflow-y: auto; padding-right: 5px; margin-bottom: 20px; display: flex; flex-direction: column; gap: 12px; scrollbar-width: thin; scrollbar-color: #ca8a04 #0f172a}
+.eldora-profile-style-994f87fa{font-size: 1.6em}
+.eldora-profile-style-db0f7274{width: 32px; height: 32px; object-fit: contain; filter: drop-shadow(0px 2px 3px rgba(0,0,0,0.8))}
+.eldora-profile-style-5ba9cf0b{background: rgba(30, 41, 59, 0.8); padding: 12px; border-radius: 10px; border: 1px solid #ca8a04; box-shadow: inset 0 0 15px rgba(202, 138, 4, 0.1); position: relative}
+.eldora-profile-style-8d79764b{display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px}
+.eldora-profile-style-fb9057b6{display: flex; align-items: center; gap: 10px}
+.eldora-profile-style-4b88ca6b{color: #facc15; font-weight: 900; font-family: 'Cinzel', serif; text-transform: uppercase; text-shadow: 1px 1px 2px #000; letter-spacing: 1px}
+.eldora-profile-style-aaa6b25b{color: #cbd5e1; font-size: 0.8em; font-weight: bold}
+.eldora-profile-style-13cbe03b{text-align: right}
+.eldora-profile-style-88e3bfb6{color: #fff; font-size: 0.75em; font-weight: bold; background: #000; padding: 4px 8px; border-radius: 6px; border: 1px solid #333}
+.eldora-profile-style-f8290e1f{width: 100%; height: 8px; background: #020617; border-radius: 4px; border: 1px solid #000; overflow: hidden; margin-bottom: 8px}
+.eldora-profile-style-7f1984d9{text-align: right; color: #6ee7b7; font-size: 0.75em; font-weight: bold; text-shadow: 1px 1px 2px #000; background: rgba(0,0,0,0.4); padding: 4px 8px; border-radius: 4px; border: 1px dashed #059669; display: inline-block; float: right}
+.eldora-profile-style-cdd5ccc3{clear: both}
+.eldora-profile-style-7ca1adb2{background: rgba(15, 23, 42, 0.6); padding: 12px; border-radius: 10px; border: 1px dashed #475569; margin-bottom: 20px; text-align: center}
+.eldora-profile-style-7b82a692{color: #94a3b8; font-size: 0.9em; font-weight: bold; margin-bottom: 4px}
+.eldora-profile-style-f0f52796{color: #64748b; font-size: 0.75em; font-style: italic}
+.eldora-profile-style-0ae0d5ee{display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px}
+.eldora-profile-style-72bf51c5{background:#2ecc71; color:#000; border:none; border-radius:4px; width:24px; height:24px; font-weight:bold; cursor:pointer}
+.eldora-profile-style-31e41829{background: #1e293b; border: 1px solid #334155; padding: 10px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center}
+.eldora-profile-style-99b23121{font-size: 1.2em}
+.eldora-profile-style-b3871c39{color: #cbd5e1; font-size: 0.8em; text-transform: uppercase; font-weight: bold}
+.eldora-profile-style-3088da11{display: flex; align-items: center; gap: 8px}
+.eldora-profile-style-51cfd0f1{color: #f8fafc; font-size: 1.2em}
+.eldora-profile-style-4b64103b{margin-top: 15px; background: #1e293b; border: 1px solid #334155; padding: 10px; border-radius: 8px}
+.eldora-profile-style-83e74752{color: #94a3b8; font-size: 0.7em; font-weight: bold; text-transform: uppercase; margin-bottom: 8px}
+.eldora-profile-style-bad1d81f{display: flex; justify-content: space-around; font-size: 0.9em}
+.eldora-profile-style-a33384fd{color: #38bdf8}
+.eldora-profile-style-00644777{color: #f87171}
+.eldora-profile-style-21853e97{font-size: 1.4em; opacity: 0.3}
+.eldora-profile-style-008017cb{max-width: 85%; max-height: 85%; object-fit: contain; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.8))}
+.eldora-profile-style-b7f7a8e4{display:none; font-size: 1.8em}
+.eldora-profile-style-841f7e3a{margin-top: 12px; background: #020617; border: 2px solid #334155; border-radius: 12px; padding: 10px; box-shadow: inset 0 0 20px rgba(0,0,0,0.8)}
+.eldora-profile-style-be0a0ad8{color: #facc15; font-family: 'Cinzel', serif; font-size: 0.8em; font-weight: 900; text-transform: uppercase; margin-bottom: 8px; text-align: center; letter-spacing: 1px}
+.eldora-profile-style-c25e3c96{display: grid; grid-template-columns: repeat(auto-fill, minmax(62px, 1fr)); gap: 8px}
+.eldora-profile-style-b5fecb8f{position:absolute; left:5px; right:5px; bottom:4px; height:4px; background:#020617; border-radius:4px; overflow:hidden; border:1px solid #111827}
+.eldora-profile-style-cf178804{font-size: 1.7em; opacity: 0.35}
+.eldora-profile-style-30188eda{max-width: 78%; max-height: 72%; object-fit: contain; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.8))}
+.eldora-profile-style-950dd573{display:none; font-size: 1.7em}
+.eldora-profile-style-adecf77c{position:absolute; top:-6px; right:-6px; background:#0f172a; color:#facc15; border:1px solid #475569; border-radius:7px; padding:1px 4px; font-size:0.55em; font-weight:900}
+.eldora-profile-style-b62ee557{margin-top: 15px}
+.eldora-profile-style-ff9781f7{position: relative; width: 100%; height: 420px; background: #020617; border-radius: 12px; border: 2px solid #334155; overflow: hidden; box-shadow: inset 0 0 30px rgba(0,0,0,0.9)}
+.eldora-profile-style-83ad1f84{position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; opacity: 0.4}
+.eldora-profile-style-4a466668{width: 100%; height: 100%; object-fit: cover}
+.eldora-profile-style-4ec5f851{position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 70%; height: 95%; z-index: 1; display: flex; justify-content: center; align-items: center; opacity: 0.7}
+.eldora-profile-style-918da39f{width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0px 10px 15px rgba(0,0,0,0.9)); pointer-events: none}
+.eldora-profile-style-d9b56f37{position: relative; width: 100%; height: 100%; z-index: 2}
+.eldora-profile-style-ca6eb74e{display:block;width:100%;min-height:60px;margin:12px 0;padding:12px;background:#172231;border:1px solid #b99752;border-radius:12px;color:#ecd08c;text-align:left;cursor:pointer}
+.eldora-profile-style-e18a3df1{font-size:12px;color:#cbd5e1}
+.eldora-profile-style-494596d6{display: flex; gap: 5px; margin-top: 15px; margin-bottom: 15px; overflow-x: auto; padding-bottom: 5px}
+.eldora-profile-style-2cadcdff{flex: 1; padding: 6px; background: #3b82f6; color: #fff; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 0.75em}
+.eldora-profile-style-9b604a42{flex: 1; padding: 6px; background: #1e293b; color: #94a3b8; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 0.75em}
+.eldora-profile-style-5bf71092{display: grid; grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); gap: 8px}
+.eldora-profile-style-c58de097{position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(0deg, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.4) 50%, rgba(0,0,0,0.6) 100%); z-index: 1}
+.eldora-profile-style-4ffcc85c{position: absolute; bottom: -5px; left: 50%; transform: translateX(-50%); height: 95%; width: auto; object-fit: contain; z-index: 2; filter: drop-shadow(0 0 15px rgba(0,0,0,0.9)); pointer-events: none}
+.eldora-profile-style-93b71188{position: absolute; bottom: 20px; right: 20px; z-index: 3; text-align: right}
+.eldora-profile-style-048b9a2b{display: block}
+.eldora-profile-style-f2892a2e{display: none}
+.eldora-profile-style-90d64983{display: grid; grid-template-columns: 1fr 1fr; gap: 10px}
+.eldora-profile-style-c11effc7{font-size:1.5em; margin-bottom:5px}
+.eldora-profile-style-c1b8e467{font-size:0.7em; color:#fff}
+.eldora-profile-style-ad7f0944{grid-column: 1/-1; text-align: center; color: #64748b; font-size: 0.8em; margin-top: 10px}
+.eldora-profile-style-28886218{text-align: center; color: #94a3b8; padding: 20px}
+.eldora-profile-style-801160c3{padding: 10px}
+.eldora-profile-style-593914d0{color:#facc15; text-align:center; margin-bottom:15px; font-family: 'Cinzel', serif; text-shadow: 0 0 10px rgba(250, 204, 21, 0.3)}
+.eldora-profile-style-111cc8c9{text-align: center; color: #64748b; font-style: italic; margin-top: 30px}
+.eldora-profile-style-6b96c2c2{display: grid; grid-template-columns: repeat(auto-fill, minmax(65px, 1fr)); gap: 12px}
+.eldora-profile-style-15475bc2{position: absolute; bottom: -5px; right: -5px; background: #8b5cf6; color: #fff; font-size: 0.7em; padding: 2px 6px; border-radius: 8px; font-weight: bold; border: 2px solid #0f172a; z-index: 5}
+.eldora-profile-style-29af6337{width: 42px; height: 42px; border-radius: 50%; overflow: hidden; background: #000; border: 1px solid #1e293b}
+.eldora-profile-style-84043008{text-align:center; font-size:0.7em; color:#94a3b8; margin-top:20px; letter-spacing: 0.5px}
+.eldora-profile-style-f48620d5{text-align: center; color: #ef4444}
+.eldora-profile-style-8b46bed8{width:100%; padding:10px; background:#ef4444; color:white; border:none; border-radius:8px; font-weight:bold; cursor:pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.3)}
+.eldora-profile-style-ceed80a0{width:100%; padding:10px; background:#10b981; color:white; border:none; border-radius:8px; font-weight:bold; cursor:pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.3)}
+.eldora-profile-style-f23d2056{opacity:0.5}
+.eldora-profile-style-3395e2db{display:flex; justify-content:space-between; align-items:flex-start}
+.eldora-profile-style-8894607e{display:flex; gap:12px; align-items:center}
+.eldora-profile-style-2dbd2893{width:54px; height:54px; border-radius:50%; border:2px solid #8b5cf6; object-fit:cover; background: #000}
+.eldora-profile-style-2ed4b0fd{font-size:12px; color:#94a3b8; margin-top:4px}
+.eldora-profile-style-c73cb885{color:#60a5fa}
+.eldora-profile-style-e85027a3{color:#f87171}
+.eldora-profile-style-bc4392d5{cursor:pointer; color:#ef4444; font-weight:bold; font-size:20px; line-height:1}
+.eldora-profile-style-bf3d6245{font-size:13px; color:#cbd5e1; background:#1e293b; padding:12px; border-radius:8px; border:1px solid #334155}
+.eldora-profile-style-21776fc0{grid-column: 1 / -1; text-align: center; padding: 20px; color: #64748b}
+.eldora-profile-style-c8590c2b{max-width: 80%; max-height: 80%; object-fit: contain; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.9))}
+.eldora-profile-style-e6b19889{display:none; font-size: 2em; opacity: 0.8}
+.eldora-profile-style-6a5a7d0d{position: absolute; bottom: -5px; right: -5px; background: #000; color: #fff; font-size: 0.7em; font-weight: bold; padding: 2px 6px; border-radius: 10px; border: 1px solid #333; box-shadow: 0 2px 4px rgba(0,0,0,0.5)}
+.eldora-profile-style-7acfd725{position: absolute; top: -5px; left: -5px; background: #eab308; color: #000; font-size: 0.65em; font-weight: bold; padding: 2px 4px; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.5)}
+.eldora-profile-style-a210d4af{display:none;
+                position:fixed;
+                top:0;
+                left:0;
+                width:100%;
+                height:100vh;
+                height:100dvh;
+                padding:12px;
+                box-sizing:border-box;
+                background:rgba(0,0,0,0.85);
+                z-index:99999;
+                justify-content:center;
+                align-items:center;
+                backdrop-filter:blur(4px)}
+.eldora-profile-style-1d2f3eda{background:linear-gradient(135deg, #1e293b, #0f172a);
+                    width:100%;
+                    max-width:320px;
+                    max-height:calc(100dvh - 24px);
+                    overflow-y:auto;
+                    overscroll-behavior:contain;
+                    box-sizing:border-box;
+                    border-radius:12px;
+                    border:2px solid #3b82f6;
+                    padding:15px;
+                    text-align:center;
+                    position:relative}
+.eldora-profile-style-84ab6d66{position: absolute; top: 10px; right: 15px; font-size: 1.5em; color: #ef4444; cursor: pointer; font-weight:bold}
+.eldora-profile-style-4132a818{width:110px;
+                        height:110px;
+                        margin:0 auto 8px auto;
+                        display:flex;
+                        justify-content:center;
+                        align-items:center}
+.eldora-profile-style-f3fd4aeb{margin: 0 0 5px 0; color: #fff; font-size: 1.2em; font-family:'Cinzel',serif}
+.eldora-profile-style-df5f89ff{font-size: 0.8em; font-weight: bold; margin-bottom: 10px; text-transform: uppercase}
+.eldora-profile-style-d4d63d08{color: #94a3b8; font-size: 0.85em; margin: 10px 0; border-top: 1px solid #334155; padding-top: 10px}
+.eldora-profile-style-eeef0f29{display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; margin-bottom: 15px}
+.eldora-profile-style-7e45cc0e{display:flex;
+                        gap:8px;
+                        justify-content:center;
+                        flex-wrap:wrap;
+                        position:sticky;
+                        bottom:-15px;
+                        z-index:5;
+                        background:linear-gradient(180deg, rgba(15,23,42,0), #0f172a 30%);
+                        padding:14px 0 4px 0}
+.eldora-profile-style-1b346c3f{color: #fbbf24; font-size: 0.8em}
+.eldora-profile-style-f47716cb{width:100%;
+                height:100%;
+                object-fit:contain;
+                filter:drop-shadow(0 4px 10px rgba(0,0,0,0.9))}
+.eldora-profile-style-6e6fc52f{display:none; font-size: 2.5em; text-shadow: 0 0 10px rgba(255,255,255,0.2)}
+.eldora-profile-style-6f0e3ff5{background: #020617; padding: 4px 8px; border-radius: 6px; font-size: 0.8em; color: #fff; border: 1px solid #3f3f46; box-shadow: 0 2px 4px rgba(0,0,0,0.5)}
+.eldora-profile-style-775e837e{color: #64748b; font-size: 0.8em}
+.eldora-profile-style-3849b30a{background:#020617;
+                padding:4px 8px;
+                border-radius:6px;
+                font-size:.8em;
+                color:#facc15;
+                border:1px solid #854d0e}
+.eldora-profile-style-f0547d36{width: 100%; margin-top: 10px; margin-bottom: 10px; text-align: left}
+.eldora-profile-style-7ae2014d{display: flex; justify-content: space-between; font-size: 0.75em; color: #94a3b8; margin-bottom: 3px; font-weight: bold}
+.eldora-profile-style-1b874464{width: 100%; height: 6px; background: #020617; border-radius: 3px; border: 1px solid #334155}
+.eldora-profile-style-7c693876{flex:1; padding:10px; background: linear-gradient(180deg, #27ae60 0%, #1e8449 100%); color:white; border:1px solid #2ecc71; border-radius:4px; font-weight:bold; cursor:pointer}
+.eldora-profile-style-038e3ada{flex:1; min-height:44px; padding:10px; background:linear-gradient(180deg,#8e44ad,#732d91); color:white; border:1px solid #9b59b6; border-radius:4px; font-weight:bold; cursor:pointer}
+.eldora-profile-style-e9e08d6a{flex:1; padding:10px; background: linear-gradient(180deg, #c0392b 0%, #922b21 100%); color:white; border:1px solid #e74c3c; border-radius:4px; font-weight:bold; cursor:pointer}
+.eldora-profile-style-43efeeaf{flex:1; padding:10px; background: linear-gradient(180deg, #2980b9 0%, #1f618d 100%); color:white; border:1px solid #3498db; border-radius:4px; font-weight:bold; cursor:pointer}
+.eldora-profile-style-3198545b{padding:12px;color:#e6d2a6}
+.eldora-profile-style-f1ce6332{width:100%;
+                    padding:10px;
+                    margin-bottom:8px;
+                    background:rgba(59,130,246,0.08);
+                    border:1px dashed #3b82f6;
+                    color:#93c5fd;
+                    font-size:0.85em;
+                    border-radius:4px;
+                    font-weight:bold;
+                    text-align:center}
+.eldora-profile-style-873b2342{flex:1;
+                        padding:10px;
+                        background:linear-gradient(180deg,#8e44ad 0%,#732d91 100%);
+                        color:white;
+                        border:1px solid #9b59b6;
+                        border-radius:4px;
+                        font-weight:bold;
+                        cursor:pointer}
+.eldora-profile-style-3a71e7e3{width: 100%; padding: 10px; margin-bottom: 8px; background: rgba(241, 196, 15, 0.1); border: 1px dashed #f1c40f; color: #f1c40f; font-size: 0.85em; border-radius: 4px; font-weight: bold; text-align: center}
+.eldora-profile-style-50b8d325{width: 100%; padding:10px; background: #ca8a04; color:black; border:none; border-radius:4px; font-weight:bold; cursor:pointer; margin-bottom: 8px}
+.eldora-profile-style-e4b50000{flex:1; padding:10px; background: linear-gradient(180deg, #334155 0%, #1e293b 100%); color:white; border:1px solid #475569; border-radius:4px; font-weight:bold; cursor:pointer}
+.eldora-profile-style-3442af12{color:#94a3b8; font-style:italic; grid-column: 1 / -1; text-align:center; padding-top:30px; font-family:'Cinzel', serif}
+.eldora-profile-style-98b031ef{font-size:12px; margin-bottom:10px; text-align:center; color:#fbbf24; font-weight:bold}
+.eldora-profile-style-d6e5fed8{display:flex; justify-content:space-between}
+.eldora-profile-style-847ec13b{width:45px; height:45px; border-radius:50%; background:#0f172a; border:2px solid #ef4444; cursor:pointer; display:flex; justify-content:center; align-items:center; position:relative; transition: transform 0.1s}
+.eldora-profile-style-f369cd95{width:35px; height:35px; border-radius:50%; object-fit:cover}
+.eldora-profile-style-bba53f06{position:absolute; bottom:-8px; background:#000; font-size:10px; border-radius:6px; padding:1px 5px; border:1px solid #475569}
+
+#aba-perfil .eldora-profile-pane:not(.is-active) { display: none; }
+#aba-perfil .eldora-profile-pane.is-active { display: block; }
+
+
+
+/* Elementos com valores vindos dos dados do herói. */
+#aba-perfil .eldora-profile-pane:not(.is-active) { display: none; }
+#aba-perfil .eldora-profile-pane.is-active { display: block; }
+#aba-perfil .eldora-resource-track i,
+#aba-perfil .eldora-xp-track i { width: var(--progress, 0%); }
+#aba-perfil .eldora-profile-hero { background-image: var(--eldora-profile-banner, none); }
+.eldora-image-fallback { display: none; }
+.eldora-image-fallback.is-visible { display: inline-block; }
+.eldora-profession-icon-fallback { font-size: 1.6em; }
+#modal-item { display: none; }
+#modal-item.is-open { display: flex; }
+
+#aba-perfil .eldora-equipment-slot[data-empty="false"] {
+    border-color: #f59e0b !important;
+    background: rgba(245, 158, 11, .15) !important;
+    cursor: pointer;
+}
+#aba-perfil .eldora-equipment-slot[data-empty="true"] { cursor: default; }
+#aba-perfil .eldora-equipment-slot[data-slot="elmo"],
+#aba-perfil .eldora-equipment-slot[data-slot="colar"] { top: 12%; }
+#aba-perfil .eldora-equipment-slot[data-slot="arma"],
+#aba-perfil .eldora-equipment-slot[data-slot="brinco"] { top: 31%; }
+#aba-perfil .eldora-equipment-slot[data-slot="armadura"],
+#aba-perfil .eldora-equipment-slot[data-slot="calca"] { top: 50%; }
+#aba-perfil .eldora-equipment-slot[data-slot="luvas"],
+#aba-perfil .eldora-equipment-slot[data-slot="anel"] { top: 69%; }
+#aba-perfil .eldora-equipment-slot[data-slot="tool"],
+#aba-perfil .eldora-equipment-slot[data-slot="botas"] { top: 88%; }
+#aba-perfil .eldora-equipment-slot[data-slot="elmo"],
+#aba-perfil .eldora-equipment-slot[data-slot="arma"],
+#aba-perfil .eldora-equipment-slot[data-slot="armadura"],
+#aba-perfil .eldora-equipment-slot[data-slot="luvas"],
+#aba-perfil .eldora-equipment-slot[data-slot="tool"] { left: 12%; }
+#aba-perfil .eldora-equipment-slot[data-slot="colar"],
+#aba-perfil .eldora-equipment-slot[data-slot="brinco"],
+#aba-perfil .eldora-equipment-slot[data-slot="calca"],
+#aba-perfil .eldora-equipment-slot[data-slot="anel"],
+#aba-perfil .eldora-equipment-slot[data-slot="botas"] { left: 88%; }
+
+#aba-perfil .eldora-tool-slot {
+    position: relative;
+    display: flex;
+    min-height: 64px;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid #334155;
+    border-radius: 12px;
+    background: rgba(15, 23, 42, .84);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, .35);
+}
+#aba-perfil .eldora-tool-slot[data-empty="false"] {
+    border-color: #22c55e !important;
+    background: rgba(34, 197, 94, .12) !important;
+    cursor: pointer;
+}
+#aba-perfil .eldora-tool-slot[data-empty="true"] { cursor: default; }
+#aba-perfil .eldora-profile-style-b5fecb8f > div {
+    width: var(--progress, 0%);
+    height: 100%;
+    background: var(--durability-color, #22c55e);
+}
+#aba-perfil .eldora-profile-style-f8290e1f > div {
+    width: var(--progress, 0%);
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #a16207, #facc15);
+    box-shadow: 0 0 8px rgba(250, 204, 21, .6);
+}
+#aba-perfil .eldora-item-slot {
+    border: 2px solid var(--rarity-border, #475569);
+}
+#aba-perfil .eldora-item-durability-track i {
+    display: block;
+    width: var(--progress, 0%);
+    height: 100%;
+    border-radius: inherit;
+    background: var(--durability-color, #22c55e);
+}
+
+#aba-perfil .is-rarity-comum,
+#modal-item-raridade.is-rarity-comum { color: #cbd5e1; border-color: #64748b; }
+#aba-perfil .is-rarity-incomum,
+#aba-perfil .is-rarity-bom,
+#modal-item-raridade.is-rarity-incomum,
+#modal-item-raridade.is-rarity-bom { color: #4ade80; border-color: #22c55e; }
+#aba-perfil .is-rarity-raro,
+#modal-item-raridade.is-rarity-raro { color: #60a5fa; border-color: #3b82f6; }
+#aba-perfil .is-rarity-epico,
+#modal-item-raridade.is-rarity-epico { color: #c084fc; border-color: #a855f7; }
+#aba-perfil .is-rarity-lendario,
+#modal-item-raridade.is-rarity-lendario { color: #facc15; border-color: #eab308; }
+#aba-perfil .is-rarity-mitico,
+#modal-item-raridade.is-rarity-mitico { color: #22d3ee; border-color: #06b6d4; }
+#aba-perfil .is-rarity-unico,
+#modal-item-raridade.is-rarity-unico { color: #f87171; border-color: #ef4444; }
+
+#aba-perfil .eldora-profession-tool-icon {
+    display: flex;
+    position: relative;
+    width: 48px;
+    height: 48px;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid var(--tier-border, #475569);
+    border-radius: 10px;
+    background: var(--tier-background, #0f172a);
+    box-shadow: 0 0 10px var(--tier-glow, rgba(0, 0, 0, .5));
+}
+#aba-perfil .eldora-profession-tier-badge {
+    position: absolute;
+    right: -6px;
+    bottom: -6px;
+    padding: 2px 5px;
+    border-radius: 6px;
+    background: var(--tier-border, #475569);
+    color: #fff;
+    font-size: .6rem;
+    font-weight: 800;
+    text-shadow: 1px 1px 1px #000;
+}
+#aba-perfil .eldora-profession-xp-track > div { width: var(--progress, 0%); }
+
+
+/* Skins, grimório e janelas de habilidade. */
+#aba-perfil .eldora-skin-card {
+    min-height: 96px;
+    padding: 12px;
+    border: 1px solid rgba(139, 159, 186, .3);
+    border-radius: 12px;
+    background: linear-gradient(145deg, #1b2a3e, #111d2e);
+    color: #f4ead4;
+    text-align: center;
+    cursor: pointer;
+}
+#aba-perfil .eldora-skin-card.is-equipped {
+    border-color: #e6c574;
+    box-shadow: 0 0 12px rgba(230, 197, 116, .2);
+}
+#aba-perfil .eldora-spell-card {
+    position: relative;
+    display: flex;
+    aspect-ratio: 1;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid #334155;
+    border-radius: 12px;
+    background: rgba(15, 23, 42, .9);
+    cursor: pointer;
+    transition: transform .15s ease, box-shadow .15s ease;
+}
+#aba-perfil .eldora-spell-card.is-equipped {
+    border-color: #8b5cf6;
+    box-shadow: 0 0 12px rgba(139, 92, 246, .5);
+}
+#aba-perfil .eldora-spell-card:hover,
+#aba-perfil .eldora-skin-card:hover,
+#aba-perfil .eldora-combat-skill-slot:hover,
+#aba-perfil .eldora-skill-replacement:hover { transform: translateY(-2px) scale(1.03); }
+.eldora-skill-modal {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    z-index: 100000;
+    display: flex;
+    width: min(320px, calc(100vw - 28px));
+    flex-direction: column;
+    gap: 15px;
+    padding: 20px;
+    transform: translate(-50%, -50%);
+    border: 2px solid #8b5cf6;
+    border-radius: 16px;
+    background: rgba(15, 23, 42, .98);
+    box-shadow: 0 0 30px rgba(0, 0, 0, .8);
+    color: #fff;
+}
+.eldora-skill-modal-title { margin: 0; font-size: 16px; color: #c4b5fd; font-family: Cinzel, serif; }
+.eldora-skill-modal-title.is-unavailable { color: #ef4444; }
+#aba-perfil .eldora-combat-skill-slots {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(65px, 1fr));
+    gap: 12px;
+    padding: 15px;
+}
+#aba-perfil .eldora-combat-skill-slot {
+    position: relative;
+    display: flex;
+    width: 65px;
+    height: 65px;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid #334155;
+    border-radius: 10px;
+    background: #0f172a;
+    cursor: pointer;
+    transition: transform .15s ease, box-shadow .15s ease;
+}
+#aba-perfil .eldora-combat-skill-slot.is-equipped {
+    border-color: #8b5cf6;
+    box-shadow: 0 0 12px rgba(139, 92, 246, .4);
+}
+#aba-perfil .eldora-combat-skill-icon {
+    width: 50px;
+    height: 50px;
+    overflow: hidden;
+    border: 2px solid #1e293b;
+    border-radius: 50%;
+    background: #000;
+}
+#aba-perfil .eldora-combat-skill-image { width: 100%; height: 100%; object-fit: cover; }
+#aba-perfil .eldora-combat-skill-badge {
+    position: absolute;
+    right: -6px;
+    bottom: -6px;
+    padding: 2px 6px;
+    border: 2px solid #0f172a;
+    border-radius: 8px;
+    background: #8b5cf6;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 800;
+}
+
+.eldora-skill-action {
+    width: 100%;
+    min-height: 44px;
+    padding: 10px 14px;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    color: #fff;
+    font-weight: 800;
+    cursor: pointer;
+}
+.eldora-skill-action:disabled { opacity: .5; cursor: not-allowed; }
+.eldora-skill-action.is-remove { background: linear-gradient(180deg, #ef4444, #b91c1c); }
+.eldora-skill-action.is-equip { background: linear-gradient(180deg, #10b981, #047857); }
+
+.eldora-profession-total { color: var(--total-color, #f8fafc); }
+
+.eldora-profile-style-1b874464 > div {
+    width: var(--progress, 0%);
+    height: 100%;
+    border-radius: inherit;
+    background: var(--durability-color, #22c55e);
+    transition: width .3s ease;
 }

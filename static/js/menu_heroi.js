@@ -3,22 +3,118 @@
     const toggle = document.getElementById('btn-abrir-menu');
     if (!menu || !toggle) return;
     const blockers = '.modal-moderno, .eldora-modal, [role="dialog"], dialog[open], #tela-combate-global, #tela-pvp-global, #tela-raid-invasao, #forja-container, #refinaria-container, #mercado-container, #loja-reino-container, #loja-aventureiro-container, #rpg-dialogo-container, #modal-item';
+    let nivelBuscaId = '';
+    let perfilCarregadoId = '';
+    let nivelBuscaPendente = false;
+    let nivelTentarNovamenteEm = 0;
     const visible = el => {
         const style = getComputedStyle(el);
         return !el.hidden && style.display !== 'none' && style.visibility !== 'hidden' && Number(style.opacity) !== 0 && el.getClientRects().length > 0;
     };
+    function carregarPerfilParaNivel() {
+        const charId = String(window.eldoraCharacterId || localStorage.getItem('jogadorEldoraID') || '');
+        if (!charId) return;
+        if (nivelBuscaId !== charId) {
+            nivelBuscaId = charId;
+            perfilCarregadoId = '';
+            nivelTentarNovamenteEm = 0;
+        }
+        if (perfilCarregadoId === charId || nivelBuscaPendente || Date.now() < nivelTentarNovamenteEm) return;
+
+        nivelBuscaPendente = true;
+        fetch(`/perfil/${encodeURIComponent(charId)}?t=${Date.now()}`, { cache: 'no-store' })
+            .then(resposta => {
+                if (!resposta.ok) throw new Error('Não foi possível carregar o perfil do herói.');
+                return resposta.json();
+            })
+            .then(perfil => {
+                if (!perfil || perfil.erro) return;
+                const charIdAtual = String(window.eldoraCharacterId || localStorage.getItem('jogadorEldoraID') || '');
+                if (charIdAtual !== charId) return;
+                perfilCarregadoId = charId;
+                window.perfilDadosGlobais = { ...(window.perfilDadosGlobais || {}), ...perfil };
+                syncResumoHeroi();
+            })
+            .catch(() => { nivelTentarNovamenteEm = Date.now() + 15000; })
+            .finally(() => { nivelBuscaPendente = false; });
+    }
+    function syncNivelHeroi() {
+        const nivelEl = document.getElementById('eldora-menu-nivel') || document.querySelector('#side-menu .eldora-menu-avatar-selo');
+        const perfil = window.perfilDadosGlobais || {};
+        const nivel = Number.parseInt(perfil.level ?? perfil.nivel ?? window.eldoraCharacterLevel, 10);
+        const nivelValido = Number.isFinite(nivel) && nivel > 0;
+
+        if (nivelEl) {
+            const textoNivel = nivelValido ? String(nivel) : '…';
+            const tituloNivel = nivelValido ? `Nível ${nivel}` : 'Carregando nível do herói';
+            if (nivelEl.textContent !== textoNivel) nivelEl.textContent = textoNivel;
+            if (nivelEl.title !== tituloNivel) nivelEl.title = tituloNivel;
+        }
+    }
+    function resolverImagemAvatar(perfil, hudAvatar) {
+        let avatar = perfil.avatar_customizado;
+        if (avatar && typeof avatar === 'object') avatar = avatar.path || avatar.id || '';
+
+        const catalogo = window.CATALOGO_SISTEMA?.avatares || {};
+        if (typeof avatar === 'string' && avatar && avatar !== 'padrao') {
+            if (catalogo[avatar]?.path) return catalogo[avatar].path;
+            if (/^https?:\/\//i.test(avatar) || avatar.startsWith('/static/')) return avatar;
+            const nomeArquivo = avatar.startsWith('avatar_') ? avatar : `avatar_${avatar}`;
+            return `https://raw.githubusercontent.com/Eldorabotpy/static-img/refs/heads/main/assets/avatares/${nomeArquivo}.png`;
+        }
+
+        if (typeof perfil.avatar === 'string' && perfil.avatar && perfil.avatar !== 'padrao') return perfil.avatar;
+        if (hudAvatar?.src && !hudAvatar.src.includes('placehold.co')) return hudAvatar.src;
+        return '';
+    }
+    function sincronizarBannerPerfil(perfil) {
+        const resumo = document.getElementById('eldora-menu-resumo');
+        if (!resumo) return;
+
+        let banner = perfil.banner_customizado;
+        if (banner && typeof banner === 'object') banner = banner.path || banner.id || '';
+        const catalogo = window.CATALOGO_SISTEMA?.banners || {};
+        let url = '';
+        if (typeof banner === 'string' && banner && banner !== 'padrao') {
+            if (catalogo[banner]?.path) url = catalogo[banner].path;
+            else if (/^https?:\/\//i.test(banner) || banner.startsWith('/static/')) url = banner;
+        }
+
+        let bannerCss = 'none';
+        if (url) {
+            try {
+                const seguro = new URL(url, window.location.origin);
+                if (seguro.protocol === 'https:' || seguro.origin === window.location.origin) {
+                    const escapado = seguro.href.replace(/\\/g, '%5C').replace(/"/g, '%22');
+                    bannerCss = `url("${escapado}")`;
+                }
+            } catch (_) {}
+        }
+        if (resumo.dataset.eldoraBannerCss === bannerCss) return;
+        resumo.style.setProperty('--eldora-menu-banner', bannerCss);
+        resumo.dataset.eldoraBannerCss = bannerCss;
+    }
     function syncResumoHeroi() {
+        carregarPerfilParaNivel();
+        const perfil = window.perfilDadosGlobais || {};
         const nome = window.eldoraCharacterName || localStorage.getItem('jogadorEldoraNome') || 'Aventureiro';
         const nomeEl = document.getElementById('eldora-menu-nome-heroi');
         if (nomeEl && nomeEl.textContent !== nome) nomeEl.textContent = nome;
+        syncNivelHeroi();
+        sincronizarBannerPerfil(perfil);
 
         const hudAvatar = document.getElementById('hud-img-avatar');
         const menuAvatar = document.getElementById('eldora-menu-avatar');
         const avatarWrap = document.getElementById('eldora-menu-avatar-wrap');
-        if (hudAvatar?.src && menuAvatar && !hudAvatar.src.includes('placehold.co') && menuAvatar.src !== hudAvatar.src) {
-            menuAvatar.src = hudAvatar.src;
-            menuAvatar.onload = () => avatarWrap?.classList.add('tem-avatar');
-            menuAvatar.onerror = () => avatarWrap?.classList.remove('tem-avatar');
+        const avatarUrl = resolverImagemAvatar(perfil, hudAvatar);
+        if (avatarUrl && menuAvatar) {
+            let avatarFinal = '';
+            try { avatarFinal = new URL(avatarUrl, window.location.origin).href; } catch (_) {}
+            if (avatarFinal && menuAvatar.src !== avatarFinal) {
+                menuAvatar.src = avatarFinal;
+                menuAvatar.onload = () => avatarWrap?.classList.add('tem-avatar');
+                menuAvatar.onerror = () => avatarWrap?.classList.remove('tem-avatar');
+            }
         }
 
         [
@@ -75,6 +171,7 @@
             }
         });
     };
+    window.atualizarResumoHeroiMenu = syncResumoHeroi;
     document.addEventListener('keydown', e => {
         if (!menu.classList.contains('aberto')) return;
         if (e.key === 'Escape') { window.fecharMenu(); toggle.focus(); }

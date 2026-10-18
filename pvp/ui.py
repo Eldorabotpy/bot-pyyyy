@@ -109,8 +109,8 @@ def build_arena_screen(
     xp = int(pdata.get("xp", 0) or 0)
     xp_max = int(pdata.get("xp_to_level", pdata.get("next_xp", 1)) or 1)
 
-    # 🎟️ Entradas da Arena (opcional, vindo do handler)
-    ticket_qty = pdata.get("_ticket_arena_qty")
+    # 🎟️ Cota compartilhada com o Coliseu PvP web
+    quota = pdata.get("_coliseu_daily_quota")
 
     lines = []
     lines.append(t["top"].format(title=t["title"]))
@@ -119,8 +119,12 @@ def build_arena_screen(
     lines.append(f'{t["mid"]}🏆 <b>Elo:</b> {elo_name} ({points} pts)')
     lines.append(f'{t["mid"]}📊 <b>Histórico:</b> {wins}V / {losses}D')
 
-    if ticket_qty is not None:
-        lines.append(f'{t["mid"]}🎟️ <b>Entradas da Arena:</b> {int(ticket_qty)}')
+    if quota:
+        lines.append(
+            f'{t["mid"]}🎟️ <b>Entradas grátis hoje:</b> '
+            f'{int(quota.get("restantes", 0))}/{int(quota.get("limite", 10))}'
+        )
+        lines.append(f'{t["mid"]}💎 <b>Tickets extras:</b> {int(quota.get("tickets", 0))}')
 
     lines.append(t["pipe"])
     lines.append(f'{t["mid"]}❤️ <b>HP</b> {hp}/{max_hp} {bar(hp, max_hp, 10)}')

@@ -253,7 +253,9 @@ def provider_login(provider):
                 account.update(telegram_credentials(data, col))
             col.insert_one(account)
         else:
-            return jsonify(erro='Identidade ainda não vinculada. Entre na conta antiga e vincule, ou escolha Criar nova conta.'), 409
+            if provider == 'google':
+                return jsonify(erro='Este Google ainda não está vinculado a uma conta-mestre. Se você já tem personagens, entre na conta existente com usuário e senha ou Telegram e vincule o Google em Conta Eldora. Não crie outra conta para recuperar seus personagens.'), 409
+            return jsonify(erro='Este Telegram ainda não está vinculado a uma conta-mestre. Se você já tem personagens, entre na conta existente e vincule o Telegram em Conta Eldora.'), 409
         start_session(account, auth_method=provider)
         return jsonify(account_payload(account))
     except ImportError:

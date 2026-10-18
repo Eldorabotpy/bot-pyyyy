@@ -17,6 +17,41 @@ ELO_DISPLAY = {
     "Mestre da Arena": "👑 Mestre da Arena",
 }
 
+# Metadados visuais e nomes públicos dos elos no Coliseu Web.
+# Mantemos as chaves originais para preservar compatibilidade com o PvP legado.
+ELO_TIER_META = {
+    "Bronze": {
+        "id": "bronze",
+        "nome": "Bronze",
+        "cor": "#c8844b",
+        "icone": "/static/assets/pvp/elos/bronze.svg",
+    },
+    "Prata": {
+        "id": "prata",
+        "nome": "Prata",
+        "cor": "#c6d8e5",
+        "icone": "/static/assets/pvp/elos/prata.svg",
+    },
+    "Ouro": {
+        "id": "ouro",
+        "nome": "Ouro",
+        "cor": "#f2ca62",
+        "icone": "/static/assets/pvp/elos/ouro.svg",
+    },
+    "Diamante": {
+        "id": "diamante",
+        "nome": "Diamante",
+        "cor": "#70d8ea",
+        "icone": "/static/assets/pvp/elos/diamante.svg",
+    },
+    "Mestre da Arena": {
+        "id": "mestre",
+        "nome": "Mestre",
+        "cor": "#d6a8ff",
+        "icone": "/static/assets/pvp/elos/mestre.svg",
+    },
+}
+
 # Dicionário com as recompensas semanais para cada Elo
 # A chave é o nome do Elo, o valor é um dicionário de recompensas {item_id: quantidade}
 WEEKLY_REWARDS = {

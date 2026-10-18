@@ -1,15 +1,26 @@
 <div id="coliseu-pvp-modal" class="coliseu-overlay" hidden aria-hidden="true">
     <section class="coliseu-panel" role="dialog" aria-modal="true" aria-labelledby="coliseu-title">
         <button id="coliseu-close" class="coliseu-close" type="button" aria-label="Fechar">×</button>
-        <div class="coliseu-emblem" aria-hidden="true">⚔️</div>
+        <div class="coliseu-emblem" aria-hidden="true">
+            <img src="https://raw.githubusercontent.com/Eldorabotpy/static-img/refs/heads/main/assets/ui/Espadas_do_coliseu.png" alt="" loading="eager">
+        </div>
         <p class="coliseu-kicker">ARENA REAL</p>
         <h2 id="coliseu-title">Coliseu de Eldora</h2>
-        <p class="coliseu-intro">O ranking inclui os personagens mesmo offline. Escolha um adversário salvo e lute contra o espelho controlado pelo jogo.</p>
+        <p class="coliseu-intro">O Coliseu é o palco dos grandes guerreiros. Escolha um rival, lute por Elo e conquiste seu lugar na temporada.</p>
+
+        <section class="coliseu-entry-quota" aria-live="polite" aria-labelledby="coliseu-entry-quota-title">
+            <div class="coliseu-entry-quota-icon" aria-hidden="true">🎟️</div>
+            <div class="coliseu-entry-quota-copy">
+                <strong id="coliseu-entry-quota-title">10 entradas gratuitas por dia</strong>
+                <span id="coliseu-entry-quota-detail">Conecte-se para consultar suas entradas e tickets extras.</span>
+            </div>
+            <button id="coliseu-buy-ticket" type="button">Comprar ticket · 10 💎</button>
+        </section>
 
         <div class="coliseu-mode-card">
             <div>
                 <h3>PvP ranqueado</h3>
-                <p>Os adversários vêm das contas cadastradas no reino. Eles podem estar offline: o Coliseu usa o espelho da defesa salva.</p>
+                <p>Desafie guerreiros do reino, suba nas patentes e grave seu nome entre os campeões de Eldora.</p>
             </div>
             <button id="coliseu-refresh-opponents" type="button">Buscar adversários</button>
         </div>
@@ -37,6 +48,49 @@
         </div>
 
         <p id="coliseu-season-status" class="coliseu-season-status">Temporada ranqueada de 35 dias · Top 3 recebe 50, 20 e 5 gemas.</p>
+
+        <section id="coliseu-my-rank" class="coliseu-my-rank" aria-live="polite" hidden>
+            <div class="coliseu-my-rank-main">
+                <img id="coliseu-my-rank-emblem" class="coliseu-my-rank-emblem" alt="" hidden>
+                <div class="coliseu-my-rank-copy">
+                    <p>SUA PATENTE</p>
+                    <h3 id="coliseu-my-rank-title">Carregando…</h3>
+                    <span id="coliseu-my-rank-name"></span>
+                </div>
+                <div class="coliseu-my-rank-stats">
+                    <strong id="coliseu-my-rank-points" class="coliseu-my-rank-points"></strong>
+                    <span id="coliseu-my-rank-position" class="coliseu-my-rank-position" hidden></span>
+                </div>
+            </div>
+            <div id="coliseu-my-rank-progress" class="coliseu-my-rank-progress" hidden>
+                <div><span id="coliseu-my-rank-next"></span><strong id="coliseu-my-rank-remaining"></strong></div>
+                <div class="coliseu-my-rank-track" role="progressbar" aria-label="Progresso para a próxima patente" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                    <span id="coliseu-my-rank-fill"></span>
+                </div>
+            </div>
+            <p id="coliseu-my-rank-record" class="coliseu-my-rank-record"></p>
+        </section>
+
+        <details id="coliseu-match-history" class="coliseu-match-history" hidden>
+            <summary>
+                <strong>Histórico ranqueado</strong>
+                <span id="coliseu-match-history-count">Últimas partidas</span>
+            </summary>
+            <ol id="coliseu-match-history-list" class="coliseu-match-history-list"></ol>
+        </details>
+
+        <section class="coliseu-elo-section" aria-labelledby="coliseu-elo-title">
+            <div class="coliseu-elo-heading">
+                <div>
+                    <h3 id="coliseu-elo-title">Elos da temporada</h3>
+                    <p>Veja as cinco patentes de cada elo. I é a inicial; V é a mais alta.</p>
+                </div>
+                <span id="coliseu-elo-total" class="coliseu-elo-total">0 jogadores</span>
+            </div>
+            <div id="coliseu-elo-distribution" class="coliseu-elo-grid" aria-live="polite">
+                <p class="coliseu-elo-empty">Carregando os elos da temporada…</p>
+            </div>
+        </section>
 
         <p id="coliseu-status" class="coliseu-status" role="status" aria-live="polite">A busca inclui as contas cadastradas, mesmo quando os jogadores estão offline.</p>
         <button id="coliseu-cancel-queue" class="coliseu-cancel" type="button" hidden>Cancelar busca</button>

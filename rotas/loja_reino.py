@@ -7,6 +7,8 @@ CATALOGO_FLORA = {
     "incubadora_pet": {"nome": "Incubadora · 1 uso", "preco": 25},
     "pocao_xp_boost": {"nome": "Poção de XP P", "preco": 15},
     "pocao_xp_boost_g": {"nome": "Poção de XP G", "preco": 60},
+    "ticket_coliseu_pvp": {"nome": "Ticket de Entrada do Coliseu", "preco": 5},
+    "chave_masmorra": {"nome": "Chave de Masmorra", "preco": 20},
 }
 
 def registrar_loja_reino(socketio, db, jogadores_online):
@@ -37,6 +39,29 @@ def registrar_loja_reino(socketio, db, jogadores_online):
             else:
                 emit('respostaCompraGema', {'sucesso': False, 'mensagem': 'Gemas insuficientes! Custa 25 💎.'})
             return
+        if item == 'ticket_coliseu_pvp':
+            # O saldo de tickets e as gemas são alterados juntos, sem risco de cobrança parcial.
+            resultado = users_collection.update_one(
+                {'_id': oid, 'gems': {'$gte': produto['preco']}},
+                {'$inc': {'gems': -produto['preco'], 'coliseu_pvp_entry_tickets': 1}},
+            )
+            if resultado.modified_count:
+                emit('respostaCompraGema', {
+                    'sucesso': True,
+                    'mensagem': 'Ticket adicionado à sua conta. Ele será usado automaticamente depois das 10 entradas gratuitas diárias.',
+                })
+            else:
+                emit('respostaCompraGema', {
+                    'sucesso': False,
+                    'mensagem': f"Gemas insuficientes! O Ticket de Entrada do Coliseu custa {produto['preco']} 💎.",
+                })
+            return
+        mensagem_sucesso = f"{produto['nome']} entregue na mochila. Use para ativar o XP dobrado!"
+        if item == 'chave_masmorra':
+            mensagem_sucesso = (
+                'Chave de Masmorra adicionada à mochila. '
+                'Ela será consumida ao iniciar uma nova expedição.'
+            )
         # Comparação do inventário evita sobrescrever compras/consumos concorrentes.
         for _ in range(3):
             jogador = users_collection.find_one({'_id': oid})
@@ -57,6 +82,6 @@ def registrar_loja_reino(socketio, db, jogadores_online):
                  'inventory': anterior if 'inventory' in jogador else {'$exists': False}},
                 {'$inc': {'gems': -produto['preco']}, '$set': {'inventory': inventario}})
             if resultado.modified_count:
-                emit('respostaCompraGema', {'sucesso': True, 'mensagem': f"{produto['nome']} entregue na mochila. Use para ativar o XP dobrado!"})
+                emit('respostaCompraGema', {'sucesso': True, 'mensagem': mensagem_sucesso})
                 return
         emit('respostaCompraGema', {'sucesso': False, 'mensagem': 'O inventário mudou. Tente novamente.'})

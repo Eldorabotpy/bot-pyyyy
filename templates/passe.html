@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Passe de Temporada - Eldora</title>
-    <link rel="stylesheet" href="/static/css/season_pass.css?v=6">
+    <link rel="stylesheet" href="/static/css/season_pass.css?v=7">
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -28,6 +28,8 @@
 
         <div class="pass-status-bar">
             <span id="status-premium">Status: <b style="color: #7f8c8d;">GRÁTIS</b></span>
+            <span class="pass-season-fragment-rates">Grátis: 25/mês · Pago: +60 · Total Premium: 85/mês</span>
+            <span class="pass-skin-fragments">✨ Fragmentos de Skin: <b id="fragmentos-skin-passe">0</b></span>
             <button id="btn-comprar-premium" class="btn-premium">ATIVAR PREMIUM 💎</button>
         </div>
 
@@ -37,10 +39,11 @@
 
         <div class="pass-rewards-list" id="lista-recompensas">
             </div>
+        <div id="controles-pagina-passe" class="pass-page-controls"></div>
         
         <button class="btn-fechar" onclick="window.history.back()">VOLTAR AO MAPA</button>
     </div>
 
-    <script src="/static/js/season_pass.js?v=99"></script>
+    <script src="/static/js/season_pass.js?v=100"></script>
 </body>
 </html>

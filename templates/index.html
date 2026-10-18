@@ -19,14 +19,14 @@
     <link rel="stylesheet" href="/static/css/style.css?v=304">
     <link rel="stylesheet" href="/static/css/perfil.css">
     <link rel="stylesheet" href="/static/css/perfil_moderno.css?v=1">
-    <link rel="stylesheet" href="/static/css/perfil_redesign.css?v=20261016">
+    <link rel="stylesheet" href="/static/css/perfil_customizador_v2.css?v=2">
     <link rel="stylesheet" href="/static/css/ui_game.css">
     <link rel="stylesheet" href="/static/css/estilos_combate.css?v=113">
     <link rel="stylesheet" href="/static/css/arena_pvp.css">
-    <link rel="stylesheet" href="/static/css/coliseu_pvp.css?v=3">
-    <link rel="stylesheet" href="/static/css/social.css?v=999">
+    <link rel="stylesheet" href="/static/css/coliseu_pvp.css?v=16">
+    <link rel="stylesheet" href="/static/css/social.css?v=1001">
     <link rel="stylesheet" href="/static/css/missoes.css?v9">
-    <link rel="stylesheet" href="/static/css/loja_reino.css?v=3">
+    <link rel="stylesheet" href="/static/css/loja_reino.css?v=5">
     <link rel="stylesheet" href="/static/css/guild_missions.css?v=2">
     <link rel="stylesheet" href="/static/css/loja_premium.css?v=2">
     <style>
@@ -571,11 +571,19 @@
         }
     </style>
     <link rel="stylesheet" href="/static/css/dialogos_eldora.css?v=2">
-    <script src="/static/js/dialogos_eldora.js?v=1"></script>
+    <link rel="stylesheet" href="/static/css/dialogos_compactos_v1.css?v=3">
+    <script src="/static/js/dialogos_eldora.js?v=2"></script>
     <link rel="stylesheet" href="/static/css/runas.css?v=1">
-    <script src="/static/js/runas.js?v=1"></script>
-<link rel="stylesheet" href="/static/css/menu_heroi.css?v=3">
-    <script defer src="/static/js/menu_heroi.js?v=3"></script>
+    <script src="/static/js/runas.js?v=2"></script>
+<link rel="stylesheet" href="/static/css/menu_heroi.css?v=6">
+    <script defer src="/static/js/menu_heroi.js?v=6"></script>
+    <link rel="stylesheet" href="/static/css/perfil_redesign.css?v=20261016-4">
+    <link rel="stylesheet" href="/static/css/perfil_redesign_v1.css?v=20261016-2">
+    <link rel="stylesheet" href="/static/css/perfil_composicao_v2.css?v=20261016-5">
+    <link rel="stylesheet" href="/static/css/perfil_profissoes_v1.css?v=20261016-2">
+    <link rel="stylesheet" href="/static/css/perfil_abas_v1.css?v=20261016-3">
+    <link rel="stylesheet" href="/static/css/menu_equipamentos_v1.css?v=20261016-1">
+    <link rel="stylesheet" href="/static/css/perfil_bestiario_button.css?v=20261016-1">
 </head>
 <body>
 
@@ -867,7 +875,7 @@
         </div>
 
 
-        <section class="eldora-menu-resumo" aria-label="Resumo do herói">
+        <section id="eldora-menu-resumo" class="eldora-menu-resumo" aria-label="Resumo do herói">
             <div class="eldora-menu-resumo-topo">
                 <span>HERÓI ATIVO</span>
                 <span class="eldora-menu-presenca"><i aria-hidden="true"></i> EM JORNADA</span>
@@ -1109,14 +1117,14 @@
             <div class="perfil-container-moderno social-container">
                 <div class="social-header">
                     <h2 style="margin: 0; font-size: 1.2em; color: #f1c40f;">🍻 Taverna de Eldora</h2>
-                    <button class="btn-fechar-social" onclick="const inputChat=document.getElementById('input-chat'); if(inputChat) inputChat.blur(); document.getElementById('hub-social').style.display='none'; document.querySelectorAll('.btn-passe-mapa, .btn-social-mapa').forEach(b => b.style.display='flex');">X</button>
+                    <button type="button" class="btn-fechar-social" aria-label="Fechar chat" title="Fechar chat" onclick="const inputChat=document.getElementById('input-chat'); if(inputChat) inputChat.blur(); document.getElementById('hub-social').style.display='none'; document.querySelectorAll('.btn-passe-mapa, .btn-social-mapa').forEach(b => b.style.display='flex');">X</button>
                 </div>
             
                 <div class="social-abas">
                     <button class="aba-soc active" onclick="mudarAbaSocial('chat', this)">Chat</button>
                     <button class="aba-soc" onclick="mudarAbaSocial('amigos', this)">Amigos</button>
                     <button class="aba-soc" onclick="mudarAbaSocial('grupo', this)">Grupo</button>
-                    <button class="aba-soc" onclick="mudarAbaSocial('guilda', this)">Guilda</button>
+                    <button class="aba-soc" onclick="mudarAbaSocial('guilda', this)">Clã</button>
                 </div>
 
                 <div id="conteudo-social" class="social-content">
@@ -1168,14 +1176,13 @@
     </div>
     
     <div id="aba-perfil" class="tab-content" style="background: transparent;">
-        <div class="eldora-profile-codex-trigger" style="position: absolute; top: 75px; right: 8px; z-index: 30;">
-            <button onclick="if(window.abrirCodiceHunter) window.abrirCodiceHunter()" 
+        <div class="eldora-profile-codex-trigger">
+            <button type="button"
+                    onclick="if(window.abrirCodiceHunter) window.abrirCodiceHunter()"
                     class="eldora-profile-codex-button"
-                    style="background: #2b1d12; border: 2px solid #d4af37; border-radius: 50%; width: 50px; height: 50px; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; font-size: 24px; transition: transform 0.2s;"
-                    onmouseover="this.style.transform='scale(1.1)'" 
-                    onmouseout="this.style.transform='scale(1)'"
+                    aria-label="Abrir Códice do Caçador"
                     title="Códice do Caçador">
-                📖
+                <img src="https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/perfil/baetiario.png" alt="" loading="lazy">
             </button>
         </div>
 
@@ -1198,14 +1205,14 @@
         </div> 
     </div>
     <script src="/static/js/audio_manager.js?v=1"></script>
-    <script src="/static/js/forja_imagens.js?v=2"></script>
+    <script src="/static/js/forja_imagens.js?v=3"></script>
     <script src="/static/js/forja.js?v=3"></script>
     <script src="/static/js/refinaria.js?v=2"></script>
     <script src="/static/js/npc_missoes_ui.js"></script>
     <script src="/static/js/profissao_ui.js"></script>
     <script src="/static/js/hud_core.js?v=aqui112"></script>
     <script src="/static/js/perfil_visual.js?v=1113"></script>
-    <script src="/static/js/perfil.js?v=1120"></script>
+    <script src="/static/js/perfil.js?v=20261017-1"></script>
     <link rel="stylesheet" href="/static/css/companheiros.css?v=3">
     <link rel="stylesheet" href="/static/css/bestiario.css?v=3">
     <script src="/static/js/companheiros.js?v=6"></script>
@@ -1213,14 +1220,14 @@
     <script src="/static/js/mapa_hud.js?v=22"></script>
     <script src="/static/js/hud_invasao.js"></script>
     <script src="/static/js/mapa_invasao.js?v=1"></script>
-    <script src="/static/js/mapa_interativo.js?v=12"></script>
-    <script src="/static/js/mapa_multiplayer.js?v=27"></script>
+    <script src="/static/js/mapa_interativo.js?v=16"></script>
+    <script src="/static/js/mapa_multiplayer.js?v=28"></script>
     <script src="/static/js/mercado.js?v=1258"></script>
     <script src="/static/js/central_eldora.js?v=4"></script>
     <script src="/static/js/cla.js?v=8"></script>
     <script src="/static/js/guild_missions.js?v=3"></script>
     <script src="/static/js/loja_aventureiro.js?v=5"></script>
-    <script src="/static/js/loja_reino.js?v=2"></script>
+    <script src="/static/js/loja_reino.js?v=3"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="/static/js/loja_premium.js?v=6"></script>
     <link rel="stylesheet" href="/static/css/bruxa_pocoes.css?v=5">
@@ -1241,8 +1248,8 @@
     <!-- 🌀 SISTEMA DE PORTAIS -->
     <script src="/static/js/portal_manager.js?v=1"></script>
 
-    <script src="/static/js/mapa.js?v=9940"></script>
-    <script src="/static/js/coliseu_pvp.js?v=4"></script>
+    <script src="/static/js/mapa.js?v=9942"></script>
+    <script src="/static/js/coliseu_pvp.js?v=17"></script>
 
     <script>
         if (window.Telegram && window.Telegram.WebApp) {

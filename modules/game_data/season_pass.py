@@ -1,11 +1,22 @@
 # modules/game_data/season_pass.py
 
 XP_POR_NIVEL_PASSE = 100
+NIVEIS_PASSE_POR_TEMPORADA = 100
+FRAGMENTOS_SKIN_GRATIS_POR_TEMPORADA = 25
+FRAGMENTOS_SKIN_PREMIUM_EXTRA_POR_TEMPORADA = 60
+FRAGMENTOS_SKIN_POR_MARCO_PREMIUM = 5
+
+# Em uma temporada de 100 níveis, a faixa grátis dá 1 fragmento a cada
+# quatro níveis. A faixa Premium acrescenta 5 fragmentos a cada oito níveis.
+INTERVALO_FRAGMENTOS_GRATIS = NIVEIS_PASSE_POR_TEMPORADA // FRAGMENTOS_SKIN_GRATIS_POR_TEMPORADA
+INTERVALO_FRAGMENTOS_PREMIUM = NIVEIS_PASSE_POR_TEMPORADA // (FRAGMENTOS_SKIN_PREMIUM_EXTRA_POR_TEMPORADA // FRAGMENTOS_SKIN_POR_MARCO_PREMIUM)
+NIVEIS_FRAGMENTOS_GRATIS = set(range(INTERVALO_FRAGMENTOS_GRATIS, NIVEIS_PASSE_POR_TEMPORADA + 1, INTERVALO_FRAGMENTOS_GRATIS))
+NIVEIS_FRAGMENTOS_PREMIUM = set(range(INTERVALO_FRAGMENTOS_PREMIUM, NIVEIS_PASSE_POR_TEMPORADA + 1, INTERVALO_FRAGMENTOS_PREMIUM))
 
 RECOMPENSAS_PASSE = {}
 
 # O GERADOR COMPLETO: Matemática Modesta + Coleção S1 (1 a 100)
-for i in range(1, 101):
+for i in range(1, NIVEIS_PASSE_POR_TEMPORADA + 1):
     
     # ==========================================
     # 1. BASE DOS NÍVEIS (Modesto)
@@ -89,7 +100,11 @@ for i in range(1, 101):
     # Salva no dicionário do passe
     RECOMPENSAS_PASSE[i] = {
         "free": free,
-        "premium": premium
+        "premium": premium,
+        "fragmentos_skin": {
+            "free": 1 if i in NIVEIS_FRAGMENTOS_GRATIS else 0,
+            "premium": FRAGMENTOS_SKIN_POR_MARCO_PREMIUM if i in NIVEIS_FRAGMENTOS_PREMIUM else 0,
+        },
     }
 
 def adicionar_xp_passe(
@@ -146,7 +161,6 @@ def adicionar_xp_passe(
         passe["level"] += 1
         passe["xp"] -= XP_POR_NIVEL_PASSE
         subiu_nivel = True
-
     return (
         subiu_nivel,
         passe["level"],

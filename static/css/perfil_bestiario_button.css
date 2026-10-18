@@ -1,0 +1,65 @@
+/* Ícone ilustrado do Códice no cabeçalho do perfil. */
+#aba-perfil .eldora-profile-codex-trigger {
+    position: absolute;
+    top: 75px;
+    right: 8px;
+    z-index: 30;
+}
+
+#aba-perfil .eldora-profile-codex-button {
+    display: grid !important;
+    width: 58px !important;
+    height: 58px !important;
+    place-items: center;
+    padding: 0 !important;
+    overflow: visible;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    cursor: pointer;
+    transition: transform .18s ease, filter .18s ease;
+    -webkit-tap-highlight-color: transparent;
+}
+
+#aba-perfil .eldora-profile-codex-button img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    filter: drop-shadow(0 3px 5px rgba(0, 0, 0, .62));
+    pointer-events: none;
+}
+
+#aba-perfil .eldora-profile-codex-button:hover {
+    transform: scale(1.08);
+    filter: brightness(1.08);
+}
+
+#aba-perfil .eldora-profile-codex-button:active {
+    transform: scale(.94);
+}
+
+#aba-perfil .eldora-profile-codex-button:focus-visible {
+    outline: 2px solid #e6c574;
+    outline-offset: 2px;
+    border-radius: 8px !important;
+}
+
+@media (max-width: 640px) {
+    #aba-perfil .eldora-profile-codex-trigger {
+        top: 75px;
+        right: 7px;
+    }
+
+    #aba-perfil .eldora-profile-codex-button {
+        width: 56px !important;
+        height: 56px !important;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #aba-perfil .eldora-profile-codex-button {
+        transition: none;
+    }
+}

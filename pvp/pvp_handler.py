@@ -1,5 +1,5 @@
 # pvp/pvp_handler.py
-# (VERSÃO 5.4: PvP por inventário, sem limite diário, menu resiliente, ordem de handlers corrigida)
+# (VERSÃO 5.5: entradas compartilhadas do Coliseu, menu resiliente, ordem de handlers corrigida)
 
 import logging
 import random
@@ -27,6 +27,7 @@ from . import pvp_battle
 from . import pvp_utils
 from . import tournament_system
 from .ui import build_arena_screen
+from .entry_quota import DAILY_FREE_ENTRIES, consume_daily_entries, get_daily_entry_quota
 from modules.game_data import regions as game_data_regions
 
 from modules.auth_utils import get_current_player_id, requires_login
@@ -58,8 +59,6 @@ PVP_HISTORICO = "pvp_historico"
 PVP_THEME_MENU = "pvp_theme_menu"
 PVP_THEME_SET_PREFIX = "pvp_theme_set:"  # ex: pvp_theme_set:sombrio
 
-# Ticket/Entrada do PvP (inventário)
-PVP_TICKET_KEY = "ticket_arena"
 WAR_PVP_PICK_PREFIX = "war_pvp_pick:"
 WAR_PVP_REFRESH = "war_pvp_refresh"
 
@@ -129,85 +128,11 @@ def _is_war_pvp_on_cooldown(pdata: dict) -> tuple[bool, int]:
     secs = int((end - now).total_seconds())
     return (True, secs)
 
-# ==============================
-# UTILS INVENTÁRIO (robustos)
-# ==============================
 def _safe_str(x) -> str:
     try:
         return str(x)
     except Exception:
         return "<err>"
-
-
-def _inv_get_qty(pdata: dict, item_key: str) -> int:
-    """
-    Lê quantidade de um item no inventário.
-    Suporta:
-      - inventory: {"ticket_arena": 3, ...}
-      - inventory: {"items": {"ticket_arena": 3}}
-      - inventory: [{"id":"ticket_arena","qty":3}] (ou key/item_id/name + qty/amount/count)
-    """
-    inv = pdata.get("inventory") or {}
-
-    # dict direto ou dict com "items"
-    if isinstance(inv, dict):
-        if "items" in inv and isinstance(inv["items"], dict):
-            try:
-                return int(inv["items"].get(item_key, 0) or 0)
-            except Exception:
-                return 0
-        try:
-            return int(inv.get(item_key, 0) or 0)
-        except Exception:
-            return 0
-
-    # lista de itens
-    if isinstance(inv, list):
-        for it in inv:
-            if not isinstance(it, dict):
-                continue
-            k = it.get("id") or it.get("key") or it.get("item_id") or it.get("name")
-            if k == item_key:
-                v = it.get("qty") or it.get("amount") or it.get("count") or it.get("qtd") or 0
-                try:
-                    return int(v)
-                except Exception:
-                    return 0
-
-    return 0
-
-
-def _inv_set_qty(pdata: dict, item_key: str, qty: int):
-    """
-    Escreve quantidade de um item no inventário (mesmos formatos do _inv_get_qty).
-    """
-    qty = max(0, int(qty))
-    inv = pdata.get("inventory")
-
-    if inv is None:
-        pdata["inventory"] = {}
-        inv = pdata["inventory"]
-
-    if isinstance(inv, dict):
-        if "items" in inv and isinstance(inv["items"], dict):
-            inv["items"][item_key] = qty
-        else:
-            inv[item_key] = qty
-        return
-
-    if isinstance(inv, list):
-        for it in inv:
-            if not isinstance(it, dict):
-                continue
-            k = it.get("id") or it.get("key") or it.get("item_id") or it.get("name")
-            if k == item_key:
-                it["qty"] = qty
-                return
-        inv.append({"id": item_key, "qty": qty})
-        return
-
-    # fallback: normaliza para dict
-    pdata["inventory"] = {item_key: qty}
 
 
 def _try_objectid(x):
@@ -352,12 +277,8 @@ async def pvp_menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
         return
 
-    # Entradas atuais (inventário)
-    ticket_qty = 0
-    try:
-        ticket_qty = _inv_get_qty(pdata, PVP_TICKET_KEY)
-    except Exception:
-        ticket_qty = 0
+    # O PvP normal e o Coliseu web compartilham a mesma cota diária.
+    quota = get_daily_entry_quota(users_collection, str(user_id)) if users_collection is not None else None
 
     points = int(pdata.get("pvp_points", 0))
     wins = int(pdata.get("pvp_wins", 0))
@@ -375,8 +296,7 @@ async def pvp_menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         media_key = "pvp_arena_media"
     media = file_ids.get_file_data(media_key) or file_ids.get_file_data("menu_arena_pvp")
 
-    # injeta contagem para UI, sem depender de "pvp_entries"
-    pdata["_ticket_arena_qty"] = ticket_qty
+    pdata["_coliseu_daily_quota"] = quota
 
     txt = build_arena_screen(
         pdata=pdata,
@@ -388,9 +308,14 @@ async def pvp_menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         day_desc=day_desc,
     )
 
-    # Botões (sem "usar ticket" para virar entrada; ticket já é a entrada)
+    quota_label = "cota indisponível"
+    if quota:
+        quota_label = f'{quota["restantes"]}/{quota["limite"]} grátis'
+        if quota["tickets"]:
+            quota_label += f' · 🎟️ {quota["tickets"]}'
+
     kb = [
-        [InlineKeyboardButton(f"⚔️ PROCURAR OPONENTE  (🎟️ {ticket_qty})", callback_data=PVP_PROCURAR_OPONENTE)],
+        [InlineKeyboardButton(f"⚔️ PROCURAR OPONENTE ({quota_label})", callback_data=PVP_PROCURAR_OPONENTE)],
         [
             InlineKeyboardButton("🏆 Ranking", callback_data=PVP_RANKING),
             InlineKeyboardButton("📜 Histórico", callback_data=PVP_HISTORICO),
@@ -468,7 +393,7 @@ async def pvp_menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # ==============================
-# PROCURAR OPONENTE (consome ticket do inventário)
+# PROCURAR OPONENTE (consome a cota compartilhada do Coliseu)
 # ==============================
 @requires_login
 async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -661,20 +586,21 @@ async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAU
     # PvP NORMAL (se não entrou no modo guerra)
     # ------------------------------
 
-    # Entradas = ticket_arena no inventário (sem limite diário)
-    ticket_qty = 0
-    try:
-        ticket_qty = _inv_get_qty(pdata, PVP_TICKET_KEY)
-    except Exception:
-        ticket_qty = 0
-
-    if ticket_qty <= 0:
+    quota = get_daily_entry_quota(users_collection, str(user_id)) if users_collection is not None else None
+    if quota and quota["restantes"] <= 0 and quota["tickets"] <= 0:
         await query.edit_message_text(
-            "🚫 <b>Sem Entradas da Arena!</b>\n\n"
-            "Você não tem <b>Ticket da Arena</b> no inventário.\n"
-            "Aguarde o job diário enviar suas entradas ou compre na loja.",
+            f"🚫 <b>Você usou as {DAILY_FREE_ENTRIES} entradas grátis de hoje.</b>\n\n"
+            "Compre um <b>Ticket do Coliseu PvP</b> na Loja por 10 💎 para continuar. "
+            "O ticket extra será usado automaticamente na próxima luta.",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="pvp_arena")]]),
             parse_mode="HTML",
+        )
+        return
+
+    if users_collection is None:
+        await query.edit_message_text(
+            "❌ Não consegui acessar a cota do Coliseu agora. Tente novamente em instantes.",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="pvp_arena")]]),
         )
         return
 
@@ -731,14 +657,22 @@ async def procurar_oponente_callback(update: Update, context: ContextTypes.DEFAU
         )
         return
 
-    # Consome 1 Ticket do inventário (entrada real)
-    try:
-        _inv_set_qty(pdata, PVP_TICKET_KEY, ticket_qty - 1)
-        await player_manager.save_player_data(user_id, pdata)
-    except Exception:
+    # Reserva uma entrada só depois de confirmar um oponente válido.
+    entrada = consume_daily_entries(users_collection, [str(user_id)])
+    if not entrada.get("sucesso"):
+        quota = entrada.get("quota") or get_daily_entry_quota(users_collection, str(user_id))
+        if quota and quota["restantes"] <= 0 and quota["tickets"] <= 0:
+            texto = (
+                f"🚫 <b>Você usou as {DAILY_FREE_ENTRIES} entradas grátis de hoje.</b>\n\n"
+                "Compre um <b>Ticket do Coliseu PvP</b> na Loja por 10 💎 para continuar. "
+                "O ticket extra será usado automaticamente na próxima luta."
+            )
+        else:
+            texto = "❌ Não consegui reservar sua entrada no Coliseu. Tente novamente em instantes."
         await query.edit_message_text(
-            "❌ Não consegui consumir sua entrada no inventário. Tente novamente.",
+            texto,
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Voltar", callback_data="pvp_arena")]]),
+            parse_mode="HTML",
         )
         return
 
