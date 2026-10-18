@@ -548,13 +548,83 @@ class MapaScene extends Phaser.Scene {
         // ==========================================
         if (this.regiaoAtual === 'capital_eldora') {
             // Ícone da loja no ponto marcado no Tiled (tile 51,18).
-            const iconeLojaSkins = this.add.sprite(51 * 32 + 16, 18 * 32 + 16, 'icone_loja_skins_capital')
+            const lojaSkinsX = 51 * 32 + 16;
+            const lojaSkinsY = 18 * 32 + 16;
+            const haloLojaSkins = this.add.circle(lojaSkinsX, lojaSkinsY, 24, 0xb45cff, 0.24)
+                .setDepth(11)
+                .setBlendMode(Phaser.BlendModes.ADD);
+            const iconeLojaSkins = this.add.sprite(lojaSkinsX, lojaSkinsY, 'icone_loja_skins_capital')
                 .setDepth(12)
                 .setDisplaySize(40, 40)
                 .setInteractive({ useHandCursor: true });
+
+            const placaLojaSkins = this.add.container(lojaSkinsX, lojaSkinsY - 38).setDepth(30);
+            const textoPlacaSkins = this.add.text(0, 0, 'ATELIÊ DE SKINS', {
+                fontFamily: 'Cinzel, Georgia, serif',
+                fontSize: '10px',
+                color: '#ffe6a6',
+                fontStyle: 'bold',
+                stroke: '#32164f',
+                strokeThickness: 3,
+                shadow: { offsetX: 0, offsetY: 0, color: '#ffcf5c', blur: 6, fill: true }
+            }).setOrigin(0.5);
+            const larguraPlacaSkins = textoPlacaSkins.width + 18;
+            const alturaPlacaSkins = textoPlacaSkins.height + 10;
+            const fundoPlacaSkins = this.add.graphics();
+            fundoPlacaSkins.fillStyle(0x29153d, 0.96);
+            fundoPlacaSkins.lineStyle(2, 0xf3c969, 1);
+            fundoPlacaSkins.fillRoundedRect(
+                -larguraPlacaSkins / 2,
+                -alturaPlacaSkins / 2,
+                larguraPlacaSkins,
+                alturaPlacaSkins,
+                6
+            );
+            fundoPlacaSkins.strokeRoundedRect(
+                -larguraPlacaSkins / 2,
+                -alturaPlacaSkins / 2,
+                larguraPlacaSkins,
+                alturaPlacaSkins,
+                6
+            );
+            fundoPlacaSkins.fillStyle(0x29153d, 1);
+            fundoPlacaSkins.fillTriangle(-5, alturaPlacaSkins / 2 - 1, 5, alturaPlacaSkins / 2 - 1, 0, alturaPlacaSkins / 2 + 5);
+            fundoPlacaSkins.lineStyle(2, 0xf3c969, 1);
+            fundoPlacaSkins.beginPath();
+            fundoPlacaSkins.moveTo(-5, alturaPlacaSkins / 2);
+            fundoPlacaSkins.lineTo(0, alturaPlacaSkins / 2 + 5);
+            fundoPlacaSkins.lineTo(5, alturaPlacaSkins / 2);
+            fundoPlacaSkins.strokePath();
+            placaLojaSkins.add([fundoPlacaSkins, textoPlacaSkins]);
+
+            this.tweens.add({
+                targets: haloLojaSkins,
+                scale: 1.3,
+                alpha: 0.38,
+                duration: 900,
+                ease: 'Sine.InOut',
+                yoyo: true,
+                repeat: -1
+            });
             this.tweens.add({
                 targets: iconeLojaSkins,
                 y: iconeLojaSkins.y - 5,
+                duration: 650,
+                ease: 'Sine.InOut',
+                yoyo: true,
+                repeat: -1
+            });
+            this.tweens.add({
+                targets: haloLojaSkins,
+                y: haloLojaSkins.y - 5,
+                duration: 650,
+                ease: 'Sine.InOut',
+                yoyo: true,
+                repeat: -1
+            });
+            this.tweens.add({
+                targets: placaLojaSkins,
+                y: placaLojaSkins.y - 5,
                 duration: 650,
                 ease: 'Sine.InOut',
                 yoyo: true,
