@@ -561,7 +561,7 @@ window.abrirMenuItensPvP = function() {
     }
 };
 // ==========================================
-// NOVA FUNÇÃO: CAIXA DE LOGS SCROLLÁVEL
+// Log compacto: mantém somente as duas mensagens mais recentes, sem rolagem.
 // ==========================================
 window.adicionarLogPvP = function(textoHTML) {
     let containerLog = document.getElementById('pvp-caixa-logs-scroll');
@@ -576,19 +576,8 @@ window.adicionarLogPvP = function(textoHTML) {
             containerLog = document.createElement('div');
             containerLog.id = 'pvp-caixa-logs-scroll';
             
-            // Estilização direta no JS para garantir que funcione no Mini-App
-            containerLog.style.height = '110px'; // Preenche aquele espaço vazio da imagem
-            containerLog.style.overflowY = 'auto';
-            containerLog.style.display = 'flex';
-            containerLog.style.flexDirection = 'column';
-            containerLog.style.gap = '6px';
-            containerLog.style.padding = '8px';
-            containerLog.style.textAlign = 'left';
-            containerLog.style.fontSize = '0.95em';
-            containerLog.style.fontFamily = 'monospace, sans-serif'; 
-            containerLog.style.backgroundColor = 'rgba(0, 0, 0, 0.5)'; // Fundo escurecido
-            containerLog.style.borderRadius = '6px';
-            containerLog.style.border = '1px solid rgba(255, 255, 255, 0.1)';
+            // O CSS limita o log ao espaço de duas mensagens e não cria uma barra de rolagem.
+            containerLog.className = 'pvp-log-scroll';
             
             parentBox.appendChild(containerLog);
         }
@@ -604,6 +593,8 @@ window.adicionarLogPvP = function(textoHTML) {
         ], {duration: 300});
         
         containerLog.appendChild(novaLinha);
-        containerLog.scrollTop = containerLog.scrollHeight; // Auto-scroll para o final!
+        while (containerLog.children.length > 2) {
+            containerLog.removeChild(containerLog.firstElementChild);
+        }
     }
 };

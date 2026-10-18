@@ -4,6 +4,22 @@
 
 let pveBatalhaAtual = null;
 
+function adicionarLinhaLogPvE(texto, cor = '#e2e8f0', destaque = false) {
+    const logBox = document.getElementById('pve-log-content');
+    if (!logBox) return;
+
+    const linha = document.createElement('div');
+    linha.className = 'pve-log-entry';
+    linha.textContent = String(texto ?? '');
+    linha.style.color = cor;
+    if (destaque) linha.style.fontWeight = 'bold';
+    logBox.appendChild(linha);
+
+    while (logBox.children.length > 2) {
+        logBox.removeChild(logBox.firstElementChild);
+    }
+}
+
 // Escutando Eventos Globais
 if (window.socket) {
     window.socket.on('batalha_iniciada', (dados) => {
@@ -39,18 +55,13 @@ if (window.socket) {
         renderizarEstadoPvE();
         
         // Adiciona Logs
-        const logBox = document.getElementById('pve-log-content');
         if (dados.logs && dados.logs.length > 0) {
             dados.logs.forEach(msg => {
-                const sp = document.createElement('div');
-                sp.innerText = msg;
-                sp.style.margin = "2px 0";
-                if(msg.includes('CRÍTICO')) sp.style.color = '#ef4444';
-                else if(msg.includes('💚')) sp.style.color = '#10b981';
-                else sp.style.color = '#e2e8f0';
-                logBox.appendChild(sp);
+                let cor = '#e2e8f0';
+                if (String(msg).includes('CRÍTICO')) cor = '#ef4444';
+                else if (String(msg).includes('💚')) cor = '#10b981';
+                adicionarLinhaLogPvE(msg, cor);
             });
-            document.getElementById('pve-log-box').scrollTop = document.getElementById('pve-log-box').scrollHeight;
         }
 
         // Se a batalha acabou, mostra os botões de voltar
@@ -62,14 +73,7 @@ if (window.socket) {
     window.socket.on('batalha_encerrada', (dados) => {
         if (!pveBatalhaAtual || pveBatalhaAtual.battle_id !== dados.battle_id) return;
         
-        const logBox = document.getElementById('pve-log-content');
-        const sp = document.createElement('div');
-        sp.innerText = dados.msg_loot;
-        sp.style.fontWeight = 'bold';
-        sp.style.color = dados.vitoria ? '#facc15' : '#ef4444';
-        sp.style.margin = "10px 0";
-        logBox.appendChild(sp);
-        document.getElementById('pve-log-box').scrollTop = document.getElementById('pve-log-box').scrollHeight;
+        adicionarLinhaLogPvE(dados.msg_loot, dados.vitoria ? '#facc15' : '#ef4444', true);
 
         document.getElementById('pve-menu-botoes').style.display = 'none';
         document.getElementById('pve-botoes-fim-batalha').style.display = 'block';
@@ -80,7 +84,8 @@ function abrirTelaBatalhaPvE(dados) {
     document.getElementById('tela-pve-global').style.display = 'flex';
     document.getElementById('pve-menu-botoes').style.display = 'grid';
     document.getElementById('pve-botoes-fim-batalha').style.display = 'none';
-    document.getElementById('pve-log-content').innerHTML = '<div style="color:#facc15;">Batalha começou!</div>';
+    document.getElementById('pve-log-content').innerHTML = '';
+    adicionarLinhaLogPvE('Batalha começou!', '#facc15');
     
     // Configura o Monstro
     document.getElementById('nome-monstro-pve').innerText = dados.monstro.nome || 'Monstro';

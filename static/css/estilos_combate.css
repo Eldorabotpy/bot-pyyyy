@@ -306,7 +306,7 @@ body.combate-aberto #btn-painel-gm { display:none !important; pointer-events:non
 /* Cenários 1440×1080: a arena mantém 4:3, sem crescimento vertical do flex. */
 #tela-combate-global #arena-box { flex:0 0 auto; aspect-ratio:4 / 3; min-height:0; height:auto !important; max-height:none; border:0 !important; border-radius:0 !important; background-size:contain; background-position:center; background-repeat:no-repeat; }
 #tela-combate-global .combate-painel { box-sizing:border-box; flex:1 0 210px; min-height:210px; padding:12px !important; gap:10px !important; border:0 !important; border-top:1px solid #ffffff15 !important; background:linear-gradient(160deg,#152033,#090f1d) !important; }
-#tela-combate-global #combat-log-box { padding:12px !important; min-height:64px !important; background:#080f1dcc !important; border:1px solid #334155 !important; border-radius:12px !important; box-shadow:none; }
+#tela-combate-global #combat-log-box { box-sizing:border-box; padding:9px !important; min-height:44px !important; overflow:hidden; background:#080f1dcc !important; border:1px solid #334155 !important; border-radius:12px !important; box-shadow:none; }
 #tela-combate-global #log-texto-1 { font:600 14px/1.4 'Segoe UI',Arial,sans-serif; letter-spacing:0; }
 #tela-combate-global #log-texto-2 { display:block; font:12px/1.5 'Segoe UI',Arial,sans-serif; }
 #tela-combate-global .modern-btn { min-height:44px; border:1px solid #3b4961; border-radius:10px; font:600 13px 'Segoe UI',Arial,sans-serif; box-shadow:0 2px 5px #0003; }
@@ -322,4 +322,23 @@ body.combate-aberto #btn-painel-gm { display:none !important; pointer-events:non
     #tela-combate-global #combate-arena { flex-direction:row !important; align-items:flex-start; }
     #tela-combate-global #arena-box { width:min(60%, calc(100dvh * 4 / 3)) !important; }
     #tela-combate-global .combate-painel { flex:1 1 0; min-width:0; min-height:100%; border-top:0 !important; border-left:1px solid #ffffff15 !important; }
+}
+
+/* PvP/PvE: use the available viewport for the arena and keep logs content-sized. */
+#tela-pvp-global, #tela-pve-global { box-sizing:border-box; height:100vh !important; height:100dvh !important; min-height:0; overflow:hidden; }
+#pvp-arena, #pve-arena { box-sizing:border-box; min-height:0; }
+#pvp-arena-box, #pve-arena-box { box-sizing:border-box; flex:1 1 auto !important; height:auto !important; min-height:min(320px, 38dvh); }
+.combat-action-panel { box-sizing:border-box; flex:0 0 auto !important; min-height:0; max-height:42dvh; overflow:hidden !important; }
+#pvp-log-box, #pve-log-box { box-sizing:border-box; flex:0 1 auto; height:auto !important; min-height:0 !important; max-height:104px; overflow:hidden !important; scrollbar-width:none !important; -ms-overflow-style:none; }
+#pvp-caixa-logs-scroll, .pvp-log-scroll { box-sizing:border-box; width:100%; min-height:1.4em; max-height:82px; overflow:hidden !important; scrollbar-width:none !important; -ms-overflow-style:none; display:flex; flex-direction:column; gap:5px; padding:6px 8px; text-align:left; font:0.95em/1.35 monospace,sans-serif; background:rgba(0,0,0,.38); border-radius:6px; }
+#pvp-combat-panel::-webkit-scrollbar, #pvp-log-box::-webkit-scrollbar, #pvp-caixa-logs-scroll::-webkit-scrollbar,
+#pve-combat-panel::-webkit-scrollbar, #pve-log-box::-webkit-scrollbar, #pve-log-content::-webkit-scrollbar { display:none !important; width:0 !important; height:0 !important; }
+#pvp-caixa-logs-scroll > div, #pve-log-content > div { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; overflow-wrap:anywhere; }
+#pve-log-content { min-height:1.35em; }
+
+@media(max-height:520px) and (orientation:landscape) {
+    #tela-pvp-global, #tela-pve-global { overflow-y:auto; }
+    #pvp-arena, #pve-arena { height:auto !important; min-height:100dvh; }
+    #pvp-arena-box, #pve-arena-box { flex:0 0 54dvh !important; min-height:190px; }
+    #pvp-combat-panel, #pve-combat-panel { max-height:none; }
 }
