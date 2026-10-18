@@ -519,7 +519,7 @@ class MapaScene extends Phaser.Scene {
     
         const skinFinal = this.textures.exists(this.skinAtiva) ? this.skinAtiva : 'aventureiro_base';
         this.player = this.physics.add.sprite(27 * 32, 29 * 32, skinFinal);
-        this.player.setCollideWorldBounds(true).setDepth(this.regiaoAtual === 'capital_eldora' ? 31 : 15);
+        this.player.setCollideWorldBounds(true).setDepth(15);
 
         // Reduz visualmente qualquer sprite para o tamanho final do mapa
         this.player.setDisplaySize(48, 48);
