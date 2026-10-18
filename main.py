@@ -206,6 +206,8 @@ def pagina_login():
 
 @app.get('/api/pvp/coliseu/status')
 def status_coliseu_pvp():
+    limite = request.args.get("limite", default=5, type=int)
+    limite = max(1, min(limite or 5, 60))
     agenda = get_event_status()
     finalizar_eventos_encerrados(users_collection, duelos_ativos)
     temporada = ensure_active_season(users_collection, duelos_ativos)
@@ -217,7 +219,7 @@ def status_coliseu_pvp():
         jogadores = users_collection.find(
             {"$or": [{"character_name": {"$type": "string", "$ne": ""}}, {"name": {"$type": "string", "$ne": ""}}, {"nome": {"$type": "string", "$ne": ""}}]},
             {"character_name": 1, "name": 1, "nome": 1, "pvp_points": 1},
-        ).sort("pvp_points", -1).limit(5)
+        ).sort("pvp_points", -1).limit(limite)
         for posicao, jogador in enumerate(jogadores, 1):
             pontos = _elo_points(jogador)
             ranking.append({
