@@ -2054,16 +2054,49 @@ class MapaScene extends Phaser.Scene {
         // ==========================================
         if (this.regiaoAtual === 'capital_eldora') {
             // Coloquei a fornalha um pouco mais para a esquerda (X: 47, Y: 27) para não encavalar com a Forja (X: 53)
-            let fornalhaRefino = this.physics.add.sprite(45 * 32, 36 * 32, 'item_fornalha').setDepth(20).setDisplaySize(48, 48);
+            const fornalhaRefinoX = 45 * 32;
+            const fornalhaRefinoY = 36 * 32;
+            const haloRefino = this.add.circle(fornalhaRefinoX, fornalhaRefinoY, 24, 0xa10cf7, 0.2)
+                .setDepth(19)
+                .setBlendMode(Phaser.BlendModes.ADD);
+            const fornalhaRefino = this.add.sprite(fornalhaRefinoX, fornalhaRefinoY, 'item_fornalha')
+                .setDepth(20)
+                .setDisplaySize(48, 48);
             
             // Pinta ela de um tom meio laranja/avermelhado para diferenciar da forja
             //fornalhaRefino.setTint(a10cf7); 
             
             // Textinho flutuante em cima da fornalha
-            this.add.text(fornalhaRefino.x, fornalhaRefino.y - 35, 'Refino', {
+            const placaRefino = this.add.text(fornalhaRefino.x, fornalhaRefino.y - 35, 'Refino', {
                 fontSize: '12px', color: '#2f0cf7', fontFamily: 'Cinzel, Arial', 
                 stroke: '#000', strokeThickness: 4, fontStyle: 'bold'
             }).setOrigin(0.5).setDepth(30);
+
+            this.tweens.add({
+                targets: fornalhaRefino,
+                y: fornalhaRefinoY - 4,
+                duration: 750,
+                ease: 'Sine.InOut',
+                yoyo: true,
+                repeat: -1
+            });
+            this.tweens.add({
+                targets: [haloRefino, placaRefino],
+                y: '-=4',
+                duration: 750,
+                ease: 'Sine.InOut',
+                yoyo: true,
+                repeat: -1
+            });
+            this.tweens.add({
+                targets: haloRefino,
+                scale: 1.25,
+                alpha: 0.42,
+                duration: 900,
+                ease: 'Sine.InOut',
+                yoyo: true,
+                repeat: -1
+            });
 
             fornalhaRefino.setInteractive({ useHandCursor: true });
             fornalhaRefino.on('pointerover', () => this.input.setDefaultCursor('pointer'));
