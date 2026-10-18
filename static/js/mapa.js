@@ -544,32 +544,22 @@ class MapaScene extends Phaser.Scene {
         this.cameras.main.setRoundPixels(true);
         
         // ==========================================
-        // ⛺ NPC MERCADOR (SÓ APARECE NA CAPITAL) ⛺
+        // ÍCONE DA LOJA DE SKINS (SÓ NA CAPITAL)
         // ==========================================
         if (this.regiaoAtual === 'capital_eldora') {
-            // Loja permanente de aparências: fica junto à praça central.
-            const npcSkins = this.add.sprite(49 * 32, 20 * 32, 'npc_merlin').setDepth(10);
-            npcSkins.setFrame(1);
-            this.criarPlaquinhaNome(npcSkins.x, npcSkins.y - 18, 'Mestra das Aparências');
-            npcSkins.setInteractive({ useHandCursor: true });
-            npcSkins.on('pointerdown', (pointer, localX, localY, event) => {
-                if (event) event.stopPropagation();
-                const distancia = Phaser.Math.Distance.Between(this.player.x, this.player.y, npcSkins.x, npcSkins.y);
-                if (distancia <= 112) {
-                    window.location.href = '/loja-skins';
-                    return;
-                }
-                const aviso = this.add.text(this.player.x, this.player.y - 50, 'Aproxime-se da Mestra das Aparências...', {
-                    fontSize: '12px', fontFamily: 'Arial', color: '#ef4444', fontStyle: 'bold', stroke: '#000', strokeThickness: 3
-                }).setOrigin(0.5, 1).setDepth(100);
-                this.tweens.add({ targets: aviso, y: aviso.y - 20, alpha: 0, duration: 2000, onComplete: () => aviso.destroy() });
-            });
-
             // Ícone da loja no ponto marcado no Tiled (tile 51,18).
             const iconeLojaSkins = this.add.sprite(51 * 32 + 16, 18 * 32 + 16, 'icone_loja_skins_capital')
                 .setDepth(12)
                 .setDisplaySize(40, 40)
                 .setInteractive({ useHandCursor: true });
+            this.tweens.add({
+                targets: iconeLojaSkins,
+                y: iconeLojaSkins.y - 5,
+                duration: 650,
+                ease: 'Sine.InOut',
+                yoyo: true,
+                repeat: -1
+            });
             iconeLojaSkins.on('pointerdown', (pointer, localX, localY, event) => {
                 if (event) event.stopPropagation();
                 const distancia = Phaser.Math.Distance.Between(this.player.x, this.player.y, iconeLojaSkins.x, iconeLojaSkins.y);
