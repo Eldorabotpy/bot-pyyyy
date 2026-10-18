@@ -519,7 +519,7 @@ class MapaScene extends Phaser.Scene {
     
         const skinFinal = this.textures.exists(this.skinAtiva) ? this.skinAtiva : 'aventureiro_base';
         this.player = this.physics.add.sprite(27 * 32, 29 * 32, skinFinal);
-        this.player.setCollideWorldBounds(true).setDepth(15);
+        this.player.setCollideWorldBounds(true).setDepth(this.regiaoAtual === 'capital_eldora' ? 31 : 15);
 
         // Reduz visualmente qualquer sprite para o tamanho final do mapa
         this.player.setDisplaySize(48, 48);
@@ -551,14 +551,14 @@ class MapaScene extends Phaser.Scene {
             const lojaSkinsX = 51 * 32 + 16;
             const lojaSkinsY = 18 * 32 + 16;
             const haloLojaSkins = this.add.circle(lojaSkinsX, lojaSkinsY, 24, 0xb45cff, 0.24)
-                .setDepth(11)
+                .setDepth(29)
                 .setBlendMode(Phaser.BlendModes.ADD);
             const iconeLojaSkins = this.add.sprite(lojaSkinsX, lojaSkinsY, 'icone_loja_skins_capital')
-                .setDepth(12)
+                .setDepth(30)
                 .setDisplaySize(40, 40)
                 .setInteractive({ useHandCursor: true });
 
-            const placaLojaSkins = this.add.container(lojaSkinsX, lojaSkinsY - 38).setDepth(14);
+            const placaLojaSkins = this.add.container(lojaSkinsX, lojaSkinsY - 38).setDepth(40);
             const textoPlacaSkins = this.add.text(0, 0, 'ATELIÊ DE SKINS', {
                 fontFamily: 'Cinzel, Georgia, serif',
                 fontSize: '10px',
