@@ -558,7 +558,7 @@ class MapaScene extends Phaser.Scene {
                 .setDisplaySize(40, 40)
                 .setInteractive({ useHandCursor: true });
 
-            const placaLojaSkins = this.add.container(lojaSkinsX, lojaSkinsY - 38).setDepth(30);
+            const placaLojaSkins = this.add.container(lojaSkinsX, lojaSkinsY - 38).setDepth(14);
             const textoPlacaSkins = this.add.text(0, 0, 'ATELIÊ DE SKINS', {
                 fontFamily: 'Cinzel, Georgia, serif',
                 fontSize: '10px',
