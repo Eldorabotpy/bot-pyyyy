@@ -480,6 +480,7 @@ class MotorMultiplayer {
         this.socket.off('registroRegiaoFalhou');
         this.socket.off('novoJogador');
         this.socket.off('jogadorMoveu');
+        this.socket.off('visualAtualizado');
         this.socket.off('jogadorSaiu');
         this.socket.off('acaoMapa');
         this.socket.off('desconectarDuplicado');
@@ -677,6 +678,14 @@ class MotorMultiplayer {
             
             this.atualizarPilula(); 
         });
+
+        // Atualiza a aparência de quem equipa uma skin sem sair do mapa.
+        this.socket.on('visualAtualizado', (dados) => {
+            const outro = this.scene.outrosJogadores.getChildren().find(
+                jogador => jogador.playerId === dados.id
+            );
+            if (outro && dados.skin) this.atualizarSkinOutroJogador(outro, dados.skin);
+        });
         
         // =====================================
         // 🏃 CORREÇÃO DO MOVIMENTO
@@ -723,7 +732,10 @@ class MotorMultiplayer {
                     let animacao = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up');
                     outro.direcaoParadaEspecial = animacao;
                     
-                    let skinDele = outro.texture.key;
+                    // A textura pode estar temporariamente na folha de idle especial.
+                    // As animações de deslocamento sempre pertencem à folha base.
+                    let skinDele = outro.skinBaseKey || outro.texture.key;
+                    outro.setTexture(skinDele);
                     this.scene.gerarAnimacoes(skinDele); 
                     
                     try { 
@@ -1384,6 +1396,56 @@ class MotorMultiplayer {
                 if (outro.active) this.agendarParadaEspecialRemota(outro);
             });
         }
+    }
+
+    atualizarSkinOutroJogador(jogador, skin) {
+        const skinDesejada = String(skin).trim().toLowerCase();
+        if (!skinDesejada || !jogador?.active) return;
+
+        this.cancelarParadaEspecialRemota(jogador);
+        jogador.movimentoTween?.stop();
+        jogador.textoTween?.stop();
+        jogador.skinBaseKey = skinDesejada;
+        jogador.skinCarregando = skinDesejada;
+
+        const aplicar = () => {
+            if (!jogador.active || jogador.skinBaseKey !== skinDesejada) return;
+            jogador.skinCarregando = null;
+            jogador.anims.stop();
+            jogador.setTexture(skinDesejada);
+            jogador.setFrame(1);
+            try {
+                this.scene.gerarAnimacoes(skinDesejada);
+            } catch (erro) {
+                console.warn('Erro ao preparar animações da skin remota:', erro);
+            }
+
+            if (window.ANIMACOES_PARADAS_ESPECIAIS?.[skinDesejada]) {
+                this.scene.garantirFolhaAnimacaoParadaEspecial(skinDesejada, () => {
+                    if (jogador.active && jogador.skinBaseKey === skinDesejada) {
+                        this.agendarParadaEspecialRemota(jogador);
+                    }
+                });
+            }
+        };
+
+        if (this.scene.textures.exists(skinDesejada)) {
+            aplicar();
+            return;
+        }
+
+        const linkNuvem = 'https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/classes/';
+        this.scene.load.spritesheet(skinDesejada, `${linkNuvem}${skinDesejada}.png`, {
+            frameWidth: 128,
+            frameHeight: 128
+        });
+        this.scene.load.once(`filecomplete-spritesheet-${skinDesejada}`, aplicar);
+        this.scene.load.once('loaderror', (file) => {
+            if (file.key !== skinDesejada || !jogador.active || jogador.skinBaseKey !== skinDesejada) return;
+            jogador.skinCarregando = null;
+            console.warn(`Não foi possível carregar a skin remota ${skinDesejada}: ${file.url}`);
+        });
+        this.scene.load.start();
     }
 
     cancelarParadaEspecialRemota(jogador) {
