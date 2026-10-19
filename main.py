@@ -1,4 +1,2207 @@
-one
+import os
+import asyncio
+import random
+import time
+import math
+import logging
+from datetime import datetime, timezone
+from threading import Thread, Lock
+from uuid import uuid4
+from flask import Flask, render_template, jsonify, request, session
+from flask.json.provider import DefaultJSONProvider
+from flask_socketio import SocketIO, emit
+from bson import ObjectId, errors
+from pymongo import MongoClient
+
+from config import MONGO_CONNECTION_STRING
+from modules.database import initialize_database
+from modules.player.core import users_collection, clear_all_player_cache
+from pvp.coliseum_event import get_event_status, get_ended_event_ids
+from pvp.coliseum_rewards import (
+    ensure_active_season,
+    finalizar_eventos_encerrados,
+    isoformat_utc,
+    season_is_expired,
+)
+from pvp.entry_quota import DAILY_FREE_ENTRIES, consume_daily_entries, get_daily_entry_quota
+from modules.webapp_api import webapp_bp
+from modules.game_data.skills import SKILL_DATA
+from modules.game_data.monsters import MONSTERS_DATA
+from modules.game_data.season_pass import adicionar_xp_passe
+from eventos_invasao import GerenciadorInvasao
+from modules.mob_engine import GerenciadorCacada
+from modules import player_manager
+from modules.combat.party_engine import obter_grupo_do_jogador, sair_ou_desfazer_grupo
+from modules.combat import group_combat_manager as gcm
+from modules.social_chat import classificar_destino_mensagem, sids_online_do_cla
+# from modules.combat.web_battle_manager import WebBattleManager
+# pyrefly: ignore [missing-import]
+from telegram.ext import Application, CommandHandler
+from telegram.error import NetworkError, TimedOut
+from config import TELEGRAM_TOKEN
+from start_handler import start_command
+# ==============================================================================
+# 🔇 CONTROLE DE LOGS EXTERNOS
+# ==============================================================================
+# Mantém o terminal limpo.
+# WARNING e ERROR continuam aparecendo quando forem realmente importantes.
+# ==============================================================================
+
+logging.getLogger("werkzeug").setLevel(logging.WARNING)
+
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
+
+logging.getLogger("telegram").setLevel(logging.WARNING)
+logging.getLogger("telegram.ext").setLevel(logging.WARNING)
+logging.getLogger("start_handler").setLevel(logging.WARNING)
+logging.getLogger("modules.crafting_registry").setLevel(logging.WARNING)
+logging.getLogger("engineio").setLevel(logging.WARNING)
+logging.getLogger("socketio").setLevel(logging.WARNING)
+
+# 👇 IMPORTS CORRETOS DO NOVO SISTEMA DE PARTY 👇
+from modules.combat.party_engine import parties_collection, criar_novo_grupo, adicionar_membro, obter_grupo
+from modules.cooldowns import iniciar_turno, aplicar_cooldown
+from modules.combat.combat_engine import processar_acao_combate
+from modules.game_data.items_consumables import CONSUMABLES_DATA
+from modules.player.combat_stats import get_combat_stats_sync, aplicar_combat_stats_no_player
+from modules.socket_invites import SocketInviteRegistry
+
+# ==============================================================================
+# 🏰 EVENTOS DE DUNGEON
+# ==============================================================================
+from modules.dungeon_event_service import (
+    is_dungeon_event_mob,
+    validate_event_mob_owner,
+)
+
+# ==============================================================================
+# 1. INICIALIZAÇÃO DO MOTOR E REGISTRO DE ROTAS
+# ==============================================================================
+
+class MongoJSONProvider(DefaultJSONProvider):
+    """
+    Permite enviar ObjectId do MongoDB em respostas JSON.
+    O ObjectId permanece normal no banco e vira string apenas na resposta.
+    """
+
+    def default(self, obj):
+        if isinstance(obj, ObjectId):
+            return str(obj)
+
+        return super().default(obj)
+
+
+initialize_database()
+
+app = Flask('')
+
+# JSON global compatível com ObjectId do MongoDB.
+app.json = MongoJSONProvider(app)
+
+app.secret_key = os.getenv(
+    "FLASK_SECRET_KEY"
+)
+
+if not app.secret_key:
+    raise RuntimeError(
+        "FLASK_SECRET_KEY não configurada."
+    )
+
+client = MongoClient(
+    MONGO_CONNECTION_STRING
+)
+
+# --- REGISTRO DOS BLUEPRINTS ---
+app.register_blueprint(webapp_bp)
+from modules.portal_auth import portal_auth_bp
+from datetime import timedelta
+app.register_blueprint(portal_auth_bp)
+app.config.update(SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE='Lax',
+                  SESSION_COOKIE_SECURE=os.getenv('ELDORA_COOKIE_SECURE', '1') != '0',
+                  PERMANENT_SESSION_LIFETIME=timedelta(days=7))
+
+
+from rotas.admin import admin_bp
+from rotas.passe import passe_bp
+from rotas.character import character_bp
+from rotas.loja_reino import registrar_loja_reino
+from rotas.npc import npc_bp
+from rotas.dungeon_events import dungeon_events_bp
+from rotas.dynamic_events import dynamic_events_bp
+
+app.register_blueprint(admin_bp)
+app.register_blueprint(passe_bp)
+app.register_blueprint(character_bp)
+app.register_blueprint(npc_bp)
+app.register_blueprint(dungeon_events_bp)
+app.register_blueprint(dynamic_events_bp)
+
+
+@app.before_request
+def enforce_selected_character_for_player_apis():
+    """Bind legacy player-ID API calls to the character selected in this account session."""
+    if not request.path.startswith('/api/') or request.path.startswith('/api/auth/'):
+        return None
+
+    payload = request.get_json(silent=True) or {}
+    candidates = []
+    sources = (request.view_args or {}, request.args, request.form, payload)
+    for source in sources:
+        for key in ('user_id', 'char_id', 'jogador_id', 'player_id', 'character_id', 'personagem_id', 'id_personagem', 'id_jogador'):
+            value = source.get(key) if hasattr(source, 'get') else None
+            if value not in (None, ''):
+                candidates.append(str(value))
+    if not candidates:
+        return None
+    if len(set(candidates)) != 1:
+        return jsonify(erro='A solicitação contém mais de um personagem.'), 403
+
+    from modules.portal_auth import PlayerSessionError, require_player_identity
+    try:
+        require_player_identity(candidates[0])
+    except PlayerSessionError as exc:
+        return jsonify(erro=str(exc)), exc.status_code
+    return None
+
+# --- INICIALIZAÇÃO SOCKET E MONGO ---
+socketio = SocketIO(
+    app,
+    cors_allowed_origins="*",
+    async_mode="threading",
+    logger=False,
+    engineio_logger=False
+)
+conexoes_mapa = {}
+url_do_jogo = "https://163-176-44-198.sslip.io"
+
+db = client["eldora_bot"]
+chat_collection = db["chat_historico"]
+chat_collection.create_index("data_envio", expireAfterSeconds=43200)
+
+# 📬 NOVA COLEÇÃO: Correios de Eldora (Mensagens Privadas Offline)
+# 2592000 segundos = Exatamente 30 dias! Depois disso o Mongo apaga sozinho.
+mensagens_offline_col = db["mensagens_offline"]
+mensagens_offline_col.create_index("data_envio", expireAfterSeconds=2592000)
+
+sistema_invasao_mapa = GerenciadorInvasao(socketio)
+
+app.config[
+    "SISTEMA_INVASAO_MAPA"
+] = sistema_invasao_mapa
+
+sistema_cacada = GerenciadorCacada(socketio)
+sistema_cacada.app = app
+# battle_manager = WebBattleManager(socketio)
+app.config['SISTEMA_CACADA'] = sistema_cacada
+
+# ==============================================================================
+# 2. ROTAS PRINCIPAIS (TELA INICIAL E QUESTS)
+# ==============================================================================
+
+@app.route('/')
+def home():
+    return render_template('index.html')
+
+@app.route('/login')
+def pagina_login():
+    return render_template('login.html')
+
+
+@app.get('/api/pvp/coliseu/status')
+def status_coliseu_pvp():
+    limite = request.args.get("limite", default=5, type=int)
+    limite = max(1, min(limite or 5, 60))
+    agenda = get_event_status()
+    finalizar_eventos_encerrados(users_collection, duelos_ativos)
+    temporada = ensure_active_season(users_collection, duelos_ativos)
+    ranking = []
+    elos_temporada = []
+    participantes_temporada = 0
+    registros = []
+    placar_evento = []
+    try:
+        from pvp.season_ranking import build_elo_standings
+
+        numero_temporada = int(temporada.get("numero", 0)) if temporada else 0
+        filtro_temporada = {
+            "pvp_season_number": numero_temporada,
+            "pvp_season_matches": {"$gt": 0},
+            "$or": [
+                {"character_name": {"$type": "string", "$ne": ""}},
+                {"name": {"$type": "string", "$ne": ""}},
+                {"nome": {"$type": "string", "$ne": ""}},
+            ],
+        }
+        jogadores_db = users_collection.find(
+            filtro_temporada,
+            {
+                "character_name": 1,
+                "name": 1,
+                "nome": 1,
+                "level": 1,
+                "pvp_points": 1,
+                "pvp_season_wins": 1,
+                "pvp_season_losses": 1,
+            },
+        )
+
+        registros = [
+            {
+                "nome": _nome_personagem_db(jogador),
+                "id": str(jogador.get("_id") or ""),
+                "nivel": _safe_int(jogador.get("level"), 1),
+                "pontos": _elo_points(jogador),
+                "vitorias": _safe_int(jogador.get("pvp_season_wins"), 0),
+                "derrotas": _safe_int(jogador.get("pvp_season_losses"), 0),
+            }
+            for jogador in jogadores_db
+        ]
+        elos_temporada, ranking, participantes_temporada = build_elo_standings(registros, ranking_limit=limite)
+
+        placar_event_id = agenda.get("event_id")
+        if not agenda.get("active"):
+            eventos_encerrados = get_ended_event_ids()
+            if eventos_encerrados:
+                placar_event_id = eventos_encerrados[0]
+        if placar_event_id:
+            eventos = list(users_collection.database["coliseu_evento_pvp"].find(
+                {"event_id": placar_event_id},
+                {"nome": 1, "vitorias": 1, "partidas": 1, "derrotas": 1},
+            ))
+            eventos.sort(key=lambda doc: (
+                -int(doc.get("vitorias", 0) or 0),
+                -(int(doc.get("vitorias", 0) or 0) / max(1, int(doc.get("partidas", 0) or 0))),
+                int(doc.get("derrotas", 0) or 0),
+                str(doc.get("nome", "")).casefold(),
+            ))
+            placar_evento = [
+                {"posicao": i, "nome": doc.get("nome", "Herói"),
+                 "vitorias": int(doc.get("vitorias", 0)),
+                 "partidas": int(doc.get("partidas", 0))}
+                for i, doc in enumerate(eventos, 1)
+            ]
+    except Exception:
+        app.logger.exception("Não foi possível carregar os placares do Coliseu")
+
+    minha_patente = None
+    historico_pessoal = None
+    personagem_selecionado = str(session.get('portal_character') or '')
+    if temporada and ObjectId.is_valid(personagem_selecionado):
+        try:
+            from modules.portal_auth import PlayerSessionError, require_player_identity
+            jogador_atual = require_player_identity(personagem_selecionado)
+            numero_temporada = int(temporada.get('numero', 0))
+            participou = (
+                _safe_int(jogador_atual.get('pvp_season_number'), 0) == numero_temporada
+                and _safe_int(jogador_atual.get('pvp_season_matches'), 0) > 0
+            )
+            from pvp.season_history import build_player_match_history
+            try:
+                partidas = users_collection.database['coliseu_pvp_partidas'].find(
+                    {'jogadores': str(jogador_atual['_id'])},
+                    {'jogadores': 1, 'nomes': 1, 'vencedor': 1, 'alteracoes': 1, 'temporada': 1, 'criado_em': 1},
+                ).sort('criado_em', -1).limit(10)
+                historico_pessoal = build_player_match_history(jogador_atual['_id'], partidas)
+                for partida in historico_pessoal:
+                    partida['data'] = isoformat_utc(partida.get('data'))
+            except Exception:
+                app.logger.exception('Não foi possível carregar o histórico pessoal do Coliseu')
+
+            minha_patente = {"participou": participou, "temporada": numero_temporada}
+            if participou:
+                from pvp.season_ranking import build_player_season_rank, find_player_season_position
+                posicao = find_player_season_position(registros, jogador_atual["_id"])
+                if posicao:
+                    minha_patente.update(posicao)
+                minha_patente["patente"] = build_player_season_rank({
+                    "nome": _nome_personagem_db(jogador_atual),
+                    "nivel": _safe_int(jogador_atual.get("level"), 1),
+                    "pontos": _elo_points(jogador_atual),
+                    "vitorias": _safe_int(jogador_atual.get("pvp_season_wins"), 0),
+                    "derrotas": _safe_int(jogador_atual.get("pvp_season_losses"), 0),
+                })
+        except PlayerSessionError:
+            # O placar público continua disponível mesmo sem uma sessão válida.
+            minha_patente = None
+            historico_pessoal = None
+
+    return jsonify({
+        "evento": agenda,
+        "event_id_placar": placar_event_id if "placar_event_id" in locals() else agenda.get("event_id"),
+        "temporada": {
+            "numero": temporada.get("numero"),
+            "inicio": isoformat_utc(temporada.get("inicio")),
+            "fim": isoformat_utc(temporada.get("fim")),
+            "status": temporada.get("status"),
+            "dias": 35,
+            "recompensas": {"1": 50, "2": 20, "3": 5},
+        } if temporada else None,
+        "ranking": ranking,
+        "elos_temporada": elos_temporada,
+        "participantes_temporada": participantes_temporada,
+        "minha_patente": minha_patente,
+        "historico_pessoal": historico_pessoal,
+        "placar_evento": placar_evento,
+    })
+
+@app.route('/api/recent_premium')
+def obter_recent_premium():
+    try:
+        cursor = users_collection.find(
+            {"premium_tier": {"$ne": "free"}}, 
+            {"character_name": 1, "premium_tier": 1, "_id": 0}
+        ).sort("_id", -1).limit(5)
+        
+        colaboradores = [{"nome": c.get("character_name", "Aventureiro"), "tier": str(c.get("premium_tier", "VIP")).upper()} for c in cursor]
+        return jsonify(colaboradores)
+    except Exception:
+        return jsonify([])
+
+@app.route('/api/eventos_ativos/<user_id>', methods=['GET'])
+def api_eventos_ativos_seguro(user_id):
+    try:
+        eventos = [
+            {
+                "id": "world_boss",
+                "nome": "👹 World Boss",
+                "descricao": "A fera está dormindo.",
+                "tempo_texto": "⏰ 08h, 14h, 19h e 23h",
+                "cor": "#475569",
+                "botao_texto": "DORMINDO",
+                "funcao_click": "console.log('Boss dormindo')",
+                "btn_estilo": "background: #1e293b; border-color: #0f172a; color: #64748b; cursor: not-allowed;"
+            }
+        ]
+        return jsonify(eventos)
+    except Exception:
+        return jsonify([])
+
+@app.route('/api/quest/completar', methods=['POST'])
+def completar_quest():
+    try:
+        data = request.json
+        uid = data.get('user_id')
+        qid = data.get('quest_id')
+        
+        player = users_collection.find_one({"_id": ObjectId(uid)})
+        
+        if player:
+            quest_atual = player.get('quests', {}).get(qid, {})
+            if quest_atual.get('status') == 'resgatada':
+                return jsonify({"sucesso": False, "erro": "A missão já foi paga antes!"})
+            
+            users_collection.update_one(
+                {"_id": ObjectId(uid)},
+                {
+                    "$set": {f"quests.{qid}.status": "resgatada"},
+                    "$inc": {"gold": 100}
+                }
+            )
+            return jsonify({"sucesso": True})
+                
+        return jsonify({"sucesso": False, "erro": "O servidor não encontrou este personagem pelo ObjectId."})
+        
+    except Exception as e:
+        print("Erro crítico na API de quests:", str(e))
+        return jsonify({"sucesso": False, "erro": f"Erro interno: {str(e)}"}), 500
+      
+@app.route('/api/quest/iniciar', methods=['POST'])
+def iniciar_quest():
+    try:
+        data = request.json
+        uid = data.get('user_id')
+        qid = data.get('quest_id')
+        qdata = data.get('quest_data')
+
+        if not uid or not qid or not qdata:
+            return jsonify({"sucesso": False, "erro": "Dados incompletos enviados ao servidor."}), 400
+
+        player = users_collection.find_one({"_id": ObjectId(uid)})
+        
+        if player:
+            users_collection.update_one(
+            {"_id": ObjectId(uid)},
+            {"$set": {f"quests.{qid}": qdata}}
+            )
+            return jsonify({"sucesso": True})
+            
+        return jsonify({"sucesso": False, "erro": f"Herói com ID {uid} não encontrado!"})
+        
+    except Exception as e:
+        print("Erro ao iniciar quest:", str(e))
+        return jsonify({"sucesso": False, "erro": str(e)}), 500
+
+@app.route('/api/player/escolher_classe', methods=['POST'])
+def escolher_classe():
+    try:
+        data = request.json
+        user_id = data.get('user_id')
+        nova_classe = data.get('nova_classe')
+
+        player = users_collection.find_one({"_id": ObjectId(user_id)})
+        if not player:
+            return jsonify({"sucesso": False, "erro": "Jogador não encontrado!"})
+
+        if player.get("level", 1) < 5:
+            return jsonify({"sucesso": False, "erro": "Você precisa do Nível 5 para o ritual!"})
+
+        from modules.game_data.classes import CLASSES_DATA, get_class_avatar
+        dados_classe = CLASSES_DATA.get(nova_classe)
+
+        if not dados_classe:
+            return jsonify({"sucesso": False, "erro": "Esta classe não existe nos pergaminhos."})
+
+        mods = dados_classe.get("stat_modifiers", {})
+        level_atual = player.get("level", 5)
+        
+        # Fórmula: Base inicial + (Ganhos por level * multiplicador da classe)
+        novo_max_hp = int(50 + (level_atual * 10 * mods.get('hp', 1.0)))
+        novo_max_mp = int(50 + (level_atual * 5 * mods.get('max_mana', 1.0)))
+        
+        genero = player.get("gender", "masculino")
+        nova_skin = f"{nova_classe}_{genero}" 
+        novo_avatar_url = get_class_avatar(nova_classe, genero, "web")
+
+        # 👇 1. Cria os IDs curtos para os cosméticos (Ex: guerreiro_m)
+        genero_curto = "f" if genero == "feminino" else "m"
+        nova_skin_id = f"{nova_classe}_{genero_curto}"
+        novo_avatar_id = f"{nova_classe}_{genero_curto}"
+
+        users_collection.update_one(
+            {"_id": ObjectId(user_id)},
+            {
+                "$set": {
+                    "class": nova_classe,
+                    "skin": nova_skin,         
+                    "avatar": novo_avatar_url, 
+                    # 👇 2. FORÇA A TROCA NO SISTEMA DE COSMÉTICOS 👇
+                    "equipped_skin": nova_skin_id,        
+                    "avatar_customizado": novo_avatar_id, 
+                    "max_hp": novo_max_hp,
+                    "current_hp": novo_max_hp, 
+                    "max_mana": novo_max_mp,
+                    "current_mp": novo_max_mp,
+                    "quests.q4_selene_classe.status": "resgatada"
+                },
+                # 👇 3. DESBLOQUEIA PARA SEMPRE NO GUARDA-ROUPA 👇
+                "$addToSet": {
+                    "unlocked_skins": nova_skin_id,
+                    "unlocked_avatars": novo_avatar_id
+                }
+            }
+        )
+
+        return jsonify({"sucesso": True})
+        
+    except Exception as e:
+        print(f"Erro na transmutação de classe: {str(e)}")
+        return jsonify({"sucesso": False, "erro": "Falha na magia do servidor."})
+        
+def _buscar_sids_por_char_ids(char_ids):
+    encontrados = {}
+    alvo_set = set(str(x) for x in char_ids)
+
+    for sid, info in jogadores_online.items():
+        if str(info.get("char_id")) in alvo_set:
+            encontrados[str(info.get("char_id"))] = sid
+
+    return encontrados
+
+
+def _ids_participantes_grupo(grupo):
+    ids = []
+
+    def adicionar(valor):
+        if not valor:
+            return
+
+        if isinstance(valor, dict):
+            valor = valor.get("char_id") or valor.get("_id") or valor.get("id")
+
+        valor = str(valor)
+
+        if valor and valor not in ids:
+            ids.append(valor)
+
+    adicionar(grupo.get("lider"))
+
+    for membro_id in grupo.get("membros", []) or []:
+        adicionar(membro_id)
+
+    return ids[:5]
+
+
+def _montar_equipe_herois_grupo(grupo, regiao_atual):
+    from bson import ObjectId
+    from modules.player.combat_stats import get_combat_stats_sync, aplicar_combat_stats_no_player
+
+    equipe = []
+    pendentes = []
+
+    participantes_ids = _ids_participantes_grupo(grupo)
+
+    online_por_char = {}
+
+    for sid, info in list(jogadores_online.items()):
+        char_id = str(info.get("char_id") or "")
+
+        if char_id in participantes_ids:
+            online_por_char[char_id] = info
+
+    for membro_id_str in participantes_ids:
+        online_info = online_por_char.get(membro_id_str)
+
+        if not online_info:
+            pendentes.append({
+                "char_id": membro_id_str,
+                "motivo": "offline_ou_webapp_nao_carregado"
+            })
+            continue
+
+        try:
+            player_db = users_collection.find_one({"_id": ObjectId(membro_id_str)})
+        except Exception:
+            player_db = None
+
+        if not player_db:
+            pendentes.append({
+                "char_id": membro_id_str,
+                "motivo": "personagem_nao_encontrado"
+            })
+            continue
+
+        regiao_online = (
+            online_info.get("regiao")
+            or online_info.get("current_location")
+            or player_db.get("current_location")
+        )
+
+        if regiao_online != regiao_atual:
+            pendentes.append({
+                "char_id": membro_id_str,
+                "nome": player_db.get("character_name", "Herói"),
+                "motivo": f"regiao_diferente:{regiao_online}"
+            })
+            continue
+
+        stats = get_combat_stats_sync(player_db)
+        player_db = aplicar_combat_stats_no_player(player_db, stats)
+
+        equipe.append({
+            "char_id": membro_id_str,
+            "nome": player_db.get("character_name", "Herói"),
+            "level": player_db.get("level", 1),
+            "current_hp": stats.get("current_hp", stats.get("max_hp", 100)),
+            "current_mp": stats.get("current_mp", stats.get("max_mana", 50)),
+            "max_hp": stats.get("max_hp", 100),
+            "max_mana": stats.get("max_mana", 50),
+            "attack": stats.get("attack", 5),
+            "defense": stats.get("defense", 0),
+            "initiative": stats.get("initiative", 5),
+            "luck": stats.get("luck", 0),
+            "magic_attack": stats.get("magic_attack", 0),
+        })
+
+    return equipe, pendentes, participantes_ids
+
+@app.route('/api/combate/iniciar', methods=['POST'])
+def iniciar_combate():
+    try:
+        data = request.json
+        user_id = data.get('user_id')
+        if data.get('sala_id'):
+            sala_convocada = gcm.obter_sala(data['sala_id'])
+            if (not sala_convocada or sala_convocada.get('retorno_mapa') or
+                    str(user_id) not in list(map(str, sala_convocada.get('membros_ids', [])))):
+                return jsonify({'erro': 'Convocação expirada ou jogador fora desta caçada.'}), 403
+        else:
+            sala_em_curso = gcm.obter_sala_do_jogador(str(user_id))
+            if sala_em_curso and sala_em_curso.get('spawn_id') != data.get('spawn_id'):
+                return jsonify({'erro': 'Seu grupo já está em outra caçada.'}), 409
+
+        spawn_id = data.get('spawn_id')
+
+        # 🔍 Busca o jogador no banco de dados
+        player = users_collection.find_one({"_id": ObjectId(user_id)})
+        if not player:
+            return jsonify({"erro": "Herói não encontrado nos registros."})
+
+        if data.get('auto_cacada') is True:
+            from datetime import datetime, timezone
+
+            premium = player.get("eldora_premium") or {}
+            expira_em = premium.get("expires_at")
+
+            if not isinstance(expira_em, datetime):
+                return jsonify({
+                    "erro": "Auto Caçada é exclusiva do Eldora Premium."
+                }), 403
+
+            if expira_em.tzinfo is None:
+                expira_em = expira_em.replace(
+                    tzinfo=timezone.utc
+                )
+
+            if expira_em <= datetime.now(timezone.utc):
+                return jsonify({
+                    "erro": "Auto Caçada é exclusiva do Eldora Premium."
+                }), 403
+
+        # 💥 FONTE ÚNICA DE STATUS DE COMBATE
+        # ==========================================
+        player_stats_calculados = get_combat_stats_sync(player)
+        player = aplicar_combat_stats_no_player(player, player_stats_calculados)
+
+        hp_max_real = int(player_stats_calculados.get("max_hp", 50))
+        mp_max_real = int(player_stats_calculados.get("max_mana", 50))
+
+        player_hp = int(player_stats_calculados.get("current_hp", hp_max_real))
+        player_mp = int(player_stats_calculados.get("current_mp", mp_max_real))
+
+        # Determina a região e o monstro
+        regiao_atual = player.get('current_location', 'capital_eldora')
+        for sid, info in jogadores_online.items():
+            if str(info.get('char_id')) == str(user_id):
+                regiao_atual = info.get('regiao', regiao_atual)
+                break
+                
+        monster_id_real = "slime_verde"
+        mob_vivo = None 
+        
+        if regiao_atual in sistema_cacada.mobs_vivos and spawn_id in sistema_cacada.mobs_vivos[regiao_atual]:
+            mob_vivo = sistema_cacada.mobs_vivos[regiao_atual][spawn_id]
+            monster_id_real = mob_vivo.get("monster_id", "slime_verde")
+
+        # ==========================================
+        # 🏰 MOB ESPECIAL DE EVENTO DA DUNGEON
+        # ==========================================
+        eh_evento_dungeon = is_dungeon_event_mob(
+            mob_vivo
+        )
+
+        # O Mímico criado pelo puzzle pertence somente
+        # ao jogador que despertou aquele encontro.
+        if (
+            eh_evento_dungeon
+            and not validate_event_mob_owner(
+                mob_vivo,
+                user_id
+            )
+        ):
+            return jsonify({
+                "erro": "Esse encontro pertence a outro jogador."
+            }), 403
+
+        # ==========================================
+        # 🏰 SEGURANÇA DA INSTÂNCIA DA DUNGEON
+        # ==========================================
+        if regiao_atual == "dungeon_01":
+
+            # Spawn inexistente não pode virar um
+            # monstro padrão por acidente.
+            if not mob_vivo:
+
+                return jsonify({
+                    "erro": (
+                        "Esse monstro não existe "
+                        "nesta execução da dungeon."
+                    )
+                }), 404
+
+            # ======================================
+            # ⚔️ MOB NORMAL / BOSS
+            # ======================================
+            #
+            # Mímico já foi validado acima pelo dono
+            # do evento individual.
+            #
+            # Para mobs normais e o Rei Caído,
+            # jogador e monstro precisam pertencer
+            # exatamente à mesma instância.
+            # ======================================
+            if not eh_evento_dungeon:
+
+                instancia_jogador = str(
+                    sistema_cacada
+                    .dungeon_jogador_instancia
+                    .get(
+                        str(user_id)
+                    )
+                    or ""
+                )
+
+                instancia_mob = str(
+                    mob_vivo.get(
+                        "dungeon_instance_id"
+                    )
+                    or ""
+                )
+
+                if (
+                    not instancia_jogador
+                    or not instancia_mob
+                    or instancia_jogador
+                    != instancia_mob
+                ):
+
+                    return jsonify({
+                        "erro": (
+                            "Esse monstro pertence "
+                            "a outra execução da dungeon."
+                        )
+                    }), 403
+
+        mob_data = None
+
+        for categoria, mobs in MONSTERS_DATA.items():
+            if categoria.startswith('_'): continue
+            for m in mobs:
+                if m.get('id') == monster_id_real:
+                    mob_data = m
+                    break
+            if mob_data: break
+
+        if not mob_data:
+            return jsonify({
+                "erro": "O monstro fugiu para a floresta!"
+            })
+
+        # ==========================================
+        # 👑 BOSS DA DUNGEON
+        # ==========================================
+        eh_boss_dungeon = (
+            regiao_atual == "dungeon_01"
+            and (
+                monster_id_real
+                == "rei_caido_dungeon_01"
+
+                or bool(
+                    mob_vivo
+                    and mob_vivo.get(
+                        "dungeon_boss"
+                    )
+                )
+
+                or bool(
+                    mob_vivo
+                    and mob_vivo.get(
+                        "boss"
+                    )
+                )
+
+                or bool(
+                    mob_data.get(
+                        "dungeon_boss"
+                    )
+                )
+
+                or bool(
+                    mob_data.get(
+                        "boss"
+                    )
+                )
+            )
+        )
+            
+        # Status dinâmicos do monstro
+        mob_level_final = mob_vivo.get("level", mob_data.get('min_level', 1)) if mob_vivo else mob_data.get('min_level', 1)
+        mob_hp_final = mob_vivo.get("hp_atual", mob_data.get('hp', 50)) if mob_vivo else mob_data.get('hp', 50)
+        mob_hp_max = mob_vivo.get("hp_max", mob_data.get('hp', 50)) if mob_vivo else mob_data.get('hp', 50)
+        mob_atk_final = mob_vivo.get("attack", mob_data.get('attack', 5)) if mob_vivo else mob_data.get('attack', 5)
+        mob_def_final = mob_vivo.get("defense", mob_data.get('defense', 0)) if mob_vivo else mob_data.get('defense', 0)
+        
+        # ==========================================
+        # 💥 SISTEMA DE EMBOSCADA (AMBUSH)
+        # ==========================================
+        ambush_log = None
+        raw_chance = float(mob_data.get('ambush_chance', 0.0))
+        
+        if raw_chance > 0 and player_hp > 0:
+            chance_base = raw_chance if raw_chance <= 1.0 else (raw_chance / 100.0)
+            
+            # Agilidade (Iniciativa) e Sorte reduzem a chance de emboscada
+            evasao = (player_stats_calculados.get('initiative', 5) + player_stats_calculados.get('luck', 5)) * 0.005
+            chance_final = max(0.02, chance_base - evasao)
+            
+            if random.random() < chance_final:
+                defesa_player = player_stats_calculados.get('defense', 0)
+                dano = max(1, mob_atk_final - (defesa_player // 2))
+                player_hp = max(0, player_hp - dano)
+                
+                nome_mob_tela = mob_data.get('name', 'Monstro')
+                textos_susto = [
+                    f"⚠️ EMBOSCADA! O monstro atacou de surpresa: -{dano} HP!",
+                    f"🩸 ATAQUE FURTIVO! {nome_mob_tela} saltou em você: -{dano} HP!"
+                ]
+                ambush_log = random.choice(textos_susto)
+                
+                # Salva o HP no banco imediatamente
+                users_collection.update_one({"_id": player["_id"]}, {"$set": {"current_hp": player_hp}})
+        
+        # ==========================================
+        # 📖 LÓGICA DO BESTIÁRIO
+        # ==========================================
+        bestiario = player.get("bestiario", {})
+        abates = bestiario.get(monster_id_real, 0)
+
+        # ==========================================
+        # 📖 CONHECIMENTO ESPECIAL DA DUNGEON
+        # ==========================================
+        #
+        # Mímico:
+        # já se revelou através do evento.
+        #
+        # Rei Caído:
+        # é o chefe final da dungeon e deve aparecer
+        # com nome e nível completos imediatamente.
+        # ==========================================
+        if (
+            eh_evento_dungeon
+            or eh_boss_dungeon
+        ):
+            nivel_conhecimento = 3
+
+        else:
+            nivel_conhecimento = (
+                3 if abates >= 50
+                else 2 if abates >= 10
+                else 1 if abates >= 1
+                else 0
+            )
+
+        nome_mob_tela = mob_data.get('name', 'Monstro') if nivel_conhecimento > 0 else "Criatura Desconhecida"
+        lvl_mob_tela = mob_level_final if nivel_conhecimento > 0 else "??"
+
+        pastas_github = {"capital_eldora": "capital", "pradaria_inicial": "pradaria", "floresta_sombria": "floresta", "pedreira_granito": "pedreira"}
+        nome_da_pasta = pastas_github.get(regiao_atual, regiao_atual)
+        link_imagem_monstro = f"https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/mob/combate/{nome_da_pasta}/{mob_data.get('id')}.png"
+        
+        # Estado final enviado para o combate.js
+        estado = {
+            "regiao": regiao_atual,
+            "spawn_id": spawn_id,
+            "monster_id": monster_id_real,
+
+            # ==========================================
+            # 🏰 EVENTO ESPECIAL DE DUNGEON
+            # ==========================================
+            "evento_dungeon": eh_evento_dungeon,
+
+            # ==========================================
+            # 👑 IDENTIFICAÇÃO DO BOSS
+            # ==========================================
+            "boss": eh_boss_dungeon,
+            "dungeon_boss": eh_boss_dungeon,
+
+            "mob_nome": nome_mob_tela,
+            "mob_img": link_imagem_monstro,
+            "monster_level": lvl_mob_tela, 
+            "monster_hp": mob_hp_final,
+            "monster_stats": {
+                "max_hp": mob_hp_max, 
+                "attack": mob_atk_final,
+                "defense": mob_def_final,
+                "initiative": mob_data.get('initiative', 0),
+                "luck": mob_data.get('luck', 0)
+            },
+            "player_hp": player_hp, 
+            "player_mp": player_mp,
+            "player_level": player.get('level', 1),
+            # Envia os limites REAIS (155 Mana / 162 Vida) para o Javascript
+            "player_stats": {"max_hp": hp_max_real, "max_mana": mp_max_real}, 
+            "classe_player": player.get('class', 'aventureiro'),
+            "genero_player": player.get('gender', 'masculino'),
+            "nivel_conhecimento": nivel_conhecimento,
+            "abates_bestiario": abates,
+            "ambush_log": ambush_log 
+        }
+        
+                # ==========================================
+        # 🤝 ENTRADA EM COMBATE DE GRUPO
+        # ==========================================
+        sala_id_recebida = data.get("sala_id")
+        modo_grupo = data.get("modo_grupo", False)
+
+        # Se o jogador já veio convocado por uma sala existente
+        if sala_id_recebida:
+            sala_existente = gcm.obter_sala(sala_id_recebida)
+            return jsonify({
+                "estado": estado,
+                "grupo": True,
+                "sala_id": sala_id_recebida,
+                "sala": gcm.pacote_estado_sala(sala_id_recebida) if sala_existente else None
+            })
+
+        # ==========================================
+        # 👹 MÍMICO DA DUNGEON = COMBATE SOLO
+        # ==========================================
+        #
+        # Mesmo que o jogador esteja em uma party,
+        # o Mímico pertence ao evento individual
+        # daquele jogador.
+        #
+        # Os outros combates continuam funcionando
+        # normalmente em grupo.
+        # ==========================================
+
+        grupo = (
+            None
+            if eh_evento_dungeon
+            else obter_grupo_do_jogador(
+                str(user_id)
+            )
+        )
+
+        if grupo and mob_vivo:
+            lider_id = str(grupo.get("lider"))
+
+            if lider_id != str(user_id):
+                sala_existente = gcm.obter_sala_por_spawn(regiao_atual, spawn_id)
+
+                if sala_existente:
+                    return jsonify({
+                        "estado": estado,
+                        "grupo": True,
+                        "sala_id": sala_existente["sala_id"],
+                        "sala": gcm.pacote_estado_sala(sala_existente["sala_id"])
+                    })
+
+                return jsonify({
+                    "erro": "Apenas o líder do grupo pode iniciar a caçada em grupo."
+                })
+
+            # Por enquanto só o líder cria a sala
+            if lider_id == str(user_id):
+                sala_existente = gcm.obter_sala_por_spawn(regiao_atual, spawn_id)
+
+                if sala_existente:
+                    return jsonify({
+                        "estado": estado,
+                        "grupo": True,
+                        "sala_id": sala_existente["sala_id"],
+                        "sala": gcm.pacote_estado_sala(sala_existente["sala_id"])
+                    })
+                else:
+                    equipe, pendentes, participantes_ids = _montar_equipe_herois_grupo(grupo, regiao_atual)
+
+                    total_membros_grupo = len(participantes_ids)
+
+                    if pendentes or len(equipe) != total_membros_grupo:
+
+                        return jsonify({
+                            "erro": f"Aguardando todos os membros do grupo carregarem o mapa. Prontos: {len(equipe)}/{total_membros_grupo}",
+                            "grupo": True,
+                            "aguardando_grupo": True,
+                            "prontos": len(equipe),
+                            "total": total_membros_grupo,
+                            "participantes": participantes_ids,
+                            "pendentes": pendentes
+                        })
+
+                    if len(equipe) >= 2:
+                        sala = gcm.criar_cacada_grupo(
+                            equipe_herois=equipe,
+                            mob_vivo=mob_vivo,
+                            regiao=regiao_atual,
+                            spawn_id=spawn_id,
+                            lider_id=str(user_id),
+                            grupo_id=str(grupo.get("_id", ""))
+                        )
+
+                        pacote = {
+                            "sala_id": sala["sala_id"],
+                            "spawn_id": spawn_id,
+                            "regiao": regiao_atual,
+                            "lider_id": str(user_id),
+                            "estado": estado,
+                            "sala": gcm.pacote_estado_sala(sala["sala_id"])
+                        }
+
+                        sids = _buscar_sids_por_char_ids(sala.get("membros_ids", []))
+
+                        for membro_id, sid in sids.items():
+                            if str(membro_id) != str(user_id):
+                                socketio.emit("convocarCombateGrupo", pacote, to=sid)
+
+                        return jsonify({
+                            "estado": estado,
+                            "grupo": True,
+                            "sala_id": sala["sala_id"],
+                            "sala": gcm.pacote_estado_sala(sala["sala_id"])
+                        })
+        users_collection.update_one({"_id": ObjectId(user_id)}, {"$set": {"rune_hunt_active": {
+            "regiao": regiao_atual,
+            "spawn_id": spawn_id,
+            "battle_id": str(uuid4()),
+            "origin": "auto_cacada" if data.get("auto_cacada") is True else "manual",
+            "started_at": datetime.now(timezone.utc),
+        }}})
+        return jsonify({"estado": estado, "grupo": False})
+
+    except Exception:
+        import traceback
+        print(
+            "🚨 Erro ao iniciar combate:\n"
+            + traceback.format_exc()
+        )
+        return jsonify({"erro": "Falha mágica no servidor!"}), 500
+
+@app.route('/api/combate/grupo/pronto', methods=['POST'])
+def combate_grupo_pronto():
+    try:
+        data = request.get_json() or {}
+
+        sala_id = str(data.get("sala_id") or "")
+        user_id = str(data.get("user_id") or data.get("char_id") or "")
+
+        if not sala_id or not user_id:
+            return jsonify({"erro": "Dados inválidos para marcar pronto."}), 400
+
+        sala = gcm.marcar_membro_pronto(sala_id, user_id)
+
+        if not sala:
+            return jsonify({"erro": "Sala de combate não encontrada."}), 404
+
+        pacote_sala = gcm.pacote_estado_sala(sala_id)
+
+        payload = {
+            "sala_id": sala_id,
+            "spawn_id": sala.get("spawn_id"),
+            "sala": pacote_sala,
+            "estado": pacote_sala.get("estado") if pacote_sala else sala.get("estado"),
+            "turno_atual": pacote_sala.get("turno_atual") if pacote_sala else None,
+            "finalizado": False,
+            "log": [],
+        }
+
+        membros_ids = set(str(x) for x in sala.get("membros_ids", []))
+        sids_enviados = set()
+
+        for sid, info in list(jogadores_online.items()):
+            char_online = str(info.get("char_id"))
+
+            if char_online in membros_ids:
+                socketio.emit("estadoSalaGrupo", payload, to=sid)
+                socketio.emit("grupoCombateEstado", payload, to=sid)
+                sids_enviados.add(sid)
+
+        # Broadcast sempre, para não depender de SID velho.
+        socketio.emit("estadoSalaGrupo", payload)
+        socketio.emit("grupoCombateEstado", payload)
+
+        return jsonify(payload)
+
+    except Exception:
+        import traceback
+        print(
+            "🚨 Erro ao marcar membro pronto:\n"
+            + traceback.format_exc()
+        )
+        return jsonify({"erro": "Falha ao marcar pronto no combate."}), 500
+                               
+# ==============================================================================
+# 3. MULTIPLAYER (SOCKET.IO)
+# ==============================================================================
+jogadores_online = {}
+socket_invites = SocketInviteRegistry(ttl_seconds=300)
+
+
+def revoke_account_sockets(account_id):
+    for sid, player in list(jogadores_online.items()):
+        if str(player.get('account_id') or '') != str(account_id):
+            continue
+        socket_invites.discard_socket(sid)
+        try:
+            socketio.server.disconnect(sid, namespace='/')
+        except Exception:
+            app.logger.exception('Falha ao desconectar sessão revogada')
+        if sid in jogadores_online:
+            jogadores_online.pop(sid, None)
+            socketio.emit('jogadorSaiu', sid, broadcast=True, include_self=False)
+
+
+app.config['REVOKE_ACCOUNT_SOCKETS'] = revoke_account_sockets
+
+
+def _authenticated_socket_player(requested_id=None):
+    player = jogadores_online.get(request.sid)
+    if not player:
+        return None
+    char_id = str(player.get('char_id') or '')
+    if requested_id is not None and str(requested_id) != char_id:
+        return None
+    try:
+        from modules.portal_auth import require_player_identity
+        require_player_identity(char_id)
+    except Exception:
+        return None
+    return player
+app.config['JOGADORES_ONLINE'] = jogadores_online
+registrar_loja_reino(socketio, db, jogadores_online)
+
+
+@socketio.on('jogador_morreu')
+def handle_jogador_morreu(data):
+    jogador_info = _authenticated_socket_player()
+    if not jogador_info:
+        return
+
+    emit('mostrarLapide', data, broadcast=True, include_self=False)
+    char_id = jogador_info['char_id']
+    player_data = users_collection.find_one({"_id": ObjectId(char_id)})
+
+    if not player_data:
+        return
+
+    stats = get_combat_stats_sync(player_data)
+    hp_maximo_real = int(stats.get("max_hp", 100))
+    mp_maximo_real = int(stats.get("max_mana", 50))
+
+    users_collection.update_one(
+        {"_id": ObjectId(char_id)},
+        {"$set": {
+            "current_hp": hp_maximo_real,
+            "current_mp": mp_maximo_real,
+            "stats": aplicar_combat_stats_no_player(player_data, stats).get("stats", {}),
+            "max_hp": hp_maximo_real,
+            "max_mana": mp_maximo_real,
+            "attack": int(stats.get("attack", 0)),
+            "defense": int(stats.get("defense", 0)),
+            "initiative": int(stats.get("initiative", 0)),
+            "luck": int(stats.get("luck", 0)),
+            "magic_attack": int(stats.get("magic_attack", 0)),
+        }}
+    )
+
+@socketio.on('dispararEventoGlobal')
+def handle_evento_global(dados):
+    # Pega o evento que o Javascript enviou e repassa para TODOS os jogadores (broadcast=True)
+    emit('efeitoGlobalMapa', dados, broadcast=True)
+    
+@socketio.on('enviarMensagemChat')
+def handle_chat_message(dados):
+    try:
+        player_sid = request.sid
+        if player_sid not in jogadores_online: 
+            emit('solicitarRegistro', {}, to=player_sid)
+            return
+
+        remetente = jogadores_online[player_sid]['nome']
+        char_id = jogadores_online[player_sid]['char_id']
+        mensagem = dados.get('texto', '').strip()
+        
+        if not mensagem: return
+
+        # 📸 MÁGICA DO AVATAR: Busca a foto real do jogador no banco de dados!
+        jogador_db = users_collection.find_one({"_id": ObjectId(char_id)})
+        avatar_real = "avatar_padrao_m"
+        if jogador_db:
+            ac = jogador_db.get("avatar_customizado")
+            if ac and ac != "padrao":
+                avatar_real = ac.get("path", ac) if isinstance(ac, dict) else ac
+            else:
+                avatar_real = jogador_db.get("avatar", "avatar_padrao_m")
+
+        # 🔧 A CORREÇÃO: Adiciona o prefixo 'avatar_' se faltar!
+        nome_puro = avatar_real.split("/")[-1].replace(".png", "")
+        if not nome_puro.startswith("avatar_") and "cunminicon" not in nome_puro:
+            nome_puro = f"avatar_{nome_puro}"
+            
+        avatar_real = f"https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/avatares/{nome_puro}.png"
+         
+        # 1. VERIFICA SUSSURRO (PRIVADO)
+        if mensagem.startswith('/w '):
+            nome_alvo = ""
+            texto_real = ""
+            if '"' in mensagem:
+                partes = mensagem.split('"', 2)
+                if len(partes) >= 3:
+                    nome_alvo = partes[1]
+                    texto_real = partes[2].strip()
+            else:
+                partes = mensagem.split(' ', 2)
+                if len(partes) >= 3:
+                    nome_alvo = partes[1]
+                    texto_real = partes[2].strip()
+                    
+            if nome_alvo and texto_real:
+                # Salva o Sussurro COM O AVATAR no banco
+                pacote_offline = {
+                    "remetente": remetente, "destinatario": nome_alvo,
+                    "texto": texto_real, "data_envio": datetime.utcnow(), "lida": False,
+                    "avatar": avatar_real 
+                }
+                mensagens_offline_col.insert_one(pacote_offline)
+
+                emit('novaMensagemChat', {"remetente": f"Para {nome_alvo}", "texto": texto_real, "tipo": "privado", "nome_puro": nome_alvo, "avatar": avatar_real}, to=player_sid)
+
+                alvo_online = False
+                for sid, info in jogadores_online.items():
+                    if info.get('nome') == nome_alvo:
+                        emit('novaMensagemChat', {"remetente": remetente, "texto": texto_real, "tipo": "privado", "nome_puro": remetente, "avatar": avatar_real}, to=sid)
+                        alvo_online = True
+                        break
+                
+                if not alvo_online:
+                    emit('novaMensagemChat', {"remetente": "Sistema", "texto": f"Aviso: {nome_alvo} está off-line. A mensagem foi guardada!", "tipo": "erro"}, to=player_sid)
+            else:
+                emit('novaMensagemChat', {"remetente": "Sistema", "texto": "Formato inválido.", "tipo": "erro"}, to=player_sid)
+            
+            return
+
+        canal_chat, texto_chat = classificar_destino_mensagem(mensagem)
+        if canal_chat == 'comando_invalido':
+            emit('novaMensagemChat', {
+                "remetente": "Sistema",
+                "texto": "Comando de chat inválido.",
+                "tipo": "erro",
+            }, to=player_sid)
+            return
+
+        # 2. Mensagens de grupo ficam restritas aos membros da party.
+        if canal_chat == 'grupo':
+            if texto_chat:
+                grupo = obter_grupo_do_jogador(char_id)
+                if grupo:
+                    for membro_id in grupo.get('membros', []):
+                        for sid, info in jogadores_online.items():
+                            if str(info['char_id']) == str(membro_id):
+                                emit('novaMensagemChat', {
+                                    "remetente": remetente,
+                                    "texto": texto_chat,
+                                    "tipo": "grupo",
+                                    "canal": "grupo",
+                                    "avatar": avatar_real,
+                                }, to=sid)
+                else:
+                    emit('novaMensagemChat', {
+                        "remetente": "Sistema",
+                        "texto": "Você não está em um grupo.",
+                        "tipo": "erro",
+                        "canal": "grupo",
+                    }, to=player_sid)
+            return
+
+        # 3. Mensagens de clã usam o vínculo oficial de membro do sistema de clãs.
+        if canal_chat == 'cla':
+            if not texto_chat:
+                return
+
+            try:
+                from modules.clan.clan_manager import obter_cla_do_jogador
+
+                cla = obter_cla_do_jogador(char_id, reparar_vinculo=False)
+            except Exception:
+                app.logger.exception("Falha ao validar o clã para o chat")
+                emit('novaMensagemChat', {
+                    "remetente": "Sistema",
+                    "texto": "Não foi possível carregar o chat do clã agora.",
+                    "tipo": "erro",
+                    "canal": "guilda",
+                }, to=player_sid)
+                return
+
+            membros_cla = {
+                str(membro.get("user_id"))
+                for membro in (cla or {}).get("membros", [])
+                if isinstance(membro, dict) and membro.get("user_id") is not None
+            }
+            if not cla or str(char_id) not in membros_cla:
+                emit('novaMensagemChat', {
+                    "remetente": "Sistema",
+                    "texto": "Você não participa de um clã ativo.",
+                    "tipo": "erro",
+                    "canal": "guilda",
+                }, to=player_sid)
+                return
+
+            pacote_cla = {
+                "remetente": remetente,
+                "texto": texto_chat,
+                "alvo": "cla",
+                "clan_id": str(cla.get("_id")),
+                "tipo": "cla",
+                "data_envio": datetime.utcnow(),
+                "avatar": avatar_real,
+            }
+            chat_collection.insert_one(pacote_cla)
+            for sid in sids_online_do_cla(cla, jogadores_online):
+                emit('novaMensagemChat', {
+                    "remetente": remetente,
+                    "texto": texto_chat,
+                    "tipo": "cla",
+                    "canal": "guilda",
+                    "avatar": avatar_real,
+                }, to=sid)
+            return
+
+        # 4. Texto comum é global; comandos desconhecidos nunca chegam aqui.
+        mensagem = texto_chat
+        # Salva o Global COM O AVATAR no banco
+        pacote_global = {
+            "remetente": remetente, "texto": mensagem,
+            "alvo": "global", "data_envio": datetime.utcnow(),
+            "avatar": avatar_real 
+        }
+        chat_collection.insert_one(pacote_global)
+        
+        for sid in list(jogadores_online.keys()):
+            emit('novaMensagemChat', {"remetente": remetente, "texto": mensagem, "tipo": "global", "avatar": avatar_real}, to=sid)
+            
+    except Exception as e:
+        print(f"🚨 ERRO GRAVE NO CHAT: {str(e)}")
+                     
+@socketio.on('enviarConviteGrupo')
+def handle_convite_grupo(dados):
+
+    
+    alvo_id = dados.get('alvo_id')
+    remetente_sid = request.sid
+    remetente = jogadores_online.get(remetente_sid)
+    
+    if not remetente:
+        return
+    if not alvo_id:
+        return
+
+    lider_id = str(remetente['char_id'])
+
+    try:
+        # 1. Verifica se o ALVO já tem grupo
+        if obter_grupo_do_jogador(alvo_id):
+            emit('novaMensagemChat', {'remetente': 'Sistema', 'texto': '❌ O jogador já está num grupo!', 'tipo': 'erro'}, room=remetente_sid)
+            return
+
+        # 2. Verifica se o LÍDER já tem grupo (para não duplicar)
+        grupo_existente = obter_grupo_do_jogador(lider_id)
+        if grupo_existente:
+            if grupo_existente["lider"] != lider_id:
+                emit(
+                    'novaMensagemChat',
+                    {
+                        'remetente': 'Sistema',
+                        'texto': '❌ Só o líder pode convidar!',
+                        'tipo': 'erro'
+                    },
+                    room=remetente_sid
+                )
+                return
+            party_id = str(grupo_existente["_id"])
+
+        else:
+            party_id = criar_novo_grupo(lider_id, remetente['nome'], remetente['regiao'])
+
+        # Atualiza o HUD do líder na hora
+        grupo_fresco = obter_grupo(party_id)
+        if grupo_fresco:
+            emit('atualizarListaGrupo', grupo_fresco, room=remetente_sid)
+
+        # 3. Procura o Bastos online para mandar o modal Épico
+        alvo_encontrado = False
+        for sid, info in jogadores_online.items():
+            if str(info['char_id']) == str(alvo_id):
+                
+                # Dispara o Modal para o Bastos
+                socket_invites.issue(
+                    'grupo', sid, remetente_sid, lider_id, str(info['char_id']),
+                    context={'party_id': str(party_id)}
+                )
+                emit('receberConviteGrupo', {'party_id': party_id, 'remetente_id': lider_id, 'remetente_nome': remetente['nome']}, room=sid)
+                
+                # Confirma no chat do remetente
+                emit('novaMensagemChat', {'remetente': 'Sistema', 'texto': f'📩 Convite enviado para {info.get("nome", "aliado")}!', 'tipo': 'privado'}, room=remetente_sid)
+                
+                alvo_encontrado = True
+                break
+
+        # A BLINDAGEM: Se ele não achar o Bastos, avisa você!
+        if not alvo_encontrado:
+            emit('novaMensagemChat', {'remetente': 'Sistema', 'texto': '❌ O jogador está offline ou longe demais!', 'tipo': 'erro'}, room=remetente_sid)
+
+    except Exception as e:
+        print(f"🚨 [CRASH GRUPO] Ocorreu um erro no MongoDB ou Python: {str(e)}")
+        emit('novaMensagemChat', {'remetente': 'Sistema', 'texto': '❌ Erro mágico no servidor.', 'tipo': 'erro'}, room=remetente_sid)
+
+@socketio.on('marcarSussurrosLidos')
+def handle_marcar_lidos(dados):
+    player_sid = request.sid
+    if player_sid not in jogadores_online: return
+    
+    nome_jogador = jogadores_online[player_sid]['nome']
+    amigo = dados.get('amigo')
+    
+    if amigo:
+        # Muda o status de "lida: False" para "lida: True"
+        mensagens_offline_col.update_many(
+            {"remetente": amigo, "destinatario": nome_jogador, "lida": False},
+            {"$set": {"lida": True}}
+        )
+        
+@socketio.on('aceitarGrupo')
+def handle_aceitar_grupo(dados):
+    sid = request.sid
+    jogador = _authenticated_socket_player()
+    dados = dados if isinstance(dados, dict) else {}
+    party_id = str(dados.get('party_id') or '')
+    if not jogador or not party_id: return
+
+    convite = socket_invites.consume(
+        'grupo', sid, jogador['char_id'], context={'party_id': party_id}
+    )
+    if not convite:
+        emit('novaMensagemChat', {'remetente': 'Sistema', 'texto': 'Convite de grupo inválido ou expirado.', 'tipo': 'erro'}, to=sid)
+        return
+
+    sucesso, msg = adicionar_membro(party_id, str(jogador['char_id']), jogador['nome'])
+
+    if sucesso:
+        # 📸 Busca o avatar e FORÇA a URL certa
+        jogador_db = users_collection.find_one({"_id": ObjectId(jogador['char_id'])})
+        avatar_real = "avatar_padrao_m"
+        if jogador_db:
+            ac = jogador_db.get("avatar_customizado")
+            if ac and ac != "padrao":
+                avatar_real = ac.get("path", ac) if isinstance(ac, dict) else ac
+            else:
+                avatar_real = jogador_db.get("avatar", "avatar_padrao_m")
+                
+        nome_puro = avatar_real.split("/")[-1].replace(".png", "")
+        if not nome_puro.startswith("avatar_") and "cunminicon" not in nome_puro:
+            nome_puro = f"avatar_{nome_puro}"
+            
+        avatar_real = f"https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/avatares/{nome_puro}.png"
+
+        grupo = obter_grupo(party_id)
+        if grupo:
+            for membro_id in grupo.get('membros', []):
+                for sid_m, info_m in jogadores_online.items():
+                    if str(info_m['char_id']) == str(membro_id):
+                        if str(membro_id) != str(jogador['char_id']):
+                            emit('novaMensagemChat', {'remetente': '⚔️ Party:', 'texto': f'🤝 {jogador["nome"]} entrou no grupo!', 'tipo': 'grupo', 'avatar': avatar_real}, room=sid_m)
+                        else:
+                            emit('novaMensagemChat', {'remetente': '⚔️ Party:', 'texto': f'✅ Você se juntou ao grupo!', 'tipo': 'grupo', 'avatar': avatar_real}, room=sid_m)
+                        
+                        emit('atualizarListaGrupo', grupo, room=sid_m)
+    else:
+        emit('novaMensagemChat', {'remetente': 'Sistema', 'texto': f'⚠️ {msg}', 'tipo': 'erro'}, room=sid)
+
+@socketio.on('retornarGrupoMapa')
+def retornar_grupo_mapa(data):
+    jogador = jogadores_online.get(request.sid) or {}
+    try:
+        pacote = gcm.retornar_grupo_ao_mapa((data or {}).get('sala_id'), jogador.get('char_id'))
+    except ValueError as erro:
+        return {'success': False, 'error': str(erro)}
+    gcm.emitir_para_membros(socketio, pacote['sala_id'], 'grupoRetornouMapa', pacote, jogadores_online)
+    return {'success': True, 'sala': pacote}
+
+
+@socketio.on('solicitarEstadoSala')
+def solicitar_estado_sala(data):
+    sala_id = (data or {}).get('sala_id')
+    sala = gcm.obter_sala(sala_id)
+    jogador = jogadores_online.get(request.sid) or {}
+    if not sala or str(jogador.get('char_id')) not in list(map(str, sala.get('membros_ids', []))):
+        return
+    emit('estadoSalaGrupo', gcm.pacote_estado_sala(sala_id), to=request.sid)
+
+@socketio.on('sairGrupo')
+def handle_sair_grupo(dados):
+    sid = request.sid
+    jogador = jogadores_online.get(sid)
+    if not jogador: return
+    
+    char_id = str(jogador['char_id'])
+    sucesso, msg, membros_afetados = sair_ou_desfazer_grupo(char_id)
+    
+    if sucesso:
+        emit('novaMensagemChat', {'remetente': 'Sistema', 'texto': msg, 'tipo': 'aviso'}, room=sid)
+        emit('removerHudGrupo', {}, room=sid) # Apaga a caixinha do ecrã de quem saiu
+        
+        # Avisa a galera que sobrou
+        for membro_id in membros_afetados:
+            for sid_m, info_m in jogadores_online.items():
+                if str(info_m['char_id']) == str(membro_id):
+                    if "desfez" in msg:
+                        emit('novaMensagemChat', {'remetente': 'Sistema', 'texto': '⚠️ O líder desfez o grupo.', 'tipo': 'erro'}, room=sid_m)
+                        emit('removerHudGrupo', {}, room=sid_m)
+                    else:
+                        emit('novaMensagemChat', {'remetente': '⚔️ Party:', 'texto': f'🚪 {jogador["nome"]} saiu do grupo.', 'tipo': 'grupo'}, room=sid_m)
+                        grupo_atualizado = obter_grupo_do_jogador(membro_id)
+                        if grupo_atualizado:
+                            emit('atualizarListaGrupo', grupo_atualizado, room=sid_m)
+                                    
+@socketio.on('enviarConviteAmizade')
+def handle_convite_amizade(dados):
+    remetente_sid = request.sid
+    remetente = _authenticated_socket_player()
+    dados = dados if isinstance(dados, dict) else {}
+    if not remetente: return
+    
+    remetente_id = str(remetente['char_id'])
+    remetente_nome = remetente['nome']
+    alvo_id = str(dados.get('alvo_id') or '')
+    if not ObjectId.is_valid(alvo_id) or alvo_id == remetente_id:
+        return
+    
+    alvo_sid = None
+    for sid, info in jogadores_online.items():
+        if str(info.get('char_id')) == alvo_id:
+            alvo_sid = sid
+            break
+            
+    if alvo_sid:
+        socket_invites.issue('amizade', alvo_sid, remetente_sid, remetente_id, alvo_id)
+        emit('receberConviteAmizade', {"remetente_id": remetente_id, "remetente_nome": remetente_nome}, to=alvo_sid)
+        emit('novaMensagemChat', {"remetente": "Sistema", "texto": "Convite de amizade enviado!", "tipo": "privado"}, to=remetente_sid)
+    else:
+        emit('novaMensagemChat', {"remetente": "Sistema", "texto": "O jogador está offline ou longe.", "tipo": "erro"}, to=remetente_sid)
+
+@socketio.on('aceitarAmizade')
+def handle_aceitar_amizade(dados):
+    meu_sid = request.sid
+    jogador = _authenticated_socket_player()
+    dados = dados if isinstance(dados, dict) else {}
+    if not jogador: return
+
+    meu_id = str(jogador['char_id'])
+    amigo_id = str(dados.get('amigo_id') or '')
+    convite = socket_invites.consume('amizade', meu_sid, meu_id, sender_char_id=amigo_id)
+    amigo_online = jogadores_online.get(convite.get('sender_sid')) if convite else None
+    if (
+        not convite
+        or not amigo_online
+        or str(amigo_online.get('char_id')) != amigo_id
+        or not ObjectId.is_valid(amigo_id)
+        or amigo_id == meu_id
+    ):
+        emit('novaMensagemChat', {"remetente": "Sistema", "texto": "Convite de amizade inválido ou expirado.", "tipo": "erro"}, to=meu_sid)
+        return
+
+    meu_db = users_collection.find_one({"_id": ObjectId(meu_id)})
+    amigo_db = users_collection.find_one({"_id": ObjectId(amigo_id)})
+    if not meu_db or not amigo_db:
+        return
+    meu_nome = meu_db.get('character_name', jogador.get('nome', 'Herói'))
+    amigo_nome = amigo_db.get('character_name', amigo_online.get('nome', 'Herói'))
+
+    users_collection.update_one({"_id": ObjectId(meu_id)}, {"$addToSet": {"amigos": {"id": amigo_id, "nome": amigo_nome}}})
+    users_collection.update_one({"_id": ObjectId(amigo_id)}, {"$addToSet": {"amigos": {"id": meu_id, "nome": meu_nome}}})
+
+    emit('novaMensagemChat', {"remetente": "Sistema", "texto": f"🤝 {meu_nome} aceitou o teu pedido de amizade!", "tipo": "privado"}, to=convite['sender_sid'])
+    emit('novaMensagemChat', {"remetente": "Sistema", "texto": f"🤝 Agora és amigo de {amigo_nome}!", "tipo": "privado"}, to=meu_sid)
+
+@socketio.on('pedirListaAmigos')
+def handle_pedir_amigos():
+    meu_sid = request.sid
+    # 🛡️ Proteção: Verifica se quem pediu está na lista de online
+    if meu_sid not in jogadores_online: return
+    
+    meu_id = jogadores_online[meu_sid]['char_id']
+    jogador = users_collection.find_one({"_id": ObjectId(meu_id)})
+    
+    if jogador:
+        amigos_salvos = jogador.get("amigos", [])
+        amigos_enriquecidos = []
+        
+        # 🔍 Cria um "radar" instantâneo com os IDs de todo mundo que está online agora no servidor
+        ids_online = {str(info.get('char_id')) for info in jogadores_online.values()}
+        
+        for amg in amigos_salvos:
+            amigo_id = str(amg.get("id"))
+            
+            # 🟢 MÁGICA DO ONLINE: Checa se o ID do amigo está no radar
+            ta_online = amigo_id in ids_online
+            
+            # 📖 MÁGICA DO AVATAR/LEVEL: Busca os dados reais do amigo no banco
+            amigo_db = users_collection.find_one({"_id": ObjectId(amigo_id)})
+            
+            level_real = 1
+            pontos_pvp = 0
+            avatar_real = "avatar_padrao_m"
+            
+            if amigo_db:
+                level_real = amigo_db.get("level", 1)
+                pontos_pvp = max(0, _safe_int(amigo_db.get("pvp_points"), 0))
+                ac = amigo_db.get("avatar_customizado")
+                if ac and ac != "padrao":
+                    avatar_real = ac.get("path", ac) if isinstance(ac, dict) else ac
+                else:
+                    avatar_real = amigo_db.get("avatar", "avatar_padrao_m")
+                
+            # 🔧 A CORREÇÃO NA LISTA DE AMIGOS
+            nome_puro = avatar_real.split("/")[-1].replace(".png", "")
+            if not nome_puro.startswith("avatar_") and "cunminicon" not in nome_puro:
+                nome_puro = f"avatar_{nome_puro}"
+                
+            avatar_real = f"https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/avatares/{nome_puro}.png"
+               
+            # Monta o pacote completo para enviar ao JavaScript
+            amigos_enriquecidos.append({
+                "id": amigo_id,
+                "nome": amg.get("nome", "Desconhecido"),
+                "online": ta_online,
+                "level": level_real,
+                "pvp_points": pontos_pvp,
+                "avatar": avatar_real
+            })
+            
+        emit('receberListaAmigos', amigos_enriquecidos, to=meu_sid)
+                    
+@socketio.on('entrarRegiao')
+def handle_entrar_regiao(data):
+    player_sid = request.sid
+    data = data if isinstance(data, dict) else {}
+    char_id = data.get('char_id')
+
+    def rejeitar_registro(codigo, mensagem):
+        previous_player = jogadores_online.pop(player_sid, None)
+        if previous_player:
+            emit('jogadorSaiu', player_sid, broadcast=True, include_self=False)
+        emit(
+            'registroRegiaoFalhou',
+            {'codigo': codigo, 'mensagem': mensagem},
+            to=player_sid
+        )
+
+    if not char_id:
+        rejeitar_registro(
+            'personagem_ausente',
+            'Escolha um personagem na tela de entrada para conectar ao mundo.'
+        )
+        return
+
+    char_id = str(
+        char_id
+    )
+    from modules.portal_auth import PlayerSessionError, require_player_identity
+    try:
+        character = require_player_identity(char_id)
+    except PlayerSessionError as exc:
+        rejeitar_registro('sessao_invalida', str(exc))
+        return
+    except Exception:
+        app.logger.exception('Falha ao validar a sessão ao entrar no mapa')
+        rejeitar_registro(
+            'falha_validacao',
+            'Não foi possível validar sua conta agora. Reconecte ao jogo.'
+        )
+        return
+
+    nova_regiao = str(
+        data.get(
+            'regiao',
+            'capital_eldora'
+        )
+        or 'capital_eldora'
+    )
+
+    # ==========================================
+    # 🏰 DESCOBRIR REGIÃO ANTERIOR
+    # ==========================================
+    regiao_anterior = None
+
+    info_atual = jogadores_online.get(
+        player_sid
+    )
+
+    if (
+        info_atual
+        and str(
+            info_atual.get(
+                'char_id'
+            )
+        ) == char_id
+    ):
+        regiao_anterior = (
+            info_atual.get(
+                'regiao'
+            )
+        )
+
+    sids_para_remover = [
+        sid
+        for sid, info
+        in jogadores_online.items()
+        if (
+            str(
+                info.get(
+                    'char_id'
+                )
+            ) == char_id
+            and sid != player_sid
+        )
+    ]
+
+    # Se o navegador abriu outro socket, ainda conseguimos
+    # descobrir de qual região o jogador estava vindo.
+    if not regiao_anterior:
+
+        for old_sid in sids_para_remover:
+
+            old_info = (
+                jogadores_online.get(
+                    old_sid
+                )
+                or {}
+            )
+
+            regiao_antiga_socket = (
+                old_info.get(
+                    'regiao'
+                )
+            )
+
+            if regiao_antiga_socket:
+                regiao_anterior = (
+                    regiao_antiga_socket
+                )
+                break
+
+    # ==========================================
+    # 🚪 JOGADOR ESTÁ FORA DA DUNGEON
+    # ==========================================
+    #
+    # Chamamos mesmo se não soubermos a região
+    # anterior. Se não houver vínculo de dungeon,
+    # sair_dungeon_jogador() simplesmente não faz nada.
+    #
+    # Isso também limpa corretamente um vínculo antigo
+    # depois de queda de conexão / fechamento do jogo.
+    # ==========================================
+    if nova_regiao != "dungeon_01":
+        sistema_cacada.sair_dungeon_jogador(
+            char_id
+        )
+
+    for old_sid in sids_para_remover:
+        emit(
+            'desconectarDuplicado',
+            {},
+            to=old_sid
+        )
+
+        jogadores_online.pop(
+            old_sid,
+            None
+        )
+
+        emit(
+            'jogadorSaiu',
+            old_sid,
+            broadcast=True
+        )
+
+    if player_sid in jogadores_online:
+        from modules.companions import flush_movement
+        flush_movement(jogadores_online[player_sid])
+
+    jogadores_online[player_sid] = {
+        'id': player_sid,
+        'account_id': str(session.get('portal_account') or ''),
+        'char_id': char_id,
+        'nome': character.get('character_name', 'Herói'),
+        'regiao': nova_regiao,
+        'x': data.get(
+            'x',
+            0
+        ),
+        'y': data.get(
+            'y',
+            0
+        ),
+        'skin': data.get(
+            'skin',
+            'aventureiro_masculino'
+        )
+    }
+    
+    emit('jogadoresAtuais', jogadores_online, to=player_sid)
+    emit(
+        'registroRegiaoConfirmado',
+        {'regiao': nova_regiao, 'total': len(jogadores_online)},
+        to=player_sid
+    )
+    emit('novoJogador', jogadores_online[player_sid], broadcast=True, include_self=False)
+    
+    if sistema_invasao_mapa.evento_ativo:
+        emit(
+            'spawnMonstrosInvasao',
+            sistema_invasao_mapa.monstros_vivos,
+            to=player_sid
+        )
+
+    # ==========================================
+    # 👥 DESCOBRIR PARTY ANTES DE CARREGAR MOBS
+    # ==========================================
+    grupo_atual = obter_grupo_do_jogador(
+        char_id
+    )
+
+    group_id = None
+    group_members = None
+
+    if grupo_atual:
+
+        group_id = str(
+            grupo_atual.get(
+                "_id"
+            )
+            or ""
+        )
+
+        group_members = (
+            _ids_participantes_grupo(
+                grupo_atual
+            )
+        )
+
+        emit(
+            'atualizarListaGrupo',
+            grupo_atual,
+            to=player_sid
+        )
+
+    # ==========================================
+    # 👹 CARREGAR MOBS
+    # ==========================================
+    mobs_da_regiao = (
+        sistema_cacada.obter_mobs_regiao(
+            data.get(
+                'regiao',
+                'capital_eldora'
+            ),
+            user_id=char_id,
+            group_id=group_id,
+            group_members=group_members
+        )
+    )
+
+    emit(
+        'carregarMobsMapa',
+        mobs_da_regiao,
+        to=player_sid
+    )
+    
+    # 🌌 FENDA DIMENSIONAL — se o jogador entrou no mapa depois do spawn,
+    # envia o evento ativo para ele desenhar portal/mobs sem depender de reload.
+    try:
+        from modules.events import dimensional_boss_manager as dbm
+
+        evento_dimensional = dbm.serializar_evento()
+
+        if evento_dimensional and evento_dimensional.get("evento_id"):
+            mapa_fenda = evento_dimensional.get("mapa") or evento_dimensional.get("regiao") or "mapa_desconhecido"
+
+            emit("fendaDimensionalSurgiu", {
+                "evento": evento_dimensional,
+                "evento_id": evento_dimensional.get("evento_id"),
+                "mapa": mapa_fenda,
+                "regiao": mapa_fenda,
+                "mensagem": f"🌌 Uma Fenda Dimensional está ativa em {mapa_fenda}!"
+            }, to=player_sid)
+        else:
+            emit("fendaDimensionalEncerrada", {
+                "mensagem": "Nenhuma Fenda Dimensional ativa."
+            }, to=player_sid)
+
+    except Exception as e:
+        print(f"⚠️ [DIMENSIONAL SOCKET] Falha ao enviar Fenda ativa ao entrar no mapa: {e}")
+
+    # 📜 CARREGAR HISTÓRICO NA TELA DO JOGADOR 📜
+    nome_jogador = data.get('nome', 'Herói')
+    
+    hist_global = list(chat_collection.find({"alvo": "global"}).sort("data_envio", -1).limit(30))
+    for msg in reversed(hist_global):
+        emit('novaMensagemChat', {
+            "remetente": msg["remetente"], 
+            "texto": msg["texto"], 
+            "tipo": msg.get("tipo", "global"), 
+            "historico": True,
+            "avatar": msg.get("avatar", "") 
+        }, to=player_sid)
+
+    # Carrega somente o histórico do clã do personagem atual.
+    try:
+        from modules.clan.clan_manager import obter_cla_do_jogador
+
+        cla_atual = obter_cla_do_jogador(char_id, reparar_vinculo=False)
+        if cla_atual:
+            hist_cla = list(chat_collection.find({
+                "alvo": "cla",
+                "clan_id": str(cla_atual.get("_id")),
+            }).sort("data_envio", -1).limit(30))
+            for msg in reversed(hist_cla):
+                emit('novaMensagemChat', {
+                    "remetente": msg.get("remetente", "Herói"),
+                    "texto": msg.get("texto", ""),
+                    "tipo": "cla",
+                    "canal": "guilda",
+                    "historico": True,
+                    "avatar": msg.get("avatar", ""),
+                }, to=player_sid)
+    except Exception:
+        app.logger.exception("Falha ao carregar histórico do chat do clã")
+        
+    hist_privado = list(mensagens_offline_col.find({
+        "$or": [{"destinatario": nome_jogador}, {"remetente": nome_jogador}]
+    }).sort("data_envio", -1).limit(30))
+    
+    for msg in reversed(hist_privado):
+        if msg["remetente"] == nome_jogador:
+            rem_format = f"Para {msg['destinatario']}"
+            nome_p = msg['destinatario']
+            foi_lida = True
+        else:
+            rem_format = msg["remetente"]
+            nome_p = msg["remetente"]
+            foi_lida = msg.get("lida", False) 
+            
+        emit('novaMensagemChat', {
+            "remetente": rem_format, 
+            "texto": msg["texto"], 
+            "tipo": "privado", 
+            "nome_puro": nome_p,
+            "historico": True,
+            "nao_lida": not foi_lida,
+            "avatar": msg.get("avatar", "") 
+        }, to=player_sid)
+        
+@socketio.on('enviarAcaoMapa')
+def handle_acao_mapa(dados):
+    player_sid = request.sid
+    if player_sid not in jogadores_online: return
+    
+    char_id = str(jogadores_online[player_sid]['char_id'])
+    
+    # Manda os dois RGs! O 'char_id' pro dono reconhecer, e o 'socket_id' pros outros acharem!
+    emit('acaoMapa', {
+        "char_id": char_id,
+        "socket_id": player_sid,
+        "tipo": dados.get("tipo"),
+        "valor": dados.get("valor")
+    }, broadcast=True)
+                    
+@socketio.on('mover')
+def handle_move(data):
+    if request.sid in jogadores_online:
+        from modules import companions
+        import time
+        online = jogadores_online[request.sid]
+        now = time.monotonic()
+        sample, distance = companions.movement_distance(online.get('_pet_sample'), online.get('regiao'), data.get('x'), data.get('y'), now)
+        online['_pet_sample'] = sample
+        online['_pet_distance'] = online.get('_pet_distance', 0) + distance
+        if now - online.get('_pet_flush', 0) >= 1:
+            if companions.load(online['char_id']).get('incubation'):
+                companions.record_distance(online['char_id'], online['_pet_distance'])
+            online['_pet_distance'] = 0
+            online['_pet_flush'] = now
+        jogadores_online[request.sid].update({'x': data.get('x'), 'y': data.get('y')})
+        emit('jogadorMoveu', {'id': request.sid, 'x': data.get('x'), 'y': data.get('y')}, broadcast=True, include_self=False)
+
+@socketio.on('atualizarVisual')
+def handle_atualizar_visual(dados):
+    if request.sid in jogadores_online:
+        jogadores_online[request.sid]['skin'] = dados.get('skin')
+        emit('visualAtualizado', {'id': request.sid, 'skin': dados.get('skin')}, broadcast=True, include_self=False)
+        
+@socketio.on('disconnect')
+def handle_disconnect():
+    socket_invites.discard_socket(request.sid)
+    _retirar_fila_coliseu(request.sid)
+    _encerrar_duelo_coliseu_ao_desconectar(request.sid)
+    if request.sid in jogadores_online:
+        from modules.companions import flush_movement
+        flush_movement(jogadores_online[request.sid])
+
+        jogadores_online.pop(
+            request.sid,
+            None
+        )
+
+        emit(
+            'jogadorSaiu',
+            request.sid,
+            broadcast=True
+        )
+
+@socketio.on('pedirCuraCatedral')
+def curar_jogador_catedral(data):
+    player = _authenticated_socket_player(data.get('player_id'))
+    if not player:
+        return
+    player_id = player['char_id']
+    pdata = users_collection.find_one({"_id": ObjectId(player_id)})
+    if pdata:
+        users_collection.update_one({"_id": ObjectId(player_id)}, {"$set": {"current_hp": pdata.get('max_hp', 100)}})
+        emit('pocaoUsadaSucesso', {'player_id': player_id, 'msg': 'Cura Divina!', 'cor': '#2ecc71'}, broadcast=True)
+
+@socketio.on('sofrerDanoInvasao')
+def handle_sofrer_dano_invasao(dados):
+    player = _authenticated_socket_player(dados.get('player_id'))
+    if player:
+        sistema_invasao_mapa.jogador_levou_dano_minion(player['char_id'], player.get('nome', 'Herói'), users_collection)
+
+@socketio.on('atacarMonstroInvasao')
+def handle_atacar_monstro(dados):
+    player = _authenticated_socket_player(dados.get('player_id'))
+    if not player:
+        return
+    player_id = player['char_id']
+    player_nome = player.get('nome', 'Herói')
+    monstro_id = dados.get('monstro_id')
+    
+    # 1. Verifica se a invasão está ativa e se o monstro existe
+    monstro = sistema_invasao_mapa.monstros_vivos.get(monstro_id)
+    if not monstro:
+        emit('erroGeral', {'mensagem': "A criatura já foi derrotada ou fugiu!"}, to=request.sid)
+        return
+        
+    # 2. Chama o sistema de Invasão (e não o battle_manager)
+    # Passamos o 'users_collection' para ler os status
+    # Passamos o 'jogadores_online' para puxar as conexões do Grupo
+    sistema_invasao_mapa.processar_ataque(
+        monstro_id, 
+        player_id, 
+        player_nome, 
+        users_collection, 
+        jogadores_online
+    )
+
+@socketio.on('checarStatusInvasao')
+def handle_check_status():
+    if sistema_invasao_mapa.evento_ativo or sistema_invasao_mapa.preparacao_ativa:
+        restante = int(sistema_invasao_mapa.tempo_final_evento - time.time())
+        if restante > 0:
+            emit('statusInvasaoAtual', {"ativo": True, "onda": sistema_invasao_mapa.onda_atual if sistema_invasao_mapa.evento_ativo else 0, "tempo_restante": restante})
+
+@socketio.on('usarPocaoMapa')
+def handle_usar_pocao(data):
+    from modules.player.inventory import consume_item
+    from modules.game_data.items import ITEMS_DATA 
+    from modules.player.stats import get_player_total_stats
+    import asyncio
+    
+    player = _authenticated_socket_player(data.get('player_id'))
+    if not player:
+        return
+    player_id = player['char_id']
+    tipo_pocao = data.get('tipo') 
+    jogador = users_collection.find_one({"_id": ObjectId(player_id)})
+    if not jogador: return
+    
+    # 👇 Calcula o limite real da classe incluindo os bônus! 👇
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        
+    totals = loop.run_until_complete(get_player_total_stats(jogador))
+    hp_max_real = int(totals.get("max_hp", 100))
+    mp_max_real = int(totals.get("max_mana", 50))
+    
+    item_id = jogador.get("pocao_equipada_hp", "pocao_cura_leve") if tipo_pocao == 'hp' else jogador.get("pocao_equipada_mp", "pocao_energia_fraca") 
+        
+    if consume_item(jogador, item_id, 1):
+        efeitos = ITEMS_DATA.get(item_id, {}).get("effects", {})
+        if tipo_pocao == 'hp':
+            cura = efeitos.get("heal", 50) 
+            # ✅ Usa hp_max_real para travar a barra no número certo
+            jogador['current_hp'] = min(hp_max_real, jogador.get('current_hp', 0) + cura)
+            emit('pocaoUsadaSucesso', {'player_id': player_id, 'msg': f"+{cura} HP", 'cor': "#2ecc71"}, to=request.sid)
+        else:
+            cura = efeitos.get("mana", 100) 
+            # ✅ Usa mp_max_real para travar a barra no número certo (ex: 155)
+            jogador['current_mp'] = min(mp_max_real, jogador.get('current_mp', 0) + cura)
+            emit('pocaoUsadaSucesso', {'player_id': player_id, 'msg': f"+{cura} MP", 'cor': "#3498db"}, to=request.sid)
+            
+        users_collection.replace_one({"_id": ObjectId(player_id)}, jogador)
+    else:
+        emit('erroGeral', {'mensagem': f"Sem poção na mochila!"}, to=request.sid)
+        
+@socketio.on('jogadorSofreuDanoFatalInvasao')
+def handle_morte_jogador(data):
+    player = _authenticated_socket_player(data.get('player_id'))
+    if not player:
+        return
+    sistema_invasao_mapa.jogador_morreu(
+        player['char_id'], player.get('nome', 'Herói'), users_collection
+    )
+
+@socketio.on('jogadorLevouDanoMinion')
+def handle_dano_minion(data):
+    player = _authenticated_socket_player(data.get('player_id'))
+    if player:
+        sistema_invasao_mapa.jogador_levou_dano_minion(player['char_id'], player.get('nome', 'Herói'), users_collection)
+        
+@socketio.on('jogadorLevouDanoBoss')
+def handle_dano_boss(data):
+    player = _authenticated_socket_player(data.get('player_id'))
+    if player:
+        sistema_invasao_mapa.jogador_levou_dano_boss(player['char_id'], player.get('nome', 'Herói'), users_collection)
+
+@socketio.on('enviarConviteDuelo')
+def handle_convite_duelo(dados):
+    remetente_sid = request.sid
+    remetente = _authenticated_socket_player()
+    dados = dados if isinstance(dados, dict) else {}
+    if not remetente: return
+
+    remetente_id = str(remetente.get('char_id') or '')
+    alvo_id = str(dados.get('alvo_id') or '')
+    if not ObjectId.is_valid(alvo_id) or alvo_id == remetente_id:
+        return
+    
+    # 1. Procura o alvo online
+    alvo_sid = None
+    for sid, info in jogadores_online.items():
+        if str(info.get('char_id')) == str(alvo_id):
+            alvo_sid = sid
+            break
+            
+    if alvo_sid:
+        # Verifica se alguém já está num duelo (precisaremos da flag 'em_combate' no dicionário)
+        if remetente.get('em_combate') or jogadores_online[alvo_sid].get('em_combate'):
+            emit('novaMensagemChat', {"remetente": "Sistema", "texto": "❌ Um dos jogadores já está em combate!", "tipo": "erro"}, to=remetente_sid)
+            return
+
+        socket_invites.issue('duelo', alvo_sid, remetente_sid, remetente_id, alvo_id)
+
+        emit('receberConviteDuelo', {
+            "remetente_id": remetente['char_id'], 
+            "remetente_nome": remetente['nome']
+        }, to=alvo_sid)
+        
+        emit('novaMensagemChat', {"remetente": "Sistema", "texto": "⚔️ Desafio de duelo enviado!", "tipo": "privado"}, to=remetente_sid)
+    else:
+        emit('novaMensagemChat', {"remetente": "Sistema", "texto": "❌ O herói está offline ou muito longe.", "tipo": "erro"}, to=remetente_sid)
+
+@socketio.on('recusarDuelo')
+def handle_recusar_duelo(dados):
+    meu_sid = request.sid
+    jogador = _authenticated_socket_player()
+    dados = dados if isinstance(dados, dict) else {}
+    if not jogador: return
+    desafiante_id = str(dados.get('desafiante_id') or '')
+    convite = socket_invites.consume('duelo', meu_sid, jogador['char_id'], sender_char_id=desafiante_id)
+    if not convite:
+        return
+    meu_nome = jogador.get('nome', 'Herói')
+    if convite['sender_sid'] in jogadores_online:
+        emit('novaMensagemChat', {"remetente": "Sistema", "texto": f"❌ {meu_nome} recusou o seu desafio.", "tipo": "erro"}, to=convite['sender_sid'])
+
+@socketio.on('aceitarDuelo')
+def handle_aceitar_duelo(dados):
+    jogador_b_sid = request.sid
+    jogador_b_info = _authenticated_socket_player()
+    dados = dados if isinstance(dados, dict) else {}
+    if not jogador_b_info: return
+    desafiante_id = str(dados.get('desafiante_id') or '')
+    convite = socket_invites.consume('duelo', jogador_b_sid, jogador_b_info['char_id'], sender_char_id=desafiante_id)
+    jogador_a_sid = convite.get('sender_sid') if convite else None
     jogador_a_info = jogadores_online.get(jogador_a_sid) if jogador_a_sid else None
     if (
         not convite
