@@ -628,7 +628,6 @@ def iniciar_combate():
             return jsonify({"erro": "Herói não encontrado nos registros."})
 
         if data.get('auto_cacada') is True:
-            from datetime import datetime, timezone
 
             premium = player.get("eldora_premium") or {}
             expira_em = premium.get("expires_at")
