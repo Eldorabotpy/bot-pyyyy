@@ -60,7 +60,7 @@ def api_status_loja_skins(user_id):
         "nome": item["display_name"],
         "descricao": item["description"],
         "custo": item["cost"],
-    } for item in SKIN_SHOP_CATALOG.values()]
+    } for item in SKIN_SHOP_CATALOG.values() if genero in item["gender_variants"]]
     return jsonify({
         "sucesso": True,
         "fragmentos": max(0, int(jogador.get("skin_fragments", 0) or 0)),
@@ -81,7 +81,9 @@ def api_resgatar_skin():
     if not item:
         return jsonify({"sucesso": False, "erro": "Esta skin não está disponível na loja."}), 404
 
-    skin_id = item["gender_variants"][_genero_chave(jogador)]
+    skin_id = item["gender_variants"].get(_genero_chave(jogador))
+    if not skin_id:
+        return jsonify({"sucesso": False, "erro": "Esta skin está disponível apenas para personagens masculinos."}), 403
     resultado = users_collection.update_one(
         {
             "_id": jogador["_id"],

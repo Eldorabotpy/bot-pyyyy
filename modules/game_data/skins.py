@@ -126,6 +126,13 @@ SKIN_CATALOG = {
         'media_key': 'classe_samurai_chama_aniquiladora_media',
         'description': 'Uma armadura de batalha ornamentada, símbolo de liderança e poder.'
     },
+    'rinoceronte_m': {
+        'display_name': 'Rinoceronte de Magma',
+        'class': 'berserker',
+        'media_key': 'skin_rinoceronte_m_media',
+        'description': 'Uma fera ancestral de pedra, marcada por runas incandescentes.',
+        'gender_variants': {'masculino': 'rinoceronte_m'},
+    },
 }
     #=====================================================================================
     #evento de NATAL 2025
@@ -497,6 +504,7 @@ SKIN_SHOP_COSTS = {
     "samurai_encarnacao_sangrenta": 500,
     "samurai_guardiao_celestial": 500,
     "samurai_chama_aniquiladora": 500,
+    "rinoceronte_m": 300,
 }
 SKIN_SHOP_CATALOG = {
     skin_id: {
@@ -504,7 +512,10 @@ SKIN_SHOP_CATALOG = {
         "display_name": data["display_name"],
         "description": data.get("description", "Visual cosmético para qualquer classe."),
         "cost": SKIN_SHOP_COSTS.get(skin_id, 300),
-        "gender_variants": {"masculino": f"{skin_id}_m", "feminino": f"{skin_id}_f"},
+        "gender_variants": data.get(
+            "gender_variants",
+            {"masculino": f"{skin_id}_m", "feminino": f"{skin_id}_f"},
+        ),
     }
     for skin_id, data in SKIN_CATALOG.items()
     if skin_id not in event_skins
