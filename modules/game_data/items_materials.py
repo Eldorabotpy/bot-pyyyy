@@ -205,6 +205,17 @@ MATERIALS_DATA = {
         "icon_url": "",
     },
 
+    "essencia_sombria": {
+        "display_name": "Essência Sombria",
+        "emoji": "🟣",
+        "type": "material_monstro",
+        "category": "cacada",
+        "description": "Resíduo instável extraído de uma criatura corrompida pela Fenda Sombria.",
+        "stackable": True,
+        "media_key": "item_essencia_sombria",
+        "icon_url": "",
+    },
+
     "po_de_iniciativa": {
         "display_name": "Pó de Iniciativa",
         "emoji": "⚡",

@@ -40,6 +40,31 @@ class DynamicEventConfigTests(unittest.TestCase):
         })
         self.assertEqual(config["starts_at"].tzinfo, timezone.utc)
 
+    def test_corruption_modifiers_and_essence_chance_are_configurable(self):
+        config = normalize_config({
+            "title": "Invasão",
+            "starts_at": "2026-10-20T00:00:00Z",
+            "ends_at": "2026-10-27T00:00:00Z",
+            "corruption": {
+                "enabled": True,
+                "chance": 20,
+                "modifiers": {"hp": 1.3, "attack": 1.2, "defense": 1.1, "xp": 1.25},
+                "essence_drop_chance": 12,
+            },
+        })
+        self.assertEqual(config["corruption"]["modifiers"]["hp"], 1.3)
+        self.assertEqual(config["corruption"]["essence_drop_chance"], 12)
+        self.assertIn("essencia_sombria", ITEMS_DATA)
+
+    def test_corruption_modifiers_reject_excessive_values(self):
+        with self.assertRaises(EventError):
+            normalize_config({
+                "title": "Invasão",
+                "starts_at": "2026-10-20T00:00:00Z",
+                "ends_at": "2026-10-27T00:00:00Z",
+                "corruption": {"enabled": True, "modifiers": {"hp": 3.1}},
+            })
+
     def test_manual_and_premium_points_share_the_same_daily_cap(self):
         awarded_today = 147
         awarded_today += points_after_daily_cap(5, awarded_today, 150)

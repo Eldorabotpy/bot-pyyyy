@@ -1492,6 +1492,22 @@ async def processar_turno_combate(
     mob_status_luta["name"] = mob_vivo.get("name", mob_status_luta.get("name", "Monstro"))
     mob_status_luta["elite"] = bool(mob_vivo.get("elite") or mob_status_luta.get("elite"))
     mob_status_luta["corrupted"] = bool(mob_vivo.get("corrupted"))
+    if mob_status_luta["corrupted"] and mob_vivo.get("corruption_event_id"):
+        try:
+            from modules.events.dynamic_event_service import active_corruption_event
+            evento_corrupcao = active_corruption_event()
+            config_corrupcao = (evento_corrupcao or {}).get("corruption") or {}
+            if str((evento_corrupcao or {}).get("_id")) == str(mob_vivo.get("corruption_event_id")):
+                chance_essencia = max(0, min(100, int(config_corrupcao.get("essence_drop_chance", 8))))
+                if chance_essencia:
+                    loot_table_mob = [*(loot_table_mob or []), {
+                        "item_id": "essencia_sombria",
+                        "drop_chance": chance_essencia,
+                    }]
+                    mob_status_luta["loot_table"] = loot_table_mob
+        except Exception:
+            import logging
+            logging.getLogger(__name__).exception("Falha ao carregar drop da corrupção")
     mob_status_luta["hp"] = mob_hp
     mob_status_luta["max_hp"] = int(mob_vivo.get("hp_max", mob_vivo.get("hp", mob_hp)) or mob_hp)
 

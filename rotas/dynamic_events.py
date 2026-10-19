@@ -177,7 +177,12 @@ def admin_create_default_invasion():
                 "starts_at": now.isoformat(), "ends_at": (now + timedelta(days=7)).isoformat(),
                 "global_goal": 5000, "daily_cap": 150, "min_level": 1,
                 "rules": {"creature": 1, "elite": 5, "dungeon": 0, "event_boss": 0},
-                "corruption": {"enabled": True, "chance": 15},
+                "corruption": {
+                    "enabled": True,
+                    "chance": 15,
+                    "modifiers": {"hp": 1.2, "attack": 1.1, "defense": 1.1, "xp": 1.15},
+                    "essence_drop_chance": 8,
+                },
             })
             _sincronizar_evento_no_mapa()
             return jsonify(success=True, event=event), 201

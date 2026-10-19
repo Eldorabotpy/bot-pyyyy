@@ -78,6 +78,43 @@ class GerenciadorCacada(DungeonPersistence):
         return f"{' '.join(marcadores)} {nome}" if marcadores else nome
 
     @staticmethod
+    def _aplicar_modificadores_corrupcao(mob, evento_id, config):
+        """Aplica bônus apenas à instância e guarda a base para removê-los depois."""
+        modifiers = (config or {}).get("modifiers") or {}
+        signature = tuple(
+            (key, float(modifiers.get(key, 1.0)))
+            for key in ("hp", "attack", "defense", "xp")
+        )
+        if (
+            mob.get("corruption_modifiers_event_id") == evento_id
+            and tuple(mob.get("corruption_modifiers_signature", ())) == signature
+        ):
+            return False
+        base = mob.get("corruption_base_stats")
+        hp_max_atual = max(1, int(mob.get("hp_max", mob.get("hp", 1)) or 1))
+        hp_atual = max(0, int(mob.get("hp_atual", hp_max_atual) or 0))
+        hp_ratio = min(1.0, hp_atual / hp_max_atual)
+        if base:
+            for key, value in base.items():
+                mob[key] = value
+        else:
+            keys = ("hp_max", "max_hp", "hp", "hp_atual", "attack", "defense", "xp_reward")
+            base = {key: mob[key] for key in keys if key in mob}
+            mob["corruption_base_stats"] = base
+        for key, stat in (("hp", "hp_max"), ("attack", "attack"), ("defense", "defense"), ("xp", "xp_reward")):
+            if stat not in mob:
+                continue
+            multiplier = max(1.0, min(3.0, float(modifiers.get(key, 1.0))))
+            mob[stat] = max(0 if stat == "defense" else 1, math.floor(int(mob[stat]) * multiplier))
+        mob["max_hp"] = mob.get("hp_max", mob.get("max_hp", mob.get("hp", 1)))
+        mob["hp"] = mob["hp_max"]
+        if "hp_atual" in mob:
+            mob["hp_atual"] = max(0, min(int(mob["hp_max"]), math.floor(int(mob["hp_max"]) * hp_ratio)))
+        mob["corruption_modifiers_event_id"] = evento_id
+        mob["corruption_modifiers_signature"] = signature
+        return True
+
+    @staticmethod
     def _mob_elegivel_para_corrupcao(mob):
         return str(mob.get("tipo", "")).lower() != "boss" and not any(mob.get(flag) for flag in (
             "boss", "is_boss", "dungeon_boss", "event_boss",
@@ -121,6 +158,8 @@ class GerenciadorCacada(DungeonPersistence):
                         mob.pop("corruption_event_id", None)
                         mudou = True
                     if mob.get("corruption_checked_event_id") == evento_id:
+                        if mob.get("corrupted"):
+                            mudou = self._aplicar_modificadores_corrupcao(mob, evento_id, config) or mudou
                         if mudou:
                             mob["name"] = self._nome_mob(mob)
                             mob["nome"] = mob["name"]
@@ -131,12 +170,24 @@ class GerenciadorCacada(DungeonPersistence):
                         mob["corrupted"] = True
                         mob["corruption_event_id"] = evento_id
                         mudou = True
+                    if mob.get("corrupted"):
+                        mudou = self._aplicar_modificadores_corrupcao(mob, evento_id, config) or mudou
                     if mudou:
                         mob["name"] = self._nome_mob(mob)
                         mob["nome"] = mob["name"]
                         alterados.append((regiao, spawn_id, mob))
                 elif mob.get("corrupted") or mob.get("corruption_event_id") or mob.get("corruption_checked_event_id"):
                     tinha_corrupcao_visual = bool(mob.get("corrupted") or mob.get("corruption_event_id"))
+                    base = mob.pop("corruption_base_stats", {})
+                    hp_max_atual = max(1, int(mob.get("hp_max", mob.get("hp", 1)) or 1))
+                    hp_atual = max(0, int(mob.get("hp_atual", hp_max_atual) or 0))
+                    hp_ratio = min(1.0, hp_atual / hp_max_atual)
+                    for key, value in base.items():
+                        mob[key] = value
+                    if "hp_atual" in base:
+                        mob["hp_atual"] = max(0, min(int(mob.get("hp_max", 1)), math.floor(int(mob.get("hp_max", 1)) * hp_ratio)))
+                    mob.pop("corruption_modifiers_event_id", None)
+                    mob.pop("corruption_modifiers_signature", None)
                     mob["corrupted"] = False
                     mob.pop("corruption_event_id", None)
                     mob.pop("corruption_checked_event_id", None)
@@ -262,6 +313,7 @@ class GerenciadorCacada(DungeonPersistence):
         if mob.get("elite") or random.random() * 100 < chance:
             mob["corrupted"] = True
             mob["corruption_event_id"] = evento_id
+            self._aplicar_modificadores_corrupcao(mob, evento_id, evento.get("corruption") or {})
         mob["name"] = self._nome_mob(mob)
         mob["nome"] = mob["name"]
         return mob

@@ -24,7 +24,12 @@ DEFAULT_REWARDS = [
     {"gold": 500, "items": [{"item_id": "essencia_purificadora", "quantity": 3}]},
     {"gold": 1000, "items": [{"item_id": "folha_sombria", "quantity": 10}]},
 ]
-DEFAULT_CORRUPTION = {"enabled": False, "chance": 15}
+DEFAULT_CORRUPTION = {
+    "enabled": False,
+    "chance": 15,
+    "modifiers": {"hp": 1.2, "attack": 1.1, "defense": 1.1, "xp": 1.15},
+    "essence_drop_chance": 8,
+}
 
 
 class EventError(ValueError):
@@ -131,7 +136,32 @@ def normalize_config(data: dict, *, partial=False):
             raise EventError("A chance de corrupção precisa ser um número inteiro.") from exc
         if not 0 <= chance <= 100:
             raise EventError("A chance de corrupção deve ficar entre 0 e 100.")
-        cfg["corruption"] = {"enabled": enabled, "chance": chance}
+        raw_modifiers = raw_corruption.get("modifiers") or DEFAULT_CORRUPTION["modifiers"]
+        if not isinstance(raw_modifiers, dict):
+            raise EventError("Os modificadores da corrupção precisam ser um objeto.")
+        modifiers = {}
+        for stat, default in DEFAULT_CORRUPTION["modifiers"].items():
+            try:
+                value = float(raw_modifiers.get(stat, default))
+            except (TypeError, ValueError) as exc:
+                raise EventError(f"Modificador de {stat} inválido.") from exc
+            if not 1.0 <= value <= 3.0:
+                raise EventError(f"Modificador de {stat} deve ficar entre 1 e 3.")
+            modifiers[stat] = value
+        try:
+            essence_drop_chance = int(raw_corruption.get(
+                "essence_drop_chance", DEFAULT_CORRUPTION["essence_drop_chance"]
+            ))
+        except (TypeError, ValueError) as exc:
+            raise EventError("A chance da Essência Sombria precisa ser um número inteiro.") from exc
+        if not 0 <= essence_drop_chance <= 100:
+            raise EventError("A chance da Essência Sombria deve ficar entre 0 e 100.")
+        cfg["corruption"] = {
+            "enabled": enabled,
+            "chance": chance,
+            "modifiers": modifiers,
+            "essence_drop_chance": essence_drop_chance,
+        }
     if "tiers" in cfg and "rewards" not in cfg and not partial:
         cfg["rewards"] = DEFAULT_REWARDS[:len(cfg["tiers"])]
     if "tiers" in cfg and "rewards" in cfg and len(cfg["tiers"]) != len(cfg["rewards"]):
@@ -265,6 +295,13 @@ def active_corruption_event(now=None):
         result["corruption"] = {
             "enabled": True,
             "chance": max(0, min(100, chance)),
+            "modifiers": {
+                stat: max(1.0, min(3.0, float((corruption.get("modifiers") or {}).get(stat, default))))
+                for stat, default in DEFAULT_CORRUPTION["modifiers"].items()
+            },
+            "essence_drop_chance": max(0, min(100, int(corruption.get(
+                "essence_drop_chance", DEFAULT_CORRUPTION["essence_drop_chance"]
+            )))),
         }
         return result
     return None
