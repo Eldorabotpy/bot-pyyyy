@@ -174,6 +174,7 @@ def admin_create_default_invasion():
                 "event_key": f"invasao-sombria-{now:%Y%m%d%H%M%S}",
                 "title": "A Invasão Sombria",
                 "description": "Criaturas corrompidas ameaçam Eldora. Una forças para estabilizar a fenda e conquiste recompensas pessoais e coletivas.",
+                "banner": events.DEFAULT_INVASION_BANNER,
                 "starts_at": now.isoformat(), "ends_at": (now + timedelta(days=7)).isoformat(),
                 "global_goal": 5000, "daily_cap": 150, "min_level": 1,
                 "rules": {"creature": 1, "elite": 5, "dungeon": 0, "event_boss": 0},

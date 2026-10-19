@@ -34,6 +34,7 @@ DEFAULT_CORRUPTION = {
 }
 INVASION_TIMEZONE = ZoneInfo("America/Sao_Paulo")
 INVASION_DURATION_DAYS = 7
+DEFAULT_INVASION_BANNER = "https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/banners/Portal%20Sombrio.png"
 
 
 class EventError(ValueError):
@@ -279,6 +280,7 @@ def ensure_monthly_invasion_events(now=None):
                 **window,
                 "title": "A Invasão Sombria",
                 "description": "Criaturas corrompidas ameaçam Eldora. Una forças para estabilizar a fenda e conquiste recompensas pessoais e coletivas.",
+                "banner": DEFAULT_INVASION_BANNER,
                 "global_goal": 5000,
                 "daily_cap": 150,
                 "min_level": 1,
