@@ -280,17 +280,18 @@ class GerenciadorCacada(DungeonPersistence):
         mob_vivo["is_elite"] = mob_vivo["elite"]
         mob_vivo["elite_generated"] = elite_sorteado
 
-        if elite_sorteado:
+        if mob_vivo["elite"]:
             mob_vivo["hp_max"] = max(1, math.floor(mob_vivo["hp_max"] * ELITE_MULTIPLIERS["hp"]))
             mob_vivo["max_hp"] = mob_vivo["hp_max"]
             mob_vivo["hp_atual"] = mob_vivo["hp_max"]
             mob_vivo["hp"] = mob_vivo["hp_max"]
             mob_vivo["attack"] = max(1, math.floor(mob_vivo["attack"] * ELITE_MULTIPLIERS["attack"]))
             mob_vivo["defense"] = max(0, math.floor(mob_vivo["defense"] * ELITE_MULTIPLIERS["defense"]))
-            mob_vivo["initiative"] = int(base_stats.get("initiative", 0)) + ELITE_MULTIPLIERS["initiative_add"]
-            mob_vivo["luck"] = int(base_stats.get("luck", 0)) + ELITE_MULTIPLIERS["luck_add"]
-            mob_vivo["xp_reward"] = math.floor(mob_vivo["xp_reward"] * ELITE_MULTIPLIERS["xp"])
-            mob_vivo["gold_drop"] = math.floor(mob_vivo["gold_drop"] * ELITE_MULTIPLIERS["gold"])
+            if elite_sorteado:
+                mob_vivo["initiative"] = int(base_stats.get("initiative", 0)) + ELITE_MULTIPLIERS["initiative_add"]
+                mob_vivo["luck"] = int(base_stats.get("luck", 0)) + ELITE_MULTIPLIERS["luck_add"]
+                mob_vivo["xp_reward"] = math.floor(mob_vivo["xp_reward"] * ELITE_MULTIPLIERS["xp"])
+                mob_vivo["gold_drop"] = math.floor(mob_vivo["gold_drop"] * ELITE_MULTIPLIERS["gold"])
         mob_vivo["name"] = self._nome_mob(mob_vivo)
         mob_vivo["nome"] = mob_vivo["name"]
 

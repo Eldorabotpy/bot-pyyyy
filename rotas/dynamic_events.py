@@ -181,7 +181,7 @@ def admin_create_default_invasion():
                     "enabled": True,
                     "chance": 15,
                     "portal_enabled": True,
-                    "modifiers": {"hp": 1.2, "attack": 1.1, "defense": 1.1, "xp": 1.15},
+                    "modifiers": {"hp": 2.0, "attack": 2.0, "defense": 2.0, "xp": 1.15},
                     "essence_drop_chance": 8,
                 },
             })

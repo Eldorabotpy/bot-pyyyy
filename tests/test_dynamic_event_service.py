@@ -64,8 +64,19 @@ class DynamicEventConfigTests(unittest.TestCase):
                 "title": "Invasão",
                 "starts_at": "2026-10-20T00:00:00Z",
                 "ends_at": "2026-10-27T00:00:00Z",
-                "corruption": {"enabled": True, "modifiers": {"hp": 3.1}},
+                "corruption": {"enabled": True, "modifiers": {"hp": 4.1}},
             })
+
+    def test_corrupted_defaults_double_combat_stats(self):
+        config = normalize_config({
+            "title": "Invasão",
+            "starts_at": "2026-10-20T00:00:00Z",
+            "ends_at": "2026-10-27T00:00:00Z",
+            "corruption": {"enabled": True},
+        })
+        self.assertEqual(config["corruption"]["modifiers"]["hp"], 2.0)
+        self.assertEqual(config["corruption"]["modifiers"]["attack"], 2.0)
+        self.assertEqual(config["corruption"]["modifiers"]["defense"], 2.0)
 
     def test_manual_and_premium_points_share_the_same_daily_cap(self):
         awarded_today = 147

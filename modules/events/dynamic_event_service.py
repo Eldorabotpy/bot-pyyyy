@@ -28,7 +28,7 @@ DEFAULT_CORRUPTION = {
     "enabled": False,
     "chance": 15,
     "portal_enabled": True,
-    "modifiers": {"hp": 1.2, "attack": 1.1, "defense": 1.1, "xp": 1.15},
+    "modifiers": {"hp": 2.0, "attack": 2.0, "defense": 2.0, "xp": 1.15},
     "essence_drop_chance": 8,
 }
 
@@ -149,8 +149,8 @@ def normalize_config(data: dict, *, partial=False):
                 value = float(raw_modifiers.get(stat, default))
             except (TypeError, ValueError) as exc:
                 raise EventError(f"Modificador de {stat} inválido.") from exc
-            if not 1.0 <= value <= 3.0:
-                raise EventError(f"Modificador de {stat} deve ficar entre 1 e 3.")
+            if not 1.0 <= value <= 4.0:
+                raise EventError(f"Modificador de {stat} deve ficar entre 1 e 4.")
             modifiers[stat] = value
         try:
             essence_drop_chance = int(raw_corruption.get(
@@ -302,7 +302,7 @@ def active_corruption_event(now=None):
             "chance": max(0, min(100, chance)),
             "portal_enabled": corruption.get("portal_enabled", True) is True,
             "modifiers": {
-                stat: max(1.0, min(3.0, float((corruption.get("modifiers") or {}).get(stat, default))))
+                stat: max(1.0, min(4.0, float((corruption.get("modifiers") or {}).get(stat, default))))
                 for stat, default in DEFAULT_CORRUPTION["modifiers"].items()
             },
             "essence_drop_chance": max(0, min(100, int(corruption.get(
