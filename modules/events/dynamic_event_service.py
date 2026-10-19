@@ -27,6 +27,7 @@ DEFAULT_REWARDS = [
 DEFAULT_CORRUPTION = {
     "enabled": False,
     "chance": 15,
+    "portal_enabled": True,
     "modifiers": {"hp": 1.2, "attack": 1.1, "defense": 1.1, "xp": 1.15},
     "essence_drop_chance": 8,
 }
@@ -130,6 +131,9 @@ def normalize_config(data: dict, *, partial=False):
         enabled = raw_corruption.get("enabled", False)
         if not isinstance(enabled, bool):
             raise EventError("A opção de corrupção precisa ser verdadeira ou falsa.")
+        portal_enabled = raw_corruption.get("portal_enabled", True)
+        if not isinstance(portal_enabled, bool):
+            raise EventError("A opção do Portal Sombrio precisa ser verdadeira ou falsa.")
         try:
             chance = int(raw_corruption.get("chance", DEFAULT_CORRUPTION["chance"]))
         except (TypeError, ValueError) as exc:
@@ -159,6 +163,7 @@ def normalize_config(data: dict, *, partial=False):
         cfg["corruption"] = {
             "enabled": enabled,
             "chance": chance,
+            "portal_enabled": portal_enabled,
             "modifiers": modifiers,
             "essence_drop_chance": essence_drop_chance,
         }
@@ -295,6 +300,7 @@ def active_corruption_event(now=None):
         result["corruption"] = {
             "enabled": True,
             "chance": max(0, min(100, chance)),
+            "portal_enabled": corruption.get("portal_enabled", True) is True,
             "modifiers": {
                 stat: max(1.0, min(3.0, float((corruption.get("modifiers") or {}).get(stat, default))))
                 for stat, default in DEFAULT_CORRUPTION["modifiers"].items()

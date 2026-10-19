@@ -27,6 +27,80 @@ class MapaScene extends Phaser.Scene {
         // 🏰 EVENTOS DE DUNGEON
         // ==========================================
         this.dungeonEventManager = null;
+        this.portalSombrio = null;
+        this.portalSombrioTimer = null;
+    }
+
+    async atualizarPortalSombrio() {
+        if (this.regiaoAtual !== 'capital_eldora' || !this.scene.isActive()) {
+            this.removerPortalSombrio();
+            return;
+        }
+        try {
+            const response = await fetch('/api/eventos', { credentials: 'same-origin' });
+            if (!response.ok) return;
+            const payload = await response.json();
+            const event = (payload.events || []).find(item =>
+                item.state === 'active' && item.corruption?.enabled === true && item.corruption?.portal_enabled !== false
+            );
+            if (event) this.criarPortalSombrio(event);
+            else this.removerPortalSombrio();
+        } catch (error) {
+            console.warn('[PORTAL SOMBRIO] Não foi possível atualizar o estado do evento.', error);
+        }
+    }
+
+    criarPortalSombrio(event) {
+        if (this.portalSombrio?.eventId === String(event.id)) return;
+        this.removerPortalSombrio();
+
+        // A praça central da Capital é uma área caminhável no mapa atual.
+        const x = 30 * 32;
+        const y = 26 * 32;
+        const portal = this.add.container(x, y).setDepth(y + 8);
+        portal.eventId = String(event.id);
+
+        const glow = this.add.ellipse(0, 0, 94, 112, 0x7e22ce, 0.16);
+        const outer = this.add.ellipse(0, 0, 58, 84, 0x160a2b, 0.94).setStrokeStyle(4, 0xa855f7, 0.95);
+        const inner = this.add.ellipse(0, 0, 42, 68, 0x9333ea, 0.42).setStrokeStyle(2, 0xe9d5ff, 0.8);
+        const core = this.add.ellipse(0, 0, 25, 56, 0xd8b4fe, 0.34);
+        const label = this.add.text(0, 54, 'FENDA SOMBRIA', {
+            fontFamily: 'Cinzel, Georgia, serif', fontSize: '10px', fontStyle: 'bold',
+            color: '#ead7ff', stroke: '#160a2b', strokeThickness: 4,
+        }).setOrigin(0.5);
+        portal.add([glow, outer, inner, core, label]);
+        portal.setSize(76, 96).setInteractive({ useHandCursor: true });
+        portal.on('pointerdown', () => {
+            if (typeof window.abrirEventosEldora === 'function') window.abrirEventosEldora();
+        });
+        portal.on('pointerover', () => this.game.canvas.style.cursor = 'pointer');
+        portal.on('pointerout', () => this.game.canvas.style.cursor = 'default');
+
+        this.tweens.add({ targets: glow, alpha: 0.38, scaleX: 1.18, scaleY: 1.12, duration: 950, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+        this.tweens.add({ targets: inner, scaleX: 0.88, scaleY: 1.06, duration: 1250, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+        this.tweens.add({ targets: core, alpha: 0.72, scaleX: 1.3, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+        this.portalSombrio = portal;
+        this.portalSombrioEvent = event;
+        this.portalSombrioTimer = this.time.addEvent({
+            delay: 420, loop: true,
+            callback: () => {
+                if (!this.portalSombrio?.active) return;
+                const particle = this.add.circle(x + Phaser.Math.Between(-24, 24), y + Phaser.Math.Between(20, 44), Phaser.Math.Between(1, 3), 0xd8b4fe, 0.9).setDepth(y + 10);
+                this.tweens.add({
+                    targets: particle, y: particle.y - Phaser.Math.Between(28, 56),
+                    x: particle.x + Phaser.Math.Between(-18, 18), alpha: 0, scale: 0.2,
+                    duration: Phaser.Math.Between(700, 1100), onComplete: () => particle.destroy(),
+                });
+            },
+        });
+    }
+
+    removerPortalSombrio() {
+        if (this.portalSombrioTimer) this.portalSombrioTimer.remove(false);
+        this.portalSombrioTimer = null;
+        if (this.portalSombrio?.active) this.portalSombrio.destroy(true);
+        this.portalSombrio = null;
+        this.portalSombrioEvent = null;
     }
 
     init(data) {
@@ -51,6 +125,9 @@ class MapaScene extends Phaser.Scene {
         // A nova instância não deve carregar referência
         // do manager da dungeon anterior.
         this.dungeonEventManager = null;
+        this.portalSombrio = null;
+        this.portalSombrioTimer = null;
+        this.portalRefreshTimer = null;
         // Configurações de origem e região[cite: 4]
         this.veioDeRespawn = data && data.isRespawn ? true : false;
         this.regiaoAtual = data.regiao || 'capital_eldora';
@@ -1766,6 +1843,18 @@ class MapaScene extends Phaser.Scene {
                 if (typeof MotorCacada !== 'undefined') {
                     this.motorCacada = new MotorCacada(this, socket);
                 }
+
+            this.atualizarPortalSombrio();
+            this.portalRefreshTimer = this.time.addEvent({
+                delay: 60000,
+                loop: true,
+                callback: () => this.atualizarPortalSombrio(),
+            });
+            this.events.once('shutdown', () => {
+                this.portalRefreshTimer?.remove(false);
+                this.portalRefreshTimer = null;
+                this.removerPortalSombrio();
+            });
             }
 
             // ==========================================

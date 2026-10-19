@@ -48,11 +48,13 @@ class DynamicEventConfigTests(unittest.TestCase):
             "corruption": {
                 "enabled": True,
                 "chance": 20,
+                "portal_enabled": False,
                 "modifiers": {"hp": 1.3, "attack": 1.2, "defense": 1.1, "xp": 1.25},
                 "essence_drop_chance": 12,
             },
         })
         self.assertEqual(config["corruption"]["modifiers"]["hp"], 1.3)
+        self.assertFalse(config["corruption"]["portal_enabled"])
         self.assertEqual(config["corruption"]["essence_drop_chance"], 12)
         self.assertIn("essencia_sombria", ITEMS_DATA)
 
