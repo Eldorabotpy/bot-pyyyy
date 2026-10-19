@@ -1,0 +1,33 @@
+{
+  "image": "rinoceronte-m-chibi-walk-3x4.png",
+  "layout": {
+    "columns": 3,
+    "rows": 4,
+    "cellWidth": 362,
+    "cellHeight": 362,
+    "imageWidth": 1086,
+    "imageHeight": 1448,
+    "transparentBackground": true
+  },
+  "columns": [
+    { "index": 0, "pose": "step-a", "description": "Perna esquerda à frente" },
+    { "index": 1, "pose": "neutral-gait", "description": "Pose neutra da caminhada" },
+    { "index": 2, "pose": "step-b", "description": "Perna direita à frente" }
+  ],
+  "rows": [
+    { "index": 0, "direction": "down", "description": "Frente / para baixo" },
+    { "index": 1, "direction": "right", "description": "Direita" },
+    { "index": 2, "direction": "left", "description": "Esquerda" },
+    { "index": 3, "direction": "up", "description": "Costas / para cima" }
+  ],
+  "animation": {
+    "frameDurationMs": 120,
+    "loopColumns": [0, 1, 2, 1]
+  },
+  "cropFormula": {
+    "x": "column * 362",
+    "y": "row * 362",
+    "width": 362,
+    "height": 362
+  }
+}

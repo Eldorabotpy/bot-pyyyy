@@ -583,6 +583,28 @@
                 🧹 LIMPAR PARTIES FANTASMAS
             </button>
 
+            <button type="button" onclick="criarInvasaoSombriaGM()" style="background:#6d28d9;padding:13px;">
+                🌑 CRIAR INVASÃO SOMBRIA (7 DIAS)
+            </button>
+
+            <button type="button" onclick="carregarEventosDinamicosGM()" style="background:#334155;padding:13px;">
+                📋 ATUALIZAR EVENTOS DINÂMICOS
+            </button>
+
+        </div>
+
+        <div style="margin-top:12px;display:grid;gap:8px;">
+            <select id="gm-evento-dinamico" style="padding:10px;background:#0f172a;color:#e2e8f0;border:1px solid #475569;border-radius:7px;">
+                <option value="">Selecione um evento carregado</option>
+            </select>
+            <textarea id="gm-evento-config" rows="7" spellcheck="false" placeholder='Para criar: {"title":"Evento","starts_at":"2026-11-01T00:00:00Z","ends_at":"2026-11-08T00:00:00Z","global_goal":5000}. Para editar, informe os campos que deseja mudar.' style="width:100%;box-sizing:border-box;padding:10px;background:#0f172a;color:#e2e8f0;border:1px solid #475569;border-radius:7px;font-family:monospace;"></textarea>
+            <div style="display:flex;flex-wrap:wrap;gap:7px;">
+                <button type="button" onclick="criarEventoConfiguradoGM()" style="background:#256d54;padding:9px 12px;">Criar evento pelo JSON</button>
+                <button type="button" onclick="salvarConfiguracaoEventoGM()" style="background:#256d54;padding:9px 12px;">Salvar configuração</button>
+                <button type="button" onclick="acaoEventoDinamicoGM('start')" style="background:#6d28d9;padding:9px 12px;">Ativar</button>
+                <button type="button" onclick="acaoEventoDinamicoGM('end')" style="background:#b45309;padding:9px 12px;">Encerrar</button>
+                <button type="button" onclick="acaoEventoDinamicoGM('cancel')" style="background:#991b1b;padding:9px 12px;">Cancelar</button>
+            </div>
         </div>
 
         <div
@@ -2875,6 +2897,73 @@
                     true
                 );
             }
+        }
+
+        async function criarInvasaoSombriaGM() {
+            try {
+                const resposta = await fetch("/admin/api/eventos/invasao-sombria/padrao", {method:"POST", credentials:"same-origin"});
+                const dados = await resposta.json();
+                if (!resposta.ok || !dados.success) throw new Error(dados.error || "Não foi possível criar o evento.");
+                mostrarStatusFerramentaGM("🌑 Invasão Sombria criada e ativa por sete dias.");
+                await carregarEventosDinamicosGM();
+                document.getElementById("gm-evento-dinamico").value = dados.event.id;
+            } catch (erro) { mostrarStatusFerramentaGM("❌ " + erro.message, true); }
+        }
+
+        async function carregarEventosDinamicosGM() {
+            try {
+                const resposta = await fetch("/admin/api/eventos", {credentials:"same-origin"});
+                const dados = await resposta.json();
+                if (!resposta.ok || !dados.success) throw new Error(dados.error || "Falha ao consultar eventos.");
+                const select = document.getElementById("gm-evento-dinamico");
+                const anterior = select.value;
+                select.innerHTML = '<option value="">Selecione um evento carregado</option>';
+                (dados.events || []).forEach(evento => {
+                    const option = document.createElement("option");
+                    option.value = evento.id;
+                    option.textContent = `${evento.title} · ${evento.state} · ${evento.global_points}/${evento.global_goal}`;
+                    select.appendChild(option);
+                });
+                if (anterior) select.value = anterior;
+                mostrarStatusFerramentaGM(`Eventos carregados: ${(dados.events || []).length}. Selecione um para editar ou controlar.`);
+            } catch (erro) { mostrarStatusFerramentaGM("❌ " + erro.message, true); }
+        }
+
+        async function criarEventoConfiguradoGM() {
+            try {
+                const config = JSON.parse(document.getElementById("gm-evento-config").value || "{}");
+                const resposta = await fetch("/admin/api/eventos", {method:"POST", credentials:"same-origin", headers:{"Content-Type":"application/json"}, body:JSON.stringify(config)});
+                const dados = await resposta.json();
+                if (!resposta.ok || !dados.success) throw new Error(dados.error || "Falha ao criar evento.");
+                mostrarStatusFerramentaGM(`Evento criado: ${dados.event.title} · ${dados.event.state}.`);
+                await carregarEventosDinamicosGM();
+                document.getElementById("gm-evento-dinamico").value = dados.event.id;
+            } catch (erro) { mostrarStatusFerramentaGM("❌ " + erro.message, true); }
+        }
+
+        async function salvarConfiguracaoEventoGM() {
+            try {
+                const id = document.getElementById("gm-evento-dinamico").value;
+                if (!id) throw new Error("Selecione um evento.");
+                const config = JSON.parse(document.getElementById("gm-evento-config").value || "{}");
+                const resposta = await fetch(`/admin/api/eventos/${encodeURIComponent(id)}`, {method:"PATCH", credentials:"same-origin", headers:{"Content-Type":"application/json"}, body:JSON.stringify(config)});
+                const dados = await resposta.json();
+                if (!resposta.ok || !dados.success) throw new Error(dados.error || "Falha ao salvar configuração.");
+                mostrarStatusFerramentaGM("Configuração do evento atualizada.");
+                await carregarEventosDinamicosGM();
+            } catch (erro) { mostrarStatusFerramentaGM("❌ " + erro.message, true); }
+        }
+
+        async function acaoEventoDinamicoGM(acao) {
+            try {
+                const id = document.getElementById("gm-evento-dinamico").value;
+                if (!id) throw new Error("Selecione um evento.");
+                const resposta = await fetch(`/admin/api/eventos/${encodeURIComponent(id)}/${acao}`, {method:"POST", credentials:"same-origin"});
+                const dados = await resposta.json();
+                if (!resposta.ok || !dados.success) throw new Error(dados.error || "Falha ao alterar o estado.");
+                mostrarStatusFerramentaGM(`Evento atualizado: ${dados.event.title} · ${dados.event.state}.`);
+                await carregarEventosDinamicosGM();
+            } catch (erro) { mostrarStatusFerramentaGM("❌ " + erro.message, true); }
         }
 
 

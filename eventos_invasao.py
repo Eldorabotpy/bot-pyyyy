@@ -1550,6 +1550,27 @@ class GerenciadorInvasao:
             else:
                 resultado = "derrota"
 
+        # Raid de invasão é a única atividade do sistema atual que confirma
+        # uma vitória coletiva contra um chefe comunitário.
+        if resultado == "vitoria":
+            try:
+                from modules.events.dynamic_event_service import contribute
+                raid_id = str(raid_state.get("raid_id") or "")
+                participacao = raid_state.get("participacao", {}) or {}
+                for player_id, dados_part in (participacao.items() if raid_id else []):
+                    dados_part = dados_part or {}
+                    if int(dados_part.get("dano", 0) or 0) <= 0 and int(dados_part.get("turnos", 0) or 0) <= 0:
+                        continue
+                    contribute(
+                        str(player_id),
+                        f"event-boss:{raid_id}",
+                        "event_boss",
+                        origin="invasion_raid",
+                    )
+            except Exception:
+                import traceback
+                print("⚠️ Falha ao registrar chefe de invasão no evento dinâmico:\n" + traceback.format_exc())
+
         if not hasattr(self, "frentes_em_raid"):
             self.frentes_em_raid = set()
 

@@ -584,6 +584,7 @@
     <link rel="stylesheet" href="/static/css/perfil_abas_v1.css?v=20261016-3">
     <link rel="stylesheet" href="/static/css/menu_equipamentos_v1.css?v=20261016-1">
     <link rel="stylesheet" href="/static/css/perfil_bestiario_button.css?v=20261016-1">
+    <link rel="stylesheet" href="/static/css/eventos_dinamicos.css?v=1">
 </head>
 <body>
 
@@ -984,6 +985,11 @@
                 </span>
             </button>
 
+            <button type="button" class="menu-btn eldora-menu-btn eldora-eventos-menu" id="nav-btn-eventos" onclick="abrirEventosEldora()">
+                <span class="eldora-menu-icone">🌑</span>
+                <span class="texto">Eventos</span>
+            </button>
+
 
             <button
                 onclick="navegarMenuHeroi('aba-reino', 'abrirTelaCla')"
@@ -1070,6 +1076,13 @@
         </div>
 
     </nav>
+
+    <section id="modal-eventos-eldora" class="eventos-overlay" aria-hidden="true">
+        <div class="eventos-modal" role="dialog" aria-modal="true" aria-labelledby="eventos-titulo">
+            <button class="eventos-fechar" type="button" onclick="fecharEventosEldora()" aria-label="Fechar eventos">×</button>
+            <div id="eventos-conteudo"><p class="eventos-carregando">Consultando os eventos do reino…</p></div>
+        </div>
+    </section>
 
     <div id="aba-reino" class="tab-content active">
     
@@ -1250,6 +1263,7 @@
 
     <script src="/static/js/mapa.js?v=9943"></script>
     <script src="/static/js/coliseu_pvp.js?v=17"></script>
+    <script src="/static/js/eventos_dinamicos.js?v=1"></script>
 
     <script>
         if (window.Telegram && window.Telegram.WebApp) {

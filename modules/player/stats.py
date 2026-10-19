@@ -1811,6 +1811,53 @@ async def processar_turno_combate(
                 or {}
             )
 
+        # Pontos do evento são derivados somente desta vitória validada pelo motor.
+        # O ID é escrito no próprio mob antes de contabilizar para que chamadas
+        # repetidas do mesmo resultado não criem uma segunda contribuição.
+        if not eh_evento_dungeon:
+            try:
+                from modules.events.dynamic_event_service import contribute
+                from uuid import uuid4
+
+                event_action_id = str(mob_vivo.setdefault("event_action_id", uuid4()))
+                event_kind = (
+                    "event_boss" if mob_vivo.get("event_boss") or mob_status_luta.get("event_boss")
+                    else "elite" if mob_vivo.get("elite") or mob_status_luta.get("elite")
+                    else "creature"
+                )
+                hunting = player.get("rune_hunt_active") or {}
+                contributors = list(map(str, sala_grupo.get("membros_ids", []))) if sala_grupo else [str(user_id)]
+                for contributor_id in set(contributors):
+                    contribute(
+                        contributor_id,
+                        f"kill:{event_action_id}",
+                        event_kind,
+                        character_name=player.get("character_name", "Aventureiro") if contributor_id == str(user_id) else "Aventureiro",
+                        origin=hunting.get("origin", "manual") if contributor_id == str(user_id) else "party",
+                        battle_id=hunting.get("battle_id") if contributor_id == str(user_id) else (sala_grupo.get("sala_id") if sala_grupo else None),
+                    )
+            except Exception:
+                import logging
+                logging.getLogger(__name__).exception("Falha ao registrar contribuição de evento")
+
+        if (
+            isinstance(resultado_morte_mob, dict)
+            and resultado_morte_mob.get("dungeon_concluida")
+        ):
+            try:
+                from modules.events.dynamic_event_service import contribute
+                instance_id = resultado_morte_mob.get("dungeon_instance_id")
+                action_key = f"dungeon:{instance_id}:complete"
+                for member_id in resultado_morte_mob.get("membros", []) or [str(user_id)]:
+                    contribute(
+                        str(member_id), action_key, "dungeon",
+                        character_name=(player.get("character_name") if str(member_id) == str(user_id) else "Aventureiro"),
+                        origin="dungeon",
+                    )
+            except Exception:
+                import logging
+                logging.getLogger(__name__).exception("Falha ao registrar conclusão de dungeon no evento")
+
         if monster_id_real and not eh_evento_dungeon:
             bestiario[monster_id_real] = bestiario.get(monster_id_real, 0) + 1
             from modules import companions

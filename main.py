@@ -4,7 +4,7 @@ import random
 import time
 import math
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from threading import Thread, Lock
 from uuid import uuid4
 from flask import Flask, render_template, jsonify, request, session
@@ -128,12 +128,14 @@ from rotas.character import character_bp
 from rotas.loja_reino import registrar_loja_reino
 from rotas.npc import npc_bp
 from rotas.dungeon_events import dungeon_events_bp
+from rotas.dynamic_events import dynamic_events_bp
 
 app.register_blueprint(admin_bp)
 app.register_blueprint(passe_bp)
 app.register_blueprint(character_bp)
 app.register_blueprint(npc_bp)
 app.register_blueprint(dungeon_events_bp)
+app.register_blueprint(dynamic_events_bp)
 
 
 @app.before_request
@@ -1028,7 +1030,13 @@ def iniciar_combate():
                             "sala_id": sala["sala_id"],
                             "sala": gcm.pacote_estado_sala(sala["sala_id"])
                         })
-        users_collection.update_one({"_id": ObjectId(user_id)}, {"$set": {"rune_hunt_active": {"regiao": regiao_atual, "spawn_id": spawn_id}}})
+        users_collection.update_one({"_id": ObjectId(user_id)}, {"$set": {"rune_hunt_active": {
+            "regiao": regiao_atual,
+            "spawn_id": spawn_id,
+            "battle_id": str(uuid4()),
+            "origin": "auto_cacada" if data.get("auto_cacada") is True else "manual",
+            "started_at": datetime.now(timezone.utc),
+        }}})
         return jsonify({"estado": estado, "grupo": False})
 
     except Exception:
@@ -3246,6 +3254,8 @@ def loop_agendamento_coliseu():
     while True:
         try:
             finalizar_eventos_encerrados(users_collection, duelos_ativos)
+            from modules.events.dynamic_event_service import close_expired_events
+            close_expired_events()
             ensure_active_season(users_collection, duelos_ativos)
             filas_evento_encerradas = []
             with fila_coliseu_lock:
