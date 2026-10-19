@@ -1,1 +1,147 @@
-.eventos-overlay{display:none;position:fixed;inset:0;z-index:15000;background:#080611dd;backdrop-filter:blur(5px);align-items:center;justify-content:center;padding:14px}.eventos-overlay.aberto{display:flex}.eventos-modal{position:relative;width:min(760px,100%);max-height:min(88vh,850px);overflow:auto;border:1px solid #8060aa;border-radius:16px;background:radial-gradient(ellipse at 50% 0%,#382353 0,#171426 48%,#11111b 100%);box-shadow:0 22px 80px #000b;color:#eee9f6;padding:24px}.eventos-fechar{position:absolute;right:12px;top:10px;border:0;background:#ffffff14;color:#fff;border-radius:50%;width:36px;height:36px;font-size:25px;cursor:pointer}.eventos-hero{min-height:150px;border:1px solid #7a579c;border-radius:12px;padding:22px 24px;background:linear-gradient(100deg,#130d20ee,#2b1639aa),var(--evento-banner,linear-gradient(135deg,#29183e,#10101a));background-position:center;background-size:cover;display:flex;flex-direction:column;justify-content:end}.eventos-kicker{color:#d5afff;text-transform:uppercase;letter-spacing:.15em;font-size:.72rem}.eventos-hero h2{font:700 clamp(1.4rem,4vw,2.15rem) Cinzel,serif;margin:6px 36px 4px 0;color:#fff}.eventos-desc{color:#d4ccdf;margin:0;max-width:610px}.eventos-meta{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0}.eventos-meta span,.eventos-pill{border:1px solid #ffffff23;background:#ffffff0c;padding:7px 10px;border-radius:999px;font-size:.82rem}.eventos-progress{height:12px;background:#08070e;border:1px solid #614879;border-radius:20px;overflow:hidden}.eventos-progress i{display:block;height:100%;background:linear-gradient(90deg,#733bb0,#c28cff);box-shadow:0 0 16px #a459e9;transition:width .4s}.eventos-progress-label{display:flex;justify-content:space-between;color:#cec1df;font-size:.83rem;margin:7px 2px}.eventos-tabs{display:flex;gap:8px;margin:20px 0 12px;border-bottom:1px solid #ffffff20;padding-bottom:10px}.eventos-tabs button,.eventos-claim{border:1px solid #6f5487;color:#eee;background:#251d32;border-radius:8px;padding:9px 13px;cursor:pointer}.eventos-tabs button.active{background:#69408d;border-color:#bb8ee2}.eventos-panel{min-height:180px}.eventos-row{display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid #ffffff18;background:#ffffff08;padding:12px;border-radius:10px;margin:8px 0}.eventos-row small{display:block;color:#b9abc9;margin-top:4px}.eventos-claim{white-space:nowrap;background:#5f3a82}.eventos-claim:disabled{opacity:.5;cursor:default}.eventos-empty,.eventos-carregando{color:#cbbadb;text-align:center;padding:28px 10px}.eventos-ranking{width:100%;border-collapse:collapse}.eventos-ranking td{padding:10px;border-bottom:1px solid #ffffff16}.eventos-ranking td:last-child{text-align:right;color:#e3c7ff;font-weight:bold}.eventos-error{color:#ffb5c0;text-align:center;padding:24px}.@media(max-width:540px){.eventos-modal{padding:18px 13px;border-radius:12px}.eventos-hero{padding:17px;min-height:145px}.eventos-meta span{font-size:.74rem;padding:6px 8px}.eventos-row{align-items:flex-start}.eventos-tabs{gap:5px}.eventos-tabs button{flex:1;padding:9px 4px;font-size:.83rem}.eventos-claim{padding:8px;font-size:.8rem}}
+.eventos-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 15000;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  overflow: hidden;
+  background: #080611dd;
+  backdrop-filter: blur(5px);
+}
+
+.eventos-overlay.aberto { display: flex; }
+
+.eventos-modal {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: min(760px, 100%);
+  height: min(850px, calc(100vh - 16px));
+  height: min(850px, calc(100dvh - 16px));
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid #8060aa;
+  border-radius: 16px;
+  background: radial-gradient(ellipse at 50% 0%, #382353 0, #171426 48%, #11111b 100%);
+  box-shadow: 0 22px 80px #000b;
+  color: #eee9f6;
+}
+
+#eventos-conteudo {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #74538d transparent;
+  padding: 54px 24px 22px;
+}
+
+#eventos-conteudo::-webkit-scrollbar { width: 6px; }
+#eventos-conteudo::-webkit-scrollbar-thumb { border-radius: 8px; background: #74538d; }
+#eventos-conteudo::-webkit-scrollbar-track { background: transparent; }
+
+.eventos-fechar {
+  position: absolute;
+  z-index: 2;
+  top: 10px;
+  right: 10px;
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border: 1px solid #ffffff1c;
+  border-radius: 50%;
+  background: #292337;
+  color: #fff;
+  font-size: 25px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.eventos-hero {
+  box-sizing: border-box;
+  display: flex;
+  min-height: 150px;
+  flex-direction: column;
+  justify-content: flex-end;
+  overflow: hidden;
+  border: 1px solid #7a579c;
+  border-radius: 12px;
+  padding: 22px 24px;
+  background: linear-gradient(100deg, #130d20ee, #2b1639aa), var(--evento-banner, linear-gradient(135deg, #29183e, #10101a));
+  background-position: center;
+  background-size: cover;
+}
+
+.eventos-kicker { color: #d5afff; text-transform: uppercase; letter-spacing: .15em; font-size: .72rem; }
+.eventos-hero h2 { margin: 6px 0 4px; color: #fff; font: 700 clamp(1.4rem, 4vw, 2.15rem) Cinzel, serif; overflow-wrap: anywhere; }
+.eventos-desc { max-width: 610px; margin: 0; color: #e0d8e9; line-height: 1.45; }
+.eventos-meta { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0; }
+.eventos-meta span, .eventos-pill { border: 1px solid #ffffff23; border-radius: 999px; background: #ffffff0c; padding: 7px 10px; font-size: .82rem; }
+.eventos-progress { height: 12px; overflow: hidden; border: 1px solid #614879; border-radius: 20px; background: #08070e; }
+.eventos-progress i { display: block; height: 100%; background: linear-gradient(90deg, #733bb0, #c28cff); box-shadow: 0 0 16px #a459e9; transition: width .4s; }
+.eventos-progress-label { display: flex; justify-content: space-between; gap: 12px; margin: 7px 2px; color: #cec1df; font-size: .83rem; }
+.eventos-progress-label > * { min-width: 0; }
+
+.eventos-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin: 20px 0 12px;
+  border-bottom: 1px solid #ffffff20;
+  padding-bottom: 10px;
+}
+
+.eventos-tabs button, .eventos-claim {
+  min-width: 0;
+  border: 1px solid #6f5487;
+  border-radius: 8px;
+  background: #251d32;
+  color: #eee;
+  padding: 9px 10px;
+  cursor: pointer;
+}
+
+.eventos-tabs button { overflow-wrap: anywhere; }
+.eventos-tabs button.active { border-color: #bb8ee2; background: #69408d; }
+.eventos-panel { min-height: 0; }
+.eventos-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; margin: 8px 0; border: 1px solid #ffffff18; border-radius: 10px; background: #ffffff08; padding: 12px; }
+.eventos-row > div { min-width: 0; flex: 1 1 auto; }
+.eventos-row small { display: block; margin-top: 4px; color: #b9abc9; line-height: 1.4; }
+.eventos-claim { flex: 0 0 auto; white-space: nowrap; background: #5f3a82; }
+.eventos-claim:disabled { opacity: .5; cursor: default; }
+.eventos-empty, .eventos-carregando { padding: 28px 10px; color: #cbbadb; text-align: center; }
+.eventos-ranking { width: 100%; border-collapse: collapse; }
+.eventos-ranking td { padding: 10px; border-bottom: 1px solid #ffffff16; }
+.eventos-ranking td:last-child { color: #e3c7ff; font-weight: bold; text-align: right; }
+.eventos-error { padding: 24px; color: #ffb5c0; text-align: center; }
+
+@media (max-width: 540px) {
+  .eventos-modal { border-radius: 13px; }
+  #eventos-conteudo { padding: 52px 12px 16px; }
+  .eventos-hero { min-height: 132px; padding: 15px; }
+  .eventos-hero h2 { font-size: clamp(1.35rem, 6vw, 1.75rem); }
+  .eventos-desc { font-size: .9rem; }
+  .eventos-meta { gap: 6px; margin: 10px 0; }
+  .eventos-meta span { padding: 6px 8px; font-size: .74rem; }
+  .eventos-tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-top: 14px; }
+  .eventos-tabs button { min-height: 40px; padding: 8px 5px; font-size: .82rem; }
+  .eventos-row { align-items: flex-start; gap: 8px; padding: 10px; }
+  .eventos-pill { max-width: 38%; flex: 0 1 auto; white-space: normal; text-align: center; }
+  .eventos-claim { padding: 8px; font-size: .78rem; }
+}
+
+@media (max-width: 360px) {
+  #eventos-conteudo { padding-right: 10px; padding-left: 10px; }
+  .eventos-hero { min-height: 122px; padding: 13px; }
+  .eventos-kicker { font-size: .64rem; }
+  .eventos-progress-label { font-size: .76rem; }
+  .eventos-row { gap: 6px; padding: 9px; }
+}
