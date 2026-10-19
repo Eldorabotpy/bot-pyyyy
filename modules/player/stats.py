@@ -1382,6 +1382,9 @@ async def processar_turno_combate(
     if not mob_vivo:
         return {"erro": "O monstro sumiu!"}
 
+    sistema_cacada.atualizar_evento_corrupcao(force=False)
+    mob_vivo = sistema_cacada.mobs_vivos.get(regiao_atual, {}).get(spawn_id, mob_vivo)
+
     # =============================================================
     # 🏰 EVENTO ESPECIAL DE DUNGEON
     # =============================================================
@@ -1472,6 +1475,23 @@ async def processar_turno_combate(
     mob_status_luta["defense"] = mob_vivo.get("defense", mob_status_luta.get("defense", 0))
     mob_status_luta["xp_reward"] = mob_vivo.get("xp_reward", mob_status_luta.get("xp_reward", 0))
     mob_status_luta["gold_drop"] = mob_vivo.get("gold_drop", mob_status_luta.get("gold_drop", 0))
+    loot_table_mob = mob_vivo.get("loot_table", mob_status_luta.get("loot_table", []))
+    if mob_vivo.get("elite_generated"):
+        from modules.game_data.elite_config import ELITE_MULTIPLIERS
+        loot_table_mob = [
+            {
+                **drop,
+                "drop_chance": min(100, float(drop.get("drop_chance", 0)) + ELITE_MULTIPLIERS["loot_bonus_pct"]),
+            }
+            for drop in (loot_table_mob or [])
+            if isinstance(drop, dict)
+        ]
+    mob_status_luta["loot_table"] = loot_table_mob
+    mob_status_luta["initiative"] = mob_vivo.get("initiative", mob_status_luta.get("initiative", 0))
+    mob_status_luta["luck"] = mob_vivo.get("luck", mob_status_luta.get("luck", 0))
+    mob_status_luta["name"] = mob_vivo.get("name", mob_status_luta.get("name", "Monstro"))
+    mob_status_luta["elite"] = bool(mob_vivo.get("elite") or mob_status_luta.get("elite"))
+    mob_status_luta["corrupted"] = bool(mob_vivo.get("corrupted"))
     mob_status_luta["hp"] = mob_hp
     mob_status_luta["max_hp"] = int(mob_vivo.get("hp_max", mob_vivo.get("hp", mob_hp)) or mob_hp)
 
@@ -1835,6 +1855,7 @@ async def processar_turno_combate(
                         character_name=player.get("character_name", "Aventureiro") if contributor_id == str(user_id) else "Aventureiro",
                         origin=hunting.get("origin", "manual") if contributor_id == str(user_id) else "party",
                         battle_id=hunting.get("battle_id") if contributor_id == str(user_id) else (sala_grupo.get("sala_id") if sala_grupo else None),
+                        corruption_event_id=mob_vivo.get("corruption_event_id"),
                     )
             except Exception:
                 import logging

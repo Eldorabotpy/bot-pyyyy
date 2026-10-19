@@ -24,6 +24,7 @@ DEFAULT_REWARDS = [
     {"gold": 500, "items": [{"item_id": "essencia_purificadora", "quantity": 3}]},
     {"gold": 1000, "items": [{"item_id": "folha_sombria", "quantity": 10}]},
 ]
+DEFAULT_CORRUPTION = {"enabled": False, "chance": 15}
 
 
 class EventError(ValueError):
@@ -117,6 +118,20 @@ def normalize_config(data: dict, *, partial=False):
         cfg["rewards"] = [_validate_reward(r) for r in rewards]
     if "collective_reward" in data or not partial:
         cfg["collective_reward"] = _validate_reward(data.get("collective_reward") or {"gold": 750, "items": [{"item_id": "essencia_purificadora", "quantity": 2}]})
+    if "corruption" in data or not partial:
+        raw_corruption = data.get("corruption") or {}
+        if not isinstance(raw_corruption, dict):
+            raise EventError("A configuração de corrupção precisa ser um objeto.")
+        enabled = raw_corruption.get("enabled", False)
+        if not isinstance(enabled, bool):
+            raise EventError("A opção de corrupção precisa ser verdadeira ou falsa.")
+        try:
+            chance = int(raw_corruption.get("chance", DEFAULT_CORRUPTION["chance"]))
+        except (TypeError, ValueError) as exc:
+            raise EventError("A chance de corrupção precisa ser um número inteiro.") from exc
+        if not 0 <= chance <= 100:
+            raise EventError("A chance de corrupção deve ficar entre 0 e 100.")
+        cfg["corruption"] = {"enabled": enabled, "chance": chance}
     if "tiers" in cfg and "rewards" not in cfg and not partial:
         cfg["rewards"] = DEFAULT_REWARDS[:len(cfg["tiers"])]
     if "tiers" in cfg and "rewards" in cfg and len(cfg["tiers"]) != len(cfg["rewards"]):
@@ -219,6 +234,42 @@ def list_events(include_past=False):
     return [_public(x) for x in EVENTS.find(query).sort("starts_at", -1).limit(50)]
 
 
+def active_corruption_event(now=None):
+    """Retorna a invasão ativa que controla a corrupção dos mobs do mapa."""
+    if EVENTS is None:
+        return None
+    now = now or utcnow()
+    close_expired_events(now)
+    active = EVENTS.find(
+        {
+            "state": "active",
+            "starts_at": {"$lte": now},
+            "ends_at": {"$gt": now},
+        }
+    ).sort("starts_at", -1)
+    for event in active:
+        corruption = event.get("corruption")
+        # Compatibilidade com Invasões Sombrias criadas antes deste campo existir.
+        if not isinstance(corruption, dict):
+            if str(event.get("event_key", "")).startswith("invasao-sombria-"):
+                corruption = {"enabled": True, "chance": DEFAULT_CORRUPTION["chance"]}
+            else:
+                continue
+        if not corruption.get("enabled"):
+            continue
+        result = dict(event)
+        try:
+            chance = int(corruption.get("chance", DEFAULT_CORRUPTION["chance"]))
+        except (TypeError, ValueError):
+            chance = DEFAULT_CORRUPTION["chance"]
+        result["corruption"] = {
+            "enabled": True,
+            "chance": max(0, min(100, chance)),
+        }
+        return result
+    return None
+
+
 def event_detail(event_id, character_id=None):
     close_expired_events()
     doc = EVENTS.find_one({"_id": _event_id(event_id)})
@@ -240,13 +291,14 @@ def ranking(event_id, page=1, page_size=20):
     return {"page": page, "page_size": page_size, "total": PARTICIPANTS.count_documents({"event_id": doc["_id"], "points": {"$gt": 0}}), "entries": [{"rank": (page - 1) * page_size + i + 1, "name": row.get("character_name", "Aventureiro"), "points": int(row.get("points", 0))} for i, row in enumerate(rows)]}
 
 
-def contribute(character_id, action_key, kind, *, character_name="Aventureiro", origin="manual", battle_id=None):
+def contribute(character_id, action_key, kind, *, character_name="Aventureiro", origin="manual", battle_id=None, corruption_event_id=None):
     """Award points once; all writes for an action are committed atomically."""
     ensure_indexes()
     now = utcnow()
     action_key = str(action_key or "")
     if not action_key or len(action_key) > 200:
         return None
+    close_expired_events(now)
     player = users_collection.find_one({"_id": ObjectId(str(character_id))}, {"level": 1, "character_name": 1})
     if not player:
         return None
@@ -260,6 +312,15 @@ def contribute(character_id, action_key, kind, *, character_name="Aventureiro", 
         for event in active_events:
             if kind not in event.get("rules", {}) or int(event.get("rules", {}).get(kind, 0)) <= 0:
                 continue
+            corruption = event.get("corruption")
+            if not isinstance(corruption, dict) and str(event.get("event_key", "")).startswith("invasao-sombria-"):
+                corruption = {"enabled": True, "chance": DEFAULT_CORRUPTION["chance"]}
+            is_invasion = isinstance(corruption, dict) and corruption.get("enabled")
+            if is_invasion:
+                # A invasão só progride com monstros que o servidor marcou
+                # como corrompidos para este evento específico.
+                if str(event["_id"]) != str(corruption_event_id or ""):
+                    continue
             if int(player.get("level", 1) or 1) < int(event.get("min_level", 1)):
                 continue
             # The same server-validated activity may contribute to each active event.

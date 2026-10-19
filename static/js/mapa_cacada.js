@@ -46,6 +46,7 @@ class MotorCacada {
             this.socket.off('carregarMobsMapa');
             this.socket.off('mobMapaMorreu');
             this.socket.off('mobMapaNasceu');
+            this.socket.off('mobMapaAtualizado');
             this.socket.off('convocarCombateGrupo');
             this.socket.off('dungeonConcluida');
 
@@ -157,6 +158,12 @@ class MotorCacada {
                         dados.mob_data
                     );
                 }
+            });
+
+            this.socket.on('mobMapaAtualizado', (dados) => {
+                const regiaoAtual = this.scene.regiaoAtual || localStorage.getItem("eldora_lastRegiao");
+                if (!dados || dados.regiao !== regiaoAtual || !dados.mob_data) return;
+                this.atualizarMobVisual(dados.mob_data);
             });
 
             // ==========================================
@@ -1015,6 +1022,51 @@ class MotorCacada {
         }
     }
 
+    aplicarAuraCorrompida(sprite, mobData) {
+        if (!sprite || !sprite.scene) return;
+        if (!mobData || mobData.corrupted !== true) {
+            if (sprite.corruptionAura) sprite.corruptionAura.destroy();
+            sprite.corruptionAura = null;
+            return;
+        }
+        if (sprite.corruptionAura && sprite.corruptionAura.active) return;
+
+        const ehBoss = mobData.is_boss === true || mobData.boss === true || mobData.dungeon_boss === true;
+        const tamanho = ehBoss ? 148 : 62;
+        const aura = this.scene.add.ellipse(
+            sprite.x,
+            sprite.y,
+            tamanho,
+            tamanho,
+            0x8b3dff,
+            0.20
+        ).setStrokeStyle(ehBoss ? 4 : 2, 0xc084fc, 0.9).setDepth((sprite.depth || 14) - 1);
+
+        sprite.corruptionAura = aura;
+        this.scene.tweens.add({
+            targets: aura,
+            alpha: 0.38,
+            scaleX: 1.12,
+            scaleY: 1.14,
+            duration: 850,
+            yoyo: true,
+            repeat: -1,
+            ease: 'Sine.easeInOut'
+        });
+    }
+
+    atualizarMobVisual(mobData) {
+        const sprite = this.mobsNoMapa.getChildren().find(mob =>
+            mob instanceof Phaser.GameObjects.Sprite && String(mob.spawn_id) === String(mobData.spawn_id)
+        );
+        if (!sprite) {
+            this.spawnMob(mobData);
+            return;
+        }
+        sprite.mobData = mobData;
+        this.aplicarAuraCorrompida(sprite, mobData);
+    }
+
     desenharSprite(mobData, textureKey) {
         try {
             // ==========================================
@@ -1216,6 +1268,7 @@ class MotorCacada {
             });
 
             this.mobsNoMapa.add(sprite);
+            this.aplicarAuraCorrompida(sprite, mobData);
             
         } catch (e) {
             console.error("Erro ao desenhar mob:", e);
@@ -1246,6 +1299,11 @@ class MotorCacada {
                 console.log("   -> Destruindo a seta flutuante.");
                 mob.indicadorAlvo.destroy();
                 mob.indicadorAlvo = null; // Limpa a referência
+            }
+
+            if (mob.corruptionAura && typeof mob.corruptionAura.destroy === 'function') {
+                mob.corruptionAura.destroy();
+                mob.corruptionAura = null;
             }
 
             // Fallback de segurança para o sistema antigo (se ainda existir algum player com nome antigo)

@@ -2,8 +2,10 @@
 import threading
 import random
 import math
+import time
 from modules.game_data.map_spawns import MAP_SPAWNS
 from modules.game_data.monsters import MONSTERS_DATA
+from modules.game_data.elite_config import ELITE_CHANCE, ELITE_MULTIPLIERS
 from modules.dungeon_persistence import DungeonPersistence, durable_dungeon
 
 class GerenciadorCacada(DungeonPersistence):
@@ -50,6 +52,10 @@ class GerenciadorCacada(DungeonPersistence):
         # ==========================================
         self.dungeon_instancias_concluidas = set()
 
+        self._evento_corrupcao_ativo = None
+        self._evento_corrupcao_refresh_at = 0.0
+        self._evento_corrupcao_lock = threading.RLock()
+
         self.inicializar_mundo()
         self.iniciar_persistencia_dungeon(dungeon_collection)
 
@@ -61,13 +67,106 @@ class GerenciadorCacada(DungeonPersistence):
                     return mob
         return None
 
+    @staticmethod
+    def _nome_mob(mob):
+        nome = str(mob.get("base_name") or mob.get("nome") or "Monstro")
+        marcadores = []
+        if mob.get("elite"):
+            marcadores.append("Elite")
+        if mob.get("corrupted"):
+            marcadores.append("Corrompido")
+        return f"{' '.join(marcadores)} {nome}" if marcadores else nome
+
+    @staticmethod
+    def _mob_elegivel_para_corrupcao(mob):
+        return str(mob.get("tipo", "")).lower() != "boss" and not any(mob.get(flag) for flag in (
+            "boss", "is_boss", "dungeon_boss", "event_boss",
+            "dungeon_mob", "event_owner_id",
+        ))
+
+    def _evento_corrupcao_atual(self, *, force=False):
+        now = time.monotonic()
+        with self._evento_corrupcao_lock:
+            if not force and now - self._evento_corrupcao_refresh_at < 10:
+                return self._evento_corrupcao_ativo
+            self._evento_corrupcao_refresh_at = now
+            try:
+                from modules.events.dynamic_event_service import active_corruption_event
+                self._evento_corrupcao_ativo = active_corruption_event()
+            except Exception:
+                # Falha no serviço de eventos não deve impedir o mapa de carregar
+                # nem remover o estado válido recebido na última consulta.
+                self._evento_corrupcao_refresh_at = 0.0
+                return self._evento_corrupcao_ativo
+        self.sincronizar_corrupcao_mobs(self._evento_corrupcao_ativo)
+        return self._evento_corrupcao_ativo
+
+    def sincronizar_corrupcao_mobs(self, evento=None):
+        """Aplica/remove a corrupção nas instâncias globais e atualiza os mapas conectados."""
+        evento_id = str((evento or {}).get("_id") or (evento or {}).get("id") or "")
+        config = (evento or {}).get("corruption") or {}
+        chance = max(0, min(100, int(config.get("chance", 15)))) if evento_id else 0
+        alterados = []
+
+        for regiao, mobs in list(self.mobs_vivos.items()):
+            if regiao == "dungeon_01":
+                continue
+            for spawn_id, mob in list(mobs.items()):
+                if evento_id:
+                    if not self._mob_elegivel_para_corrupcao(mob):
+                        continue
+                    mudou = False
+                    if (mob.get("corrupted") or mob.get("corruption_event_id")) and mob.get("corruption_event_id") != evento_id:
+                        mob["corrupted"] = False
+                        mob.pop("corruption_event_id", None)
+                        mudou = True
+                    if mob.get("corruption_checked_event_id") == evento_id:
+                        if mudou:
+                            mob["name"] = self._nome_mob(mob)
+                            mob["nome"] = mob["name"]
+                            alterados.append((regiao, spawn_id, mob))
+                        continue
+                    mob["corruption_checked_event_id"] = evento_id
+                    if mob.get("elite") or random.random() * 100 < chance:
+                        mob["corrupted"] = True
+                        mob["corruption_event_id"] = evento_id
+                        mudou = True
+                    if mudou:
+                        mob["name"] = self._nome_mob(mob)
+                        mob["nome"] = mob["name"]
+                        alterados.append((regiao, spawn_id, mob))
+                elif mob.get("corrupted") or mob.get("corruption_event_id") or mob.get("corruption_checked_event_id"):
+                    tinha_corrupcao_visual = bool(mob.get("corrupted") or mob.get("corruption_event_id"))
+                    mob["corrupted"] = False
+                    mob.pop("corruption_event_id", None)
+                    mob.pop("corruption_checked_event_id", None)
+                    if tinha_corrupcao_visual:
+                        mob["name"] = self._nome_mob(mob)
+                        mob["nome"] = mob["name"]
+                        alterados.append((regiao, spawn_id, mob))
+
+        for regiao, spawn_id, mob in alterados:
+            self.socketio.emit("mobMapaAtualizado", {
+                "regiao": regiao,
+                "spawn_id": spawn_id,
+                "mob_data": mob,
+            })
+        return len(alterados)
+
+    def atualizar_evento_corrupcao(self, *, force=True):
+        """Atualiza a seleção de corrupção após uma mudança de estado/configuração."""
+        return self._evento_corrupcao_atual(force=force)
+
     def gerar_mob_dinamico(self, config_spawn, regiao):
         """🎲 O MESTRE DE JOGO: Gera um monstro com nível e status sorteados"""
+        evento_corrupcao = self._evento_corrupcao_atual()
         base_stats = self.buscar_status_base(config_spawn["monster_id"])
         if not base_stats: return None
 
         mob_vivo = config_spawn.copy()
-        mob_vivo["nome"] = base_stats.get("name", "Monstro Desconhecido")
+        mob_vivo["base_name"] = base_stats.get("name", "Monstro Desconhecido")
+        mob_vivo["nome"] = mob_vivo["base_name"]
+        mob_vivo["name"] = mob_vivo["base_name"]
         mob_vivo["regiao"] = regiao 
         
         # ==========================================
@@ -114,7 +213,58 @@ class GerenciadorCacada(DungeonPersistence):
         mob_vivo["xp_reward"] = math.floor(base_stats.get("xp_reward", 10) * mult_recompensa)
         mob_vivo["gold_drop"] = math.floor(base_stats.get("gold_drop", 0) * mult_recompensa)
 
+        is_boss = any((
+            mob_vivo.get("boss"), mob_vivo.get("is_boss"), mob_vivo.get("dungeon_boss"),
+            mob_vivo.get("event_boss"), base_stats.get("boss"), base_stats.get("is_boss"),
+            str(mob_vivo.get("tipo", base_stats.get("tipo", ""))).lower() == "boss",
+        ))
+        elite_definido = bool(config_spawn.get("elite") or base_stats.get("elite"))
+        elite_sorteado = (
+            not elite_definido
+            and regiao != "dungeon_01"
+            and not is_boss
+            and random.random() < ELITE_CHANCE
+        )
+        mob_vivo["elite"] = elite_definido or elite_sorteado
+        mob_vivo["is_elite"] = mob_vivo["elite"]
+        mob_vivo["elite_generated"] = elite_sorteado
+
+        if elite_sorteado:
+            mob_vivo["hp_max"] = max(1, math.floor(mob_vivo["hp_max"] * ELITE_MULTIPLIERS["hp"]))
+            mob_vivo["max_hp"] = mob_vivo["hp_max"]
+            mob_vivo["hp_atual"] = mob_vivo["hp_max"]
+            mob_vivo["hp"] = mob_vivo["hp_max"]
+            mob_vivo["attack"] = max(1, math.floor(mob_vivo["attack"] * ELITE_MULTIPLIERS["attack"]))
+            mob_vivo["defense"] = max(0, math.floor(mob_vivo["defense"] * ELITE_MULTIPLIERS["defense"]))
+            mob_vivo["initiative"] = int(base_stats.get("initiative", 0)) + ELITE_MULTIPLIERS["initiative_add"]
+            mob_vivo["luck"] = int(base_stats.get("luck", 0)) + ELITE_MULTIPLIERS["luck_add"]
+            mob_vivo["xp_reward"] = math.floor(mob_vivo["xp_reward"] * ELITE_MULTIPLIERS["xp"])
+            mob_vivo["gold_drop"] = math.floor(mob_vivo["gold_drop"] * ELITE_MULTIPLIERS["gold"])
+        mob_vivo["name"] = self._nome_mob(mob_vivo)
+        mob_vivo["nome"] = mob_vivo["name"]
+
+        if evento_corrupcao:
+            self.sincronizar_corrupcao_mobs_for_instance(
+                mob_vivo,
+                evento_corrupcao,
+            )
+
         return mob_vivo
+
+    def sincronizar_corrupcao_mobs_for_instance(self, mob, evento):
+        evento_id = str((evento or {}).get("_id") or (evento or {}).get("id") or "")
+        if not evento_id or not self._mob_elegivel_para_corrupcao(mob):
+            return mob
+        if mob.get("corruption_checked_event_id") == evento_id:
+            return mob
+        mob["corruption_checked_event_id"] = evento_id
+        chance = max(0, min(100, int((evento.get("corruption") or {}).get("chance", 15))))
+        if mob.get("elite") or random.random() * 100 < chance:
+            mob["corrupted"] = True
+            mob["corruption_event_id"] = evento_id
+        mob["name"] = self._nome_mob(mob)
+        mob["nome"] = mob["name"]
+        return mob
 
     def inicializar_mundo(self):
         """Monta o mapa sorteando os níveis da primeira geração de monstros"""
@@ -989,6 +1139,7 @@ class GerenciadorCacada(DungeonPersistence):
         group_id=None,
         group_members=None
     ):
+        self._evento_corrupcao_atual()
         regiao = str(
             regiao
             or ""

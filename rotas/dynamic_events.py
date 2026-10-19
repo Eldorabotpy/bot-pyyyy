@@ -1,10 +1,21 @@
 from datetime import datetime, timedelta, timezone
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, current_app, jsonify, request
 
 from modules.events import dynamic_event_service as events
 
 dynamic_events_bp = Blueprint("dynamic_events", __name__)
+
+
+def _sincronizar_evento_no_mapa(*, force=True):
+    """Mantém as instâncias e os clientes do mapa alinhados ao evento ativo."""
+    try:
+        manager = current_app.config.get("SISTEMA_CACADA")
+        if manager:
+            manager.atualizar_evento_corrupcao(force=force)
+    except Exception:
+        import logging
+        logging.getLogger(__name__).exception("Falha ao sincronizar corrupção dos monstros")
 
 
 def _error(exc, status=400):
@@ -14,7 +25,9 @@ def _error(exc, status=400):
 @dynamic_events_bp.get("/api/eventos")
 def public_events():
     try:
-        return jsonify(success=True, events=events.list_events())
+        result = events.list_events()
+        _sincronizar_evento_no_mapa(force=False)
+        return jsonify(success=True, events=result)
     except Exception:
         return _error("Não foi possível consultar os eventos.", 503)
 
@@ -61,7 +74,9 @@ def admin_create_event():
     @admin_required
     def create():
         try:
-            return jsonify(success=True, event=events.create_event(request.get_json(silent=True) or {})), 201
+            event = events.create_event(request.get_json(silent=True) or {})
+            _sincronizar_evento_no_mapa()
+            return jsonify(success=True, event=event), 201
         except events.EventError as exc:
             return _error(exc)
         except Exception as exc:
@@ -77,7 +92,9 @@ def admin_update_event(event_id):
     @admin_required
     def update():
         try:
-            return jsonify(success=True, event=events.update_event(event_id, request.get_json(silent=True) or {}))
+            event = events.update_event(event_id, request.get_json(silent=True) or {})
+            _sincronizar_evento_no_mapa()
+            return jsonify(success=True, event=event)
         except events.EventError as exc:
             return _error(exc)
         except Exception:
@@ -91,7 +108,9 @@ def admin_transition_event(event_id, action):
     @admin_required
     def transition():
         try:
-            return jsonify(success=True, event=events.transition_event(event_id, action))
+            event = events.transition_event(event_id, action)
+            _sincronizar_evento_no_mapa()
+            return jsonify(success=True, event=event)
         except events.EventError as exc:
             return _error(exc)
     return transition()
@@ -157,7 +176,10 @@ def admin_create_default_invasion():
                 "description": "Criaturas corrompidas ameaçam Eldora. Una forças para estabilizar a fenda e conquiste recompensas pessoais e coletivas.",
                 "starts_at": now.isoformat(), "ends_at": (now + timedelta(days=7)).isoformat(),
                 "global_goal": 5000, "daily_cap": 150, "min_level": 1,
+                "rules": {"creature": 1, "elite": 5, "dungeon": 0, "event_boss": 0},
+                "corruption": {"enabled": True, "chance": 15},
             })
+            _sincronizar_evento_no_mapa()
             return jsonify(success=True, event=event), 201
         except Exception as exc:
             if exc.__class__.__name__ == "DuplicateKeyError":

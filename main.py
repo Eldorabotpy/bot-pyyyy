@@ -607,6 +607,7 @@ def _montar_equipe_herois_grupo(grupo, regiao_atual):
 
 @app.route('/api/combate/iniciar', methods=['POST'])
 def iniciar_combate():
+    sistema_cacada.atualizar_evento_corrupcao(force=False)
     try:
         data = request.json
         user_id = data.get('user_id')
@@ -870,7 +871,10 @@ def iniciar_combate():
                 else 0
             )
 
-        nome_mob_tela = mob_data.get('name', 'Monstro') if nivel_conhecimento > 0 else "Criatura Desconhecida"
+        mob_elite = bool(mob_vivo and (mob_vivo.get("elite") or mob_data.get("elite")))
+        mob_corrompido = bool(mob_vivo and mob_vivo.get("corrupted"))
+        nome_mob_real = (mob_vivo or {}).get("name") or mob_data.get("name", "Monstro")
+        nome_mob_tela = nome_mob_real if nivel_conhecimento > 0 or mob_elite or mob_corrompido else "Criatura Desconhecida"
         lvl_mob_tela = mob_level_final if nivel_conhecimento > 0 else "??"
 
         pastas_github = {"capital_eldora": "capital", "pradaria_inicial": "pradaria", "floresta_sombria": "floresta", "pedreira_granito": "pedreira"}
@@ -895,6 +899,8 @@ def iniciar_combate():
             "dungeon_boss": eh_boss_dungeon,
 
             "mob_nome": nome_mob_tela,
+            "is_elite": mob_elite,
+            "is_corrupted": mob_corrompido,
             "mob_img": link_imagem_monstro,
             "monster_level": lvl_mob_tela, 
             "monster_hp": mob_hp_final,
@@ -902,8 +908,8 @@ def iniciar_combate():
                 "max_hp": mob_hp_max, 
                 "attack": mob_atk_final,
                 "defense": mob_def_final,
-                "initiative": mob_data.get('initiative', 0),
-                "luck": mob_data.get('luck', 0)
+                "initiative": (mob_vivo or {}).get("initiative", mob_data.get('initiative', 0)),
+                "luck": (mob_vivo or {}).get("luck", mob_data.get('luck', 0))
             },
             "player_hp": player_hp, 
             "player_mp": player_mp,

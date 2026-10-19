@@ -11,7 +11,6 @@ logger = logging.getLogger(__name__)
 # =================================================================
 HUNT_ENERGY_COST = 1
 COLLECTION_TIME_MINUTES = 10   # ⏳ BASE REAL DA COLETA
-ELITE_CHANCE = 0.20
 
 # =================================================================
 # 2. TIERS (BENEFÍCIOS)

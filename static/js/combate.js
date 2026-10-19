@@ -598,6 +598,7 @@ window.iniciarCacadaApp = async function(spawnId, opcoesGrupo = {}) {
         
         document.getElementById('sprite-player').src = urlSpritePlayer;
         document.getElementById('sprite-mob').src = est.mob_img;
+        document.getElementById('sprite-mob').classList.toggle('mob-corrompido', est.is_corrupted === true);
         
         document.getElementById('sprite-mob').style.opacity = "1";
         document.getElementById('sprite-player').style.opacity = "1";
