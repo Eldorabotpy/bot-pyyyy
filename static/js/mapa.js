@@ -32,7 +32,7 @@ class MapaScene extends Phaser.Scene {
     }
 
     async atualizarPortalSombrio() {
-        if (this.regiaoAtual !== 'capital_eldora' || !this.scene.isActive()) {
+        if (this.regiaoAtual !== 'capital_eldora') {
             this.removerPortalSombrio();
             return;
         }
@@ -40,6 +40,9 @@ class MapaScene extends Phaser.Scene {
             const response = await fetch('/api/eventos', { credentials: 'same-origin' });
             if (!response.ok) return;
             const payload = await response.json();
+            // A resposta pode chegar depois que o jogador trocou de região ou
+            // a cena foi encerrada. Só desenhamos enquanto esta cena está ativa.
+            if (this.regiaoAtual !== 'capital_eldora' || !this.scene.isActive()) return;
             const event = (payload.events || []).find(item =>
                 item.state === 'active' && item.corruption?.enabled === true && item.corruption?.portal_enabled !== false
             );
@@ -1845,18 +1848,23 @@ class MapaScene extends Phaser.Scene {
                     this.motorCacada = new MotorCacada(this, socket);
                 }
 
-            this.atualizarPortalSombrio();
+            }
+
+            // O portal é conteúdo do mapa/evento, então sua vida não depende
+            // de o Socket.IO estar conectado. Esperamos a cena terminar o boot
+            // antes da primeira consulta e depois atualizamos periodicamente.
+            this.portalRefreshTimer?.remove(false);
             this.portalRefreshTimer = this.time.addEvent({
-                delay: 60000,
+                delay: 15000,
                 loop: true,
                 callback: () => this.atualizarPortalSombrio(),
             });
+            this.time.delayedCall(500, () => this.atualizarPortalSombrio());
             this.events.once('shutdown', () => {
                 this.portalRefreshTimer?.remove(false);
                 this.portalRefreshTimer = null;
                 this.removerPortalSombrio();
             });
-            }
 
             // ==========================================
             // 🏰 SISTEMA DE EVENTOS DA DUNGEON 01
