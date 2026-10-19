@@ -716,11 +716,19 @@ class MotorMultiplayer {
 
                     let dist = Phaser.Math.Distance.Between(outro.x, outro.y, info.x, info.y);
                     if (dist < 5) { 
+                        if (outro.movimentoTween?.isPlaying()) outro.movimentoTween.stop();
+                        if (outro.textoTween?.isPlaying()) outro.textoTween.stop();
                         outro.setPosition(info.x, info.y); 
                         outro.nomeTexto.setPosition(info.x, info.y - 25); 
-                        outro.anims.stop(); 
-                        outro.setFrame(1); 
-                        this.agendarParadaEspecialRemota(outro);
+                        // O servidor envia posições periódicas mesmo parado.
+                        // Preserve o timer e a animação se for apenas uma repetição
+                        // da mesma posição.
+                        if (!outro.animacaoParadaEspecialAtiva && !outro.animacaoParadaTimer) {
+                            outro.anims.stop();
+                            outro.setTexture(outro.skinBaseKey || outro.texture.key);
+                            outro.setFrame(1);
+                            this.agendarParadaEspecialRemota(outro);
+                        }
                         return; 
                     }
                     
@@ -1466,7 +1474,7 @@ class MotorMultiplayer {
 
     agendarParadaEspecialRemota(jogador) {
         if (!jogador.active || !window.ANIMACOES_PARADAS_ESPECIAIS?.[jogador.skinBaseKey]) return;
-        if (jogador.animacaoParadaTimer) jogador.animacaoParadaTimer.remove(false);
+        if (jogador.animacaoParadaTimer || jogador.animacaoParadaEspecialAtiva) return;
         jogador.animacaoParadaTimer = this.scene.time.delayedCall(4000, () => {
             jogador.animacaoParadaTimer = null;
             if (!jogador.active || jogador.movimentoTween?.isPlaying()) return;
