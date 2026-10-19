@@ -276,7 +276,15 @@ window.salvarCustomizacaoPerfil = async function() {
             
             const cena = window.jogoEldora?.scene?.getScene('MapaScene');
             if (cena && cena.player) {
+                if (typeof cena.cancelarAnimacaoParadaEspecial === 'function') {
+                    cena.cancelarAnimacaoParadaEspecial();
+                }
                 cena.skinAtiva = idSkin;
+                cena.skinResolvida = idSkin;
+                cena.skinBaseAtual = idSkin;
+                if (typeof cena.carregarAnimacaoParadaEspecial === 'function') {
+                    cena.carregarAnimacaoParadaEspecial(idSkin);
+                }
                 const linkNuvem = "https://raw.githubusercontent.com/Eldorabotpy/static-img/refs/heads/main/assets/classes/";
 
                 if (!cena.textures.exists(idSkin)) {

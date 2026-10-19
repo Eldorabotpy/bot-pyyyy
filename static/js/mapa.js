@@ -2,12 +2,25 @@
 const socket = (typeof io !== 'undefined') ? io() : null;
 window.eldoraSocket = socket;
 
+const ANIMACOES_PARADAS_ESPECIAIS = {
+    rinoceronte_m: {
+        textureKey: 'rinoceronte_m_parado',
+        assetPath: 'classes/animacoes_especiais/rinoceronte_parado.png'
+    }
+};
+window.ANIMACOES_PARADAS_ESPECIAIS = ANIMACOES_PARADAS_ESPECIAIS;
+
 class MapaScene extends Phaser.Scene {
     constructor() {
         super('MapaScene');
         this.target = new Phaser.Math.Vector2();
         this.isMoving = false;
         this.objetosInterativos = [];
+        this.skinBaseAtual = null;
+        this.direcaoParadaEspecial = 'down';
+        this.inicioParadoEspecial = null;
+        this.indiceParadoEspecial = 0;
+        this.animacaoParadaEspecialAtiva = false;
 
         // ==========================================
         // 🏰 EVENTOS DE DUNGEON
@@ -21,6 +34,11 @@ class MapaScene extends Phaser.Scene {
         this.isMoving = false;
         this.travadoNoPortal = true; // O jogador nasce ignorando portais
         this.graficosProntos = false;
+        this.skinBaseAtual = null;
+        this.direcaoParadaEspecial = 'down';
+        this.inicioParadoEspecial = null;
+        this.indiceParadoEspecial = 0;
+        this.animacaoParadaEspecialAtiva = false;
 
         // Controle da confirmação de saída da dungeon.
         this.confirmacaoTransicaoAberta = false;
@@ -178,6 +196,19 @@ class MapaScene extends Phaser.Scene {
         });
 
         this.load.spritesheet(this.skinAtiva, pathSkin, { frameWidth: fWidth, frameHeight: fHeight });
+
+        const animacaoParada = ANIMACOES_PARADAS_ESPECIAIS[nomeSkin];
+        if (animacaoParada) {
+            this.skinEspecialParadaId = nomeSkin;
+            this.load.spritesheet(
+                animacaoParada.textureKey,
+                `${GITHUB_ASSETS}${animacaoParada.assetPath}${cacheBuster}`,
+                { frameWidth: 128, frameHeight: 128 }
+            );
+        } else {
+            this.skinEspecialParadaId = null;
+        }
+
         this.load.spritesheet('aventureiro_base', pathFallback, { frameWidth: 48, frameHeight: 48 });
         
         this.load.spritesheet('explosao_sombria', '/static/assets/sprites/explosao_sombria.png', { frameWidth: 128, frameHeight: 128 });
@@ -518,6 +549,7 @@ class MapaScene extends Phaser.Scene {
         );
     
         const skinFinal = this.textures.exists(this.skinAtiva) ? this.skinAtiva : 'aventureiro_base';
+        this.skinBaseAtual = skinFinal;
         this.player = this.physics.add.sprite(27 * 32, 29 * 32, skinFinal);
         this.player.setCollideWorldBounds(true).setDepth(15);
 
@@ -2651,7 +2683,7 @@ class MapaScene extends Phaser.Scene {
         }, 300);
     }
     
-    update() {
+    update(time) {
 
         // ==========================================
         // 🖼️ PRIMEIRO FRAME DO NOVO MAPA
@@ -2704,6 +2736,8 @@ class MapaScene extends Phaser.Scene {
             window.__coliseuPvPAb
         ) {
 
+            this.cancelarAnimacaoParadaEspecial();
+            this.inicioParadoEspecial = null;
             this.isMoving = false;
 
             this.player?.body?.stop();
@@ -2767,6 +2801,9 @@ class MapaScene extends Phaser.Scene {
         }
 
         if (moveX !== 0 || moveY !== 0) {
+            this.cancelarAnimacaoParadaEspecial();
+            this.inicioParadoEspecial = null;
+
             // 🤖 AUTO CAÇADA
             // Movimento manual por teclado/joystick cancela a Auto Caçada.
             if (
@@ -2801,9 +2838,11 @@ class MapaScene extends Phaser.Scene {
             try {
                 let chave = '_' + this.player.texture.key;
                 if (Math.abs(moveX) > Math.abs(moveY)) { 
-                    moveX > 0 ? this.player.anims.play('right' + chave, true) : this.player.anims.play('left' + chave, true); 
+                    this.direcaoParadaEspecial = moveX > 0 ? 'right' : 'left';
+                    this.player.anims.play(this.direcaoParadaEspecial + chave, true);
                 } else { 
-                    moveY > 0 ? this.player.anims.play('down' + chave, true) : this.player.anims.play('up' + chave, true); 
+                    this.direcaoParadaEspecial = moveY > 0 ? 'down' : 'up';
+                    this.player.anims.play(this.direcaoParadaEspecial + chave, true);
                 }
             } catch(e) {}
             
@@ -2829,22 +2868,28 @@ class MapaScene extends Phaser.Scene {
                         const vyNovo = this.player.body.velocity.y;
 
                         try {
+                            this.cancelarAnimacaoParadaEspecial();
+                            this.inicioParadoEspecial = null;
                             let chave = '_' + this.player.texture.key;
                             if (Math.abs(vxNovo) > Math.abs(vyNovo)) { 
-                                vxNovo > 0 ? this.player.anims.play('right' + chave, true) : this.player.anims.play('left' + chave, true); 
+                                this.direcaoParadaEspecial = vxNovo > 0 ? 'right' : 'left';
+                                this.player.anims.play(this.direcaoParadaEspecial + chave, true);
                             } else { 
-                                vyNovo > 0 ? this.player.anims.play('down' + chave, true) : this.player.anims.play('up' + chave, true); 
+                                this.direcaoParadaEspecial = vyNovo > 0 ? 'down' : 'up';
+                                this.player.anims.play(this.direcaoParadaEspecial + chave, true);
                             }
                         } catch(e) {}
                     }
                 }
             } else {
-                // 🛑 AQUI ESTÁ A CORREÇÃO: O boneco fica 100% parado e olhando para frente
                 this.player.setVelocity(0, 0);
-                try {
-                    this.player.anims.stop();
-                    this.player.setFrame(1); // Frame padrão de "parado" na maioria dos seus sprites
-                } catch(e) {}
+                if (!this.atualizarAnimacaoParadaEspecial(time)) {
+                    try {
+                        this.player.anims.stop();
+                        this.player.setTexture(this.skinBaseAtual || this.skinAtiva);
+                        this.player.setFrame(1);
+                    } catch(e) {}
+                }
             }
         }
 
@@ -4276,11 +4321,135 @@ class MapaScene extends Phaser.Scene {
     }
 
     gerarAnimacoes(skin) {
-        if (this.anims.exists('down_' + skin)) return;
-        this.anims.create({ key: 'down_' + skin, frames: this.anims.generateFrameNumbers(skin, { start: 0, end: 2 }), frameRate: 10, repeat: -1 });
-        this.anims.create({ key: 'left_' + skin, frames: this.anims.generateFrameNumbers(skin, { start: 3, end: 5 }), frameRate: 10, repeat: -1 });
-        this.anims.create({ key: 'right_' + skin, frames: this.anims.generateFrameNumbers(skin, { start: 6, end: 8 }), frameRate: 10, repeat: -1 });
-        this.anims.create({ key: 'up_' + skin, frames: this.anims.generateFrameNumbers(skin, { start: 9, end: 11 }), frameRate: 10, repeat: -1 });
+        if (!this.anims.exists('down_' + skin)) {
+            this.anims.create({ key: 'down_' + skin, frames: this.anims.generateFrameNumbers(skin, { start: 0, end: 2 }), frameRate: 10, repeat: -1 });
+            this.anims.create({ key: 'left_' + skin, frames: this.anims.generateFrameNumbers(skin, { start: 3, end: 5 }), frameRate: 10, repeat: -1 });
+            this.anims.create({ key: 'right_' + skin, frames: this.anims.generateFrameNumbers(skin, { start: 6, end: 8 }), frameRate: 10, repeat: -1 });
+            this.anims.create({ key: 'up_' + skin, frames: this.anims.generateFrameNumbers(skin, { start: 9, end: 11 }), frameRate: 10, repeat: -1 });
+        }
+        this.criarAnimacoesParadaEspecial(skin);
+    }
+
+    criarAnimacoesParadaEspecial(skin) {
+        const config = ANIMACOES_PARADAS_ESPECIAIS[skin];
+        if (!config || !this.textures.exists(config.textureKey)) return;
+
+        this.skinEspecialParadaId = skin;
+        const inicioLinha = { down: 0, left: 3, right: 6, up: 9 };
+        for (const [direcao, inicio] of Object.entries(inicioLinha)) {
+            for (let colunaInicial = 0; colunaInicial < 3; colunaInicial++) {
+                const key = `parado_especial_${skin}_${direcao}_${colunaInicial}`;
+                if (this.anims.exists(key)) continue;
+                const frames = [0, 1, 2].map(offset => ({
+                    key: config.textureKey,
+                    frame: inicio + ((colunaInicial + offset) % 3)
+                }));
+                this.anims.create({ key, frames, frameRate: 6, repeat: 0 });
+            }
+        }
+    }
+
+    carregarAnimacaoParadaEspecial(skin) {
+        const config = ANIMACOES_PARADAS_ESPECIAIS[skin];
+        if (!config) {
+            this.skinEspecialParadaId = null;
+            this.cancelarAnimacaoParadaEspecial();
+            return;
+        }
+
+        this.skinEspecialParadaId = skin;
+        if (this.player) this.skinBaseAtual = skin;
+        this.garantirFolhaAnimacaoParadaEspecial(skin);
+    }
+
+    garantirFolhaAnimacaoParadaEspecial(skin, aoCarregar) {
+        const config = ANIMACOES_PARADAS_ESPECIAIS[skin];
+        if (!config) return;
+        if (this.textures.exists(config.textureKey)) {
+            this.criarAnimacoesParadaEspecial(skin);
+            if (aoCarregar) aoCarregar();
+            return;
+        }
+
+        if (!this.callbacksFolhasParadaEspecial) this.callbacksFolhasParadaEspecial = {};
+        if (aoCarregar) {
+            (this.callbacksFolhasParadaEspecial[skin] ||= []).push(aoCarregar);
+        }
+        if (this.carregandoSkinParadaEspecial === skin) return;
+
+        this.carregandoSkinParadaEspecial = skin;
+        const url = `https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/${config.assetPath}?v=${Date.now()}`;
+        this.load.once(`filecomplete-spritesheet-${config.textureKey}`, () => {
+            this.carregandoSkinParadaEspecial = null;
+            this.criarAnimacoesParadaEspecial(skin);
+            const callbacks = this.callbacksFolhasParadaEspecial?.[skin] || [];
+            delete this.callbacksFolhasParadaEspecial[skin];
+            callbacks.forEach(callback => callback());
+        });
+        this.load.once('loaderror', (file) => {
+            if (file.key !== config.textureKey) return;
+            this.carregandoSkinParadaEspecial = null;
+            delete this.callbacksFolhasParadaEspecial[skin];
+            console.warn(`Não foi possível carregar a animação especial de ${skin}: ${url}`);
+        });
+        this.load.spritesheet(config.textureKey, url, { frameWidth: 128, frameHeight: 128 });
+        this.load.start();
+    }
+
+    atualizarAnimacaoParadaEspecial(time) {
+        const skin = this.player?.texture?.key === this.skinBaseAtual
+            ? this.skinBaseAtual
+            : this.skinEspecialParadaId;
+        const config = ANIMACOES_PARADAS_ESPECIAIS[skin];
+        if (!config || !this.textures.exists(config.textureKey)) {
+            this.inicioParadoEspecial = null;
+            return false;
+        }
+
+        if (this.animacaoParadaEspecialAtiva) return true;
+        if (this.inicioParadoEspecial === null) {
+            this.inicioParadoEspecial = time;
+            return false;
+        }
+        if (time - this.inicioParadoEspecial < 4000) return false;
+
+        this.criarAnimacoesParadaEspecial(skin);
+        const colunaInicial = this.indiceParadoEspecial % 3;
+        const key = `parado_especial_${skin}_${this.direcaoParadaEspecial}_${colunaInicial}`;
+        if (!this.anims.exists(key)) return false;
+
+        this.indiceParadoEspecial = (this.indiceParadoEspecial + 1) % 3;
+        this.inicioParadoEspecial = time;
+        this.animacaoParadaEspecialAtiva = true;
+        this.player.play(key);
+        const eventoConclusao = `animationcomplete-${key}`;
+        if (this.callbackParadaEspecial) {
+            this.player.off(this.callbackParadaEspecial.evento, this.callbackParadaEspecial.handler);
+        }
+        const handlerConclusao = () => {
+            this.callbackParadaEspecial = null;
+            this.animacaoParadaEspecialAtiva = false;
+            if (!this.player || this.isMoving) return;
+            this.player.anims.stop();
+            this.player.setTexture(this.skinBaseAtual || skin);
+            this.player.setFrame(1);
+        };
+        this.callbackParadaEspecial = { evento: eventoConclusao, handler: handlerConclusao };
+        this.player.once(eventoConclusao, handlerConclusao);
+        return true;
+    }
+
+    cancelarAnimacaoParadaEspecial() {
+        if (!this.player) return;
+        if (this.callbackParadaEspecial) {
+            this.player.off(this.callbackParadaEspecial.evento, this.callbackParadaEspecial.handler);
+            this.callbackParadaEspecial = null;
+        }
+        if (!this.animacaoParadaEspecialAtiva) return;
+        this.player.anims.stop();
+        this.player.setTexture(this.skinBaseAtual || this.skinAtiva);
+        this.player.setFrame(1);
+        this.animacaoParadaEspecialAtiva = false;
     }
 
     tocarAnimacaoRenascimento() {

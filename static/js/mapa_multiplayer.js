@@ -419,6 +419,7 @@ class MotorMultiplayer {
                 // 🛑 A MÁGICA ESTÁ AQUI: Paramos as animações antes de apagar!
                 if (velho.movimentoTween) velho.movimentoTween.stop();
                 if (velho.textoTween) velho.textoTween.stop();
+                if (velho.animacaoParadaTimer) velho.animacaoParadaTimer.remove(false);
                 
                 // 💣 Apaga as partes visuais
                 if (velho.lapideAtiva) velho.lapideAtiva.destroy();
@@ -689,6 +690,8 @@ class MotorMultiplayer {
 
             this.scene.outrosJogadores.getChildren().forEach((outro) => {
                 if (outro.playerId === info.id) {
+
+                    this.cancelarParadaEspecialRemota(outro);
                     
                     // Se o jogador se moveu, destrói a lápide vinculada a ele
                     if (outro.lapideAtiva) {
@@ -708,6 +711,7 @@ class MotorMultiplayer {
                         outro.nomeTexto.setPosition(info.x, info.y - 25); 
                         outro.anims.stop(); 
                         outro.setFrame(1); 
+                        this.agendarParadaEspecialRemota(outro);
                         return; 
                     }
                     
@@ -717,6 +721,7 @@ class MotorMultiplayer {
                     
                     let dx = info.x - outro.x, dy = info.y - outro.y;
                     let animacao = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up');
+                    outro.direcaoParadaEspecial = animacao;
                     
                     let skinDele = outro.texture.key;
                     this.scene.gerarAnimacoes(skinDele); 
@@ -730,7 +735,12 @@ class MotorMultiplayer {
                         x: info.x, 
                         y: info.y, 
                         duration: duracaoTempo, 
-                        onComplete: () => { outro.anims.stop(); outro.setFrame(1); } 
+                        onComplete: () => {
+                            outro.anims.stop();
+                            outro.setTexture(outro.skinBaseKey || outro.texture.key);
+                            outro.setFrame(1);
+                            this.agendarParadaEspecialRemota(outro);
+                        }
                     });
                     
                     outro.textoTween = this.scene.tweens.add({ 
@@ -1325,6 +1335,9 @@ class MotorMultiplayer {
         ).setDepth(15);
 
         outro.playerId = id;
+        outro.skinBaseKey = skinDesejada;
+        outro.direcaoParadaEspecial = 'down';
+        outro.indiceParadaEspecial = 0;
 
         // 🔥 MESMO TAMANHO DO JOGADOR PRINCIPAL
         outro.setDisplaySize(48, 48);
@@ -1365,6 +1378,57 @@ class MotorMultiplayer {
         });
 
         this.scene.outrosJogadores.add(outro);
+
+        if (window.ANIMACOES_PARADAS_ESPECIAIS?.[skinDesejada]) {
+            this.scene.garantirFolhaAnimacaoParadaEspecial(skinDesejada, () => {
+                if (outro.active) this.agendarParadaEspecialRemota(outro);
+            });
+        }
+    }
+
+    cancelarParadaEspecialRemota(jogador) {
+        if (jogador.animacaoParadaTimer) {
+            jogador.animacaoParadaTimer.remove(false);
+            jogador.animacaoParadaTimer = null;
+        }
+        if (!jogador.animacaoParadaEspecialAtiva) return;
+        if (jogador.callbackParadaEspecial) {
+            jogador.off(jogador.callbackParadaEspecial.evento, jogador.callbackParadaEspecial.handler);
+            jogador.callbackParadaEspecial = null;
+        }
+        jogador.anims.stop();
+        jogador.setTexture(jogador.skinBaseKey || jogador.texture.key);
+        jogador.setFrame(1);
+        jogador.animacaoParadaEspecialAtiva = false;
+    }
+
+    agendarParadaEspecialRemota(jogador) {
+        if (!jogador.active || !window.ANIMACOES_PARADAS_ESPECIAIS?.[jogador.skinBaseKey]) return;
+        if (jogador.animacaoParadaTimer) jogador.animacaoParadaTimer.remove(false);
+        jogador.animacaoParadaTimer = this.scene.time.delayedCall(4000, () => {
+            jogador.animacaoParadaTimer = null;
+            if (!jogador.active || jogador.movimentoTween?.isPlaying()) return;
+
+            const colunaInicial = (jogador.indiceParadaEspecial || 0) % 3;
+            const key = `parado_especial_${jogador.skinBaseKey}_${jogador.direcaoParadaEspecial || 'down'}_${colunaInicial}`;
+            if (!this.scene.anims.exists(key)) return;
+
+            jogador.indiceParadaEspecial = (colunaInicial + 1) % 3;
+            jogador.animacaoParadaEspecialAtiva = true;
+            jogador.play(key);
+            const eventoConclusao = `animationcomplete-${key}`;
+            const handlerConclusao = () => {
+                jogador.callbackParadaEspecial = null;
+                jogador.animacaoParadaEspecialAtiva = false;
+                if (!jogador.active || jogador.movimentoTween?.isPlaying()) return;
+                jogador.anims.stop();
+                jogador.setTexture(jogador.skinBaseKey);
+                jogador.setFrame(1);
+                this.agendarParadaEspecialRemota(jogador);
+            };
+            jogador.callbackParadaEspecial = { evento: eventoConclusao, handler: handlerConclusao };
+            jogador.once(eventoConclusao, handlerConclusao);
+        });
     }
 }
 // ==========================================
