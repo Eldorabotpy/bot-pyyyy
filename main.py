@@ -3253,12 +3253,22 @@ def loop_agendamento_invasao():
 
 
 def loop_agendamento_coliseu():
-    """Fecha eventos e temporadas mesmo quando nenhum jogador abre o painel."""
+    """Mantém agendamentos de eventos e temporadas sem depender de jogadores online."""
     global fila_coliseu_evento_id
     while True:
         try:
             finalizar_eventos_encerrados(users_collection, duelos_ativos)
-            from modules.events.dynamic_event_service import close_expired_events
+            from modules.events.dynamic_event_service import (
+                close_expired_events,
+                ensure_monthly_invasion_events,
+            )
+            for event in ensure_monthly_invasion_events():
+                app.logger.info(
+                    "Invasão Sombria mensal criada/agendada: %s (%s → %s)",
+                    event.get("event_key"),
+                    event.get("starts_at"),
+                    event.get("ends_at"),
+                )
             close_expired_events()
             ensure_active_season(users_collection, duelos_ativos)
             filas_evento_encerradas = []

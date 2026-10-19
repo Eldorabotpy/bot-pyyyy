@@ -6,12 +6,38 @@ from modules.events.dynamic_event_service import (
     DEFAULT_TIERS,
     EventError,
     ITEMS_DATA,
+    monthly_invasion_windows,
     normalize_config,
     points_after_daily_cap,
 )
 
 
 class DynamicEventConfigTests(unittest.TestCase):
+    def test_monthly_invasion_runs_first_seven_days_in_sao_paulo(self):
+        windows = monthly_invasion_windows(datetime(2026, 11, 5, 12, tzinfo=timezone.utc))
+        self.assertEqual(
+            [(row["event_key"], row["starts_at"], row["ends_at"]) for row in windows],
+            [
+                (
+                    "invasao-sombria-mensal-202611",
+                    datetime(2026, 11, 1, 3, tzinfo=timezone.utc),
+                    datetime(2026, 11, 8, 3, tzinfo=timezone.utc),
+                ),
+                (
+                    "invasao-sombria-mensal-202612",
+                    datetime(2026, 12, 1, 3, tzinfo=timezone.utc),
+                    datetime(2026, 12, 8, 3, tzinfo=timezone.utc),
+                ),
+            ],
+        )
+
+    def test_monthly_invasion_skips_elapsed_window_and_rolls_year(self):
+        windows = monthly_invasion_windows(datetime(2026, 12, 20, tzinfo=timezone.utc))
+        self.assertEqual(len(windows), 1)
+        self.assertEqual(windows[0]["event_key"], "invasao-sombria-mensal-202701")
+        self.assertEqual(windows[0]["starts_at"], datetime(2027, 1, 1, 3, tzinfo=timezone.utc))
+        self.assertEqual(windows[0]["ends_at"], datetime(2027, 1, 8, 3, tzinfo=timezone.utc))
+
     def test_default_invasion_has_five_progression_milestones(self):
         config = normalize_config({
             "title": "A Invasão Sombria",

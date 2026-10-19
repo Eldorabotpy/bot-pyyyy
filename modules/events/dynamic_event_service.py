@@ -1,8 +1,9 @@
 """Persistent, server-authoritative dynamic events for Eldora."""
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, time as datetime_time, timedelta, timezone
 from hashlib import sha256
+from zoneinfo import ZoneInfo
 
 from bson import ObjectId
 from pymongo import ReturnDocument
@@ -31,6 +32,8 @@ DEFAULT_CORRUPTION = {
     "modifiers": {"hp": 2.0, "attack": 2.0, "defense": 2.0, "xp": 1.15},
     "essence_drop_chance": 8,
 }
+INVASION_TIMEZONE = ZoneInfo("America/Sao_Paulo")
+INVASION_DURATION_DAYS = 7
 
 
 class EventError(ValueError):
@@ -223,6 +226,76 @@ def create_event(data: dict):
     }
     result = EVENTS.insert_one(doc)
     return _public({**doc, "_id": result.inserted_id})
+
+
+def monthly_invasion_windows(now=None):
+    """Return the current occurrence (if not over) and the next one in São Paulo time."""
+    now = now or utcnow()
+    if now.tzinfo is None:
+        now = now.replace(tzinfo=timezone.utc)
+    local_now = now.astimezone(INVASION_TIMEZONE)
+    month_start = datetime.combine(
+        local_now.date().replace(day=1), datetime_time.min, tzinfo=INVASION_TIMEZONE
+    )
+    next_month_start = (
+        month_start.replace(year=month_start.year + 1, month=1)
+        if month_start.month == 12
+        else month_start.replace(month=month_start.month + 1)
+    )
+
+    windows = []
+    for start_local in (month_start, next_month_start):
+        end_local = start_local + timedelta(days=INVASION_DURATION_DAYS)
+        if start_local == month_start and local_now >= end_local:
+            continue
+        windows.append({
+            "event_key": f"invasao-sombria-mensal-{start_local:%Y%m}",
+            "starts_at": start_local.astimezone(timezone.utc),
+            "ends_at": end_local.astimezone(timezone.utc),
+        })
+    return windows
+
+
+def ensure_monthly_invasion_events(now=None):
+    """Idempotently create this month's invasion and pre-schedule next month's."""
+    if EVENTS is None:
+        return []
+    ensure_indexes()
+    created = []
+    for window in monthly_invasion_windows(now):
+        if EVENTS.find_one({"event_key": window["event_key"]}):
+            continue
+        # Never overlap an existing one-off or recurring Invasão Sombria.
+        overlap = EVENTS.find_one({
+            "event_key": {"$regex": "^invasao-sombria-"},
+            "state": {"$in": ["scheduled", "active"]},
+            "starts_at": {"$lt": window["ends_at"]},
+            "ends_at": {"$gt": window["starts_at"]},
+        })
+        if overlap:
+            continue
+        try:
+            created.append(create_event({
+                **window,
+                "title": "A Invasão Sombria",
+                "description": "Criaturas corrompidas ameaçam Eldora. Una forças para estabilizar a fenda e conquiste recompensas pessoais e coletivas.",
+                "global_goal": 5000,
+                "daily_cap": 150,
+                "min_level": 1,
+                "rules": {"creature": 1, "elite": 5, "dungeon": 0, "event_boss": 0},
+                "corruption": {
+                    "enabled": True,
+                    "chance": 15,
+                    "portal_enabled": True,
+                    "modifiers": {"hp": 2.0, "attack": 2.0, "defense": 2.0, "xp": 1.15},
+                    "essence_drop_chance": 8,
+                },
+            }))
+        except Exception as exc:
+            # The unique event key also protects against two workers creating it together.
+            if exc.__class__.__name__ != "DuplicateKeyError":
+                raise
+    return created
 
 
 def update_event(event_id, data):
