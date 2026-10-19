@@ -21,6 +21,7 @@ class MapaScene extends Phaser.Scene {
         this.inicioParadoEspecial = null;
         this.indiceParadoEspecial = 0;
         this.animacaoParadaEspecialAtiva = false;
+        this.timerPoseParadaEspecial = null;
 
         // ==========================================
         // 🏰 EVENTOS DE DUNGEON
@@ -39,6 +40,7 @@ class MapaScene extends Phaser.Scene {
         this.inicioParadoEspecial = null;
         this.indiceParadoEspecial = 0;
         this.animacaoParadaEspecialAtiva = false;
+        this.timerPoseParadaEspecial = null;
 
         // Controle da confirmação de saída da dungeon.
         this.confirmacaoTransicaoAberta = false;
@@ -4413,37 +4415,29 @@ class MapaScene extends Phaser.Scene {
         }
         if (time - this.inicioParadoEspecial < 4000) return false;
 
-        this.criarAnimacoesParadaEspecial(skin);
-        const colunaInicial = this.indiceParadoEspecial % 3;
-        const key = `parado_especial_${skin}_${this.direcaoParadaEspecial}_${colunaInicial}`;
-        if (!this.anims.exists(key)) return false;
-
-        this.indiceParadoEspecial = (this.indiceParadoEspecial + 1) % 3;
-        this.inicioParadoEspecial = time;
+        const coluna = this.indiceParadoEspecial % 3;
+        const linha = { down: 0, left: 3, right: 6, up: 9 }[this.direcaoParadaEspecial] ?? 0;
+        this.indiceParadoEspecial = (coluna + 1) % 3;
         this.animacaoParadaEspecialAtiva = true;
-        this.player.play(key);
-        const eventoConclusao = `animationcomplete-${key}`;
-        if (this.callbackParadaEspecial) {
-            this.player.off(this.callbackParadaEspecial.evento, this.callbackParadaEspecial.handler);
-        }
-        const handlerConclusao = () => {
-            this.callbackParadaEspecial = null;
+        this.player.anims.stop();
+        this.player.setTexture(config.textureKey);
+        this.player.setFrame(linha + coluna);
+        this.timerPoseParadaEspecial = this.time.delayedCall(800, () => {
+            this.timerPoseParadaEspecial = null;
             this.animacaoParadaEspecialAtiva = false;
             if (!this.player || this.isMoving) return;
-            this.player.anims.stop();
             this.player.setTexture(this.skinBaseAtual || skin);
             this.player.setFrame(1);
-        };
-        this.callbackParadaEspecial = { evento: eventoConclusao, handler: handlerConclusao };
-        this.player.once(eventoConclusao, handlerConclusao);
+            this.inicioParadoEspecial = this.time.now;
+        });
         return true;
     }
 
     cancelarAnimacaoParadaEspecial() {
         if (!this.player) return;
-        if (this.callbackParadaEspecial) {
-            this.player.off(this.callbackParadaEspecial.evento, this.callbackParadaEspecial.handler);
-            this.callbackParadaEspecial = null;
+        if (this.timerPoseParadaEspecial) {
+            this.timerPoseParadaEspecial.remove(false);
+            this.timerPoseParadaEspecial = null;
         }
         if (!this.animacaoParadaEspecialAtiva) return;
         this.player.anims.stop();

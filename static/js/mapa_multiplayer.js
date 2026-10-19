@@ -420,6 +420,7 @@ class MotorMultiplayer {
                 if (velho.movimentoTween) velho.movimentoTween.stop();
                 if (velho.textoTween) velho.textoTween.stop();
                 if (velho.animacaoParadaTimer) velho.animacaoParadaTimer.remove(false);
+                if (velho.timerPoseParadaEspecial) velho.timerPoseParadaEspecial.remove(false);
                 
                 // 💣 Apaga as partes visuais
                 if (velho.lapideAtiva) velho.lapideAtiva.destroy();
@@ -1461,6 +1462,10 @@ class MotorMultiplayer {
             jogador.animacaoParadaTimer.remove(false);
             jogador.animacaoParadaTimer = null;
         }
+        if (jogador.timerPoseParadaEspecial) {
+            jogador.timerPoseParadaEspecial.remove(false);
+            jogador.timerPoseParadaEspecial = null;
+        }
         if (!jogador.animacaoParadaEspecialAtiva) return;
         if (jogador.callbackParadaEspecial) {
             jogador.off(jogador.callbackParadaEspecial.evento, jogador.callbackParadaEspecial.handler);
@@ -1479,25 +1484,23 @@ class MotorMultiplayer {
             jogador.animacaoParadaTimer = null;
             if (!jogador.active || jogador.movimentoTween?.isPlaying()) return;
 
-            const colunaInicial = (jogador.indiceParadaEspecial || 0) % 3;
-            const key = `parado_especial_${jogador.skinBaseKey}_${jogador.direcaoParadaEspecial || 'down'}_${colunaInicial}`;
-            if (!this.scene.anims.exists(key)) return;
-
-            jogador.indiceParadaEspecial = (colunaInicial + 1) % 3;
+            const config = window.ANIMACOES_PARADAS_ESPECIAIS[jogador.skinBaseKey];
+            if (!this.scene.textures.exists(config.textureKey)) return;
+            const coluna = jogador.indiceParadaEspecial % 3;
+            const linha = { down: 0, left: 3, right: 6, up: 9 }[jogador.direcaoParadaEspecial || 'down'] ?? 0;
+            jogador.indiceParadaEspecial = (coluna + 1) % 3;
             jogador.animacaoParadaEspecialAtiva = true;
-            jogador.play(key);
-            const eventoConclusao = `animationcomplete-${key}`;
-            const handlerConclusao = () => {
-                jogador.callbackParadaEspecial = null;
+            jogador.anims.stop();
+            jogador.setTexture(config.textureKey);
+            jogador.setFrame(linha + coluna);
+            jogador.timerPoseParadaEspecial = this.scene.time.delayedCall(800, () => {
+                jogador.timerPoseParadaEspecial = null;
                 jogador.animacaoParadaEspecialAtiva = false;
                 if (!jogador.active || jogador.movimentoTween?.isPlaying()) return;
-                jogador.anims.stop();
                 jogador.setTexture(jogador.skinBaseKey);
                 jogador.setFrame(1);
                 this.agendarParadaEspecialRemota(jogador);
-            };
-            jogador.callbackParadaEspecial = { evento: eventoConclusao, handler: handlerConclusao };
-            jogador.once(eventoConclusao, handlerConclusao);
+            });
         });
     }
 }
