@@ -1040,11 +1040,7 @@ def iniciar_combate():
         return jsonify({"estado": estado, "grupo": False})
 
     except Exception:
-        import traceback
-        print(
-            "🚨 Erro ao iniciar combate:\n"
-            + traceback.format_exc()
-        )
+        app.logger.exception("Erro ao iniciar combate")
         return jsonify({"erro": "Falha mágica no servidor!"}), 500
 
 @app.route('/api/combate/grupo/pronto', methods=['POST'])
