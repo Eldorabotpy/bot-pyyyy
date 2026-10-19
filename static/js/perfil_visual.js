@@ -12,6 +12,7 @@ window.CATALOGO_SISTEMA = {
     skins: {
         'aventureiro_masculino': { nome: 'Corpo Aventureiro', path: `${GITHUB_BASE}corpo_completo/aventureiro_m_full.png` },
         'aventureiro_feminino':  { nome: 'Corpo Aventureira', path: `${GITHUB_BASE}corpo_completo/aventureiro_f_full.png` },
+        'rinoceronte_m': { nome: 'Rinoceronte de Magma (M)', path: `${GITHUB_BASE}corpo_completo/rinoceronte_m_full.png` },
         'skin_xiongmaoren_s1_m': { nome: 'Corpo Panda M', path: `${GITHUB_BASE}corpo_completo/skin_xiongmaoren_s1_m_full.png` },
         'skin_xiongmaoren_s1_f': { nome: 'Corpo Panda F', path: `${GITHUB_BASE}corpo_completo/skin_xiongmaoren_s1_f_full.png` }
     },
@@ -105,8 +106,6 @@ class PerfilVisual {
         });
 
         // 4. Montar Skins de Corpo
-        let htmlSkins = '';
-
         const classeEhInicial =
             classeDoBanco === 'aprendiz' ||
             classeDoBanco === 'aventureiro';
@@ -118,11 +117,25 @@ class PerfilVisual {
             'aventureiro_feminino'
         ];
 
-        let listaSkinsBruta = [
-            ...(classeEhInicial ? [baseAventureiroId] : []),
-            minhaClasseId,
-            ...(p.unlocked_skins || [])
-        ];
+        const skinPadraoId = classeEhInicial ? baseAventureiroId : minhaClasseId;
+        const nomeClasseVisual = classeDoBanco.charAt(0).toUpperCase() + classeDoBanco.slice(1);
+        const nomeGeneroVisual = generoCurto === 'm' ? 'M' : 'F';
+        const skinPadrao = {
+            nome: `Corpo Padrão · ${nomeClasseVisual} (${nomeGeneroVisual})`,
+            path: `${GITHUB_BASE}corpo_completo/${skinPadraoId}_full.png`
+        };
+        const padraoSelecionado =
+            !p.equipped_skin ||
+            p.equipped_skin === 'padrao' ||
+            p.equipped_skin === skinPadraoId;
+
+        let htmlSkins = `
+            <div class="card-opcao ${padraoSelecionado ? 'selecionado' : ''}" id="sk-${skinPadraoId}" onclick="perfilVisual.selecionar('skin', '${skinPadraoId}')">
+                <img src="${skinPadrao.path}" alt="${skinPadrao.nome}" onerror="this.src='https://placehold.co/45x85/111/f39c12?text=?'">
+                <span>${skinPadrao.nome}</span>
+            </div>`;
+
+        let listaSkinsBruta = [...(p.unlocked_skins || [])];
 
         const skinsParaExibir = [...new Set(listaSkinsBruta)]
             .filter(filtroGenero)
@@ -134,7 +147,7 @@ class PerfilVisual {
         skinsParaExibir.forEach(id => {
             const info = CATALOGO_SISTEMA.skins[id];
             if (!info) return; 
-            const isSel = (p.equipped_skin === id || (id === baseAventureiroId && (!p.equipped_skin || p.equipped_skin === 'padrao'))) ? 'selecionado' : '';
+            const isSel = p.equipped_skin === id ? 'selecionado' : '';
             
             htmlSkins += `
                 <div class="card-opcao ${isSel}" id="sk-${id}" onclick="perfilVisual.selecionar('skin', '${id}')">

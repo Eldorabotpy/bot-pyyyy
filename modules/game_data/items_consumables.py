@@ -129,6 +129,20 @@ CONSUMABLES_DATA = {
         "stackable": True,
         "tradable": False # 🔴 BLOQUEADO
     },
+    "fragmento_skin": {
+        "display_name": "Fragmento de Skin",
+        "emoji": "✨",
+        "type": "currency",
+        "category": "consumivel",
+        "description": "Fragmento usado para resgatar skins no Ateliê de Skins.",
+        "icon_url": (
+            "https://raw.githubusercontent.com/"
+            "Eldorabotpy/static-img/main/assets/"
+            "itens/consumiveis/fragmento_skin.png"
+        ),
+        "stackable": True,
+        "tradable": False,
+    },
     # ============================================================
     # 📜 ITEM DE HISTÓRIA — GUILDA DOS AVENTUREIROS
     # ============================================================

@@ -23,6 +23,9 @@ window.FORJA_IMAGENS = {
   "fragmento_bravura": [
     "consumiveis/fragmento_bravura.png"
   ],
+  "fragmento_skin": [
+    "consumiveis/fragmento_skin.png"
+  ],
   "frasco_com_agua": [
     "consumiveis/frasco_com_agua.png",
     "materiais/frasco_com_agua.png"

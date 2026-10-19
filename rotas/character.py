@@ -65,7 +65,25 @@ def atualizar_perfil_custom():
         atualizacao = {}
         if id_avatar: atualizacao["avatar_customizado"] = id_avatar
         if id_banner: atualizacao["banner_customizado"] = id_banner
-        if id_skin:   atualizacao["equipped_skin"] = id_skin
+
+        # Selecionar o corpo padrão remove a skin equipada. Skins especiais só
+        # podem ser equipadas se estiverem desbloqueadas para este personagem.
+        genero_curto = "f" if str(jogador.get("gender", "masculino")).lower() in {"f", "feminino", "female"} else "m"
+        classe_padrao = str(jogador.get("class", "aventureiro")).lower()
+        if classe_padrao in {"aprendiz", "aventureiro"}:
+            skin_padrao_id = "aventureiro_feminino" if genero_curto == "f" else "aventureiro_masculino"
+        else:
+            skin_padrao_id = f"{classe_padrao}_{genero_curto}"
+
+        if id_skin in (None, "", "padrao", skin_padrao_id):
+            atualizacao["equipped_skin"] = None
+        else:
+            if id_skin not in (jogador.get("unlocked_skins") or []):
+                return jsonify({"sucesso": False, "erro": "Você não possui esta skin."}), 403
+            genero_skin = "f" if str(id_skin).endswith("_f") else "m" if str(id_skin).endswith("_m") else None
+            if genero_skin and genero_skin != genero_curto:
+                return jsonify({"sucesso": False, "erro": "Esta skin não corresponde ao gênero do personagem."}), 403
+            atualizacao["equipped_skin"] = id_skin
         
         if atualizacao:
             users_collection.update_one({"_id": ObjectId(user_id)}, {"$set": atualizacao})
