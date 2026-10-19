@@ -54,9 +54,10 @@ class MapaScene extends Phaser.Scene {
         if (this.portalSombrio?.eventId === String(event.id)) return;
         this.removerPortalSombrio();
 
-        // A praça central da Capital é uma área caminhável no mapa atual.
-        const x = 30 * 32;
-        const y = 26 * 32;
+        // Fica ao lado do portal de região já existente na Capital,
+        // mantendo o caminho livre e sem sobrepor o objeto original.
+        const x = 48.5 * 32;
+        const y = 11.5 * 32;
         const portal = this.add.container(x, y).setDepth(y + 8);
         portal.eventId = String(event.id);
 
