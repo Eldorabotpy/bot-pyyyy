@@ -77,217 +77,7 @@ class GerenciadorInvasao:
         self.monstros_vivos = {}
         self.registro_dano = {}  
         self.eliminados = []     
-        self.jogadores_ativos = 0 
-        self.ids_jogadores_evento = []
-        self.frentes_ativas = []
-        self.frentes_em_raid = set()
-        self.frentes_concluidas = set()
-        self.frentes_perdidas = set()
-        self.onda_em_transicao = False
-        self.contador_invocacoes = 0
-        self.recompensas_raid_entregues = set()
-
-    def _jogadores_por_frente_estimado(self):
-        total_jogadores = int(getattr(self, "jogadores_ativos", 1) or 1)
-        total_jogadores = max(1, min(MAX_JOGADORES_INVASAO, total_jogadores))
-
-        total_frentes = len(getattr(self, "frentes_ativas", []) or [])
-        total_frentes = max(1, total_frentes)
-
-        return max(
-            1,
-            min(
-                MAX_MEMBROS_POR_FRENTE,
-               (total_jogadores + total_frentes - 1) // total_frentes
-            )
-        )
-
-
-    def _calcular_balanceamento_frente(self, numero_onda):
-        onda = max(1, int(numero_onda or 1))
-        jogadores = self._jogadores_por_frente_estimado()
-
-        fator_onda_hp_boss = 1.0 + ((onda - 1) * 0.35)
-        fator_onda_hp_minion = 1.0 + ((onda - 1) * 0.25)
-
-        boss_hp_mult = (
-            BALANCE_INVASAO["boss_hp_base"] +
-            jogadores * BALANCE_INVASAO["boss_hp_por_jogador"]
-        ) * fator_onda_hp_boss
-
-        minion_hp_mult = (
-            BALANCE_INVASAO["minion_hp_base"] +
-            jogadores * BALANCE_INVASAO["minion_hp_por_jogador"]
-        ) * fator_onda_hp_minion
-
-        atk_mult = (
-            1.0 +
-            ((onda - 1) * BALANCE_INVASAO["atk_onda"]) +
-            ((jogadores - 1) * BALANCE_INVASAO["atk_jogador"])
-        )
-
-        def_mult = 1.0 + ((onda - 1) * BALANCE_INVASAO["def_onda"])
-
-        minions_iniciais = min(
-            BALANCE_INVASAO["minions_max"],
-            max(BALANCE_INVASAO["minions_min"], jogadores + 2)
-        )
-
-        limite_minions = min(
-            BALANCE_INVASAO["limite_minions_max"],
-            max(BALANCE_INVASAO["limite_minions_min"], jogadores + 4)
-        )
-
-        invocar_por_ciclo = 1
-        if jogadores >= 3:
-            invocar_por_ciclo = 2
-        if jogadores >= 5 and onda >= 3:
-            invocar_por_ciclo = 3
-
-        intervalo_invocacao = max(10.0, 18.0 - (onda * 1.5))
-        intervalo_aoe = max(12.0, 20.0 - (onda * 1.5))
-        raio_aoe = min(170, 115 + (onda * 10))
-
-        return {
-            "jogadores": jogadores,
-            "boss_hp_mult": boss_hp_mult,
-            "minion_hp_mult": minion_hp_mult,
-            "atk_mult": atk_mult,
-            "def_mult": def_mult,
-            "minions_iniciais": minions_iniciais,
-            "limite_minions": limite_minions,
-            "invocar_por_ciclo": invocar_por_ciclo,
-            "intervalo_invocacao": intervalo_invocacao,
-            "intervalo_aoe": intervalo_aoe,
-            "raio_aoe": raio_aoe,
-        }
-
-
-    def _extrair_ids_online(self, jogadores_online):
-        ids = []
-
-        if isinstance(jogadores_online, dict):
-            for _, info in jogadores_online.items():
-                if isinstance(info, dict):
-                    char_id = info.get("char_id") or info.get("player_id") or info.get("id")
-                    if char_id:
-                        ids.append(str(char_id))
-                elif info:
-                    ids.append(str(info))
-
-        elif isinstance(jogadores_online, list):
-            for info in jogadores_online:
-                if isinstance(info, dict):
-                    char_id = info.get("char_id") or info.get("player_id") or info.get("id")
-                    if char_id:
-                        ids.append(str(char_id))
-                elif info:
-                    ids.append(str(info))
-
-        ids_unicos = []
-        vistos = set()
-
-        for pid in ids:
-            if pid not in vistos:
-                vistos.add(pid)
-                ids_unicos.append(pid)
-
-        return ids_unicos[:MAX_JOGADORES_INVASAO]
-
-
-    def _preparar_escalonamento_invasao(self, jogadores_online):
-        self.ids_jogadores_evento = self._extrair_ids_online(jogadores_online)
-
-        qtd = len(self.ids_jogadores_evento)
-        self.jogadores_ativos = max(1, min(MAX_JOGADORES_INVASAO, qtd))
-
-        qtd_frentes = max(
-            1,
-            min(
-                MAX_GRUPOS_INVASAO,
-                (self.jogadores_ativos + MAX_MEMBROS_POR_FRENTE - 1) // MAX_MEMBROS_POR_FRENTE
-            )
-        )
-
-        self.frentes_ativas = FRENTES_INVASAO[:qtd_frentes]
-        self.frentes_em_raid = set()
-        self.frentes_concluidas = set()
-        self.frentes_perdidas = set()
-
-        return self.frentes_ativas
-
-
-    def _obter_dados_mob_db(self, mob_id):
-        from modules.game_data.monsters import MONSTERS_DATA
-
-        for mob in MONSTERS_DATA.get("defesa_reino", []):
-            if mob.get("id") == mob_id:
-                return mob
-
-        return {}
-
-
-    def _posicao_minion_frente(self, frente, indice):
-        espalhamento = [
-            (-90, -50), (-45, -75), (0, -90), (45, -75), (90, -50),
-            (-100, 20), (-55, 45), (0, 60), (55, 45), (100, 20),
-        ]
-
-        dx, dy = espalhamento[indice % len(espalhamento)]
-
-        return (
-            int(frente["x"] + dx + random.randint(-12, 12)),
-            int(frente["y"] + dy + random.randint(-12, 12)),
-        )
-
-
-    def _emitir_status_frentes(self):
-        frentes_payload = []
-
-        for frente in getattr(self, "frentes_ativas", []) or []:
-            fid = frente.get("id")
-
-            status = "aberta"
-            if fid in getattr(self, "frentes_em_raid", set()):
-                status = "em_combate"
-            elif fid in getattr(self, "frentes_concluidas", set()):
-                status = "defendida"
-            elif fid in getattr(self, "frentes_perdidas", set()):
-                status = "perdida"
-
-            frentes_payload.append({
-                "id": fid,
-                "nome": frente.get("nome", fid),
-                "status": status
-            })
-
-        self.socketio.emit("statusInvasaoFrentes", {
-            "ativo": bool(self.evento_ativo),
-            "onda": int(getattr(self, "onda_atual", 1) or 1),
-            "total_frentes": len(frentes_payload),
-            "defendidas": len(getattr(self, "frentes_concluidas", set())),
-            "perdidas": len(getattr(self, "frentes_perdidas", set())),
-            "em_raid": len(getattr(self, "frentes_em_raid", set())),
-            "frentes": frentes_payload
-        })
-
-    def agendar_invasao(self, jogadores_online):
-        if self.evento_ativo or self.preparacao_ativa: return
-        
-        self.preparacao_ativa = True
-        duracao_prep = 600 # 10 minutos
-        self.tempo_final_evento = time.time() + duracao_prep
-        
-        # Enviamos o tempo final para o JS se sincronizar
-        self.socketio.emit('alertaInvasao', {
-            "mensagem": "A INVASÃO COMEÇARÁ EM 10 MINUTOS!",
-            "tempo_restante": duracao_prep 
-        })
-        
-        threading.Timer(duracao_prep, self.iniciar_invasao, args=[jogadores_online]).start()
-        
-    def iniciar_invasao(self, jogadores_online):
-        if self.evento_ativo:
+        self.jogadoresento_ativo:
             return
 
         self.evento_ativo = True
@@ -1549,6 +1339,27 @@ class GerenciadorInvasao:
                 resultado = "vitoria"
             else:
                 resultado = "derrota"
+
+        # Raid de invasão é a única atividade do sistema atual que confirma
+        # uma vitória coletiva contra um chefe comunitário.
+        if resultado == "vitoria":
+            try:
+                from modules.events.dynamic_event_service import contribute
+                raid_id = str(raid_state.get("raid_id") or "")
+                participacao = raid_state.get("participacao", {}) or {}
+                for player_id, dados_part in (participacao.items() if raid_id else []):
+                    dados_part = dados_part or {}
+                    if int(dados_part.get("dano", 0) or 0) <= 0 and int(dados_part.get("turnos", 0) or 0) <= 0:
+                        continue
+                    contribute(
+                        str(player_id),
+                        f"event-boss:{raid_id}",
+                        "event_boss",
+                        origin="invasion_raid",
+                    )
+            except Exception:
+                import traceback
+                print("⚠️ Falha ao registrar chefe de invasão no evento dinâmico:\n" + traceback.format_exc())
 
         if not hasattr(self, "frentes_em_raid"):
             self.frentes_em_raid = set()
