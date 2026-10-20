@@ -10,22 +10,28 @@
 #ui-mercado button:focus-visible, #ui-mercado input:focus-visible, #ui-mercado select:focus-visible { outline:2px solid #d6b777; outline-offset:2px; }
 #ui-mercado .mercado-close { margin-left:auto; background:#ffffff06; color:#aab8ca; border:1px solid #ffffff14; border-radius:10px; width:36px; height:36px; flex-shrink:0; font-size:24px; padding:0; }
 #ui-mercado .mercado-tabs { display:flex; gap:8px; padding:10px 16px; background:linear-gradient(180deg,#080f1bd9,#080f1b99); border-bottom:1px solid #ffffff0b; }
-#ui-mercado .tab-mercado { position:relative; flex:1; min-width:0; min-height:54px; padding:7px 9px; border:1px solid #344156; border-radius:12px; background:linear-gradient(145deg,#172337,#0d1625); color:#aebbd0; display:flex; align-items:center; justify-content:flex-start; gap:8px; text-align:left; transition:background .18s ease,border-color .18s ease,color .18s ease,transform .18s ease,box-shadow .18s ease; }
-#ui-mercado .tab-mercado:hover { color:#f1f5fb; border-color:#71809a; background:linear-gradient(145deg,#1d2b40,#111c2d); transform:translateY(-1px); }
-#ui-mercado .tab-mercado[aria-selected="true"] { background:linear-gradient(140deg,#5b4828,#27251f 78%); border-color:#e2bc68; color:#ffdfa0; box-shadow:inset 0 1px #fff4d033,0 4px 14px #0005,0 0 0 1px #e2bc681c; }
-#ui-mercado .tab-mercado-gemas[aria-selected="true"] { background:linear-gradient(140deg,#193f62,#142337 78%); border-color:#67b8f4; color:#bce4ff; box-shadow:inset 0 1px #e4f5ff24,0 4px 14px #0005,0 0 0 1px #67b8f424; }
-#ui-mercado .tab-mercado-anunciar { border-color:#675334; background:linear-gradient(145deg,#30291e,#151b25); color:#e2c68e; }
-#ui-mercado .tab-mercado-anunciar[aria-selected="true"] { background:linear-gradient(140deg,#76551e,#302619 78%); border-color:#f0c56b; color:#ffe3a8; box-shadow:inset 0 1px #fff4d033,0 4px 14px #0005,0 0 0 1px #e2bc681c; }
-#ui-mercado .mercado-tab-icon { width:30px; height:30px; flex:0 0 30px; display:grid; place-items:center; border:1px solid #ffffff17; border-radius:9px; background:#080f1b9c; }
-#ui-mercado .mercado-tab-icon.ouro { border-color:#e2bc6852; background:linear-gradient(145deg,#d1a54124,#6b4e171c); }
-#ui-mercado .mercado-tab-icon.gemas { border-color:#67b8f452; background:linear-gradient(145deg,#409ce42b,#1a47721c); }
-#ui-mercado .mercado-tab-icon.anunciar { border-color:#d6ad5a5c; background:#c2953a1c; color:#f4cc77; font-size:21px; line-height:1; }
+#ui-mercado .tab-mercado { position:relative; flex:1; min-width:0; min-height:58px; overflow:hidden; padding:7px 9px; border:1px solid #344156; border-radius:12px; background:#111a29; color:#aebbd0; display:flex; align-items:center; justify-content:flex-start; gap:8px; text-align:left; transition:background .18s ease,border-color .18s ease,color .18s ease,transform .18s ease,box-shadow .18s ease; }
+#ui-mercado .tab-mercado::before { content:""; position:absolute; inset:0 0 auto; height:2px; background:currentColor; opacity:.65; }
+#ui-mercado .tab-mercado:hover { color:#f1f5fb; border-color:#71809a; transform:translateY(-1px); }
+#ui-mercado .tab-mercado-ouro { border-color:#80632e; background:linear-gradient(145deg,#302817,#191a1b 82%); color:#e9c36c; }
+#ui-mercado .tab-mercado-gemas { border-color:#345f7e; background:linear-gradient(145deg,#142b3c,#111a29 82%); color:#88c9f5; }
+#ui-mercado .tab-mercado-anunciar { border-color:#765b32; background:linear-gradient(145deg,#35291a,#191a1b 82%); color:#e8c684; }
+#ui-mercado .tab-mercado-ouro:hover { border-color:#c69b43; background:linear-gradient(145deg,#40331d,#1d1c1b 82%); }
+#ui-mercado .tab-mercado-gemas:hover { border-color:#5d9ac3; background:linear-gradient(145deg,#19394f,#131d2b 82%); }
+#ui-mercado .tab-mercado-anunciar:hover { border-color:#bc9146; background:linear-gradient(145deg,#45331b,#1d1c1b 82%); }
+#ui-mercado .tab-mercado[aria-selected="true"] { background:linear-gradient(140deg,#72531f,#342919 82%); border-color:#f0c75f; color:#fff0bd; box-shadow:inset 0 1px #fff5d54a,0 5px 16px #d9a73722,0 0 0 1px #e2bc6828; }
+#ui-mercado .tab-mercado-gemas[aria-selected="true"] { background:linear-gradient(140deg,#205477,#172a3d 82%); border-color:#7ad0ff; color:#ddf3ff; box-shadow:inset 0 1px #e4f5ff38,0 5px 16px #43adf426,0 0 0 1px #67b8f430; }
+#ui-mercado .tab-mercado-anunciar[aria-selected="true"] { background:linear-gradient(140deg,#76521d,#392817 82%); border-color:#ffd16b; color:#fff0c9; box-shadow:inset 0 1px #fff5d54a,0 5px 16px #d9a73722,0 0 0 1px #e2bc6828; }
+#ui-mercado .mercado-tab-icon { width:32px; height:32px; flex:0 0 32px; display:grid; place-items:center; border:1px solid #ffffff20; border-radius:10px; background:#080f1b9c; box-shadow:inset 0 1px #ffffff0d; }
+#ui-mercado .mercado-tab-icon.ouro { border-color:#d9ad4b88; background:linear-gradient(145deg,#d1a5413d,#6b4e1733); }
+#ui-mercado .mercado-tab-icon.gemas { border-color:#62b9f288; background:linear-gradient(145deg,#409ce448,#1a477233); }
+#ui-mercado .mercado-tab-icon.anunciar { border-color:#e3b95788; background:linear-gradient(145deg,#c2953a38,#563a152e); color:#ffe09a; font-size:22px; line-height:1; }
 #ui-mercado .mercado-tab-copy { min-width:0; display:grid; gap:2px; line-height:1.05; }
 #ui-mercado .mercado-tab-copy > span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px; font-weight:700; }
 #ui-mercado .mercado-tab-copy small { margin:0; color:#8493a8; font-size:7px; font-weight:700; letter-spacing:.75px; white-space:nowrap; }
 #ui-mercado .tab-mercado[aria-selected="true"] .mercado-tab-copy small { color:currentColor; opacity:.76; }
-#ui-mercado .mercado-tab-dot { width:9px; height:9px; border-radius:50%; background:#f2bf4f; box-shadow:0 0 8px #f2bf4f75; }
-#ui-mercado .mercado-tab-dot.gemas { background:#75c5ff; transform:rotate(45deg); border-radius:2px; box-shadow:0 0 8px #75c5ff75; }
+#ui-mercado .mercado-tab-dot { width:13px; height:13px; border:1px solid #ffe08a; border-radius:50%; background:radial-gradient(circle at 35% 30%,#fff1b4 0 12%,#e9b83e 36%,#a96d17 100%); box-shadow:0 0 9px #f2bf4f75,inset 0 0 0 2px #fff2; }
+#ui-mercado .mercado-tab-dot.gemas { width:11px; height:11px; border:1px solid #d5f0ff; border-radius:3px; background:linear-gradient(135deg,#e0f6ff,#60c5ff 48%,#3476d0); transform:rotate(45deg); box-shadow:0 0 9px #75c5ff85,inset -2px -2px 0 #17488177; }
 #ui-mercado .mercado-notificacao { position:relative; margin:10px 16px 0; padding:11px 14px 11px 42px; border:1px solid #547961; border-radius:11px; background:linear-gradient(110deg,#153b2bdc,#10251fdc); color:#c5f0d4; font-size:12px; line-height:1.45; box-shadow:inset 0 1px #ffffff0b,0 6px 18px #0002; animation:mercado-notificacao-entrar .2s ease-out; }
 #ui-mercado .mercado-notificacao::before { content:"✓"; position:absolute; left:13px; top:50%; transform:translateY(-50%); display:grid; place-items:center; width:20px; height:20px; border-radius:50%; background:#a0e4c41a; color:#a0e4c4; font-weight:800; }
 #ui-mercado .mercado-notificacao[data-tipo="erro"] { border-color:#8b4e52; background:linear-gradient(110deg,#431e27e8,#271820e8); color:#ffd1d1; }
@@ -79,11 +85,11 @@
  #ui-mercado .mercado-section > span { font-size:9px; }
  #ui-mercado .mercado-fields { gap:11px; margin-bottom:13px; }
  #ui-mercado .mercado-tabs { gap:6px; padding:8px 10px; }
- #ui-mercado .tab-mercado { min-height:52px; padding:6px 5px; gap:6px; border-radius:11px; }
- #ui-mercado .mercado-tab-icon { width:25px; height:25px; flex-basis:25px; border-radius:8px; }
- #ui-mercado .mercado-tab-icon.anunciar { font-size:18px; }
+ #ui-mercado .tab-mercado { min-height:54px; padding:6px 5px; gap:6px; border-radius:11px; }
+ #ui-mercado .mercado-tab-icon { width:27px; height:27px; flex-basis:27px; border-radius:8px; }
+ #ui-mercado .mercado-tab-icon.anunciar { font-size:19px; }
  #ui-mercado .mercado-tab-copy > span { font-size:11px; }
- #ui-mercado .mercado-tab-copy small { font-size:6px; letter-spacing:.55px; }
+ #ui-mercado .mercado-tab-copy small { font-size:7px; letter-spacing:.25px; }
  #ui-mercado .mercado-notificacao { margin:8px 10px 0; padding:10px 11px 10px 38px; font-size:11px; }
  #ui-mercado .mercado-action { margin-top:12px; }
 }
