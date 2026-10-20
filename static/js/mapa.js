@@ -1799,44 +1799,145 @@ class MapaScene extends Phaser.Scene {
             Array.isArray(camadaColisaoObjetos.objects)
         ) {
 
-            camadaColisaoObjetos.objects.forEach(obj => {
-
-                if (
-                    !obj ||
-                    Number(obj.width || 0) <= 0 ||
-                    Number(obj.height || 0) <= 0
-                ) {
+            const adicionarHitboxEstatica = (x, y, largura, altura) => {
+                if (largura <= 0 || altura <= 0) {
                     return;
                 }
 
-                const largura =
-                    Number(obj.width);
+                const hitbox = this.add.zone(
+                    x,
+                    y,
+                    largura,
+                    altura
+                );
 
-                const altura =
-                    Number(obj.height);
+                this.physics.add.existing(hitbox, true);
+                this.physics.add.collider(this.player, hitbox);
+            };
 
-                const centroX =
-                    Number(obj.x) + (largura / 2);
-
-                const centroY =
-                    Number(obj.y) + (altura / 2);
-
-                const hitbox =
-                    this.add.zone(
+            // Arcade Physics trabalha com caixas alinhadas aos eixos. Para
+            // aproximar retângulos girados, dividimos o lado maior em trechos
+            // curtos e criamos uma caixa alinhada para cada trecho.
+            const adicionarRetanguloOrientado = (
+                centroX,
+                centroY,
+                largura,
+                altura,
+                angulo
+            ) => {
+                if (Math.abs(angulo % 360) < 0.01) {
+                    adicionarHitboxEstatica(
                         centroX,
                         centroY,
                         largura,
                         altura
                     );
+                    return;
+                }
 
-                this.physics.add.existing(
-                    hitbox,
-                    true
-                );
+                const radianos = Phaser.Math.DegToRad(angulo);
+                const cos = Math.cos(radianos);
+                const sin = Math.sin(radianos);
+                const ladoMaior = Math.max(largura, altura);
+                const quantidade = Math.max(1, Math.ceil(ladoMaior / 24));
+                const ladoLongoHorizontal = largura >= altura;
 
-                this.physics.add.collider(
-                    this.player,
-                    hitbox
+                for (let indice = 0; indice < quantidade; indice++) {
+                    const trecho = ladoMaior / quantidade;
+                    const deslocamento =
+                        -ladoMaior / 2 + trecho * (indice + 0.5);
+
+                    const deslocamentoX = ladoLongoHorizontal
+                        ? deslocamento
+                        : 0;
+                    const deslocamentoY = ladoLongoHorizontal
+                        ? 0
+                        : deslocamento;
+
+                    const x = centroX + deslocamentoX * cos - deslocamentoY * sin;
+                    const y = centroY + deslocamentoX * sin + deslocamentoY * cos;
+                    const trechoLargura = ladoLongoHorizontal ? trecho : largura;
+                    const trechoAltura = ladoLongoHorizontal ? altura : trecho;
+                    const larguraAABB =
+                        Math.abs(cos) * trechoLargura + Math.abs(sin) * trechoAltura;
+                    const alturaAABB =
+                        Math.abs(sin) * trechoLargura + Math.abs(cos) * trechoAltura;
+
+                    adicionarHitboxEstatica(
+                        x,
+                        y,
+                        larguraAABB,
+                        alturaAABB
+                    );
+                }
+            };
+
+            camadaColisaoObjetos.objects.forEach(obj => {
+
+                if (!obj) {
+                    return;
+                }
+
+                const largura =
+                    Number(obj.width || 0);
+
+                const altura =
+                    Number(obj.height || 0);
+
+                const rotacao = Number(obj.rotation || 0);
+
+                // Polígonos desenhados no Tiled podem ter width/height zerados.
+                // Convertemos seus lados em hitboxes curtas para não descartá-los.
+                if (Array.isArray(obj.polygon) && obj.polygon.length >= 2) {
+                    const radianos = Phaser.Math.DegToRad(rotacao);
+                    const cos = Math.cos(radianos);
+                    const sin = Math.sin(radianos);
+                    const pontos = obj.polygon.map(ponto => ({
+                        x: Number(obj.x || 0) + Number(ponto.x || 0) * cos - Number(ponto.y || 0) * sin,
+                        y: Number(obj.y || 0) + Number(ponto.x || 0) * sin + Number(ponto.y || 0) * cos
+                    }));
+
+                    pontos.forEach((ponto, indice) => {
+                        const proximo = pontos[(indice + 1) % pontos.length];
+                        const dx = proximo.x - ponto.x;
+                        const dy = proximo.y - ponto.y;
+                        const comprimento = Math.hypot(dx, dy);
+
+                        if (comprimento <= 0) {
+                            return;
+                        }
+
+                        adicionarRetanguloOrientado(
+                            (ponto.x + proximo.x) / 2,
+                            (ponto.y + proximo.y) / 2,
+                            comprimento,
+                            12,
+                            Phaser.Math.RadToDeg(Math.atan2(dy, dx))
+                        );
+                    });
+
+                    return;
+                }
+
+                if (largura <= 0 || altura <= 0) {
+                    return;
+                }
+
+                const radianos = Phaser.Math.DegToRad(rotacao);
+                const cos = Math.cos(radianos);
+                const sin = Math.sin(radianos);
+                const centroX =
+                    Number(obj.x || 0) + (largura / 2) * cos - (altura / 2) * sin;
+
+                const centroY =
+                    Number(obj.y || 0) + (largura / 2) * sin + (altura / 2) * cos;
+
+                adicionarRetanguloOrientado(
+                    centroX,
+                    centroY,
+                    largura,
+                    altura,
+                    rotacao
                 );
             });
         }
