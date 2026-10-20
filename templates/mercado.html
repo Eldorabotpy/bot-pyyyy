@@ -1,4 +1,4 @@
-<link rel="stylesheet" href="/static/css/mercado.css?v=3">
+<link rel="stylesheet" href="/static/css/mercado.css?v=4">
 <div id="ui-mercado" style="display:none;">
     <div class="mercado-shell" role="dialog" aria-modal="true" aria-labelledby="mercado-titulo">
         <div class="mercado-header">
@@ -7,9 +7,9 @@
             <button class="mercado-close" aria-label="Fechar mercado" onclick="fecharMercado()">×</button>
         </div>
         <div class="mercado-tabs" role="tablist" aria-label="Seções do mercado">
-            <button class="tab-mercado" role="tab" aria-selected="false" aria-controls="aba-comprar-ouro" data-aba="aba-comprar-ouro" onclick="mudarAbaMercado('aba-comprar-ouro', this)"><span>Ouro</span><span class="mercado-tab-dot ouro" aria-hidden="true"></span></button>
-            <button class="tab-mercado" role="tab" aria-selected="false" aria-controls="aba-comprar-gemas" data-aba="aba-comprar-gemas" onclick="mudarAbaMercado('aba-comprar-gemas', this)"><span>Gemas</span><span class="mercado-tab-dot gemas" aria-hidden="true"></span></button>
-            <button class="tab-mercado tab-mercado-anunciar" role="tab" aria-selected="false" aria-controls="aba-vender" data-aba="aba-vender" onclick="mudarAbaMercado('aba-vender', this)"><span class="mercado-tab-plus" aria-hidden="true">＋</span><span>Anunciar</span></button>
+            <button class="tab-mercado tab-mercado-ouro" role="tab" aria-selected="false" aria-controls="aba-comprar-ouro" data-aba="aba-comprar-ouro" onclick="mudarAbaMercado('aba-comprar-ouro', this)"><span class="mercado-tab-icon ouro" aria-hidden="true"><span class="mercado-tab-dot ouro"></span></span><span class="mercado-tab-copy"><span>Ouro</span><small>COMPRAR</small></span></button>
+            <button class="tab-mercado tab-mercado-gemas" role="tab" aria-selected="false" aria-controls="aba-comprar-gemas" data-aba="aba-comprar-gemas" onclick="mudarAbaMercado('aba-comprar-gemas', this)"><span class="mercado-tab-icon gemas" aria-hidden="true"><span class="mercado-tab-dot gemas"></span></span><span class="mercado-tab-copy"><span>Gemas</span><small>COMPRAR</small></span></button>
+            <button class="tab-mercado tab-mercado-anunciar" role="tab" aria-selected="false" aria-controls="aba-vender" data-aba="aba-vender" onclick="mudarAbaMercado('aba-vender', this)"><span class="mercado-tab-icon anunciar" aria-hidden="true">＋</span><span class="mercado-tab-copy"><span>Anunciar</span><small>VENDER ITEM</small></span></button>
         </div>
         <div id="mercado-notificacao" class="mercado-notificacao" role="status" aria-live="polite" aria-atomic="true" hidden></div>
         <div class="mercado-body">
