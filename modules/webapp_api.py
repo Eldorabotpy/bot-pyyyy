@@ -2364,8 +2364,7 @@ def api_listar_mercado():
                 base_id = item_payload["item"].get("base_id", base_id)
 
             quantidade = anuncio.get('quantity', 1)
-            unit_price = anuncio.get('unit_price', 0)
-            precio_total = unit_price * quantidade # O JS espera o preço total do bloco
+            precio_total = market_manager.listing_total(anuncio)
             
             # Consulta o catálogo do sistema para pegar a tradução em português
             info_real = items_data.ITEMS_DATA.get(base_id, {})

@@ -41,6 +41,19 @@ document.addEventListener('visibilitychange', () => {
 });
 
 const mercadoOperacoesPendentes = new Set();
+let mercadoNotificacaoTimer = null;
+function mercadoNotificar(mensagem, tipo = 'aviso') {
+    const aviso = document.getElementById('mercado-notificacao');
+    if (!aviso) {
+        window.alertaEldora?.(tipo === 'erro' ? 'Erro no mercado' : 'Mercado', mensagem, tipo);
+        return;
+    }
+    window.clearTimeout(mercadoNotificacaoTimer);
+    aviso.textContent = String(mensagem || 'Não foi possível concluir a operação.');
+    aviso.dataset.tipo = ['sucesso', 'erro', 'aviso'].includes(tipo) ? tipo : 'aviso';
+    aviso.hidden = false;
+    mercadoNotificacaoTimer = window.setTimeout(() => { aviso.hidden = true; }, 8000);
+}
 // ==========================================
 // LÓGICA DO MERCADO DO AVENTUREIRO
 // ==========================================
@@ -95,6 +108,9 @@ function abrirMercado() {
 function fecharMercado() {
     document.activeElement?.blur?.();
     window.__mercadoAberto = false;
+    window.clearTimeout(mercadoNotificacaoTimer);
+    const notificacao = document.getElementById('mercado-notificacao');
+    if (notificacao) notificacao.hidden = true;
     const anterior = mercadoEntradaAnterior;
     mercadoEntradaAnterior = null;
     if (anterior?.cena?.input) {
@@ -1155,15 +1171,13 @@ async function confirmarVenda() {
     let qtd = mercadoInteiroPositivo(document.getElementById('input-qtd')?.value);
 
     if (!itemSelecionado || !preco || preco <= 0 || !qtd || qtd <= 0) {
-        if (window.alertaEldora) {
-            window.alertaEldora("Atenção", "Preencha a quantidade e um preço válido!", "erro");
-        }
+        mercadoNotificar("Selecione um item e informe uma quantidade e um preço válidos.", "erro");
         return;
     }
 
     const limite = Number(document.getElementById('input-qtd').max);
     if (limite > 0 && qtd > limite) {
-        window.alertaEldora?.('Quantidade inválida', `Você possui apenas ${limite} unidades desse item.`, 'erro');
+        mercadoNotificar(`Quantidade inválida. Você possui apenas ${limite} unidades desse item.`, 'erro');
         return;
     }
     window.__mercadoVendendo = true;
@@ -1208,15 +1222,11 @@ async function confirmarVenda() {
 
         if (!res.ok || !data.sucesso) {
             const msgErro = data.erro || data.error || data.message || "Erro ao anunciar item.";
-            if (window.alertaEldora) {
-                window.alertaEldora("Aviso", msgErro, "erro");
-            }
+            mercadoNotificar(msgErro, "erro");
             return;
         }
 
-        if (window.alertaEldora) {
-            window.alertaEldora("Sucesso", data.mensagem || "Item anunciado! O Rei agradece os 10%.", "sucesso");
-        }
+        mercadoNotificar(data.mensagem || "Anúncio publicado! O item já está disponível no mercado.", "sucesso");
 
         document.getElementById('input-preco').value = "";
         document.getElementById('input-qtd').value = "1";
@@ -1242,9 +1252,7 @@ async function confirmarVenda() {
     } catch (e) {
         console.error("Falha real ao anunciar:", e);
 
-        if (window.alertaEldora) {
-            window.alertaEldora("Erro", e.message || "Falha ao anunciar item.", "erro");
-        }
+        mercadoNotificar(e.message || "Falha ao anunciar o item. Confira sua conexão e tente novamente.", "erro");
     } finally {
         window.__mercadoVendendo = false;
         if (btnContrato) {
@@ -1280,12 +1288,7 @@ async function comprarItemMercado(idVenda, moeda) {
         const data = await res.json();
         
         if (data.sucesso) {
-            // Avisa que deu certo!
-            if (window.alertaEldora) {
-                window.alertaEldora("Transação Concluída", data.mensagem, "sucesso");
-            } else {
-                window.avisoEldora(data.mensagem);
-            }
+            mercadoNotificar(data.mensagem || "Compra concluída! O item foi enviado para sua mochila.", "sucesso");
             
             // Toca um som de moedas (opcional)
             if (typeof window.AudioManager !== 'undefined') {
@@ -1301,14 +1304,11 @@ async function comprarItemMercado(idVenda, moeda) {
             }
         } else {
             // Se o cara não tiver dinheiro, avisa!
-            if (window.alertaEldora) {
-                window.alertaEldora("Aviso Real", data.erro, "erro");
-            } else {
-                window.avisoEldora("Erro: " + data.erro);
-            }
+            mercadoNotificar(data.erro || "Não foi possível concluir a compra.", "erro");
         }
     } catch(e) {
         console.error("Falha ao processar compra:", e);
+        mercadoNotificar(e.message || "Falha de conexão ao comprar. Confira sua mochila antes de tentar novamente.", "erro");
     } finally {
         mercadoOperacoesPendentes.delete(idVenda);
     }
@@ -1338,11 +1338,7 @@ async function cancelarVendaMercado(idVenda) {
         const data = await res.json();
         
         if (data.sucesso) {
-            if (window.alertaEldora) {
-                window.alertaEldora("Sucesso", "Anúncio cancelado! O item voltou para a sua mochila.", "sucesso");
-            } else {
-                window.avisoEldora("Anúncio cancelado! O item voltou para a sua mochila.");
-            }
+            mercadoNotificar("Anúncio cancelado. O item voltou para a sua mochila.", "sucesso");
             
             // 2. Atualiza a tela (O item some da loja na hora)
             carregarVitrineMercado(); 
@@ -1354,14 +1350,11 @@ async function cancelarVendaMercado(idVenda) {
             carregarInventarioNoMercado();
             
         } else {
-            if (window.alertaEldora) {
-                window.alertaEldora("Aviso Real", data.erro, "erro");
-            } else {
-                window.avisoEldora("Erro: " + data.erro);
-            }
+            mercadoNotificar(data.erro || "Não foi possível cancelar o anúncio.", "erro");
         }
     } catch(e) {
         console.error("Falha ao processar o cancelamento:", e);
+        mercadoNotificar(e.message || "Falha de conexão ao cancelar o anúncio. Tente novamente.", "erro");
     } finally {
         mercadoOperacoesPendentes.delete(idVenda);
     }
