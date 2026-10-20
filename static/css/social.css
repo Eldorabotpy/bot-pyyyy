@@ -268,6 +268,30 @@
     transform: scale(1.06);
 }
 
+@keyframes atalhosMapaRespiram {
+    0%, 100% {
+        transform: translateY(0) scale(1);
+        filter: drop-shadow(0 2px 3px rgba(0, 0, 0, .35));
+    }
+    50% {
+        transform: translateY(-2px) scale(1.06);
+        filter: drop-shadow(0 3px 7px rgba(255, 208, 82, .58));
+    }
+}
+
+.btn-passe-mapa img,
+#btn-chat-mapa img {
+    transform-origin: center;
+    animation: atalhosMapaRespiram 2.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .btn-passe-mapa img,
+    #btn-chat-mapa img {
+        animation: none;
+    }
+}
+
 /* ========================================== */
 /* 🔔 NOTIFICAÇÕES TOAST (MUNDO DE ELDORA)    */
 /* ========================================== */
