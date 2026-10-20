@@ -94,6 +94,21 @@ class MapaInterativo {
 
                     cristalEstatua.setDepth(calcularProfundidade(cristalEstatua));
                     spriteEstatua.setDepth(calcularProfundidade(spriteEstatua));
+
+                    // Os quadros do spritesheet do cristal deslocam o pedestal
+                    // ~8 px para a esquerda por quadro. Compensamos essa margem
+                    // de origem para que só o cristal pareça girar.
+                    const ajusteXPorQuadroPx = [0, 8.25, 15.5, 23.65];
+                    cristalEstatua.on('animationupdate', (animacao, quadro) => {
+                        if (animacao.key !== 'estatua_pedroca_cristal_idle') return;
+
+                        const indiceQuadro = Number(quadro.textureFrame);
+                        const ajusteX = ajusteXPorQuadroPx[indiceQuadro];
+                        if (Number.isFinite(ajusteX)) {
+                            cristalEstatua.x = xEstatua + ajusteX * escalaEstatua;
+                        }
+                    });
+
                     cristalEstatua.play('estatua_pedroca_cristal_idle');
                 }
 
