@@ -254,10 +254,10 @@
     padding: 2px !important; /* Remove a margem interna para a imagem ocupar todo o espaço */
 }
 
-/* Se quiser que a imagem fique levemente maior até passar da borda do botão */
+/* Ícone do botão de expressões */
 #btn-expressoes img {
-    width: 46px !important;
-    height: 46px !important;
+    width: 54px !important;
+    height: 54px !important;
     object-fit: contain;
     transform: none;
     transition: transform 0.2s ease;
