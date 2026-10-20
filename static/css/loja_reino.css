@@ -58,3 +58,92 @@
     object-fit: contain;
     filter: drop-shadow(0 3px 6px rgba(0, 0, 0, .35));
 }
+
+#modal-loja-reino .container-premium {
+    background:
+        radial-gradient(circle at 50% 0%, rgba(214, 167, 57, .16), transparent 230px),
+        linear-gradient(150deg, #172238, #0b1120 72%);
+    border: 1px solid rgba(228, 193, 103, .68);
+    border-radius: 18px;
+    box-shadow: 0 22px 60px rgba(0, 0, 0, .68), inset 0 1px rgba(255, 255, 255, .05);
+}
+
+#modal-loja-reino .container-premium > h2 {
+    text-shadow: 0 2px 14px rgba(251, 191, 36, .22);
+}
+
+#modal-loja-reino .card-item-gema {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    align-items: center;
+    padding: 13px 11px;
+    background: linear-gradient(145deg, rgba(28, 39, 59, .95), rgba(11, 17, 29, .98));
+    border: 1px solid rgba(148, 163, 184, .22);
+    border-radius: 13px;
+    box-shadow: inset 0 1px rgba(255, 255, 255, .035);
+    transition: border-color .18s ease, transform .18s ease, box-shadow .18s ease;
+}
+
+#modal-loja-reino .card-item-gema:hover {
+    border-color: rgba(244, 220, 145, .72);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, .25), 0 0 16px rgba(228, 193, 103, .08);
+    transform: translateY(-2px);
+}
+
+#modal-loja-reino .imagem-item-gema {
+    width: 72px;
+    height: 72px;
+    margin: 0 auto 5px;
+    border: 1px solid rgba(216, 184, 90, .2);
+    border-radius: 15px;
+    background: radial-gradient(circle, rgba(83, 63, 125, .28), rgba(10, 16, 28, .72));
+}
+
+#modal-loja-reino .imagem-item-gema img {
+    width: 58px;
+    height: 58px;
+    filter: drop-shadow(0 5px 8px rgba(0, 0, 0, .48));
+}
+
+#modal-loja-reino .card-item-gema h4 {
+    color: #f4dc91 !important;
+    font-family: "Cinzel", serif;
+    font-size: .74rem !important;
+    line-height: 1.25;
+}
+
+#modal-loja-reino .card-item-gema .xp-duracao {
+    flex: 1;
+    margin: 5px 0 8px;
+    font-size: .68rem;
+}
+
+#modal-loja-reino .card-ticket-coliseu,
+#modal-loja-reino .card-chave-masmorra {
+    border-color: rgba(216, 184, 90, .4);
+    background: linear-gradient(135deg, rgba(82, 62, 29, .28), rgba(11, 17, 29, .96));
+}
+
+#modal-loja-reino .btn-comprar-gema {
+    padding: 9px 10px;
+    color: #fff7df;
+    background: linear-gradient(180deg, #b88d2e, #76571b);
+    border: 1px solid rgba(244, 220, 145, .5);
+    border-radius: 8px;
+    box-shadow: inset 0 1px rgba(255, 255, 255, .14);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, .65);
+    transition: filter .15s ease, transform .15s ease;
+}
+
+#modal-loja-reino .btn-comprar-gema:hover {
+    filter: brightness(1.12);
+    transform: translateY(-1px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #modal-loja-reino .card-item-gema,
+    #modal-loja-reino .btn-comprar-gema {
+        transition: none;
+    }
+}

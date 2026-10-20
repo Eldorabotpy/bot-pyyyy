@@ -72,26 +72,43 @@
    ========================================================== */
 
 .loja-premium-header {
-    min-height: 68px;
+    position: relative;
+    min-height: 126px;
 
     display: flex;
-    align-items: center;
+    align-items: flex-end;
     justify-content: space-between;
 
     gap: 12px;
 
-    padding: 12px 14px;
+    padding: 14px 18px 15px;
 
     border-bottom:
         1px solid
         rgba(216, 184, 90, 0.20);
 
     background:
-        rgba(10, 16, 27, 0.92);
+        linear-gradient(90deg, rgba(8, 13, 22, 0.14), rgba(8, 13, 22, 0.02) 62%),
+        linear-gradient(0deg, rgba(8, 13, 22, 0.96), rgba(8, 13, 22, 0.03) 70%),
+        url("/static/assets/loja/banner-rei.png") center 43% / cover no-repeat;
+}
+
+.loja-premium-banner-kicker {
+    margin: 0 0 3px 38px;
+    color: #f4dc91;
+    font-family: "Cinzel", serif;
+    font-size: 0.49rem;
+    font-weight: 900;
+    letter-spacing: 1.4px;
+    text-shadow: 0 1px 5px rgba(0, 0, 0, 0.9);
 }
 
 
 .loja-premium-titulo {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
     color: #f4dc91;
 
     font-family:
@@ -102,6 +119,23 @@
     font-weight: 900;
 
     letter-spacing: 0.7px;
+}
+
+.loja-premium-titulo-icone {
+    display: grid;
+    width: 30px;
+    height: 30px;
+    flex: 0 0 30px;
+    place-items: center;
+    border: 1px solid rgba(216, 184, 90, 0.42);
+    border-radius: 9px;
+    background: linear-gradient(145deg, rgba(73, 57, 26, .34), rgba(13, 20, 32, .94));
+    box-shadow: inset 0 1px rgba(255, 255, 255, .05), 0 0 12px rgba(228, 193, 103, .07);
+}
+
+.loja-premium-titulo-icone img {
+    width: 19px;
+    height: 19px;
 }
 
 
@@ -119,6 +153,10 @@
     width: 35px;
     height: 35px;
 
+    position: absolute;
+    top: 12px;
+    right: 14px;
+    z-index: 1;
     flex: 0 0 35px;
 
     padding: 0;
@@ -198,6 +236,18 @@
     color: #ddd6fe;
 }
 
+.loja-premium-saldo-icone {
+    display: grid;
+    width: 21px;
+    height: 21px;
+    place-items: center;
+}
+
+.loja-premium-saldo-icone img {
+    width: 19px;
+    height: 19px;
+}
+
 
 .loja-premium-saldo strong {
     font-size: 1.15rem;
@@ -231,6 +281,11 @@
 .loja-premium-aba {
     min-height: 39px;
 
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+
     padding: 7px;
 
     color: #94a3b8;
@@ -250,6 +305,24 @@
     cursor: pointer;
 }
 
+.loja-premium-aba-icone {
+    display: grid;
+    width: 25px;
+    height: 25px;
+    flex: 0 0 25px;
+    place-items: center;
+    border: 1px solid rgba(216, 184, 90, .27);
+    border-radius: 7px;
+    background: linear-gradient(145deg, rgba(48, 39, 24, .48), rgba(10, 17, 29, .96));
+    box-shadow: inset 0 1px rgba(255, 255, 255, .045);
+}
+
+.loja-premium-aba-icone img {
+    width: 17px;
+    height: 17px;
+    object-fit: contain;
+}
+
 
 .loja-premium-aba.active {
     color: #f4dc91;
@@ -259,6 +332,11 @@
 
     border-color:
         rgba(216, 184, 90, 0.40);
+}
+
+.loja-premium-aba.active .loja-premium-aba-icone {
+    border-color: rgba(244, 220, 145, .58);
+    box-shadow: 0 0 12px rgba(228, 193, 103, .12), inset 0 1px rgba(255, 255, 255, .08);
 }
 
 
@@ -295,6 +373,10 @@
 
 
 .loja-premium-secao-topo h3 {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+
     margin: 0;
 
     color: #f4dc91;
@@ -304,6 +386,13 @@
         serif;
 
     font-size: 0.83rem;
+}
+
+.loja-premium-secao-icone {
+    width: 18px;
+    height: 18px;
+    object-fit: contain;
+    filter: drop-shadow(0 0 5px rgba(228, 193, 103, .18));
 }
 
 
@@ -383,6 +472,10 @@
 
     padding: 3px 5px;
 
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+
     color: #fff4c7;
 
     background:
@@ -400,10 +493,15 @@
     letter-spacing: 0.4px;
 }
 
+.loja-premium-badge img {
+    width: 12px;
+    height: 12px;
+}
+
 
 .loja-premium-pacote-icone {
-    width: 38px;
-    height: 38px;
+    width: 48px;
+    height: 48px;
 
     display: flex;
     align-items: center;
@@ -413,14 +511,21 @@
 
     border:
         1px solid
-        rgba(167, 139, 250, 0.22);
+        rgba(216, 184, 90, 0.36);
 
     border-radius: 11px;
 
     background:
-        rgba(91, 33, 182, 0.10);
+        linear-gradient(145deg, rgba(73, 57, 26, .3), rgba(10, 17, 29, .92));
 
     font-size: 20px;
+}
+
+.loja-premium-pacote-icone img {
+    width: 37px;
+    height: 37px;
+    object-fit: contain;
+    filter: drop-shadow(0 0 5px rgba(228, 193, 103, .16));
 }
 
 
@@ -461,6 +566,85 @@
 
     font-size: 0.91rem;
     font-weight: 900;
+}
+
+.loja-premium-pacote.destaque .loja-premium-pacote-descricao {
+    min-height: 0;
+}
+
+.loja-premium-beneficios {
+    display: grid;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.loja-premium-beneficio {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    color: #aab6c7;
+}
+
+.loja-premium-beneficio > span {
+    display: grid;
+    width: 25px;
+    height: 25px;
+    flex: 0 0 25px;
+    place-items: center;
+    border: 1px solid rgba(216, 184, 90, 0.18);
+    border-radius: 7px;
+    background: rgba(10, 16, 27, 0.7);
+}
+
+.loja-premium-beneficio img {
+    width: 20px;
+    height: 20px;
+    object-fit: contain;
+}
+
+.loja-premium-beneficio strong {
+    font-size: 0.58rem;
+}
+
+.loja-premium-profissao-atalho {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    gap: 9px;
+    margin-top: 12px;
+    padding: 8px 10px;
+    text-align: left;
+    color: #e9edf4;
+    background: rgba(14, 22, 36, 0.8);
+    border: 1px solid rgba(216, 184, 90, 0.28);
+    border-radius: 10px;
+    cursor: pointer;
+}
+
+.loja-premium-profissao-atalho > img {
+    width: 34px;
+    height: 34px;
+}
+
+.loja-premium-profissao-atalho > span {
+    display: grid;
+    flex: 1;
+    gap: 2px;
+}
+
+.loja-premium-profissao-atalho strong {
+    color: #f4dc91;
+    font-size: 0.65rem;
+}
+
+.loja-premium-profissao-atalho small {
+    color: #8996a8;
+    font-size: 0.54rem;
+}
+
+.loja-premium-profissao-atalho > b {
+    color: #f4dc91;
+    font-size: 1.3rem;
 }
 
 
@@ -981,6 +1165,12 @@
     font-size: 1.1rem;
 }
 
+.loja-premium-servico-icone img {
+    width: 31px;
+    height: 31px;
+    object-fit: contain;
+}
+
 .loja-premium-servico-cabecalho strong {
     display: block;
     color: #f4dc91;
@@ -1155,8 +1345,20 @@
     }
 
     .loja-premium-header {
-        min-height: 58px;
-        padding: 9px 12px;
+        min-height: 108px;
+        padding: 12px 13px 13px;
+        background-position: center 43%;
+    }
+
+    .loja-premium-banner-kicker {
+        margin-left: 35px;
+        font-size: 0.43rem;
+        letter-spacing: 1.1px;
+    }
+
+    .loja-premium-fechar {
+        top: 10px;
+        right: 11px;
     }
 
     .loja-premium-saldo-card {
@@ -1172,6 +1374,22 @@
     .loja-premium-aba {
         padding-inline: 4px;
         font-size: 0.62rem;
+        min-height: 49px;
+        flex-direction: column;
+        gap: 2px;
+        line-height: 1.1;
+    }
+
+    .loja-premium-aba-icone {
+        width: 22px;
+        height: 22px;
+        flex-basis: 22px;
+        border-radius: 6px;
+    }
+
+    .loja-premium-aba-icone img {
+        width: 15px;
+        height: 15px;
     }
 
     .loja-premium-servicos {

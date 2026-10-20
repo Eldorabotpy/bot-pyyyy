@@ -273,7 +273,13 @@ const AudioManager = {
     // 🔕 BOTÃO MESTRE: LIGA/DESLIGA
     toggleMute() {
         this.isMuted = !this.isMuted;
-        localStorage.setItem("eldora_muted", this.isMuted);
+        this.atualizarIconeBotao();
+
+        try {
+            localStorage.setItem("eldora_muted", this.isMuted);
+        } catch (erro) {
+            console.warn("Não foi possível salvar a preferência de som:", erro);
+        }
         
         if (this.isMuted) {
             this.pararTudo();
@@ -287,25 +293,32 @@ const AudioManager = {
             }
         }
         
-        this.atualizarIconeBotao();
         return this.isMuted;
     },
 
     atualizarIconeBotao() {
         const img = document.getElementById("img-mute-icon");
+        const botao = document.getElementById("btn-mute-global");
         if (img) {
-            // Links diretos para as imagens no seu repositório assets/ui
-            const iconeLigado = "https://raw.githubusercontent.com/Eldorabotpy/static-img/refs/heads/main/assets/ui/som_on.png";
-            const iconeDesligado = "https://raw.githubusercontent.com/Eldorabotpy/static-img/refs/heads/main/assets/ui/Som%2520mudo.png";
-        
-            // Define a imagem baseada no estado de mudo
+            const iconeLigado = "/static/images/ui/icone_som_ligado.png?v=1";
+            const iconeDesligado = "/static/images/ui/icone_som_desligado.png?v=1";
+
             img.src = this.isMuted ? iconeDesligado : iconeLigado;
-        
-            // Feedback visual extra (opcional): deixa um pouco transparente quando mudo
-            img.style.opacity = this.isMuted ? "0.6" : "1";
+            img.style.opacity = "1";
+        }
+
+        if (botao) {
+            botao.setAttribute("aria-pressed", String(this.isMuted));
+            botao.setAttribute("aria-label", this.isMuted ? "Som desligado. Clique para ligar" : "Som ligado. Clique para desligar");
+            botao.title = this.isMuted ? "Som desligado — clique para ligar" : "Som ligado — clique para desligar";
         }
     }
 };
 
 // Exporta para ser usado em qualquer lugar (combate.js ou mapa.js)
 window.AudioManager = AudioManager;
+const botaoMuteGlobal = document.getElementById("btn-mute-global");
+if (botaoMuteGlobal) {
+    botaoMuteGlobal.addEventListener("click", () => AudioManager.toggleMute());
+}
+AudioManager.atualizarIconeBotao();

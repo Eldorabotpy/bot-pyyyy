@@ -184,6 +184,8 @@ def notificar_novo_pedido(
     dias=0,
     chaves_masmorra=0,
     trocas_classe=0,
+    trocas_profissao=0,
+    pocoes_xp_g=0,
 ):
 
     codigo = html.escape(
@@ -230,6 +232,8 @@ def notificar_novo_pedido(
             f"⏳ Duração: <b>{int(dias or 0)} dias</b>\n"
             f"🗝️ Chaves: <b>{int(chaves_masmorra or 0)}</b>\n"
             f"🔄 Troca de classe: <b>{int(trocas_classe or 0)}</b>\n"
+            f"🧰 Troca de profissão: <b>{int(trocas_profissao or 0)}</b>\n"
+            f"🧪 Poções de XP G: <b>{int(pocoes_xp_g or 0)}</b>\n"
         )
 
     else:
@@ -269,6 +273,8 @@ def notificar_comprovante_recebido(
     dias=0,
     chaves_masmorra=0,
     trocas_classe=0,
+    trocas_profissao=0,
+    pocoes_xp_g=0,
 ):
 
     codigo = html.escape(
@@ -315,6 +321,8 @@ def notificar_comprovante_recebido(
             f"⏳ Duração: <b>{int(dias or 0)} dias</b>\n"
             f"🗝️ Chaves: <b>{int(chaves_masmorra or 0)}</b>\n"
             f"🔄 Troca de classe: <b>{int(trocas_classe or 0)}</b>\n"
+            f"🧰 Troca de profissão: <b>{int(trocas_profissao or 0)}</b>\n"
+            f"🧪 Poções de XP G: <b>{int(pocoes_xp_g or 0)}</b>\n"
         )
 
     else:

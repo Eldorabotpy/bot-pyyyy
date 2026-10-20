@@ -954,6 +954,29 @@ background-size: cover;
     }
 }
 
+/* Os atalhos do menu usam a coleção ilustrada em static/images/ui. */
+#side-menu .eldora-menu-icone,
+#side-menu .eldora-menu-btn.active .eldora-menu-icone,
+#side-menu .eldora-menu-btn:hover .eldora-menu-icone,
+#side-menu .eldora-menu-central .eldora-central-icone,
+#side-menu .eldora-menu-sair .eldora-menu-icone {
+    display: block;
+    padding: 0;
+    color: transparent;
+    background: transparent;
+    border-color: transparent;
+    border-radius: 0;
+    box-shadow: none;
+}
+
+#side-menu .eldora-menu-icone img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    filter: drop-shadow(0 2px 3px rgba(0, 0, 0, .36));
+}
+
 /* Ícones flutuantes sem placas coloridas atrás deles. */
 #btn-abrir-menu,
 #eldora-hub-toggle {

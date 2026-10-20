@@ -242,6 +242,12 @@ ELDORA_PREMIUM = {
     "trocas_classe":
         1,
 
+    "trocas_profissao":
+        1,
+
+    "pocoes_xp_g":
+        5,
+
     "auto_cacada":
         True,
         
@@ -249,8 +255,8 @@ ELDORA_PREMIUM = {
         "👑",
 
     "descricao": (
-        "30 dias de Eldora Premium com "
-        "benefícios exclusivos."
+        "30 dias com 1 troca de classe, 1 troca de profissão, "
+        "10 chaves de masmorra e 5 poções grandes de XP."
     ),
 
     "ativo":

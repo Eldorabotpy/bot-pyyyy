@@ -16,8 +16,10 @@
         <div class="loja-premium-header">
 
             <div>
+                <div class="loja-premium-banner-kicker">TESOURO REAL DE ELDORA</div>
                 <div class="loja-premium-titulo">
-                    💎 LOJA DE ELDORA
+                    <span class="loja-premium-titulo-icone" aria-hidden="true"><img src="/static/assets/loja/gema.svg" alt=""></span>
+                    <span>LOJA DE ELDORA</span>
                 </div>
 
                 <div class="loja-premium-subtitulo">
@@ -60,7 +62,7 @@
 
             <div class="loja-premium-saldo">
 
-                <span>💎</span>
+                <span class="loja-premium-saldo-icone" aria-hidden="true"><img src="/static/assets/loja/gema.svg" alt=""></span>
 
                 <strong
                     id="loja-premium-saldo"
@@ -88,7 +90,8 @@
                 class="loja-premium-aba active"
                 data-loja-premium-aba="pacotes"
             >
-                💎 Gemas
+                <span class="loja-premium-aba-icone" aria-hidden="true"><img src="/static/assets/loja/gema.svg" alt=""></span>
+                <span>Gemas</span>
             </button>
 
             <button
@@ -96,7 +99,8 @@
                 class="loja-premium-aba"
                 data-loja-premium-aba="premium"
             >
-                👑 Premium
+                <span class="loja-premium-aba-icone" aria-hidden="true"><img src="/static/assets/loja/coroa.svg" alt=""></span>
+                <span>Premium</span>
             </button>
 
             <button
@@ -104,7 +108,8 @@
                 class="loja-premium-aba"
                 data-loja-premium-aba="servicos"
             >
-                🔄 Serviços
+                <span class="loja-premium-aba-icone" aria-hidden="true"><img src="/static/assets/loja/servicos.svg" alt=""></span>
+                <span>Serviços</span>
             </button>
 
 
@@ -113,7 +118,8 @@
                 class="loja-premium-aba"
                 data-loja-premium-aba="pedidos"
             >
-                📜 Meus pedidos
+                <span class="loja-premium-aba-icone" aria-hidden="true"><img src="/static/assets/loja/pedidos.svg" alt=""></span>
+                <span>Meus pedidos</span>
             </button>
 
         </div>
@@ -176,7 +182,8 @@
                 <div class="loja-premium-secao-topo">
 
                     <h3>
-                        👑 Eldora Premium
+                        <img class="loja-premium-secao-icone" src="/static/assets/loja/coroa.svg" alt="" aria-hidden="true">
+                        Eldora Premium
                     </h3>
 
                     <p>
@@ -223,7 +230,9 @@
                 >
                     <article class="loja-premium-servico-card">
                         <div class="loja-premium-servico-cabecalho">
-                            <span class="loja-premium-servico-icone">⚔️</span>
+                            <span class="loja-premium-servico-icone">
+                                <img src="/static/assets/loja/troca-classe.svg" alt="" aria-hidden="true">
+                            </span>
                             <div>
                                 <strong>Trocar classe</strong>
                                 <small>Escolha uma nova classe base</small>
@@ -259,12 +268,14 @@
 
                     <article class="loja-premium-servico-card">
                         <div class="loja-premium-servico-cabecalho">
-                            <span class="loja-premium-servico-icone">🛠️</span>
+                            <span class="loja-premium-servico-icone">
+                                <img src="/static/assets/loja/troca-profissao.svg" alt="" aria-hidden="true">
+                            </span>
                             <div>
                                 <strong>Trocar profissão ativa</strong>
                                 <small>Escolha um ofício ainda sem maestria</small>
                             </div>
-                            <b>💎 250</b>
+                            <b id="loja-premium-profissao-preco">💎 250</b>
                         </div>
 
                         <select
@@ -273,12 +284,12 @@
                         ></select>
 
                         <div class="loja-premium-servico-aviso">
-                            Substitui sua profissão ativa por uma ainda sem maestria. Ofícios novos começam no nível 1. O progresso já obtido é preservado. A profissão atual, as de nível 50 ou superior e aquelas com maestria resgatada não aparecem na lista.
+                            Substitui sua profissão ativa por uma ainda sem maestria. O Premium usa primeiro 1 crédito gratuito; depois, cada troca custa 250 gemas. Ofícios novos começam no nível 1 e o progresso anterior é preservado.
                         </div>
 
                         <label class="loja-premium-concordo">
                             <input type="checkbox" id="loja-premium-concordo-profissao">
-                            <span>Li e concordo com a troca de profissão. A ferramenta do ofício será equipada; se não houver uma na mochila, receberei a inicial.</span>
+                            <span>Li e concordo. Se disponível, será usado meu crédito Premium de profissão; a ferramenta será equipada e, se necessário, receberei a inicial.</span>
                         </label>
 
                         <button

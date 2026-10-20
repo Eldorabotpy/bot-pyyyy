@@ -1,6 +1,32 @@
 // ==========================================
 // 🛡️ HUD DO GRUPO (BOTÃO FLUTUANTE)
 // ==========================================
+window.criarPlacaNomeJogador = function(scene, x, y, nome) {
+    const nomeExibido = String(nome || 'Herói');
+    const texto = scene.add.text(0, 0, nomeExibido, {
+        fontSize: '10px',
+        fontStyle: 'bold',
+        color: '#f4e2ad',
+        fontFamily: 'Cinzel, Arial',
+        stroke: '#080d16',
+        strokeThickness: 2
+    }).setOrigin(0.5);
+    texto.setShadow(0, 1, '#000000', 2, false, true);
+
+    const largura = Math.max(40, Math.ceil(texto.width + 14));
+    const altura = Math.max(18, Math.ceil(texto.height + 6));
+    const fundo = scene.add.graphics();
+    fundo.fillStyle(0x101827, 0.94);
+    fundo.fillRoundedRect(-largura / 2, -altura / 2, largura, altura, 5);
+    fundo.lineStyle(1, 0xc6a35c, 0.9);
+    fundo.strokeRoundedRect(-largura / 2, -altura / 2, largura, altura, 5);
+
+    const placa = scene.add.container(x, y, [fundo, texto]).setDepth(30);
+    // Mantém o nome acessível para a lógica de lápide que compara nomeTexto.text.
+    placa.text = nomeExibido;
+    return placa;
+};
+
 function obterCharIdAtivo() {
     return String(window.eldoraCharacterId || localStorage.getItem('jogadorEldoraID') || '');
 }
@@ -721,7 +747,7 @@ class MotorMultiplayer {
                         if (outro.movimentoTween?.isPlaying()) outro.movimentoTween.stop();
                         if (outro.textoTween?.isPlaying()) outro.textoTween.stop();
                         outro.setPosition(info.x, info.y); 
-                        outro.nomeTexto.setPosition(info.x, info.y - 25); 
+                        outro.nomeTexto.setPosition(info.x, info.y - 37);
                         // O servidor envia posições periódicas mesmo parado.
                         // Preserve o timer e a animação se for apenas uma repetição
                         // da mesma posição.
@@ -768,7 +794,7 @@ class MotorMultiplayer {
                     outro.textoTween = this.scene.tweens.add({ 
                         targets: outro.nomeTexto, 
                         x: info.x, 
-                        y: info.y - 25, 
+                        y: info.y - 37,
                         duration: duracaoTempo 
                     });
                 }
@@ -1379,20 +1405,12 @@ class MotorMultiplayer {
         outro.setDisplaySize(48, 48);
 
         // Nome
-        outro.nomeTexto = this.scene.add.text(
+        outro.nomeTexto = window.criarPlacaNomeJogador(
+            this.scene,
             outro.x,
-            outro.y - 25,
-            info.nome || "Herói",
-            {
-                fontSize: '10px',
-                color: '#fff',
-                fontFamily: 'Cinzel, Arial',
-                stroke: '#000',
-                strokeThickness: 2
-            }
-        )
-        .setOrigin(0.5, 1)
-        .setDepth(30);
+            outro.y - 37,
+            info.nome || 'Herói'
+        );
 
         outro.setInteractive();
 

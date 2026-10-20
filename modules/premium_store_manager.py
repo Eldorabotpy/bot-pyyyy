@@ -302,10 +302,49 @@ def _montar_chave_masmorra(
 
     return novo_item
 
+
+def _montar_consumivel_pilha(
+    inventario,
+    item_id,
+    adicionar,
+):
+    """Soma um consumível empilhável, respeitando chaves antigas do inventário."""
+    quantidade_adicional = max(0, int(adicionar or 0))
+    uid = item_id
+    item_atual = inventario.get(uid)
+
+    if item_atual is None:
+        for uid_existente, item in inventario.items():
+            if isinstance(item, dict) and item.get("base_id") == item_id:
+                uid = uid_existente
+                item_atual = item
+                break
+
+    if isinstance(item_atual, dict):
+        novo_item = dict(item_atual)
+        try:
+            quantidade_atual = int(
+                novo_item.get("quantity", novo_item.get("qtd", 0)) or 0
+            )
+        except (TypeError, ValueError):
+            quantidade_atual = 0
+        novo_item["base_id"] = novo_item.get("base_id") or item_id
+        novo_item["quantity"] = max(0, quantidade_atual) + quantidade_adicional
+        novo_item.pop("qtd", None)
+        inventario[uid] = novo_item
+        return
+
+    try:
+        quantidade_atual = int(item_atual or 0)
+    except (TypeError, ValueError):
+        quantidade_atual = 0
+    inventario[uid] = max(0, quantidade_atual) + quantidade_adicional
+
 def _montar_estado_eldora_premium(
     premium_atual,
     dias,
     trocas_classe,
+    trocas_profissao,
     codigo_pedido,
     agora=None,
 ):
@@ -374,6 +413,20 @@ def _montar_estado_eldora_premium(
         )
     )
 
+    creditos_profissao_atuais = 0
+    if premium_ativo:
+        try:
+            creditos_profissao_atuais = max(
+                0,
+                int(premium_atual.get("profession_change_credits", 0) or 0),
+            )
+        except (TypeError, ValueError):
+            creditos_profissao_atuais = 0
+
+    novos_creditos_profissao = creditos_profissao_atuais + max(
+        0, int(trocas_profissao or 0)
+    )
+
 
     nova_expiracao = (
         _calcular_expiracao_eldora_premium(
@@ -408,6 +461,9 @@ def _montar_estado_eldora_premium(
 
         "class_change_credits":
             novos_creditos,
+
+        "profession_change_credits":
+            novos_creditos_profissao,
 
         "last_order_code":
             str(
@@ -469,6 +525,7 @@ def _obter_status_eldora_premium(
 
 
     creditos_classe = 0
+    creditos_profissao = 0
 
 
     if ativo:
@@ -491,6 +548,20 @@ def _obter_status_eldora_premium(
         ):
             creditos_classe = 0
 
+        try:
+            creditos_profissao = max(
+                0,
+                int(
+                    premium.get(
+                        "profession_change_credits",
+                        0,
+                    )
+                    or 0
+                ),
+            )
+        except (TypeError, ValueError):
+            creditos_profissao = 0
+
 
     return {
         "ativo":
@@ -501,7 +572,90 @@ def _obter_status_eldora_premium(
 
         "class_change_credits":
             creditos_classe,
+
+        "profession_change_credits":
+            creditos_profissao,
     }
+
+
+def _migrar_credito_profissao_premium_antigo(
+    jogador_id,
+    jogador,
+    agora=None,
+):
+    """Garante uma troca de profissão para Premium ativo criado antes do benefício."""
+    if not jogador_id or users_col is None or not isinstance(jogador, dict):
+        return jogador
+
+    agora = _normalizar_datetime_utc(agora or _agora())
+
+    for _tentativa in range(3):
+        premium = jogador.get("eldora_premium") or {}
+        if not isinstance(premium, dict):
+            return jogador
+
+        expiracao = _normalizar_datetime_utc(premium.get("expires_at"))
+        if not isinstance(expiracao, datetime) or expiracao <= agora:
+            return jogador
+
+        if premium.get("profession_change_credit_migration_v1") is True:
+            return jogador
+
+        try:
+            creditos_profissao = max(
+                0,
+                int(premium.get("profession_change_credits", 0) or 0),
+            )
+        except (TypeError, ValueError):
+            creditos_profissao = 0
+
+        historico_salvo = jogador.get("premium_service_history")
+        historico = historico_salvo if isinstance(historico_salvo, list) else []
+        credito_ja_usado = any(
+            isinstance(registro, dict)
+            and str(registro.get("tipo") or "").strip().lower() == "profissao"
+            and str(registro.get("origem") or "").strip().lower() == "eldora_premium"
+            for registro in historico
+        )
+
+        campos = {
+            "eldora_premium.profession_change_credit_migration_v1": True,
+            "eldora_premium.updated_at": agora,
+        }
+        if creditos_profissao <= 0 and not credito_ja_usado:
+            campos["eldora_premium.profession_change_credits"] = 1
+
+        filtro = {
+            "_id": jogador_id,
+            "eldora_premium.expires_at": {"$gt": agora},
+            "eldora_premium.profession_change_credit_migration_v1": {"$ne": True},
+        }
+        if "profession_change_credits" in premium:
+            filtro["eldora_premium.profession_change_credits"] = premium.get(
+                "profession_change_credits"
+            )
+        else:
+            filtro["eldora_premium.profession_change_credits"] = {"$exists": False}
+
+        if "premium_service_history" in jogador:
+            filtro["premium_service_history"] = historico_salvo
+        else:
+            filtro["premium_service_history"] = {"$exists": False}
+
+        atualizado = users_col.find_one_and_update(
+            filtro,
+            {"$set": campos},
+            return_document=ReturnDocument.AFTER,
+        )
+        if atualizado:
+            return atualizado
+
+        jogador_atualizado = users_col.find_one({"_id": jogador_id})
+        if not jogador_atualizado:
+            return jogador
+        jogador = jogador_atualizado
+
+    return jogador
 
 def _preparar_credito_eldora_premium(
     jogador,
@@ -558,6 +712,28 @@ def _preparar_credito_eldora_premium(
         int(
             pedido.get(
                 "trocas_classe",
+                0,
+            )
+            or 0
+        ),
+    )
+
+    trocas_profissao = max(
+        0,
+        int(
+            pedido.get(
+                "trocas_profissao",
+                0,
+            )
+            or 0
+        ),
+    )
+
+    pocoes_xp_g = max(
+        0,
+        int(
+            pedido.get(
+                "pocoes_xp_g",
                 0,
             )
             or 0
@@ -630,6 +806,12 @@ def _preparar_credito_eldora_premium(
         chaves,
     )
 
+    _montar_consumivel_pilha(
+        novo_inventario,
+        "pocao_xp_boost_g",
+        pocoes_xp_g,
+    )
+
 
     novo_premium = (
         _montar_estado_eldora_premium(
@@ -638,6 +820,7 @@ def _preparar_credito_eldora_premium(
             ),
             dias,
             trocas_classe,
+            trocas_profissao,
             codigo_pedido,
             agora,
         )
@@ -819,6 +1002,12 @@ def _serializar_pedido(
                 )
                 or 0
             ),
+
+        "trocas_profissao":
+            int(pedido.get("trocas_profissao", 0) or 0),
+
+        "pocoes_xp_g":
+            int(pedido.get("pocoes_xp_g", 0) or 0),
 
         "valor_centavos":
             int(
@@ -1089,6 +1278,10 @@ def obter_catalogo(
                     )
                     or 0
                 ),
+
+            "trocas_profissao_disponiveis": int(
+                status_premium.get("profession_change_credits", 0) or 0
+            ),
         },
         "pacotes":
             pacotes,
@@ -1240,6 +1433,12 @@ def criar_pedido(
                 or 0
             ),
 
+        "trocas_profissao":
+            int(pacote.get("trocas_profissao", 0) or 0),
+
+        "pocoes_xp_g":
+            int(pacote.get("pocoes_xp_g", 0) or 0),
+
         "valor_centavos":
             int(
                 pacote[
@@ -1373,6 +1572,10 @@ def criar_pedido(
                     "trocas_classe",
                     0,
                 ),
+
+            trocas_profissao=pedido.get("trocas_profissao", 0),
+
+            pocoes_xp_g=pedido.get("pocoes_xp_g", 0),
         )
 
 
@@ -1693,6 +1896,10 @@ def gerar_checkout_pix(
                     )
                     or 0
                 ),
+
+            "trocas_profissao": int(pedido.get("trocas_profissao", 0) or 0),
+
+            "pocoes_xp_g": int(pedido.get("pocoes_xp_g", 0) or 0),
 
             "valor_centavos":
                 int(
@@ -2058,6 +2265,10 @@ def enviar_comprovante_pix(
                         "trocas_classe",
                         0,
                     ),
+
+                trocas_profissao=pedido.get("trocas_profissao", 0),
+
+                pocoes_xp_g=pedido.get("pocoes_xp_g", 0),
             )
 
 
@@ -2139,6 +2350,10 @@ def enviar_comprovante_pix(
                         )
                         or 0
                     ),
+
+                "trocas_profissao": int(pedido.get("trocas_profissao", 0) or 0),
+
+                "pocoes_xp_g": int(pedido.get("pocoes_xp_g", 0) or 0),
 
                 "valor_formatado":
                     formatar_valor_reais(
@@ -2310,6 +2525,11 @@ def obter_servicos_jogador(user_id):
             "error": "Herói não encontrado.",
         }
 
+    jogador = _migrar_credito_profissao_premium_antigo(
+        jogador_id,
+        jogador,
+    )
+
     status_premium = (
         _obter_status_eldora_premium(
             jogador
@@ -2395,6 +2615,10 @@ def obter_servicos_jogador(user_id):
                     or 0
                 ),
 
+            "trocas_profissao_disponiveis": int(
+                status_premium.get("profession_change_credits", 0) or 0
+            ),
+
             "troca_classe_gratis":
                 (
                     bool(
@@ -2412,6 +2636,11 @@ def obter_servicos_jogador(user_id):
                         or 0
                     ) > 0
                 ),
+
+            "troca_profissao_gratis": (
+                bool(status_premium.get("ativo", False))
+                and int(status_premium.get("profession_change_credits", 0) or 0) > 0
+            ),
         },
         "classe_atual": classe_atual,
         "profissao_atual": chave_atual,
@@ -2446,6 +2675,11 @@ def comprar_servico_gemas(
     jogador = users_col.find_one({"_id": jogador_id})
     if not jogador:
         return {"success": False, "error": "Herói não encontrado."}
+
+    jogador = _migrar_credito_profissao_premium_antigo(
+        jogador_id,
+        jogador,
+    )
 
     acao_atual = str(
         (jogador.get("player_state") or {}).get("action") or "idle"
@@ -2509,36 +2743,60 @@ def comprar_servico_gemas(
         if reparo_ferramenta and inventario == (jogador.get('inventory') or {}) and ferramentas == (jogador.get('equipment_tools') or {}):
             return {'success': True, 'message': 'A ferramenta do ofício já está equipada.', 'saldo_gemas': int(jogador.get('gems', 0))}
 
-        custo = 0 if reparo_ferramenta else CUSTO_TROCA_PROFISSAO
+        status_premium = _obter_status_eldora_premium(jogador, agora)
+        usar_credito_premium = (
+            not reparo_ferramenta
+            and bool(status_premium.get("ativo"))
+            and int(status_premium.get("profession_change_credits", 0) or 0) > 0
+        )
+        custo = (
+            0
+            if reparo_ferramenta or usar_credito_premium
+            else CUSTO_TROCA_PROFISSAO
+        )
         recuperacoes = list(jogador.get('premium_tool_recoveries') or [])
         if destino not in recuperacoes:
             recuperacoes.append(destino)
+        filtro_troca = {
+            "_id": jogador_id,
+            "profession": jogador.get('profession') if 'profession' in jogador else {"$exists": False},
+            "learned_professions": jogador.get('learned_professions') if 'learned_professions' in jogador else {"$exists": False},
+            "maestrias_resgatadas": jogador.get('maestrias_resgatadas') if 'maestrias_resgatadas' in jogador else {"$exists": False},
+            "player_state": jogador.get('player_state') if 'player_state' in jogador else {"$exists": False},
+            "inventory": jogador.get('inventory') if 'inventory' in jogador else {"$exists": False},
+            "equipment_tools": jogador.get('equipment_tools') if 'equipment_tools' in jogador else {"$exists": False},
+            "premium_tool_recoveries": jogador.get('premium_tool_recoveries') if 'premium_tool_recoveries' in jogador else {"$exists": False},
+        }
+        if custo:
+            filtro_troca["gems"] = {"$gte": custo}
+        if usar_credito_premium:
+            filtro_troca.update({
+                "eldora_premium.expires_at": {"$gt": agora},
+                "eldora_premium.profession_change_credits": {"$gte": 1},
+            })
+
+        atualizacao_troca = {
+            "$inc": {"gems": -custo},
+            "$set": {"profession": nova_profissao, "learned_professions": aprendidas,
+                     "inventory": inventario, "equipment_tools": ferramentas,
+                     "premium_tool_recoveries": recuperacoes},
+            "$push": {
+                "premium_service_history": {
+                    "tipo": tipo,
+                    "destino": destino,
+                    "custo_gemas": custo,
+                    "origem": "eldora_premium" if usar_credito_premium else "recuperacao" if reparo_ferramenta else "gemas",
+                    "criado_em": agora,
+                }
+            },
+        }
+        if usar_credito_premium:
+            atualizacao_troca["$inc"]["eldora_premium.profession_change_credits"] = -1
+            atualizacao_troca["$set"]["eldora_premium.updated_at"] = agora
+
         atualizado = users_col.find_one_and_update(
-            {
-                "_id": jogador_id,
-                "gems": {"$gte": custo},
-                "profession": jogador.get('profession') if 'profession' in jogador else {"$exists": False},
-                "learned_professions": jogador.get('learned_professions') if 'learned_professions' in jogador else {"$exists": False},
-                "maestrias_resgatadas": jogador.get('maestrias_resgatadas') if 'maestrias_resgatadas' in jogador else {"$exists": False},
-                "player_state": jogador.get('player_state') if 'player_state' in jogador else {"$exists": False},
-                "inventory": jogador.get('inventory') if 'inventory' in jogador else {"$exists": False},
-                "equipment_tools": jogador.get('equipment_tools') if 'equipment_tools' in jogador else {"$exists": False},
-                "premium_tool_recoveries": jogador.get('premium_tool_recoveries') if 'premium_tool_recoveries' in jogador else {"$exists": False},
-            },
-            {
-                "$inc": {"gems": -custo},
-                "$set": {"profession": nova_profissao, "learned_professions": aprendidas,
-                         "inventory": inventario, "equipment_tools": ferramentas,
-                         "premium_tool_recoveries": recuperacoes},
-                "$push": {
-                    "premium_service_history": {
-                        "tipo": tipo,
-                        "destino": destino,
-                        "custo_gemas": custo,
-                        "criado_em": agora,
-                    }
-                },
-            },
+            filtro_troca,
+            atualizacao_troca,
             return_document=ReturnDocument.AFTER,
         )
 
@@ -2802,10 +3060,15 @@ def comprar_servico_gemas(
 
     return {
         "success": True,
-        "message": f"Troca concluída: {nome_destino}.",
+        "message": (
+            f"Troca concluída: {nome_destino}. "
+            + ("Crédito de profissão do Eldora Premium usado." if tipo == "profissao" and usar_credito_premium else "")
+        ).strip(),
         "tipo": tipo,
         "destino": destino,
         "saldo_gemas": int(atualizado.get("gems", 0) or 0),
+        "custo_gemas": custo,
+        "credito_premium_usado": bool(tipo == "profissao" and usar_credito_premium),
     }
 
 
@@ -3261,6 +3524,10 @@ def aprovar_pedido_manual(
                 or 0
             )
 
+            resposta["trocas_profissao_disponiveis"] = int(
+                premium_atual.get("profession_change_credits", 0) or 0
+            )
+
 
         return resposta
 
@@ -3466,6 +3733,10 @@ def aprovar_pedido_manual(
                         or 0
                     )
 
+                    resposta["trocas_profissao_disponiveis"] = int(
+                        premium_atual.get("profession_change_credits", 0) or 0
+                    )
+
 
                 return resposta
 
@@ -3562,11 +3833,16 @@ def aprovar_pedido_manual(
             or 0
         )
 
+        trocas_profissao = int(pedido.get("trocas_profissao", 0) or 0)
+        pocoes_xp_g = int(pedido.get("pocoes_xp_g", 0) or 0)
+
 
         if (
             dias <= 0
             or chaves_masmorra < 0
             or trocas_classe < 0
+            or trocas_profissao < 0
+            or pocoes_xp_g < 0
         ):
             return {
                 "success": False,
@@ -3944,6 +4220,12 @@ def aprovar_pedido_manual(
                     )
                     or 0
                 ),
+
+            "trocas_profissao_disponiveis": int(
+                premium_atual.get("profession_change_credits", 0) or 0
+            ),
+
+            "pocoes_xp_g_entregues": pocoes_xp_g,
         }
 
 

@@ -1794,9 +1794,12 @@ class MapaScene extends Phaser.Scene {
 
         }
 
-        this.playerNameText = this.add.text(this.player.x, this.player.y - 25, meuNome, { 
-            fontSize: '12px', color: '#f1c40f', fontFamily: 'Cinzel, Arial', stroke: '#000', strokeThickness: 3
-        }).setOrigin(0.5, 1).setDepth(30);
+        this.playerNameText = window.criarPlacaNomeJogador(
+            this,
+            this.player.x,
+            this.player.y - 37,
+            meuNome
+        );
         
         // ==========================================
         // 🏰 CAMADAS ACIMA DO JOGADOR
@@ -3080,7 +3083,7 @@ class MapaScene extends Phaser.Scene {
         this.atualizarProfundidadeAtores();
 
         if (this.playerNameText) {
-            this.playerNameText.setPosition(Math.floor(this.player.x), Math.floor(this.player.y - 30));
+            this.playerNameText.setPosition(Math.floor(this.player.x), Math.floor(this.player.y - 37));
         }
     
         if (this.interativo) {

@@ -356,6 +356,15 @@
                     '.loja-premium-servico-comprar[data-servico="classe"]'
                 );
 
+            const trocaProfissaoGratis =
+                premium.troca_profissao_gratis === true;
+            const precoProfissao = document.getElementById(
+                "loja-premium-profissao-preco"
+            );
+            const botaoProfissao = document.querySelector(
+                '.loja-premium-servico-comprar[data-servico="profissao"]'
+            );
+
 
             if (precoClasse) {
 
@@ -372,6 +381,17 @@
                     trocaClasseGratis
                         ? "USAR TROCA PREMIUM"
                         : "CONFIRMAR POR 550 GEMAS";
+            }
+
+            if (precoProfissao) {
+                precoProfissao.textContent = trocaProfissaoGratis
+                    ? "👑 GRÁTIS"
+                    : `💎 ${Number(dados.custos?.profissao || 250)}`;
+            }
+            if (botaoProfissao) {
+                botaoProfissao.textContent = trocaProfissaoGratis
+                    ? "USAR TROCA PREMIUM"
+                    : `CONFIRMAR POR ${Number(dados.custos?.profissao || 250)} GEMAS`;
             }
 
             renderizarOpcoesServico(
@@ -818,6 +838,12 @@
                 plano.trocas_classe || 0
             );
 
+        const trocasProfissao = Number(plano.trocas_profissao || 0);
+        const pocoesXpG = Number(plano.pocoes_xp_g || 0);
+        const creditosProfissao = Number(
+            status?.trocas_profissao_disponiveis || 0
+        );
+
 
         const autoCacada =
             plano.auto_cacada === true;
@@ -838,14 +864,15 @@
         area.innerHTML = `
 
             <div class="loja-premium-badge">
-                👑 ELDORA PREMIUM
+                <img src="/static/assets/loja/coroa.svg" alt="" aria-hidden="true">
+                ELDORA PREMIUM
             </div>
 
 
             <div
                 class="loja-premium-pacote-icone"
             >
-                👑
+                <img src="/static/assets/loja/coroa.svg" alt="" aria-hidden="true">
             </div>
 
 
@@ -867,17 +894,37 @@
             <div
                 class="loja-premium-pacote-descricao"
             >
-                ${autoCacada
-                    ? "🤖 Auto Caçada<br>"
-                    : ""
-                }
-
-                🗝️ ${chaves}
-                Chaves de Masmorra<br>
-
-                🔄 ${trocas}
-                Troca de Classe
+                <div class="loja-premium-beneficios">
+                    ${autoCacada ? `
+                        <div class="loja-premium-beneficio">
+                            <span><img src="/static/assets/loja/auto-cacada.svg" alt="" aria-hidden="true"></span>
+                            <strong>Auto Caçada</strong>
+                        </div>
+                    ` : ""}
+                    <div class="loja-premium-beneficio">
+                        <span><img src="/static/assets/loja/chave-masmorra.svg" alt="" aria-hidden="true"></span>
+                        <strong>${chaves} Chaves de Masmorra</strong>
+                    </div>
+                    <div class="loja-premium-beneficio">
+                        <span><img src="/static/assets/loja/troca-classe.svg" alt="" aria-hidden="true"></span>
+                        <strong>${trocas} Troca${trocas === 1 ? "" : "s"} de Classe</strong>
+                    </div>
+                    <div class="loja-premium-beneficio">
+                        <span><img src="/static/assets/loja/troca-profissao.svg" alt="" aria-hidden="true"></span>
+                        <strong>${trocasProfissao} Troca${trocasProfissao === 1 ? "" : "s"} de Profissão</strong>
+                    </div>
+                    <div class="loja-premium-beneficio">
+                        <span><img src="/static/assets/loja/pocao-xp.svg" alt="" aria-hidden="true"></span>
+                        <strong>${pocoesXpG} Poções Grandes de XP · ×2 por 60 min</strong>
+                    </div>
+                </div>
             </div>
+
+            <button type="button" class="loja-premium-profissao-atalho">
+                <img src="/static/assets/loja/troca-profissao.svg" alt="" aria-hidden="true">
+                <span><strong>Trocar profissão</strong><small>${creditosProfissao > 0 ? "Seu crédito Premium está disponível" : ativo ? "Seu crédito foi usado · troca extra custa 250 💎" : `${trocasProfissao} troca${trocasProfissao === 1 ? "" : "s"} incluída${trocasProfissao === 1 ? "" : "s"} no Premium`}</small></span>
+                <b>›</b>
+            </button>
 
 
             ${
@@ -935,6 +982,11 @@
                 }
             );
         }
+
+        area.querySelector(".loja-premium-profissao-atalho")?.addEventListener(
+            "click",
+            () => mudarAbaLojaPremium("servicos")
+        );
     }
 
     function renderizarPacotesLojaPremium(
@@ -967,6 +1019,18 @@
         }
 
 
+        const iconesPacotes = {
+            gemas_100: "punhado-gemas.svg",
+            gemas_250: "bolsa-gemas.svg",
+            gemas_550: "bau-gemas.svg",
+            gemas_1200: "cofre-real-gemas.svg",
+            gemas_2000: "cofre-nobre-gemas.svg",
+            gemas_3500: "tesouro-epico.svg",
+            gemas_6000: "tesouro-lendario.svg",
+            gemas_10000: "tesouro-mistico.svg",
+        };
+
+
         grade.innerHTML = pacotes
             .map(
                 pacote => {
@@ -989,12 +1053,6 @@
                         );
 
 
-                    const icone =
-                        escaparHtml(
-                            pacote.icone || "💎"
-                        );
-
-
                     const valor =
                         escaparHtml(
                             pacote.valor_formatado
@@ -1005,6 +1063,14 @@
                         formatarNumero(
                             pacote.gemas
                         );
+
+                    const iconePacote =
+                        Object.prototype.hasOwnProperty.call(
+                            iconesPacotes,
+                            pacote.id
+                        )
+                            ? iconesPacotes[pacote.id]
+                            : "gema.svg";
 
 
                     return `
@@ -1031,7 +1097,7 @@
                             <div
                                 class="loja-premium-pacote-icone"
                             >
-                                ${icone}
+                                <img src="/static/assets/loja/${iconePacote}" alt="" aria-hidden="true">
                             </div>
 
 

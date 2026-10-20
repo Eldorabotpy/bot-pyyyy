@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" fill="none">
+  <defs>
+    <linearGradient id="gold" x1="12" y1="15" x2="83" y2="83" gradientUnits="userSpaceOnUse"><stop stop-color="#fff3b0"/><stop offset=".48" stop-color="#edbd43"/><stop offset="1" stop-color="#8c570b"/></linearGradient>
+    <linearGradient id="wood" x1="19" y1="34" x2="78" y2="80" gradientUnits="userSpaceOnUse"><stop stop-color="#783f20"/><stop offset="1" stop-color="#201727"/></linearGradient>
+  </defs>
+  <path d="M20 43c-2-13 8-23 21-19 4-12 17-12 21 0 13-4 23 6 21 19H20Z" fill="url(#wood)" stroke="url(#gold)" stroke-width="4"/>
+  <path d="M17 43h62v34c-18 10-44 10-62 0V43Z" fill="url(#wood)" stroke="url(#gold)" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M17 55h62M28 46v30m40-30v30" stroke="url(#gold)" stroke-width="4"/>
+  <path d="m48 44 13 12-13 17-13-17 13-12Z" fill="#1cbce6" stroke="#fff0a8" stroke-width="3"/>
+  <path d="m48 44 0 29 13-17-13-12Z" fill="#c4f7ff" fill-opacity=".82"/>
+  <path d="m48 12 3 8 8 1-6 5 2 8-7-4-7 4 2-8-6-5 8-1 3-8Z" fill="url(#gold)"/>
+</svg>

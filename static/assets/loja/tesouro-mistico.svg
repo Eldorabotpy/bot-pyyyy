@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" fill="none">
+  <defs>
+    <linearGradient id="gold" x1="13" y1="17" x2="83" y2="83" gradientUnits="userSpaceOnUse"><stop stop-color="#fff3b0"/><stop offset=".48" stop-color="#edbd43"/><stop offset="1" stop-color="#8c570b"/></linearGradient>
+    <linearGradient id="gem" x1="30" y1="24" x2="67" y2="75" gradientUnits="userSpaceOnUse"><stop stop-color="#b5faff"/><stop offset=".35" stop-color="#39d4f5"/><stop offset="1" stop-color="#1760bd"/></linearGradient>
+  </defs>
+  <circle cx="48" cy="49" r="34" fill="#152743" fill-opacity=".86" stroke="url(#gold)" stroke-width="3" stroke-dasharray="4 4"/>
+  <path d="m48 17 17 10 13 22-13 22-17 9-17-9-13-22 13-22 17-10Z" fill="#1f3770" stroke="url(#gold)" stroke-width="4" stroke-linejoin="round"/>
+  <path d="m48 25 12 10 8 14-8 15-12 8-12-8-8-15 8-14 12-10Z" fill="url(#gem)" stroke="#fff2a4" stroke-width="3" stroke-linejoin="round"/>
+  <path d="m48 25 0 47 12-8 8-15-8-14-12-10Z" fill="#d9ffff" fill-opacity=".52"/>
+  <path d="m48 8 3 7 8 1-6 5 2 8-7-4-7 4 2-8-6-5 8-1 3-7Zm37 39 2 5 5 1-4 3 1 5-4-3-5 3 1-5-4-3 5-1 3-5ZM11 47l2 5 5 1-4 3 1 5-4-3-5 3 1-5-4-3 5-1 3-5Z" fill="url(#gold)"/>
+</svg>
