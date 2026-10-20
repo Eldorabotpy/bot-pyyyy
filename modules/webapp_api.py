@@ -1677,7 +1677,8 @@ def api_mapa_objetos(regiao_id):
                     "y": 27 * 32,
 
                     "icone_x": 960,
-                    "icone_y": 882,
+                    # O novo sprite é mais alto; mantém o indicador acima do cristal.
+                    "icone_y": 840,
 
                     "texto_botao": "❗",
                     "mensagem": "Foi daqui\nque tudo começou.\nAqui nasceu o sonho\nde Eldora."

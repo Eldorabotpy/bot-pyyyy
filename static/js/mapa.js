@@ -201,6 +201,20 @@ class MapaScene extends Phaser.Scene {
                 'icone_loja_skins_capital',
                 'https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/ui/icone_loja_skins_capital.png'
             );
+            if (!this.textures.exists('estatua_pedroca_cristal')) {
+                this.load.spritesheet(
+                    'estatua_pedroca_cristal',
+                    '/static/images/tilesets/estatua_criador_anim/cristal_mana_rotacao.png',
+                    { frameWidth: 192, frameHeight: 256 }
+                );
+            }
+            if (!this.textures.exists('estatua_pedroca_despertar')) {
+                this.load.spritesheet(
+                    'estatua_pedroca_despertar',
+                    '/static/images/tilesets/estatua_criador_anim/estatua_ergue_teclado.png',
+                    { frameWidth: 192, frameHeight: 256 }
+                );
+            }
         }
 
         // ==========================================
@@ -605,12 +619,28 @@ class MapaScene extends Phaser.Scene {
 
             }
 
-            map.createLayer(
+            const camadaCriada = map.createLayer(
                 l,
                 todosTilesets,
                 0,
                 0
             ).setDepth(profundidade);
+
+            // A arte antiga da estátua é composta por 4×4 tiles na camada
+            // Casas. A versão animada substitui esse bloco quando os sprites
+            // carregam; se algum asset falhar, a estátua antiga permanece.
+            if (
+                this.regiaoAtual === 'capital_eldora' &&
+                l === 'Casas' &&
+                this.textures.exists('estatua_pedroca_cristal') &&
+                this.textures.exists('estatua_pedroca_despertar')
+            ) {
+                for (let y = 27; y <= 30; y++) {
+                    for (let x = 28; x <= 31; x++) {
+                        camadaCriada.removeTileAt(x, y, true, false);
+                    }
+                }
+            }
         });
 
 
@@ -1763,12 +1793,27 @@ class MapaScene extends Phaser.Scene {
                 return;
             }
 
-            map.createLayer(
+            const camadaCriada = map.createLayer(
                 camada.nome,
                 todosTilesets,
                 0,
                 0
             ).setDepth(camada.profundidade);
+
+            // Quatro tiles duplicados da estátua antiga estavam em uma camada
+            // acima do jogador; também são removidos para evitar sobreposição.
+            if (
+                this.regiaoAtual === 'capital_eldora' &&
+                camada.nome === 'Acima do Jogador' &&
+                this.textures.exists('estatua_pedroca_cristal') &&
+                this.textures.exists('estatua_pedroca_despertar')
+            ) {
+                for (let y = 27; y <= 28; y++) {
+                    for (let x = 29; x <= 30; x++) {
+                        camadaCriada.removeTileAt(x, y, true, false);
+                    }
+                }
+            }
         });
     
         if (map.getLayer('Camada de Colisoes')) {
@@ -1951,10 +1996,13 @@ class MapaScene extends Phaser.Scene {
             // Posições intermediárias alimentam multiplayer e incubação; timer pertence à cena.
             this.time.addEvent({ delay: 250, loop: true, callback: () => this.enviarPosicaoMapa() });
 
+            // Os objetos do mapa (incluindo o monumento) não dependem do Socket.IO.
+            if (typeof MapaInterativo !== 'undefined') {
+                this.interativo = new MapaInterativo(this);
+            }
+
             // Inicialização do Multiplayer (Não apagar)
             if (typeof socket !== 'undefined' && socket) {
-
-                if (typeof MapaInterativo !== 'undefined') this.interativo = new MapaInterativo(this);
                 if (typeof MotorDeInvasao !== 'undefined') this.motorInvasao = new MotorDeInvasao(this, socket);
                 if (typeof MotorMultiplayer !== 'undefined') this.motorMultiplayer = new MotorMultiplayer(this, socket);
                 

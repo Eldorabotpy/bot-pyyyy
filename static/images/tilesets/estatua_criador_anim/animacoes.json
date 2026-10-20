@@ -1,0 +1,22 @@
+{
+  "mapTileSize": [32, 32],
+  "frameSize": [192, 256],
+  "frameSizeInMapTiles": [6, 8],
+  "layout": "4 frames per strip, left to right",
+  "animations": {
+    "cristal_mana_rotacao": {
+      "file": "cristal_mana_rotacao.png",
+      "tileset": "cristal_mana_rotacao.tsx",
+      "frames": [0, 1, 2, 3],
+      "frameDurationsMs": [180, 180, 180, 180],
+      "loop": true
+    },
+    "estatua_ergue_teclado": {
+      "file": "estatua_ergue_teclado.png",
+      "tileset": "estatua_ergue_teclado.tsx",
+      "frames": [0, 1, 2, 3, 2, 1],
+      "frameDurationsMs": [180, 180, 180, 500, 180, 180],
+      "loop": true
+    }
+  }
+}

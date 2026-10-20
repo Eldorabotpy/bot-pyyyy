@@ -2,7 +2,44 @@ class MapaInterativo {
     constructor(scene) {
         this.scene = scene;
         this.objetosInterativos = [];
+        this.prepararAnimacoesEstatua();
         this.init();
+    }
+
+    prepararAnimacoesEstatua() {
+        if (
+            this.scene.regiaoAtual !== 'capital_eldora' ||
+            !this.scene.textures.exists('estatua_pedroca_cristal') ||
+            !this.scene.textures.exists('estatua_pedroca_despertar')
+        ) {
+            return;
+        }
+
+        const velocidadeQuadro = 1000 / 180;
+
+        if (!this.scene.anims.exists('estatua_pedroca_cristal_idle')) {
+            this.scene.anims.create({
+                key: 'estatua_pedroca_cristal_idle',
+                frames: this.scene.anims.generateFrameNumbers(
+                    'estatua_pedroca_cristal',
+                    { start: 0, end: 3 }
+                ),
+                frameRate: velocidadeQuadro,
+                repeat: -1
+            });
+        }
+
+        if (!this.scene.anims.exists('estatua_pedroca_despertar')) {
+            this.scene.anims.create({
+                key: 'estatua_pedroca_despertar',
+                frames: this.scene.anims.generateFrameNumbers(
+                    'estatua_pedroca_despertar',
+                    { start: 0, end: 3 }
+                ),
+                frameRate: velocidadeQuadro,
+                repeat: 0
+            });
+        }
     }
 
     init() {
@@ -17,6 +54,49 @@ class MapaInterativo {
             const objetos = await res.json();
 
             objetos.forEach(obj => {
+                const eEstatuaPedroca = obj.id === 'estatua_pedroca'
+                    && regiao === 'capital_eldora'
+                    && this.scene.textures.exists('estatua_pedroca_cristal')
+                    && this.scene.textures.exists('estatua_pedroca_despertar');
+                let cristalEstatua = null;
+                let spriteEstatua = null;
+
+                if (eEstatuaPedroca) {
+                    const xEstatua = obj.x;
+                    const baseYEstatua = obj.y + 128;
+                    const escalaEstatua = 2 / 3;
+
+                    cristalEstatua = this.scene.add.sprite(
+                        xEstatua,
+                        baseYEstatua,
+                        'estatua_pedroca_cristal',
+                        0
+                    )
+                        .setOrigin(0.5, 1)
+                        .setScale(escalaEstatua);
+
+                    spriteEstatua = this.scene.add.sprite(
+                        xEstatua,
+                        baseYEstatua,
+                        'estatua_pedroca_despertar',
+                        0
+                    )
+                        .setOrigin(0.5, 1)
+                        .setScale(escalaEstatua)
+                        .setAlpha(0)
+                        .setVisible(false);
+
+                    const calcularProfundidade = ator => (
+                        typeof this.scene.calcularProfundidadeAtor === 'function'
+                            ? this.scene.calcularProfundidadeAtor(ator)
+                            : 14
+                    );
+
+                    cristalEstatua.setDepth(calcularProfundidade(cristalEstatua));
+                    spriteEstatua.setDepth(calcularProfundidade(spriteEstatua));
+                    cristalEstatua.play('estatua_pedroca_cristal_idle');
+                }
+
                 // ==========================================
                 // 1. ZONA INVISÍVEL DE CLIQUE
                 // ==========================================
@@ -24,13 +104,6 @@ class MapaInterativo {
                     .setOrigin(0, 0)
                     .setInteractive()
                     .setDepth(50);
-
-                zona.on('pointerdown', (pointer, lx, ly, ev) => {
-                    ev.stopPropagation();
-                    this.scene.target.set(obj.x + 16, obj.y + 48);
-                    this.scene.isMoving = true;
-                    this.scene.physics.moveToObject(this.scene.player, this.scene.target, 150);
-                });
 
                 // ==========================================
                 // 2. POSIÇÃO DO BALÃO
@@ -128,34 +201,54 @@ class MapaInterativo {
                 );
 
                 const objetoRef = {
+                    id: obj.id || null,
                     x: obj.x,
                     y: obj.y,
                     acao: obj.acao || null,
                     botao: botao,
+                    cristalEstatua,
+                    spriteEstatua,
+                    eEstatuaPedroca,
+                    transicaoEstatua: false,
+                    estatuaTransformada: false,
                     mensagem: obj.mensagem || "Foi daqui\nque a lenda começou."
                 };
+
+                zona.on('pointerdown', (pointer, lx, ly, ev) => {
+                    ev.stopPropagation();
+
+                    if (objetoRef.eEstatuaPedroca && this.jogadorPerto(objetoRef)) {
+                        this.interagirComObjeto(objetoRef);
+                        return;
+                    }
+
+                    this.moverJogadorAte(objetoRef);
+                });
+
+                if (cristalEstatua && spriteEstatua) {
+                    const aoClicarEstatua = (pointer, lx, ly, ev) => {
+                        ev?.stopPropagation();
+
+                        if (!this.jogadorPerto(objetoRef)) {
+                            this.moverJogadorAte(objetoRef);
+                            return;
+                        }
+
+                        this.interagirComObjeto(objetoRef);
+                    };
+
+                    cristalEstatua.setInteractive();
+                    spriteEstatua.setInteractive();
+                    cristalEstatua.on('pointerdown', aoClicarEstatua);
+                    spriteEstatua.on('pointerdown', aoClicarEstatua);
+                }
 
                 // ==========================================
                 // 3. CLIQUE NO BALÃO
                 // ==========================================
                 botao.on('pointerdown', (p, lx, ly, ev) => {
                     ev.stopPropagation();
-
-                    if (objetoRef.acao === 'abrir_coliseu_pvp') {
-                        this.scene.player?.body?.stop();
-                        this.scene.isMoving = false;
-                        if (typeof window.abrirColiseuPvP === 'function') {
-                            window.abrirColiseuPvP();
-                        }
-                        return;
-                    }
-
-                    this.scene.player.body.stop();
-                    this.scene.isMoving = false;
-                    this.scene.player.anims.stop();
-                    this.scene.player.setFrame(1);
-
-                    this.abrirBalaoMensagem(objetoRef);
+                    this.interagirComObjeto(objetoRef);
                 });
 
                 this.objetosInterativos.push(objetoRef);
@@ -163,6 +256,95 @@ class MapaInterativo {
         } catch (e) {
             console.error("Erro ao carregar objetos interativos:", e);
         }
+    }
+
+    jogadorPerto(objRef) {
+        const player = this.scene.player;
+        if (!player) return false;
+
+        return Phaser.Math.Distance.Between(
+            player.x,
+            player.y,
+            objRef.x,
+            objRef.y
+        ) <= 100;
+    }
+
+    moverJogadorAte(objRef) {
+        const player = this.scene.player;
+        if (!player || !this.scene.target || !this.scene.physics) return;
+
+        this.scene.target.set(objRef.x + 16, objRef.y + 48);
+        this.scene.isMoving = true;
+        this.scene.physics.moveToObject(player, this.scene.target, 150);
+    }
+
+    pararJogador() {
+        const player = this.scene.player;
+        player?.body?.stop();
+        this.scene.isMoving = false;
+
+        if (player?.anims) {
+            player.anims.stop();
+            player.setFrame(1);
+        }
+    }
+
+    interagirComObjeto(objRef) {
+        if (!objRef) return;
+
+        if (objRef.acao === 'abrir_coliseu_pvp') {
+            this.pararJogador();
+            if (typeof window.abrirColiseuPvP === 'function') {
+                window.abrirColiseuPvP();
+            }
+            return;
+        }
+
+        this.pararJogador();
+
+        if (
+            objRef.eEstatuaPedroca &&
+            !objRef.estatuaTransformada
+        ) {
+            if (objRef.transicaoEstatua) return;
+
+            objRef.transicaoEstatua = true;
+            objRef.botao.bloqueado = true;
+            objRef.botao.setVisible(false);
+            objRef.spriteEstatua
+                .setVisible(true)
+                .setAlpha(0)
+                .play('estatua_pedroca_despertar');
+
+            this.scene.tweens.add({
+                targets: objRef.cristalEstatua,
+                alpha: 0,
+                duration: 220,
+                ease: 'Sine.easeInOut',
+                onComplete: () => objRef.cristalEstatua.setVisible(false)
+            });
+            this.scene.tweens.add({
+                targets: objRef.spriteEstatua,
+                alpha: 1,
+                duration: 220,
+                ease: 'Sine.easeInOut'
+            });
+
+            objRef.spriteEstatua.once('animationcomplete', animation => {
+                if (animation.key !== 'estatua_pedroca_despertar') return;
+
+                objRef.spriteEstatua.anims.stop();
+                objRef.spriteEstatua.setFrame(3);
+                objRef.estatuaTransformada = true;
+                objRef.transicaoEstatua = false;
+                objRef.botao.bloqueado = false;
+                this.abrirBalaoMensagem(objRef);
+            });
+            return;
+        }
+
+        this.abrirBalaoMensagem(objRef);
     }
 
     redesenharBalao(botao, largura, altura) {
