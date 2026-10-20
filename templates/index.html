@@ -575,7 +575,7 @@
     <script src="/static/js/dialogos_eldora.js?v=2"></script>
     <link rel="stylesheet" href="/static/css/runas.css?v=1">
     <script src="/static/js/runas.js?v=2"></script>
-<link rel="stylesheet" href="/static/css/menu_heroi.css?v=7">
+<link rel="stylesheet" href="/static/css/menu_heroi.css?v=8">
     <script defer src="/static/js/menu_heroi.js?v=6"></script>
     <link rel="stylesheet" href="/static/css/perfil_redesign.css?v=20261016-4">
     <link rel="stylesheet" href="/static/css/perfil_redesign_v1.css?v=20261016-2">
@@ -838,7 +838,7 @@
     <header><h1>🏰 𝐑𝐞𝐢𝐧𝐨 𝐝𝐞 𝐄𝐥𝐝𝐨𝐫𝐚 🏰</h1></header>
 
     <button id="btn-abrir-menu" onclick="abrirMenu()" aria-label="Abrir menu do herói" aria-controls="side-menu" aria-expanded="false">
-        <img src="/static/assets/sprites/ui/botao_menu.png" alt="Menu" onerror="this.src='https://img.icons8.com/color/48/settings.png'">
+        <img src="/static/assets/sprites/ui/botao_menu.png?v=1" alt="Menu" onerror="this.src='https://img.icons8.com/color/48/settings.png'">
     </button>
 
     <div id="menu-overlay" onclick="fecharMenu()"></div>
@@ -1125,7 +1125,7 @@
             <span id="online-count-text">Conectando...</span>
         </div>
 
-        <button id="btn-chat-mapa" class="btn-social-mapa" style="transition: transform 0.2s;" onclick="document.getElementById('hub-social').style.display='flex'; document.querySelectorAll('.btn-passe-mapa, .btn-social-mapa').forEach(b => b.style.display='none'); let badge = document.getElementById('badge-chat-mapa'); if(badge) badge.remove(); window.totalNotificacoesMapa = 0;">
+        <button id="btn-chat-mapa" class="btn-social-mapa" style="transition: transform 0.2s;" onclick="document.getElementById('hub-social').style.display='flex'; document.querySelectorAll('.btn-passe-mapa, .btn-social-mapa').forEach(b => b.style.display='none'); let badge = document.getElementById('badge-chat-mapa'); if(badge) badge.remove(); window.totalNotificacoesMapa = 0; if(window.eldoraSocket?.connected) window.eldoraSocket.emit('marcarChatGlobalLido');">
             <img src="/static/assets/sprites/ui/icone_chat.png" alt="Chat">
         </button>
         
@@ -1237,7 +1237,7 @@
     <script src="/static/js/hud_invasao.js"></script>
     <script src="/static/js/mapa_invasao.js?v=1"></script>
     <script src="/static/js/mapa_interativo.js?v=23"></script>
-    <script src="/static/js/mapa_multiplayer.js?v=34"></script>
+    <script src="/static/js/mapa_multiplayer.js?v=36"></script>
     <script src="/static/js/mercado.js?v=1258"></script>
     <script src="/static/js/central_eldora.js?v=4"></script>
     <script src="/static/js/cla.js?v=8"></script>
@@ -1264,7 +1264,7 @@
     <!-- 🌀 SISTEMA DE PORTAIS -->
     <script src="/static/js/portal_manager.js?v=1"></script>
 
-    <script src="/static/js/mapa.js?v=9952"></script>
+    <script src="/static/js/mapa.js?v=9955"></script>
     <script src="/static/js/coliseu_pvp.js?v=17"></script>
     <script src="/static/js/eventos_dinamicos.js?v=1"></script>
 

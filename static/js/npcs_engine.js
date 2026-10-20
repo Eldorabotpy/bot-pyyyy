@@ -86,7 +86,7 @@ class NPCsEngine {
                 #btn-quest-log:active #img-pergaminho-quest { transform: scale(1.3) !important; }
             </style>
 
-            <button id="btn-quest-log" onclick="window.toggleDiarioQuests()" style="position: absolute; top: 170px; right: 10px; z-index: 10; cursor: pointer;">
+            <button id="btn-quest-log" onclick="window.toggleDiarioQuests()" style="cursor: pointer;">
                 <div style="position: relative; display: flex; justify-content: center; align-items: center;">
                     <img id="img-pergaminho-quest" src="https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/ui/icone_pergaminho.png" style="width: 40px; height: 40px; filter: drop-shadow(2px 3px 4px rgba(0,0,0,0.8)); display: block;">
                     <div id="quest-badge" style="display: none; position: absolute; top: -1px; right: -1px; width: 10px; height: 10px; background: #ef4444; border: 2px solid #fff; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.6); z-index: 2;"></div>

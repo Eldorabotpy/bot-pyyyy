@@ -36,3 +36,10 @@ def sids_online_do_cla(cla, jogadores_online):
         for sid, info in (jogadores_online or {}).items()
         if str((info or {}).get("char_id")) in membros
     ]
+
+
+def mensagem_global_nao_lida(id_mensagem, ultimo_id_lido):
+    """Compare Mongo ObjectId values represented as ObjectIds or hex strings."""
+    if id_mensagem is None or ultimo_id_lido is None:
+        return False
+    return str(id_mensagem) > str(ultimo_id_lido)

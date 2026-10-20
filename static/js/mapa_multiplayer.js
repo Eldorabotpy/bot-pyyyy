@@ -916,10 +916,10 @@ class MotorMultiplayer {
             }
             
             // 🛡️ O DESTRUIDOR DE CLONES: Garante que nenhuma mensagem repetida apareça
-            if (msg.historico) {
+            if (msg.historico || msg.id) {
                 // Cria uma "identidade" para a mensagem
                 const canalMensagem = msg.canal || msg.tipo || 'global';
-                const idMensagem = canalMensagem + "_" + msg.remetente + "_" + msg.texto;
+                const idMensagem = canalMensagem + "_" + (msg.id || (msg.remetente + "_" + msg.texto));
                 window.historicoRecebido = window.historicoRecebido || new Set();
                 
                 // Se essa mensagem já foi desenhada na tela, ABORTA!
@@ -931,6 +931,10 @@ class MotorMultiplayer {
 
             const chatBox = document.getElementById('chat-box');
             if (!chatBox) return;
+            const hubSocial = document.getElementById('hub-social');
+            const tavernaVisivel = Boolean(
+                hubSocial && window.getComputedStyle(hubSocial).display !== 'none'
+            );
 
             // Limpa as mensagens padrão de "Bem vindo"
             Array.from(chatBox.children).forEach(child => { if(child.tagName === 'P') child.remove(); });
@@ -1063,28 +1067,34 @@ class MotorMultiplayer {
             const inputChat = document.getElementById('input-chat');
             const alvoAtual = inputChat ? inputChat.dataset.alvoPrivado : null;
             
-            let mensagemEscondida = true;
+            let mensagemNaAbaAtiva = false;
 
             if (abaAtiva === 'chat' && canalDaMsg === 'global') {
-                linha.style.display = 'block'; mensagemEscondida = false;
+                linha.style.display = 'block'; mensagemNaAbaAtiva = true;
             } else if (abaAtiva === 'amigos' && canalDaMsg === 'amigos') {
                 if (alvoAtual && linha.dataset.parceiro === alvoAtual) {
-                    linha.style.display = 'block'; mensagemEscondida = false;
+                    linha.style.display = 'block'; mensagemNaAbaAtiva = true;
                 } else {
                     linha.style.display = 'none';
                 }
             } else if (abaAtiva === 'grupo' && canalDaMsg === 'grupo') {
-                linha.style.display = 'block'; mensagemEscondida = false;
+                linha.style.display = 'block'; mensagemNaAbaAtiva = true;
             } else if (abaAtiva === 'guilda' && canalDaMsg === 'guilda') {
-                linha.style.display = 'block'; mensagemEscondida = false;
+                linha.style.display = 'block'; mensagemNaAbaAtiva = true;
             } else {
                 linha.style.display = 'none';
             }
 
+            const mensagemEscondida = !tavernaVisivel || !mensagemNaAbaAtiva;
+
             // 🔔 SISTEMA DE NOTIFICAÇÃO BLINDADO
             // Dispara se for uma mensagem Nova que você não viu, OU se for um histórico marcado como Não Lido pelo DB!
-            let isNovaEscondida = (mensagemEscondida && msg.remetente !== "Sistema" && !msg.historico);
-            let isHistoricoNaoLido = (msg.historico && msg.nao_lida);
+            let isNovaEscondida = (
+                mensagemEscondida &&
+                (msg.remetente !== "Sistema" || msg.tipo === "mercado") &&
+                !msg.historico
+            );
+            let isHistoricoNaoLido = (msg.historico && msg.nao_lida && mensagemEscondida);
 
             if (isNovaEscondida || isHistoricoNaoLido) {
                 
@@ -1095,7 +1105,7 @@ class MotorMultiplayer {
                 }
 
                 // 2. Bolinhas de notificação nas abas internas
-                document.querySelectorAll('.aba-soc').forEach(btn => {
+                if (!mensagemNaAbaAtiva) document.querySelectorAll('.aba-soc').forEach(btn => {
                     let textoBotao = btn.innerText.toLowerCase();
                     let abaAlvo = false;
 
@@ -1113,11 +1123,10 @@ class MotorMultiplayer {
                 });
 
                 // 👇 3. NOVO: O CONTADOR NO ÍCONE DO MAPA! 👇
-                const hubSocial = document.getElementById('hub-social');
                 const btnMapa = document.getElementById('btn-chat-mapa');
                 
                 // Se a janela social estiver FECHADA, mostra a notificação no ícone!
-                if (hubSocial && hubSocial.style.display === 'none' && btnMapa) {
+                if (!tavernaVisivel && btnMapa) {
                     window.totalNotificacoesMapa = (window.totalNotificacoesMapa || 0) + 1;
                     
                     let badgeMapa = document.getElementById('badge-chat-mapa');
@@ -1586,6 +1595,9 @@ window.mudarAbaSocial = function(aba, elemento) {
         // 🧽 LIMPEZA: Remove a bolinha de notificação quando clica na aba!
         let badge = elemento.querySelector('.notificacao-badge');
         if (badge) badge.remove();
+    }
+    if (aba === 'chat' && window.eldoraSocket?.connected) {
+        window.eldoraSocket.emit('marcarChatGlobalLido');
     }
     const conteudo = document.getElementById('chat-box');
     const inputArea = document.querySelector('.chat-input-area');

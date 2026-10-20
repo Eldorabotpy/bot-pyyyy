@@ -1011,3 +1011,76 @@ background-size: cover;
     border-color: transparent !important;
     box-shadow: none !important;
 }
+
+/* Atalhos do mapa organizados numa única coluna. */
+:root {
+    --eldora-atalho-topo: calc(env(safe-area-inset-top, 0px) + 12px);
+    --eldora-atalho-passo: 52px;
+    --eldora-atalho-direita: calc(env(safe-area-inset-right, 0px) + 10px);
+}
+
+#btn-abrir-menu,
+.btn-passe-mapa,
+.btn-social-mapa,
+#btn-quest-log {
+    position: fixed !important;
+    right: var(--eldora-atalho-direita) !important;
+    left: auto !important;
+    width: 44px !important;
+    height: 44px !important;
+    min-width: 44px !important;
+    min-height: 44px !important;
+    box-sizing: border-box !important;
+    margin: 0 !important;
+    padding: 3px !important;
+}
+
+#btn-abrir-menu {
+    top: var(--eldora-atalho-topo) !important;
+}
+
+.btn-passe-mapa {
+    top: calc(var(--eldora-atalho-topo) + var(--eldora-atalho-passo)) !important;
+}
+
+#btn-chat-mapa {
+    top: calc(var(--eldora-atalho-topo) + var(--eldora-atalho-passo) + var(--eldora-atalho-passo)) !important;
+}
+
+#btn-expressoes {
+    top: calc(var(--eldora-atalho-topo) + var(--eldora-atalho-passo) + var(--eldora-atalho-passo) + var(--eldora-atalho-passo)) !important;
+}
+
+#btn-quest-log {
+    top: calc(var(--eldora-atalho-topo) + var(--eldora-atalho-passo) + var(--eldora-atalho-passo) + var(--eldora-atalho-passo) + var(--eldora-atalho-passo)) !important;
+    bottom: auto !important;
+}
+
+.btn-passe-mapa img,
+.btn-social-mapa img,
+#img-pergaminho-quest {
+    width: 36px !important;
+    height: 36px !important;
+    object-fit: contain;
+}
+
+/* O ícone de conversa tem desenho cheio e precisa de mais respiro no atalho. */
+#btn-chat-mapa img {
+    width: 29px !important;
+    height: 29px !important;
+}
+
+.btn-social-mapa {
+    border-width: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+}
+
+#btn-quest-log {
+    background: transparent !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    -webkit-appearance: none !important;
+    appearance: none !important;
+}

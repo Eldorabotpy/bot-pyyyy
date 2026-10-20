@@ -2,6 +2,7 @@ import unittest
 
 from modules.social_chat import (
     classificar_destino_mensagem,
+    mensagem_global_nao_lida,
     sids_online_do_cla,
 )
 
@@ -29,6 +30,14 @@ class SocialChatRoutingTests(unittest.TestCase):
             "sid-c": {"char_id": "char-c"},
         }
         self.assertEqual(set(sids_online_do_cla(clan, online)), {"sid-a", "sid-b"})
+
+    def test_global_message_after_read_cursor_is_unread(self):
+        self.assertTrue(mensagem_global_nao_lida("66aa00000000000000000002", "66aa00000000000000000001"))
+
+    def test_global_message_at_or_before_read_cursor_is_read(self):
+        cursor = "66aa00000000000000000002"
+        self.assertFalse(mensagem_global_nao_lida(cursor, cursor))
+        self.assertFalse(mensagem_global_nao_lida("66aa00000000000000000001", cursor))
 
 
 if __name__ == "__main__":

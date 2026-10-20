@@ -2323,7 +2323,7 @@ def api_criar_anuncio():
             
             # Força salvar no banco correto do Chat (eldora_bot)
             db_certo = users_collection.database.client["eldora_bot"]
-            db_certo["chat_historico"].insert_one({
+            mensagem_salva = db_certo["chat_historico"].insert_one({
                 "remetente": "Sistema", "texto": texto_anuncio,
                 "alvo": "global", "tipo": "mercado", "data_envio": datetime.utcnow()
             })
@@ -2331,7 +2331,7 @@ def api_criar_anuncio():
             # Puxa o SocketIO verdadeiro sem dar reload no app
             sio = current_app.extensions.get('socketio')
             if sio:
-                sio.emit('novaMensagemChat', {"texto": texto_anuncio, "tipo": "mercado", "remetente": "Sistema"})
+                sio.emit('novaMensagemChat', {"id": str(mensagem_salva.inserted_id), "texto": texto_anuncio, "tipo": "mercado", "remetente": "Sistema"})
         except Exception as e:
             print(f"Erro ao emitir msg de mercado: {e}")
         # 👆 FIM DA NOTIFICAÇÃO 👆
@@ -2451,14 +2451,14 @@ def api_comprar_mercado():
             
             # Força salvar no banco correto
             db_certo = users_collection.database.client["eldora_bot"]
-            db_certo["chat_historico"].insert_one({
+            mensagem_salva = db_certo["chat_historico"].insert_one({
                 "remetente": "Sistema", "texto": texto_anuncio,
                 "alvo": "global", "tipo": "mercado", "data_envio": datetime.utcnow()
             })
             
             sio = current_app.extensions.get('socketio')
             if sio:
-                sio.emit('novaMensagemChat', {"texto": texto_anuncio, "tipo": "mercado", "remetente": "Sistema"})
+                sio.emit('novaMensagemChat', {"id": str(mensagem_salva.inserted_id), "texto": texto_anuncio, "tipo": "mercado", "remetente": "Sistema"})
         except Exception as e:
             print(f"Erro ao emitir msg de compra: {e}")
 
@@ -2493,14 +2493,14 @@ def api_cancelar_mercado():
             
             # Força salvar no banco correto
             db_certo = users_collection.database.client["eldora_bot"]
-            db_certo["chat_historico"].insert_one({
+            mensagem_salva = db_certo["chat_historico"].insert_one({
                 "remetente": "Sistema", "texto": texto_anuncio,
                 "alvo": "global", "tipo": "mercado", "data_envio": datetime.utcnow()
             })
             
             sio = current_app.extensions.get('socketio')
             if sio:
-                sio.emit('novaMensagemChat', {"texto": texto_anuncio, "tipo": "mercado", "remetente": "Sistema"})
+                sio.emit('novaMensagemChat', {"id": str(mensagem_salva.inserted_id), "texto": texto_anuncio, "tipo": "mercado", "remetente": "Sistema"})
         except Exception as e:
             print(f"Erro ao emitir msg de cancelamento: {e}")
 

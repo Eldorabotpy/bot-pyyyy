@@ -33,7 +33,11 @@ from modules.mob_engine import GerenciadorCacada
 from modules import player_manager
 from modules.combat.party_engine import obter_grupo_do_jogador, sair_ou_desfazer_grupo
 from modules.combat import group_combat_manager as gcm
-from modules.social_chat import classificar_destino_mensagem, sids_online_do_cla
+from modules.social_chat import (
+    classificar_destino_mensagem,
+    mensagem_global_nao_lida,
+    sids_online_do_cla,
+)
 # from modules.combat.web_battle_manager import WebBattleManager
 # pyrefly: ignore [missing-import]
 from telegram.ext import Application, CommandHandler
@@ -177,12 +181,63 @@ url_do_jogo = "https://163-176-44-198.sslip.io"
 
 db = client["eldora_bot"]
 chat_collection = db["chat_historico"]
-chat_collection.create_index("data_envio", expireAfterSeconds=43200)
+# O histórico do chat fica disponível no período de mensagens privadas offline.
+# Atualiza o TTL existente sem recriar índices quando a configuração já está certa.
+CHAT_RETENCAO_SEGUNDOS = 2592000
+for nome_indice, indice in chat_collection.index_information().items():
+    if (
+        indice.get("key") == [("data_envio", 1)]
+        and indice.get("expireAfterSeconds") != CHAT_RETENCAO_SEGUNDOS
+    ):
+        chat_collection.drop_index(nome_indice)
+chat_collection.create_index("data_envio", expireAfterSeconds=CHAT_RETENCAO_SEGUNDOS)
+chat_leituras_collection = db["chat_leituras"]
+chat_leituras_collection.create_index("char_id", unique=True)
 
 # 📬 NOVA COLEÇÃO: Correios de Eldora (Mensagens Privadas Offline)
 # 2592000 segundos = Exatamente 30 dias! Depois disso o Mongo apaga sozinho.
 mensagens_offline_col = db["mensagens_offline"]
 mensagens_offline_col.create_index("data_envio", expireAfterSeconds=2592000)
+
+
+def obter_cursor_leitura_chat_global(char_id):
+    char_id = str(char_id)
+    estado = chat_leituras_collection.find_one({"char_id": char_id})
+    cursor = (estado or {}).get("ultimo_id_lido")
+
+    if isinstance(cursor, str):
+        try:
+            cursor = ObjectId(cursor)
+        except Exception:
+            cursor = None
+    if isinstance(cursor, ObjectId):
+        return cursor
+
+    ultima_mensagem = chat_collection.find_one(
+        {"alvo": "global"},
+        sort=[("_id", -1)],
+        projection={"_id": 1},
+    )
+    # A primeira entrada estabelece a linha de base. Assim, só avisamos sobre
+    # mensagens que chegaram depois que o personagem começou a acompanhar o chat.
+    cursor = (
+        ultima_mensagem["_id"]
+        if ultima_mensagem
+        else ObjectId.from_datetime(datetime.utcnow())
+    )
+    chat_leituras_collection.update_one(
+        {"char_id": char_id},
+        {"$setOnInsert": {"char_id": char_id, "ultimo_id_lido": cursor}},
+        upsert=True,
+    )
+    estado = chat_leituras_collection.find_one({"char_id": char_id}) or {}
+    cursor_salvo = estado.get("ultimo_id_lido")
+    if isinstance(cursor_salvo, str):
+        try:
+            cursor_salvo = ObjectId(cursor_salvo)
+        except Exception:
+            cursor_salvo = None
+    return cursor_salvo if isinstance(cursor_salvo, ObjectId) else cursor
 
 sistema_invasao_mapa = GerenciadorInvasao(socketio)
 
@@ -1348,10 +1403,10 @@ def handle_chat_message(dados):
             "alvo": "global", "data_envio": datetime.utcnow(),
             "avatar": avatar_real 
         }
-        chat_collection.insert_one(pacote_global)
+        mensagem_salva = chat_collection.insert_one(pacote_global)
         
         for sid in list(jogadores_online.keys()):
-            emit('novaMensagemChat', {"remetente": remetente, "texto": mensagem, "tipo": "global", "avatar": avatar_real}, to=sid)
+            emit('novaMensagemChat', {"id": str(mensagem_salva.inserted_id), "remetente": remetente, "texto": mensagem, "tipo": "global", "avatar": avatar_real}, to=sid)
             
     except Exception as e:
         print(f"🚨 ERRO GRAVE NO CHAT: {str(e)}")
@@ -1916,13 +1971,16 @@ def handle_entrar_regiao(data):
     # 📜 CARREGAR HISTÓRICO NA TELA DO JOGADOR 📜
     nome_jogador = data.get('nome', 'Herói')
     
+    cursor_chat_lido = obter_cursor_leitura_chat_global(char_id)
     hist_global = list(chat_collection.find({"alvo": "global"}).sort("data_envio", -1).limit(30))
     for msg in reversed(hist_global):
         emit('novaMensagemChat', {
+            "id": str(msg.get("_id", "")),
             "remetente": msg["remetente"], 
             "texto": msg["texto"], 
             "tipo": msg.get("tipo", "global"), 
             "historico": True,
+            "nao_lida": mensagem_global_nao_lida(msg.get("_id"), cursor_chat_lido),
             "avatar": msg.get("avatar", "") 
         }, to=player_sid)
 
@@ -1971,6 +2029,36 @@ def handle_entrar_regiao(data):
             "nao_lida": not foi_lida,
             "avatar": msg.get("avatar", "") 
         }, to=player_sid)
+
+@socketio.on('marcarChatGlobalLido')
+def handle_marcar_chat_global_lido(_dados=None):
+    player_sid = request.sid
+    jogador = jogadores_online.get(player_sid)
+    if not jogador or not jogador.get('char_id'):
+        return
+
+    char_id = str(jogador['char_id'])
+    ultima_mensagem = chat_collection.find_one(
+        {"alvo": "global"},
+        sort=[("_id", -1)],
+        projection={"_id": 1},
+    )
+    cursor = (
+        ultima_mensagem["_id"]
+        if ultima_mensagem
+        else ObjectId.from_datetime(datetime.utcnow())
+    )
+    chat_leituras_collection.update_one(
+        {"char_id": char_id},
+        {
+            "$set": {
+                "char_id": char_id,
+                "ultimo_id_lido": cursor,
+                "atualizado_em": datetime.utcnow(),
+            }
+        },
+        upsert=True,
+    )
         
 @socketio.on('enviarAcaoMapa')
 def handle_acao_mapa(dados):

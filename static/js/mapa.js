@@ -22,6 +22,8 @@ class MapaScene extends Phaser.Scene {
         this.indiceParadoEspecial = 0;
         this.animacaoParadaEspecialAtiva = false;
         this.timerPoseParadaEspecial = null;
+        this.mercadoRealPendente = null;
+        this.mercadoRealSelo = null;
 
         // ==========================================
         // 🏰 EVENTOS DE DUNGEON
@@ -119,6 +121,8 @@ class MapaScene extends Phaser.Scene {
         this.indiceParadoEspecial = 0;
         this.animacaoParadaEspecialAtiva = false;
         this.timerPoseParadaEspecial = null;
+        this.mercadoRealPendente = null;
+        this.mercadoRealSelo = null;
 
         // Controle da confirmação de saída da dungeon.
         this.confirmacaoTransicaoAberta = false;
@@ -865,45 +869,33 @@ class MapaScene extends Phaser.Scene {
         // ⚖️ NOVA LOJA: MERCADO DO AVENTUREIRO (ENTRE PLAYERS)
         // ==========================================
         if (this.regiaoAtual === 'capital_eldora') {
-            // 📍 Defina as coordenadas X e Y da porta da casa escolhida no seu Tiled
-            // Exemplo genérico (mude os números abaixo para bater com a casa do seu mapa)
-            let casaMercadoX = 36 * 32; 
+            // Centro do vão da porta, conferido pelas colisões da camada Tiled.
+            let casaMercadoX = 35 * 32 + 19;
             let casaMercadoY = 18 * 32;
+            // Ponto caminhável imediatamente diante da porta, fora da colisão do Tiled.
+            const aproximacaoMercado = { x: casaMercadoX, y: 600 };
 
-            // 1. Cria o Ícone da Balança flutuando no mapa estilo indicador de Quest
-            let iconeBalanca = this.add.text(casaMercadoX, casaMercadoY - 60, '⚖️', {
-                fontSize: '22px', 
-                stroke: '#00000000', 
-                strokeThickness: 4
-            }).setOrigin(0.5).setDepth(30);
+            // Selo e letreiro ficam alinhados sobre o centro da entrada.
+            const identificadorMercado = this.criarIdentificadorMercado(casaMercadoX, casaMercadoY);
+            this.mercadoRealSelo = identificadorMercado.selo;
 
-            // Animação de pulsação vertical para a balança ficar subindo e descendo
-            this.tweens.add({
-                targets: iconeBalanca,
-                y: casaMercadoY - 53,
-                duration: 700,
-                yoyo: true,
-                repeat: -1,
-                ease: 'Sine.easeInOut'
-            });
-
-            // 2. Plaquinha oficial em cima da porta
-            this.criarPlaquinhaNome(casaMercadoX, casaMercadoY - 80, 'Mercado Real');
-
-            // 3. Hitbox interativa na porta da casa
-            let hitboxPortaMercado = this.add.rectangle(casaMercadoX, casaMercadoY - 10, 170, 150, 0x00ff00, 0.001)
-                .setDepth(50)
-                .setInteractive({ useHandCursor: true });
-
-            hitboxPortaMercado.on('pointerdown', (pointer, localX, localY, event) => {
+            // Só o emblema recebe o clique; a fachada deixa de capturar toques distantes.
+            identificadorMercado.areaClique.on('pointerdown', (pointer, localX, localY, event) => {
                 if (event) event.stopPropagation();
                 if (this.player && this.player.isGathering) return;
 
-                let dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, casaMercadoX, casaMercadoY);
-                
-                if (dist > 30) {
-                    // Auto-caminhada até a porta do Mercado se o player clicar de longe
-                    this.target.set(casaMercadoX, casaMercadoY);
+                const dist = Phaser.Math.Distance.Between(
+                    this.player.x,
+                    this.player.y,
+                    aproximacaoMercado.x,
+                    aproximacaoMercado.y
+                );
+
+                if (dist > 24) {
+                    // Caminha até a fachada e abre ao chegar, mesmo se a colisão
+                    // parar o personagem alguns pixels antes do ponto de aproximação.
+                    this.mercadoRealPendente = { ...aproximacaoMercado, raio: 24 };
+                    this.target.set(aproximacaoMercado.x, aproximacaoMercado.y);
                     this.isMoving = true;
                     this.physics.moveToObject(this.player, this.target, 150);
 
@@ -915,15 +907,9 @@ class MapaScene extends Phaser.Scene {
                     return;
                 }
 
-                // Chegou perto: para a movimentação e abre a aba HTML nova!
+                this.mercadoRealPendente = null;
                 this.pararPersonagem();
-                
-                if (typeof abrirMercado === 'function') {
-                    abrirMercado(); // Dispara o arquivo mercado.js que criamos
-                } else {
-                    console.error("Interface do Mercado (abrirMercado) não encontrada!");
-                }
-
+                this.abrirMercadoReal();
             });
         }
         
@@ -2183,6 +2169,15 @@ class MapaScene extends Phaser.Scene {
 
             if (this.isDead || window.BruxaPocoes?.aberta || window.__mercadoAberto || window.__guildaAberta || window.combateAbertoBloqueandoMapa || window.__eldoraDialogAberto || window.__oficinaRunasAberta) return;
 
+            // O clique no selo do Mercado é tratado pelo próprio emblema, sem
+            // também mandar o personagem caminhar para as coordenadas do ícone.
+            if (this.mercadoRealSelo?.active && Phaser.Math.Distance.Between(
+                pointer.worldX,
+                pointer.worldY,
+                this.mercadoRealSelo.x,
+                this.mercadoRealSelo.y
+            ) <= 25) return;
+
             // ==========================================
             // 🛡️ HUD DE STATUS ABERTO
             // Não permite o clique chegar ao mapa.
@@ -2242,7 +2237,8 @@ class MapaScene extends Phaser.Scene {
             ) {
                 this.motorCacada.pararAutoCacada("clique manual no mapa", false);
             }
-        
+
+            this.mercadoRealPendente = null;
             this.target.set(pointer.worldX, pointer.worldY);
             this.isMoving = true;
             this.physics.moveToObject(this.player, this.target, 150);
@@ -3099,6 +3095,18 @@ class MapaScene extends Phaser.Scene {
         // 🛑 TRAVA DE SEGURANÇA (Não apague isso, impede o boneco de andar morto)
         if (this.isDead || this.travadoNoPortal) return;
 
+        // Abre o Mercado assim que o personagem alcança a área caminhável diante da porta.
+        if (this.mercadoRealPendente) {
+            const { x, y, raio } = this.mercadoRealPendente;
+            const distanciaMercado = Phaser.Math.Distance.Between(this.player.x, this.player.y, x, y);
+            if (distanciaMercado <= raio) {
+                this.mercadoRealPendente = null;
+                this.pararPersonagem();
+                this.abrirMercadoReal();
+                return;
+            }
+        }
+
         // ====================================================
         // 🎮 NOVA FÍSICA DE MOVIMENTO (JOYSTICK + TECLADO)
         // ====================================================
@@ -3138,6 +3146,7 @@ class MapaScene extends Phaser.Scene {
         }
 
         if (moveX !== 0 || moveY !== 0) {
+            this.mercadoRealPendente = null;
             this.cancelarAnimacaoParadaEspecial();
             this.inicioParadoEspecial = null;
 
@@ -4916,6 +4925,107 @@ class MapaScene extends Phaser.Scene {
         });
         
     }
+    abrirMercadoReal() {
+        if (typeof window.abrirMercado === 'function') {
+            window.abrirMercado();
+        } else {
+            console.error("Interface do Mercado (abrirMercado) não encontrada!");
+        }
+    }
+
+    criarIdentificadorMercado(x, y) {
+        const placa = this.add.container(x, y - 55).setDepth(31);
+        const fundoPlaca = this.add.graphics();
+
+        fundoPlaca.fillStyle(0x0b1725, 0.97);
+        fundoPlaca.fillRoundedRect(-57, -13, 114, 26, 6);
+        fundoPlaca.fillTriangle(-6, 10, 6, 10, 0, 17);
+        fundoPlaca.lineStyle(2, 0xd8b45f, 1);
+        fundoPlaca.strokeRoundedRect(-57, -13, 114, 26, 6);
+        fundoPlaca.beginPath();
+        fundoPlaca.moveTo(-6, 10);
+        fundoPlaca.lineTo(0, 17);
+        fundoPlaca.lineTo(6, 10);
+        fundoPlaca.strokePath();
+        fundoPlaca.lineStyle(1, 0x725528, 0.95);
+        fundoPlaca.strokeRoundedRect(-52, -9, 104, 18, 4);
+
+        fundoPlaca.fillStyle(0xf0d48d, 1);
+        fundoPlaca.fillPoints([
+            { x: -47, y: 0 }, { x: -44, y: -3 }, { x: -41, y: 0 }, { x: -44, y: 3 }
+        ], true);
+        fundoPlaca.fillPoints([
+            { x: 47, y: 0 }, { x: 44, y: -3 }, { x: 41, y: 0 }, { x: 44, y: 3 }
+        ], true);
+
+        const titulo = this.add.text(0, 0, 'MERCADO REAL', {
+            fontSize: '11px',
+            fontFamily: 'Cinzel, Georgia, serif',
+            fontStyle: 'bold',
+            color: '#f5dfaa',
+            letterSpacing: 0.6,
+            stroke: '#08111b',
+            strokeThickness: 2
+        }).setOrigin(0.5).setResolution(2);
+        placa.add([fundoPlaca, titulo]);
+
+        const selo = this.add.container(x, y - 21).setDepth(32);
+        const desenho = this.add.graphics();
+        desenho.fillStyle(0x091522, 0.98);
+        desenho.fillCircle(0, 0, 16);
+        desenho.lineStyle(2, 0xe5bd68, 1);
+        desenho.strokeCircle(0, 0, 16);
+        desenho.lineStyle(1, 0x79602f, 1);
+        desenho.strokeCircle(0, 0, 12.5);
+
+        desenho.lineStyle(1.8, 0xf5d88f, 1);
+        desenho.beginPath();
+        desenho.moveTo(0, -9);
+        desenho.lineTo(0, 8);
+        desenho.moveTo(-8, -5);
+        desenho.lineTo(8, -5);
+        desenho.moveTo(0, -8);
+        desenho.lineTo(-2, -5);
+        desenho.lineTo(0, -2);
+        desenho.lineTo(2, -5);
+        desenho.moveTo(-7, -5);
+        desenho.lineTo(-9, 1);
+        desenho.moveTo(7, -5);
+        desenho.lineTo(9, 1);
+        desenho.moveTo(-3, -5);
+        desenho.lineTo(-1, 1);
+        desenho.moveTo(3, -5);
+        desenho.lineTo(1, 1);
+        desenho.moveTo(-10, 1);
+        desenho.lineTo(-8, 4);
+        desenho.lineTo(-3, 4);
+        desenho.lineTo(-1, 1);
+        desenho.moveTo(10, 1);
+        desenho.lineTo(8, 4);
+        desenho.lineTo(3, 4);
+        desenho.lineTo(1, 1);
+        desenho.strokePath();
+        selo.add(desenho);
+
+        this.tweens.add({
+            targets: selo,
+            y: y - 17,
+            scaleX: 1.04,
+            scaleY: 1.04,
+            duration: 850,
+            yoyo: true,
+            repeat: -1,
+            ease: 'Sine.easeInOut'
+        });
+
+        // Área de toque acompanha o selo animado e não cobre a porta inteira.
+        const areaClique = this.add.zone(0, 0, 50, 50)
+            .setInteractive({ useHandCursor: true });
+        selo.add(areaClique);
+
+        return { placa, selo, areaClique };
+    }
+
     // ==========================================
     // 🏷️ CRIADOR DE PLAQUINHAS DE NOME ESTILO RPG
     // ==========================================
