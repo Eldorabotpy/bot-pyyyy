@@ -331,15 +331,33 @@ class MapaInterativo {
                 // Texto da mensagem dentro do balão
                 const textoMensagem = this.scene.add.text(0, -40, '', {
                     fontFamily: 'Cinzel, Arial',
-                    fontSize: '15px',
-                    color: '#f1c40f',
+                    fontSize: '13px',
+                    color: '#f4ead2',
                     fontStyle: 'bold',
                     align: 'center',
                     wordWrap: {
-                        width: 118,
+                        width: 168,
                         useAdvancedWrap: true
                     }
 
+                }).setOrigin(0.5).setVisible(false);
+
+                const tituloMensagem = this.scene.add.text(0, -40, '', {
+                    fontFamily: 'Cinzel, Georgia, serif',
+                    fontSize: '9px',
+                    fontStyle: 'bold',
+                    color: '#f2ce73',
+                    align: 'center',
+                    letterSpacing: 1
+                }).setOrigin(0.5).setVisible(false);
+
+                const dicaMensagem = this.scene.add.text(0, -40, 'TOQUE PARA FECHAR', {
+                    fontFamily: 'Arial, sans-serif',
+                    fontSize: '8px',
+                    fontStyle: 'bold',
+                    color: '#9fb0c4',
+                    align: 'center',
+                    letterSpacing: 0.5
                 }).setOrigin(0.5).setVisible(false);
                 
                 // ==========================================
@@ -351,11 +369,18 @@ class MapaInterativo {
                 botao.iconeImagem = iconeImagem;
                 botao.simbolo = simbolo;
                 botao.textoMensagem = textoMensagem;
+                botao.tituloMensagem = tituloMensagem;
+                botao.dicaMensagem = dicaMensagem;
 
                 const elementosBotao = [];
                 if (brilho) elementosBotao.push(brilho);
                 elementosBotao.push(fundo);
-                elementosBotao.push(iconeImagem || simbolo, textoMensagem);
+                elementosBotao.push(
+                    iconeImagem || simbolo,
+                    tituloMensagem,
+                    textoMensagem,
+                    dicaMensagem
+                );
                 botao.add(elementosBotao);
                 // Desenha o balão pequeno inicial
                 this.redesenharBalao(botao, 38, 34);
@@ -378,6 +403,9 @@ class MapaInterativo {
                     transicaoEstatua: false,
                     estatuaTransformada: false,
                     ativacaoSolicitada: false,
+                    tituloMensagem: obj.titulo_mensagem || (
+                        eEstatuaPedroca ? 'MEMÓRIA DO CRIADOR' : 'AVISO DO REINO'
+                    ),
                     mensagem: obj.mensagem || "Foi daqui\nque a lenda começou."
                 };
 
@@ -415,6 +443,10 @@ class MapaInterativo {
                 // ==========================================
                 botao.on('pointerdown', (p, lx, ly, ev) => {
                     ev.stopPropagation();
+                    if (objetoRef.botao.aberto) {
+                        this.fecharBalaoMensagem(objetoRef);
+                        return;
+                    }
                     this.interagirComObjeto(objetoRef);
                 });
 
@@ -465,6 +497,11 @@ class MapaInterativo {
 
     interagirComObjeto(objRef) {
         if (!objRef) return;
+
+        if (objRef.botao?.aberto) {
+            this.fecharBalaoMensagem(objRef);
+            return;
+        }
 
         if (objRef.acao === 'abrir_coliseu_pvp') {
             this.pararJogador();
@@ -554,39 +591,57 @@ class MapaInterativo {
             return;
         }
 
-        const corFundo = 0x243248;
-        const corBorda = 0xd4a72c;
+        const corFundo = 0x111b2a;
+        const corBorda = 0xd1a94f;
 
         const balaoPequeno = largura <= 50;
 
         // ponta menor no balão do ❗
-        const pontaMetade = balaoPequeno ? 5 : 8;
-        const pontaAltura = balaoPequeno ? 5 : 9;
-        const espacoPonta = balaoPequeno ? 9 : 14;
-        const raioCanto = balaoPequeno ? 8 : 10;
+        const pontaMetade = balaoPequeno ? 5 : 9;
+        const pontaAltura = balaoPequeno ? 5 : 11;
+        const espacoPonta = balaoPequeno ? 9 : 15;
+        const raioCanto = balaoPequeno ? 8 : 12;
 
         const rectX = -largura / 2;
         const rectY = -altura;
         const rectW = largura;
         const rectH = altura - espacoPonta;
 
-        fundo.fillStyle(corFundo, 0.96);
-        fundo.lineStyle(2, corBorda, 1);
-
+        fundo.fillStyle(0x050a12, balaoPequeno ? 0.4 : 0.58);
+        fundo.fillRoundedRect(rectX + 2, rectY + 4, rectW, rectH, raioCanto);
+        fundo.fillStyle(corFundo, 0.98);
+        fundo.lineStyle(balaoPequeno ? 2 : 2.5, corBorda, 1);
         fundo.fillRoundedRect(rectX, rectY, rectW, rectH, raioCanto);
         fundo.strokeRoundedRect(rectX, rectY, rectW, rectH, raioCanto);
+
+        if (!balaoPequeno) {
+            fundo.lineStyle(1, 0x6b7890, 0.65);
+            fundo.strokeRoundedRect(rectX + 4, rectY + 4, rectW - 8, rectH - 8, 9);
+
+            fundo.fillStyle(0x1b2a3d, 0.96);
+            fundo.fillRoundedRect(rectX + 5, rectY + 5, rectW - 10, 24, 8);
+
+            fundo.lineStyle(1, 0x786338, 0.9);
+            fundo.beginPath();
+            fundo.moveTo(rectX + 13, rectY + 31);
+            fundo.lineTo(rectX + rectW - 13, rectY + 31);
+            fundo.strokePath();
+
+            fundo.fillStyle(0xe7c16a, 0.95);
+            fundo.fillCircle(0, rectY + 31, 1.5);
+        }
 
         const baseY = rectY + rectH - 1;
 
         // pontinha do balão
-        fundo.fillStyle(corFundo, 0.96);
+        fundo.fillStyle(corFundo, 0.98);
         fundo.fillTriangle(
             -pontaMetade, baseY,
              pontaMetade, baseY,
              0, baseY + pontaAltura
         );
 
-        fundo.lineStyle(2, corBorda, 1);
+        fundo.lineStyle(balaoPequeno ? 2 : 2.5, corBorda, 1);
         fundo.beginPath();
         fundo.moveTo(-pontaMetade, baseY);
         fundo.lineTo(0, baseY + pontaAltura);
@@ -601,13 +656,28 @@ class MapaInterativo {
         }
 
         if (botao.textoMensagem) {
-            botao.textoMensagem.setPosition(
-                0,
-                rectY + (rectH / 2) + 4
-            );
+            const alturaTexto = botao.alturaTextoMensagem || 32;
+            botao.textoMensagem
+                .setPosition(
+                    0,
+                    balaoPequeno
+                        ? -40
+                        : rectY + 40 + (alturaTexto / 2)
+                )
+                .setWordWrapWidth(largura - 34)
+                .setLineSpacing(1);
+        }
 
-            botao.textoMensagem.setWordWrapWidth(largura - 30);
-            botao.textoMensagem.setLineSpacing(2);
+        if (botao.tituloMensagem) {
+            botao.tituloMensagem
+                .setPosition(0, balaoPequeno ? -40 : rectY + 17)
+                .setWordWrapWidth(largura - 24);
+        }
+
+        if (botao.dicaMensagem) {
+            botao.dicaMensagem
+                .setPosition(0, balaoPequeno ? -40 : rectY + rectH - 10)
+                .setWordWrapWidth(largura - 24);
         }
 
         botao.setSize(largura, altura + 2);
@@ -627,6 +697,7 @@ class MapaInterativo {
 
         botao.aberto = true;
         botao.bloqueado = true;
+        botao.fechando = false;
 
         if (botao.tweenPulso) {
             botao.tweenPulso.stop();
@@ -634,29 +705,50 @@ class MapaInterativo {
         }
 
         botao.setVisible(true);
-        botao.setScale(1);
+        botao.setScale(0.88);
 
-        botao.simbolo.setVisible(false);
+        botao.simbolo?.setVisible(false);
         botao.textoMensagem.setVisible(true).setText('');
+        botao.tituloMensagem
+            .setText(objRef.tituloMensagem || 'AVISO DO REINO')
+            .setVisible(true);
+        botao.dicaMensagem.setVisible(true);
 
-        const larguraExpandida = 200;
-        const alturaExpandida = 118;
+        const larguraExpandida = 204;
+        this.redesenharBalao(botao, larguraExpandida, 106);
 
+        // Mede a mensagem completa antes do efeito de digitação para reservar
+        // espaço para todas as linhas e manter a dica de fechar separada.
+        botao.textoMensagem.setText(objRef.mensagem);
+        botao.alturaTextoMensagem = Math.max(
+            32,
+            Math.ceil(botao.textoMensagem.height || 32)
+        );
+        botao.textoMensagem.setText('');
+
+        const alturaExpandida = Math.max(
+            106,
+            Math.ceil(botao.alturaTextoMensagem + 80)
+        );
         this.redesenharBalao(botao, larguraExpandida, alturaExpandida);
 
-        this.scene.tweens.add({
+        botao.tweenAbertura = this.scene.tweens.add({
             targets: botao,
-            scaleX: 1.05,
-            scaleY: 1.05,
-            duration: 180,
+            scaleX: 1,
+            scaleY: 1,
+            duration: 220,
             ease: 'Back.Out',
             onComplete: () => {
-                this.digitarTextoNoBalao(
+                botao.tweenAbertura = null;
+                if (!botao.aberto) return;
+                botao.timerDigitacao = this.digitarTextoNoBalao(
                     botao.textoMensagem,
                     objRef.mensagem,
-                    70,
+                    48,
                     () => {
-                        this.scene.time.delayedCall(4500, () => {
+                        botao.timerDigitacao = null;
+                        botao.timerAutoFechamento = this.scene.time.delayedCall(6500, () => {
+                            botao.timerAutoFechamento = null;
                             this.fecharBalaoMensagem(objRef);
                         });
                     }
@@ -684,24 +776,38 @@ class MapaInterativo {
                 }
             }
         });
+
+        return timer;
     }
 
     fecharBalaoMensagem(objRef) {
         const botao = objRef.botao;
-        if (!botao) return;
+        if (!botao || !botao.aberto || botao.fechando) return;
+
+        botao.fechando = true;
+        botao.timerDigitacao?.remove(false);
+        botao.timerDigitacao = null;
+        botao.timerAutoFechamento?.remove(false);
+        botao.timerAutoFechamento = null;
+        botao.tweenAbertura?.stop();
+        botao.tweenAbertura = null;
 
         botao.textoMensagem.setVisible(false).setText('');
-        botao.simbolo.setVisible(true);
+        botao.tituloMensagem.setVisible(false).setText('');
+        botao.dicaMensagem.setVisible(false);
+        botao.simbolo?.setVisible(true);
 
         this.redesenharBalao(botao, 38, 34);
 
-        this.scene.tweens.add({
+        botao.tweenFechamento = this.scene.tweens.add({
             targets: botao,
             scaleX: 1,
             scaleY: 1,
             duration: 120,
             onComplete: () => {
+                botao.tweenFechamento = null;
                 botao.aberto = false;
+                botao.fechando = false;
 
                 if (objRef.eEstatuaPedroca && objRef.estatuaTransformada) {
                     this.reverterAnimacaoEstatua(objRef);
