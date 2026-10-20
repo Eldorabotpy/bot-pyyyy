@@ -249,9 +249,10 @@
    Tamanho Customizado do Botão de Expressões
    ========================================== */
 #btn-expressoes {
-    width: 60px !important;  /* Aumenta o tamanho geral do botão */
-    height: 60px !important; 
-    padding: 2px !important; /* Remove a margem interna para a imagem ocupar todo o espaço */
+    width: 44px !important;
+    height: 44px !important;
+    padding: 0 !important;
+    overflow: visible !important;
 }
 
 /* Ícone do botão de expressões */
