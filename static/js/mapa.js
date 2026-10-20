@@ -645,7 +645,9 @@ class MapaScene extends Phaser.Scene {
         const skinFinal = this.textures.exists(this.skinAtiva) ? this.skinAtiva : 'aventureiro_base';
         this.skinBaseAtual = skinFinal;
         this.player = this.physics.add.sprite(27 * 32, 29 * 32, skinFinal);
-        this.player.setCollideWorldBounds(true).setDepth(15);
+        this.player
+            .setCollideWorldBounds(true)
+            .setDepth(this.calcularProfundidadeAtor(this.player));
 
         // Reduz visualmente qualquer sprite para o tamanho final do mapa
         this.player.setDisplaySize(48, 48);
@@ -2895,6 +2897,47 @@ class MapaScene extends Phaser.Scene {
         }, 300);
     }
     
+    calcularProfundidadeAtor(ator) {
+        if (!ator) return 12;
+
+        const alturaMundo = Math.max(
+            Number(this.physics?.world?.bounds?.height) || 0,
+            Number(this.cameras?.main?.getBounds?.().height) || 0,
+            1
+        );
+        const origemY = Number.isFinite(ator.originY) ? ator.originY : 0.5;
+        const alturaVisual = Number(ator.displayHeight) || 0;
+        const basePes = Number(ator.y || 0) + alturaVisual * (1 - origemY);
+        const posicaoNormalizada = Phaser.Math.Clamp(basePes / alturaMundo, 0, 1);
+
+        // Reserva a faixa 12–18 para personagens e criaturas. Assim eles se
+        // ordenam entre si sem passar à frente de textos, indicadores e camadas 20+.
+        return 12 + posicaoNormalizada * 6;
+    }
+
+    atualizarProfundidadeAtores() {
+        const atualizar = ator => {
+            if (!ator?.active) return;
+            ator.setDepth(this.calcularProfundidadeAtor(ator));
+        };
+
+        atualizar(this.player);
+
+        const mobs = this.motorCacada?.mobsNoMapa?.getChildren?.() || [];
+        mobs.forEach(mob => {
+            atualizar(mob);
+            if (mob.corruptionAura?.active) {
+                mob.corruptionAura.setDepth(mob.depth - 0.01);
+            }
+        });
+
+        const outros = this.outrosJogadores?.getChildren?.() || [];
+        outros.forEach(outro => {
+            atualizar(outro);
+            if (outro.lapideAtiva?.active) atualizar(outro.lapideAtiva);
+        });
+    }
+
     update(time) {
 
         // ==========================================
@@ -2956,6 +2999,8 @@ class MapaScene extends Phaser.Scene {
 
             return;
         }
+
+        this.atualizarProfundidadeAtores();
 
         if (this.playerNameText) {
             this.playerNameText.setPosition(Math.floor(this.player.x), Math.floor(this.player.y - 30));

@@ -1353,7 +1353,16 @@ class MotorMultiplayer {
             info.x,
             info.y,
             skinAtual
-        ).setDepth(15);
+        ).setDepth(
+            this.scene.calcularProfundidadeAtor
+                ? this.scene.calcularProfundidadeAtor({
+                    x: info.x,
+                    y: info.y,
+                    displayHeight: 48,
+                    originY: 0.5
+                })
+                : 15
+        );
 
         outro.playerId = id;
         outro.skinBaseKey = skinDesejada;

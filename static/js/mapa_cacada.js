@@ -1087,7 +1087,16 @@ class MotorCacada {
                 mobData.y,
                 textureKey,
                 0
-            ).setDepth(14);
+            ).setDepth(
+                this.scene.calcularProfundidadeAtor
+                    ? this.scene.calcularProfundidadeAtor({
+                        x: mobData.x,
+                        y: mobData.y,
+                        displayHeight: tamanhoMob,
+                        originY: 0.5
+                    })
+                    : 14
+            );
 
             sprite.setDisplaySize(
                 tamanhoMob,

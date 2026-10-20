@@ -167,7 +167,9 @@ window.CompanionMapHUD = class {
         const feet=target.y+player.displayHeight*(1-(player.originY??0.5));
         const oldX=visual.x,oldY=visual.y;
         visual.setPosition(this.placed?visual.x+(target.x-visual.x)*.4:target.x,this.placed?visual.y+(feet-visual.y)*.4:feet);
-        visual.setDepth(player.depth+(target.y>player.y?1:-1));
+        visual.setDepth(this.scene.calcularProfundidadeAtor
+            ? this.scene.calcularProfundidadeAtor(visual)
+            : player.depth+(target.y>player.y?1:-1));
         if(this.animated&&visual===this.pet){
             const dx=visual.x-oldX,dy=visual.y-oldY;
             if(Math.hypot(dx,dy)>.3){
