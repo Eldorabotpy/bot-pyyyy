@@ -1064,12 +1064,6 @@ background-size: cover;
     object-fit: contain;
 }
 
-/* O ícone de conversa tem desenho cheio e precisa de mais respiro no atalho. */
-#btn-chat-mapa img {
-    width: 29px !important;
-    height: 29px !important;
-}
-
 .btn-social-mapa {
     border-width: 0 !important;
     border-radius: 0 !important;

@@ -256,7 +256,15 @@
 
 /* Se quiser que a imagem fique levemente maior até passar da borda do botão */
 #btn-expressoes img {
-    transform: scale(0.9); /* Dá um zoom de 10% só na imagem */
+    width: 46px !important;
+    height: 46px !important;
+    object-fit: contain;
+    transform: none;
+    transition: transform 0.2s ease;
+}
+
+#btn-expressoes:hover img {
+    transform: scale(1.06);
 }
 
 /* ========================================== */
