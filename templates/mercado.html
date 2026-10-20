@@ -1,4 +1,4 @@
-<link rel="stylesheet" href="/static/css/mercado.css?v=2">
+<link rel="stylesheet" href="/static/css/mercado.css?v=3">
 <div id="ui-mercado" style="display:none;">
     <div class="mercado-shell" role="dialog" aria-modal="true" aria-labelledby="mercado-titulo">
         <div class="mercado-header">
@@ -7,10 +7,11 @@
             <button class="mercado-close" aria-label="Fechar mercado" onclick="fecharMercado()">×</button>
         </div>
         <div class="mercado-tabs" role="tablist" aria-label="Seções do mercado">
-            <button class="tab-mercado" role="tab" aria-controls="aba-comprar-ouro" data-aba="aba-comprar-ouro" onclick="mudarAbaMercado('aba-comprar-ouro', this)">Ouro <span class="mercado-tab-dot ouro"></span></button>
-            <button class="tab-mercado" role="tab" aria-controls="aba-comprar-gemas" data-aba="aba-comprar-gemas" onclick="mudarAbaMercado('aba-comprar-gemas', this)">Gemas <span class="mercado-tab-dot gemas"></span></button>
-            <button class="tab-mercado" role="tab" aria-controls="aba-vender" data-aba="aba-vender" onclick="mudarAbaMercado('aba-vender', this)">＋ Anunciar</button>
+            <button class="tab-mercado" role="tab" aria-selected="false" aria-controls="aba-comprar-ouro" data-aba="aba-comprar-ouro" onclick="mudarAbaMercado('aba-comprar-ouro', this)"><span>Ouro</span><span class="mercado-tab-dot ouro" aria-hidden="true"></span></button>
+            <button class="tab-mercado" role="tab" aria-selected="false" aria-controls="aba-comprar-gemas" data-aba="aba-comprar-gemas" onclick="mudarAbaMercado('aba-comprar-gemas', this)"><span>Gemas</span><span class="mercado-tab-dot gemas" aria-hidden="true"></span></button>
+            <button class="tab-mercado tab-mercado-anunciar" role="tab" aria-selected="false" aria-controls="aba-vender" data-aba="aba-vender" onclick="mudarAbaMercado('aba-vender', this)"><span class="mercado-tab-plus" aria-hidden="true">＋</span><span>Anunciar</span></button>
         </div>
+        <div id="mercado-notificacao" class="mercado-notificacao" role="status" aria-live="polite" aria-atomic="true" hidden></div>
         <div class="mercado-body">
             <div id="mercado-busca-area" class="mercado-busca-area"><label for="mercado-busca">Encontre seu próximo item</label><input id="mercado-busca" type="search" placeholder="Buscar item ou vendedor…" oninput="filtrarMercado()" autocomplete="off"></div>
             <div id="aba-comprar-ouro" class="conteudo-mercado" role="tabpanel"><div class="mercado-section"><h3>Ofertas em ouro</h3><span>Preço por lote</span></div><div id="lista-ouro" class="mercado-lista"></div><p class="mercado-sem-resultados" hidden>Nenhuma oferta corresponde à busca.</p></div>

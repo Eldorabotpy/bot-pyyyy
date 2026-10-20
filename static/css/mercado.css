@@ -9,11 +9,22 @@
 #ui-mercado button { cursor:pointer; touch-action:manipulation; font:600 13px 'Segoe UI',Arial,sans-serif; }
 #ui-mercado button:focus-visible, #ui-mercado input:focus-visible, #ui-mercado select:focus-visible { outline:2px solid #d6b777; outline-offset:2px; }
 #ui-mercado .mercado-close { margin-left:auto; background:#ffffff06; color:#aab8ca; border:1px solid #ffffff14; border-radius:10px; width:36px; height:36px; flex-shrink:0; font-size:24px; padding:0; }
-#ui-mercado .mercado-tabs { display:flex; gap:5px; padding:8px 16px; background:#060d1766; border-bottom:1px solid #ffffff08; }
-#ui-mercado .tab-mercado { flex:1; min-width:0; padding:11px 6px; border:1px solid transparent; border-radius:9px; background:transparent; color:#95a5bb; display:flex; align-items:center; justify-content:center; gap:7px; }
-#ui-mercado .tab-mercado[aria-selected="true"] { background:#d5b06b16; border-color:#c8a76450; color:#f0d497; }
+#ui-mercado .mercado-tabs { display:flex; gap:8px; padding:10px 16px; background:linear-gradient(180deg,#080f1bd9,#080f1b99); border-bottom:1px solid #ffffff0b; }
+#ui-mercado .tab-mercado { position:relative; flex:1; min-width:0; min-height:42px; padding:9px 10px; border:1px solid #ffffff08; border-radius:11px; background:linear-gradient(180deg,#111b2a,#0c1421); color:#9aa9bc; display:flex; align-items:center; justify-content:center; gap:8px; transition:background .18s ease,border-color .18s ease,color .18s ease,transform .18s ease,box-shadow .18s ease; }
+#ui-mercado .tab-mercado:hover { color:#e5edf7; border-color:#8d774a70; background:#172234; transform:translateY(-1px); }
+#ui-mercado .tab-mercado[aria-selected="true"] { background:linear-gradient(135deg,#d5b06b24,#bd944812); border-color:#d6b77780; color:#f4d99c; box-shadow:inset 0 1px #ffffff12,0 4px 12px #0003; }
+#ui-mercado .tab-mercado-anunciar { border-color:#a9874a55; color:#d6bc88; }
+#ui-mercado .tab-mercado-anunciar[aria-selected="true"] { background:linear-gradient(135deg,#a9874a35,#6349212b); }
+#ui-mercado .mercado-tab-plus { font-size:17px; line-height:1; color:#e5c783; }
 #ui-mercado .mercado-tab-dot { width:7px; height:7px; border-radius:50%; background:#e4b755; }
 #ui-mercado .mercado-tab-dot.gemas { background:#7bbfff; transform:rotate(45deg); border-radius:1px; }
+#ui-mercado .mercado-notificacao { position:relative; margin:10px 16px 0; padding:11px 14px 11px 42px; border:1px solid #547961; border-radius:11px; background:linear-gradient(110deg,#153b2bdc,#10251fdc); color:#c5f0d4; font-size:12px; line-height:1.45; box-shadow:inset 0 1px #ffffff0b,0 6px 18px #0002; animation:mercado-notificacao-entrar .2s ease-out; }
+#ui-mercado .mercado-notificacao::before { content:"✓"; position:absolute; left:13px; top:50%; transform:translateY(-50%); display:grid; place-items:center; width:20px; height:20px; border-radius:50%; background:#a0e4c41a; color:#a0e4c4; font-weight:800; }
+#ui-mercado .mercado-notificacao[data-tipo="erro"] { border-color:#8b4e52; background:linear-gradient(110deg,#431e27e8,#271820e8); color:#ffd1d1; }
+#ui-mercado .mercado-notificacao[data-tipo="erro"]::before { content:"!"; background:#ff77771a; color:#ffaaaa; }
+#ui-mercado .mercado-notificacao[data-tipo="aviso"] { border-color:#8b7545; background:linear-gradient(110deg,#3a301be8,#211d17e8); color:#f5dfad; }
+#ui-mercado .mercado-notificacao[data-tipo="aviso"]::before { content:"i"; background:#f0d4971a; color:#f0d497; }
+@keyframes mercado-notificacao-entrar { from { opacity:0; transform:translateY(-5px); } to { opacity:1; transform:translateY(0); } }
 #ui-mercado .mercado-body { min-height:0; overflow-y:auto; padding:18px 20px; scrollbar-width:thin; scrollbar-color:#4a5567 #0c1422; overscroll-behavior:contain; }
 #ui-mercado .mercado-section { display:flex; justify-content:space-between; align-items:center; gap:8px; margin:0 0 16px; }
 #ui-mercado h3 { margin:0; color:#e6edf7; font-size:14px; font-weight:600; }
@@ -59,7 +70,9 @@
  #ui-mercado .mercado-section { margin-bottom:12px; }
  #ui-mercado .mercado-section > span { font-size:9px; }
  #ui-mercado .mercado-fields { gap:11px; margin-bottom:13px; }
- #ui-mercado .mercado-tabs { padding:6px 10px; }
+ #ui-mercado .mercado-tabs { gap:6px; padding:7px 10px; }
+ #ui-mercado .tab-mercado { min-height:40px; padding:8px 5px; font-size:12px; }
+ #ui-mercado .mercado-notificacao { margin:8px 10px 0; padding:10px 11px 10px 38px; font-size:11px; }
  #ui-mercado .mercado-action { margin-top:12px; }
 }
 #ui-mercado .mercado-price-help { grid-column:1 / -1; margin-top:-7px; }
