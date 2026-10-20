@@ -2,6 +2,19 @@ class MapaInterativo {
     constructor(scene) {
         this.scene = scene;
         this.objetosInterativos = [];
+        this.ativacoesEstatuaPendentes = [];
+        this.scene.events.on(
+            'estatuaPedrocaAtivada',
+            this.receberAtivacaoEstatua,
+            this
+        );
+        this.scene.events.once('shutdown', () => {
+            this.scene.events.off(
+                'estatuaPedrocaAtivada',
+                this.receberAtivacaoEstatua,
+                this
+            );
+        });
         this.prepararAnimacoesEstatua();
         this.init();
     }
@@ -40,6 +53,136 @@ class MapaInterativo {
                 repeat: 0
             });
         }
+
+        if (!this.scene.anims.exists('estatua_pedroca_recolher')) {
+            this.scene.anims.create({
+                key: 'estatua_pedroca_recolher',
+                frames: [3, 2, 1, 0].map(frame => ({
+                    key: 'estatua_pedroca_despertar',
+                    frame
+                })),
+                frameRate: velocidadeQuadro,
+                repeat: 0
+            });
+        }
+    }
+
+    receberAtivacaoEstatua(dados = {}) {
+        if (
+            dados.regiao &&
+            dados.regiao !== this.scene.regiaoAtual
+        ) {
+            return;
+        }
+
+        const estatua = this.objetosInterativos.find(
+            objeto => objeto.id === 'estatua_pedroca' && objeto.eEstatuaPedroca
+        );
+
+        if (!estatua) {
+            this.ativacoesEstatuaPendentes.push(dados);
+            return;
+        }
+
+        this.iniciarAnimacaoEstatua(estatua);
+    }
+
+    iniciarAnimacaoEstatua(objRef) {
+        if (
+            !objRef?.eEstatuaPedroca ||
+            objRef.transicaoEstatua ||
+            objRef.estatuaTransformada
+        ) {
+            return;
+        }
+
+        objRef.ativacaoSolicitada = false;
+        objRef.transicaoEstatua = true;
+        objRef.botao.bloqueado = true;
+        objRef.botao.setVisible(false);
+        objRef.spriteEstatua
+            .setFrame(0)
+            .setVisible(true)
+            .setAlpha(0);
+
+        this.scene.tweens.add({
+            targets: objRef.cristalEstatua,
+            alpha: 0,
+            duration: 220,
+            ease: 'Sine.easeInOut',
+            onComplete: () => objRef.cristalEstatua.setVisible(false)
+        });
+        this.scene.tweens.add({
+            targets: objRef.spriteEstatua,
+            alpha: 1,
+            duration: 220,
+            ease: 'Sine.easeInOut'
+        });
+
+        objRef.spriteEstatua.once('animationcomplete', animation => {
+            if (animation.key !== 'estatua_pedroca_despertar') return;
+
+            objRef.spriteEstatua.anims.stop();
+            objRef.spriteEstatua.setFrame(3);
+            objRef.estatuaTransformada = true;
+            this.abrirBalaoMensagem(objRef);
+        });
+        objRef.spriteEstatua.play('estatua_pedroca_despertar');
+    }
+
+    reverterAnimacaoEstatua(objRef) {
+        if (!objRef?.eEstatuaPedroca || !objRef.estatuaTransformada) return;
+
+        objRef.transicaoEstatua = true;
+        objRef.botao.bloqueado = true;
+        objRef.botao.setVisible(false);
+        objRef.spriteEstatua
+            .setFrame(3)
+            .setAlpha(1)
+            .setVisible(true);
+        objRef.cristalEstatua
+            .setAlpha(0)
+            .setVisible(true);
+
+        objRef.spriteEstatua.once('animationcomplete', animation => {
+            if (animation.key !== 'estatua_pedroca_recolher') return;
+
+            objRef.spriteEstatua.anims.stop();
+            objRef.spriteEstatua.setFrame(0);
+
+            this.scene.tweens.add({
+                targets: objRef.spriteEstatua,
+                alpha: 0,
+                duration: 220,
+                ease: 'Sine.easeInOut',
+                onComplete: () => {
+                    objRef.spriteEstatua
+                        .setVisible(false)
+                        .setAlpha(1);
+                    objRef.cristalEstatua
+                        .setVisible(true)
+                        .setAlpha(1);
+                    objRef.estatuaTransformada = false;
+                    objRef.transicaoEstatua = false;
+                    objRef.botao.bloqueado = false;
+
+                    const dist = Phaser.Math.Distance.Between(
+                        this.scene.player.x,
+                        this.scene.player.y,
+                        objRef.x,
+                        objRef.y
+                    );
+                    objRef.botao.setVisible(dist <= 100);
+                }
+            });
+            this.scene.tweens.add({
+                targets: objRef.cristalEstatua,
+                alpha: 1,
+                duration: 220,
+                ease: 'Sine.easeInOut'
+            });
+        });
+        objRef.spriteEstatua.play('estatua_pedroca_recolher');
     }
 
     init() {
@@ -212,6 +355,7 @@ class MapaInterativo {
                     eEstatuaPedroca,
                     transicaoEstatua: false,
                     estatuaTransformada: false,
+                    ativacaoSolicitada: false,
                     mensagem: obj.mensagem || "Foi daqui\nque a lenda começou."
                 };
 
@@ -253,6 +397,12 @@ class MapaInterativo {
                 });
 
                 this.objetosInterativos.push(objetoRef);
+
+                if (eEstatuaPedroca && this.ativacoesEstatuaPendentes.length) {
+                    this.ativacoesEstatuaPendentes.splice(0).forEach(() => {
+                        this.iniciarAnimacaoEstatua(objetoRef);
+                    });
+                }
             });
         } catch (e) {
             console.error("Erro ao carregar objetos interativos:", e);
@@ -304,44 +454,27 @@ class MapaInterativo {
 
         this.pararJogador();
 
-        if (
-            objRef.eEstatuaPedroca &&
-            !objRef.estatuaTransformada
-        ) {
-            if (objRef.transicaoEstatua) return;
+        if (objRef.eEstatuaPedroca) {
+            if (
+                objRef.transicaoEstatua ||
+                objRef.estatuaTransformada ||
+                objRef.ativacaoSolicitada
+            ) {
+                return;
+            }
 
-            objRef.transicaoEstatua = true;
-            objRef.botao.bloqueado = true;
-            objRef.botao.setVisible(false);
-            objRef.spriteEstatua
-                .setVisible(true)
-                .setAlpha(0)
-                .play('estatua_pedroca_despertar');
-
-            this.scene.tweens.add({
-                targets: objRef.cristalEstatua,
-                alpha: 0,
-                duration: 220,
-                ease: 'Sine.easeInOut',
-                onComplete: () => objRef.cristalEstatua.setVisible(false)
-            });
-            this.scene.tweens.add({
-                targets: objRef.spriteEstatua,
-                alpha: 1,
-                duration: 220,
-                ease: 'Sine.easeInOut'
-            });
-
-            objRef.spriteEstatua.once('animationcomplete', animation => {
-                if (animation.key !== 'estatua_pedroca_despertar') return;
-
-                objRef.spriteEstatua.anims.stop();
-                objRef.spriteEstatua.setFrame(3);
-                objRef.estatuaTransformada = true;
-                objRef.transicaoEstatua = false;
-                objRef.botao.bloqueado = false;
-                this.abrirBalaoMensagem(objRef);
-            });
+            const socket = window.eldoraSocket;
+            if (socket?.connected) {
+                objRef.ativacaoSolicitada = true;
+                objRef.botao.bloqueado = true;
+                objRef.botao.setVisible(false);
+                socket.emit('ativarEstatuaPedroca', {}, resposta => {
+                    if (resposta?.sucesso || !objRef.ativacaoSolicitada) return;
+                    this.iniciarAnimacaoEstatua(objRef);
+                });
+            } else {
+                this.iniciarAnimacaoEstatua(objRef);
+            }
             return;
         }
 
@@ -547,6 +680,12 @@ class MapaInterativo {
             duration: 120,
             onComplete: () => {
                 botao.aberto = false;
+
+                if (objRef.eEstatuaPedroca && objRef.estatuaTransformada) {
+                    this.reverterAnimacaoEstatua(objRef);
+                    return;
+                }
+
                 botao.bloqueado = false;
 
                 const dist = Phaser.Math.Distance.Between(

@@ -484,6 +484,7 @@ class MotorMultiplayer {
         this.socket.off('visualAtualizado');
         this.socket.off('jogadorSaiu');
         this.socket.off('acaoMapa');
+        this.socket.off('estatuaPedrocaAtivada');
         this.socket.off('desconectarDuplicado');
         this.socket.off('forcarTeletransporte');
         this.socket.off('efeitoGlobalMapa');
@@ -778,6 +779,11 @@ class MotorMultiplayer {
         this.socket.on('jogadorSaiu', (id) => { 
             this.removerOutroJogador(id); // Chama o Faxineiro!
             this.atualizarPilula(); 
+        });
+
+        this.socket.on('estatuaPedrocaAtivada', (dados) => {
+            if (!dados || dados.regiao !== this.scene.regiaoAtual) return;
+            this.scene.events.emit('estatuaPedrocaAtivada', dados);
         });
         
         // 💬 SISTEMA DE BALÕES NO MAPA E EMOJIS ANIMADOS 💬

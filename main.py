@@ -1986,6 +1986,26 @@ def handle_acao_mapa(dados):
         "tipo": dados.get("tipo"),
         "valor": dados.get("valor")
     }, broadcast=True)
+
+@socketio.on('ativarEstatuaPedroca')
+def handle_ativar_estatua_pedroca(_dados=None):
+    player_sid = request.sid
+    jogador = jogadores_online.get(player_sid)
+
+    if not jogador:
+        return {'sucesso': False, 'erro': 'jogador_fora_do_mapa'}
+
+    regiao = str(jogador.get('regiao') or '')
+    if regiao != 'capital_eldora':
+        return {'sucesso': False, 'erro': 'regiao_invalida'}
+
+    emit('estatuaPedrocaAtivada', {
+        'regiao': regiao,
+        'estatua_id': 'estatua_pedroca',
+        'char_id': str(jogador.get('char_id') or ''),
+        'socket_id': player_sid
+    }, broadcast=True)
+    return {'sucesso': True}
                     
 @socketio.on('mover')
 def handle_move(data):
