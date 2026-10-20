@@ -404,6 +404,9 @@ class MapaScene extends Phaser.Scene {
         const meuNome = localStorage.getItem("jogadorEldoraNome") || "Aventureiro";
     
         const map = this.make.tilemap({ key: this.regiaoAtual });
+        // Disponibiliza os objetos de referência do Tiled para sistemas como
+        // MapaInterativo, que posicionam elementos animados sobre o mapa.
+        this.tilemap = map;
         
         let todosTilesets = [];
 
@@ -477,6 +480,32 @@ class MapaScene extends Phaser.Scene {
         if (map.tilesets.some(t => t.name === 'pedreira')) {
             todosTilesets.push(
                 map.addTilesetImage('pedreira', 'tiles_pedreira')
+            );
+        }
+
+        if (
+            this.regiaoAtual === 'capital_eldora' &&
+            map.tilesets.some(t => t.name === 'cristal_mana_rotacao') &&
+            this.textures.exists('estatua_pedroca_cristal')
+        ) {
+            todosTilesets.push(
+                map.addTilesetImage(
+                    'cristal_mana_rotacao',
+                    'estatua_pedroca_cristal'
+                )
+            );
+        }
+
+        if (
+            this.regiaoAtual === 'capital_eldora' &&
+            map.tilesets.some(t => t.name === 'estatua_ergue_teclado') &&
+            this.textures.exists('estatua_pedroca_despertar')
+        ) {
+            todosTilesets.push(
+                map.addTilesetImage(
+                    'estatua_ergue_teclado',
+                    'estatua_pedroca_despertar'
+                )
             );
         }
 

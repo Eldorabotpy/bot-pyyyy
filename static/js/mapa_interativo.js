@@ -201,13 +201,38 @@ class MapaInterativo {
                     && regiao === 'capital_eldora'
                     && this.scene.textures.exists('estatua_pedroca_cristal')
                     && this.scene.textures.exists('estatua_pedroca_despertar');
+                const referenciaEstatua = eEstatuaPedroca
+                    ? this.scene.tilemap
+                        ?.getObjectLayer('Referencia da Estatua do Criador')
+                        ?.objects
+                        ?.find(referencia =>
+                            referencia.type === 'referencia_visual' ||
+                            referencia.name === 'Cristal e pedestal (referencia visual)'
+                        )
+                    : null;
                 let cristalEstatua = null;
                 let spriteEstatua = null;
+                let xInteracao = obj.x;
+                let yInteracao = obj.y;
+                let botaoX = obj.icone_x ?? (obj.x + 16);
+                let botaoY = obj.icone_y ?? (obj.y - 15);
 
                 if (eEstatuaPedroca) {
-                    const xEstatua = obj.x;
-                    const baseYEstatua = obj.y + 128;
-                    const escalaEstatua = 2 / 3;
+                    const larguraReferencia = Number(referenciaEstatua?.width) || 128;
+                    const alturaReferencia = Number(referenciaEstatua?.height) || (256 * 2 / 3);
+                    const xEstatua = Number(referenciaEstatua?.x) || obj.x;
+                    const baseYEstatua = Number(referenciaEstatua?.y) || (obj.y + 128);
+                    const escalaX = larguraReferencia / 192;
+                    const escalaY = alturaReferencia / 256;
+
+                    if (referenciaEstatua) {
+                        // Mantém o ponto de interação no mesmo lugar relativo
+                        // à arte, mesmo quando ela for movida ou redimensionada no Tiled.
+                        xInteracao = xEstatua;
+                        yInteracao = baseYEstatua - alturaReferencia * 0.75;
+                        botaoX += xInteracao - obj.x;
+                        botaoY += yInteracao - obj.y;
+                    }
 
                     cristalEstatua = this.scene.add.sprite(
                         xEstatua,
@@ -216,7 +241,7 @@ class MapaInterativo {
                         0
                     )
                         .setOrigin(0.5, 1)
-                        .setScale(escalaEstatua);
+                        .setScale(escalaX, escalaY);
 
                     spriteEstatua = this.scene.add.sprite(
                         xEstatua,
@@ -225,7 +250,7 @@ class MapaInterativo {
                         0
                     )
                         .setOrigin(0.5, 1)
-                        .setScale(escalaEstatua)
+                        .setScale(escalaX, escalaY)
                         .setAlpha(0)
                         .setVisible(false);
 
@@ -244,7 +269,7 @@ class MapaInterativo {
                 // ==========================================
                 // 1. ZONA INVISÍVEL DE CLIQUE
                 // ==========================================
-                const zona = this.scene.add.zone(obj.x, obj.y, 32, 32)
+                const zona = this.scene.add.zone(xInteracao, yInteracao, 32, 32)
                     .setOrigin(0, 0)
                     .setInteractive()
                     .setDepth(50);
@@ -252,9 +277,6 @@ class MapaInterativo {
                 // ==========================================
                 // 2. POSIÇÃO DO BALÃO
                 // ==========================================
-                const botaoX = obj.icone_x ?? (obj.x + 16);
-                const botaoY = obj.icone_y ?? (obj.y - 15);
-
                 const botao = this.scene.add.container(botaoX, botaoY)
                     .setDepth(100)
                     .setVisible(false);
@@ -346,8 +368,8 @@ class MapaInterativo {
 
                 const objetoRef = {
                     id: obj.id || null,
-                    x: obj.x,
-                    y: obj.y,
+                    x: xInteracao,
+                    y: yInteracao,
                     acao: obj.acao || null,
                     botao: botao,
                     cristalEstatua,
