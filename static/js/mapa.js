@@ -188,6 +188,9 @@ class MapaScene extends Phaser.Scene {
         this.load.image('tiles_casas', '/static/images/tilesets/casas.png'); 
         this.load.image('tiles_hpg', '/static/images/tilesets/HPGLobbyTileset.png');
         this.load.image('tiles_arvores', '/static/images/tilesets/arvores.png');
+        if (this.regiaoAtual === 'pedreira_granito') {
+            this.load.image('tiles_pedreira', '/static/images/tilesets/pedreira.png');
+        }
 
         if (this.regiaoAtual === 'capital_eldora') {
             this.load.image(
@@ -457,6 +460,12 @@ class MapaScene extends Phaser.Scene {
             );
         }
 
+        if (map.tilesets.some(t => t.name === 'pedreira')) {
+            todosTilesets.push(
+                map.addTilesetImage('pedreira', 'tiles_pedreira')
+            );
+        }
+
         // ==========================================
         // 🏰 TILESETS DA DUNGEON
         // ==========================================
@@ -496,7 +505,8 @@ class MapaScene extends Phaser.Scene {
             'tiles_grama',
             'tiles_casas',
             'tiles_hpg',
-            'tiles_arvores'
+            'tiles_arvores',
+            'tiles_pedreira'
         ].forEach(chave => {
 
             if (this.textures.exists(chave)) {
@@ -539,7 +549,8 @@ class MapaScene extends Phaser.Scene {
             'arvores2',
             'pedras',
             'pedras1',
-            'pedras2'
+            'pedras2',
+            'pedreira_base'
         ];
 
         camadasBaixas.forEach(l => {
