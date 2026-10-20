@@ -280,14 +280,18 @@
 }
 
 .btn-passe-mapa img,
-#btn-chat-mapa img {
+.btn-social-mapa img,
+#btn-abrir-menu img,
+#img-pergaminho-quest {
     transform-origin: center;
     animation: atalhosMapaRespiram 2.6s ease-in-out infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
     .btn-passe-mapa img,
-    #btn-chat-mapa img {
+    .btn-social-mapa img,
+    #btn-abrir-menu img,
+    #img-pergaminho-quest {
         animation: none;
     }
 }
@@ -548,3 +552,4 @@
         letter-spacing: .2px !important;
     }
 }
+
