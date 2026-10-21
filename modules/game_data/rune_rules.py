@@ -1,6 +1,6 @@
 # Regras compartilhadas: equipamento, Forja, perfil e mercado.
 SOCKETS_BY_RARITY = {"comum": 0, "bom": 0, "incomum": 0, "raro": 1, "epico": 2, "lendario": 3}
-EXTRACTION_GOLD = 100
+EXTRACTION_GEMS = 5
 EVOLUTION_COSTS = {1: {"gold": 500, "po_runico": 5}, 2: {"gold": 1500, "po_runico": 15, "fragmento_runa_ancestral": 1}}
 DUST_YIELD = {1: 2, 2: 6, 3: 18}
 
