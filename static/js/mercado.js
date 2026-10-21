@@ -448,6 +448,7 @@ function carregarInventarioNoMercado() {
 function toggleDropdownVenda() {
     const lista = document.getElementById('lista-dropdown-venda');
     if (lista.style.display === 'none' || lista.style.display === '') {
+        fecharSeletorMoedaMercado();
         lista.style.display = 'block';
     } else {
         lista.style.display = 'none';
@@ -466,7 +467,12 @@ function toggleMoedaMercado(event) {
     const lista = document.getElementById('lista-moedas-mercado');
     const botao = document.getElementById('btn-moeda-mercado');
     if (!lista || !botao) return;
-    lista.hidden = !lista.hidden;
+    const abrir = lista.hidden;
+    if (abrir) {
+        const dropdownItens = document.getElementById('lista-dropdown-venda');
+        if (dropdownItens) dropdownItens.style.display = 'none';
+    }
+    lista.hidden = !abrir;
     botao.setAttribute('aria-expanded', String(!lista.hidden));
 }
 
