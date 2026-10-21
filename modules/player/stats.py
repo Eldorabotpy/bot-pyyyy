@@ -1382,6 +1382,12 @@ async def processar_turno_combate(
     if not mob_vivo:
         return {"erro": "O monstro sumiu!"}
 
+    if (
+        mob_vivo.get("quest_event_id")
+        and str(mob_vivo.get("event_owner_id")) != str(user_id)
+    ):
+        return {"erro": "Esse encontro pertence a outro aventureiro."}
+
     sistema_cacada.atualizar_evento_corrupcao(force=False)
     mob_vivo = sistema_cacada.mobs_vivos.get(regiao_atual, {}).get(spawn_id, mob_vivo)
 
@@ -1846,6 +1852,21 @@ async def processar_turno_combate(
                 )
                 or {}
             )
+
+            if mob_vivo.get("quest_event_id") == "q3_varek_provacao":
+                try:
+                    from modules.quest_caravana import registrar_abate
+
+                    registrar_abate(
+                        str(user_id),
+                        str(spawn_id),
+                        sistema_cacada,
+                    )
+                except Exception:
+                    import logging
+                    logging.getLogger(__name__).exception(
+                        "Falha ao registrar o abate da caravana"
+                    )
 
         # Pontos do evento são derivados somente desta vitória validada pelo motor.
         # O ID é escrito no próprio mob antes de contabilizar para que chamadas

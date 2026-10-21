@@ -1202,10 +1202,17 @@ class GerenciadorCacada(DungeonPersistence):
         # 🌍 MAPAS NORMAIS
         # ==========================================
         if regiao != "dungeon_01":
-            return self.mobs_vivos.get(
+            user_id = str(user_id or "")
+            mobs = self.mobs_vivos.get(
                 regiao,
                 {}
             )
+            return {
+                spawn_id: mob
+                for spawn_id, mob in mobs.items()
+                if not mob.get("event_owner_id")
+                or str(mob.get("event_owner_id")) == user_id
+            }
 
         user_id = str(
             user_id
@@ -1339,6 +1346,7 @@ class GerenciadorCacada(DungeonPersistence):
             # Eles fazem parte de uma execução fechada da masmorra.
             if (
                 regiao != "dungeon_01"
+                and not mob.get("quest_event_id")
                 and not mob.get("_abate_dimensional_contado")
             ):
                 mob["_abate_dimensional_contado"] = True
@@ -1370,6 +1378,16 @@ class GerenciadorCacada(DungeonPersistence):
             )
 
             del self.mobs_vivos[regiao][spawn_id]
+
+            # Encontros de missão são pessoais e não reaparecem após a vitória.
+            if mob.get("quest_event_id"):
+                return {
+                    "removido": True,
+                    "respawn": False,
+                    "regiao": regiao,
+                    "spawn_id": spawn_id,
+                    "monster_id": mob.get("monster_id"),
+                }
 
             # ==========================================
             # 🏰 DUNGEON 01 — SEM RESPAWN NORMAL

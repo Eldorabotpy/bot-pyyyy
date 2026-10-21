@@ -41,7 +41,11 @@ def npc_aceitar_missao():
     if not user_id or not quest_id:
         return jsonify({"success": False, "error": "Magia falhou. Faltam dados da missão."}), 400
         
-    resultado = aceitar_missao(user_id, quest_id)
+    resultado = aceitar_missao(
+        user_id,
+        quest_id,
+        data.get('escolha_id'),
+    )
     return jsonify(resultado)
 
 # ==========================================
