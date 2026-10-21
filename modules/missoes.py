@@ -24,8 +24,8 @@ QUESTS_DATA = {
             {"id": "investigar", "titulo": "Observar as criaturas", "descricao": "Entender a ameaça antes de agir.", "sinais": {"curiosidade": 1, "prudencia": 1}},
             {"id": "avancar", "titulo": "Ir direto ao combate", "descricao": "Enfrentar o risco sem hesitar.", "sinais": {"coragem": 1, "determinacao": 1}},
         ],
-        "fala_aceite": "Varek anotou como você pretende enfrentar o primeiro perigo.",
-        "fala_conclusao": "Você voltou mais experiente. Varek registra seu primeiro serviço e paga a recompensa."
+        "fala_aceite": "Varek anotou sua decisão. Entre o ruído da pradaria e o som distante das criaturas, você ouve um sussurro: ‘Ainda há alguém…’. Quando olha ao redor, não há ninguém ali.",
+        "fala_conclusao": "Você voltou mais experiente. Ao entregar o relatório, o sussurro retorna: ‘A estrada guarda os que ficaram para trás’. Varek não ouviu nada. Ele paga sua recompensa."
     },
     "q2_varek_defesas": {
         "titulo": "As Defesas da Fronteira",
@@ -41,8 +41,8 @@ QUESTS_DATA = {
             {"id": "rastrear", "titulo": "Rastrear a ameaça", "descricao": "Procurar de onde vêm as feras.", "sinais": {"curiosidade": 1, "prudencia": 1}},
             {"id": "patrulhar", "titulo": "Patrulhar a linha de frente", "descricao": "Conter o perigo onde ele aparecer.", "sinais": {"coragem": 1, "dever": 1}},
         ],
-        "fala_aceite": "Varek registrou sua prioridade para a defesa da fronteira.",
-        "fala_conclusao": "A fronteira resistiu enquanto você amadurecia. Varek reconhece sua disciplina e paga a recompensa."
+        "fala_aceite": "Varek registrou sua prioridade. Naquela noite, uma voz desconhecida murmura: ‘A caravana… não deixem a estrada em silêncio’. O som desaparece antes que encontre sua origem.",
+        "fala_conclusao": "A fronteira resistiu enquanto você amadurecia. No silêncio que sucede a conversa, a voz retorna: ‘A caravana guarda uma alma’. Varek não percebe o sussurro; ele reconhece sua disciplina e paga a recompensa."
     },
     "q3_varek_provacao": {
         "titulo": "O Sinal da Caravana",
@@ -60,16 +60,34 @@ QUESTS_DATA = {
             {"id": "conter", "titulo": "Conter a ameaça", "descricao": "Impedir que a emboscada alcance a estrada e a cidade.", "sinais": {"coragem": 1, "dever": 1}},
             {"id": "planejar", "titulo": "Avaliar o terreno", "descricao": "Procurar uma forma segura de ajudar os sobreviventes.", "sinais": {"prudencia": 1, "curiosidade": 1}},
         ],
-        "fala_aceite": "Varek anotou sua decisão. Quando estiver pronto, volte para prestar contas da provação.",
-        "fala_conclusao": "Varek registrou sua decisão e reconheceu sua jornada. Agora, apresente-se à Arquimaga Selene."
+        "decisoes_finais": {
+            "alma_guardiao": {
+                "pergunta": "Quando os últimos goblins caem, uma presença pálida surge junto à estrada. A voz parece vir de alguém que protegeu a caravana: ‘Não consigo encontrar o caminho’. O que você faz?",
+                "escolhas": [
+                    {"id": "libertar", "titulo": "Ajudar a alma a partir", "descricao": "Agradecer sua proteção e deixá-la seguir em paz.", "sinais": {"compaixao": 1, "dever": 1}},
+                    {"id": "ignorar", "titulo": "Voltar aos sobreviventes", "descricao": "A prioridade agora é garantir que os vivos estejam seguros.", "sinais": {"protecao": 1}},
+                    {"id": "escutar", "titulo": "Escutar o que ela tenta dizer", "descricao": "Permanecer diante da presença e ouvir seu aviso.", "sinais": {"vinculo_espiritual": 1, "curiosidade": 1}}
+                ]
+            },
+            "foco_espiritual": {
+                "pergunta": "A presença aponta para um foco espiritual preso sob os destroços. Sua energia perturba os sobreviventes, mas também mantém a alma ligada à estrada. Qual será seu destino?",
+                "escolhas": [
+                    {"id": "selar", "titulo": "Selar o foco", "descricao": "Conter a energia para proteger os vivos e deixar a alma descansar.", "sinais": {"protecao": 1, "dever": 1}},
+                    {"id": "destruir", "titulo": "Destruir o foco", "descricao": "Encerrar o perigo de forma definitiva.", "sinais": {"coragem": 1, "determinacao": 1}},
+                    {"id": "acolher", "titulo": "Acolher as vozes", "descricao": "Aceitar ouvir os mortos e assumir a responsabilidade por esse vínculo.", "sinais": {"vinculo_espiritual": 1, "compaixao": 1}}
+                ]
+            }
+        },
+        "fala_aceite": "Varek anotou sua decisão. Ao se afastar, um sussurro atravessa o vento: ‘A estrada… ajude-nos’. A caravana aguarda na Pradaria.",
+        "fala_conclusao": "Varek registra o que você fez na estrada. Por um instante, a sombra de uma figura acompanha você — e então desaparece. Agora, apresente-se à Arquimaga Selene."
     },
     # 1. O Despertar (Nível 5)
     "q4_selene_classe": {
         "titulo": "O Despertar da Centelha",
         "npc": "selene_arquimaga",
         "level_req": 5,
-        "pre_req": None,
-        "objetivo": "Sua alma despertou. Fale com a Selene para abraçar seu destino.",
+        "pre_req": "q3_varek_provacao",
+        "objetivo": "Fale com Selene. As escolhas feitas na Pradaria podem revelar uma ressonância que ela nunca viu antes.",
         "req_itens": {},
         "recompensas": {}
     },
@@ -396,9 +414,10 @@ def obter_status_npc(player_data: dict, npc_id: str) -> dict:
             if not abates_concluidos:
                 pode_entregar = False
 
+            dados_quest_visiveis = dict(q_data)
             pacote = {
                 "id": q_id,
-                "data": q_data,
+                "data": dados_quest_visiveis,
                 "progresso_itens":
                     progresso_itens,
                 "progresso_abates":
@@ -423,6 +442,17 @@ def obter_status_npc(player_data: dict, npc_id: str) -> dict:
                 }
                 if abates_evento_feitos < abates_evento_necessarios:
                     pode_entregar = False
+
+                if q_id == "q3_varek_provacao" and abates_evento_feitos >= abates_evento_necessarios:
+                    alma = quest_salva.get("decisao_alma")
+                    foco = quest_salva.get("decisao_foco")
+                    etapa = "alma_guardiao" if not alma else ("foco_espiritual" if not foco else None)
+                    if etapa:
+                        dados_quest_visiveis["decisao_ativa"] = {
+                            "etapa": etapa,
+                            **q_data["decisoes_finais"][etapa],
+                        }
+                        pode_entregar = False
 
             if pode_entregar:
                 missoes_concluidas.append(
@@ -452,7 +482,57 @@ def obter_status_npc(player_data: dict, npc_id: str) -> dict:
 
         "bloqueadas":
             missoes_bloqueadas,
+        "jornada": {
+            "necromante_revelado": (
+                (my_quests.get("q3_varek_provacao", {}) or {}).get("decisao_alma") == "escutar"
+                and (my_quests.get("q3_varek_provacao", {}) or {}).get("decisao_foco") == "acolher"
+            )
+        },
     }
+
+
+def registrar_decisao_jornada(user_id: str, etapa: str, escolha_id: str) -> dict:
+    """Registra as duas decisões narrativas finais da provação da caravana."""
+    quest_id = "q3_varek_provacao"
+    etapas = QUESTS_DATA[quest_id].get("decisoes_finais", {})
+    etapa_anterior = {"alma_guardiao": None, "foco_espiritual": "alma_guardiao"}
+    campo = {"alma_guardiao": "decisao_alma", "foco_espiritual": "decisao_foco"}
+    if etapa not in etapas:
+        return {"success": False, "error": "Essa decisão não pertence à jornada."}
+    escolha = next((item for item in etapas[etapa]["escolhas"] if item["id"] == escolha_id), None)
+    if not escolha:
+        return {"success": False, "error": "Escolha narrativa inválida."}
+    try:
+        oid = ObjectId(user_id)
+    except Exception:
+        return {"success": False, "error": "Identidade do herói inválida."}
+    player = users_collection.find_one({"_id": oid})
+    if not player:
+        return {"success": False, "error": "Herói não encontrado."}
+    quest = (player.get("quests", {}) or {}).get(quest_id, {}) or {}
+    necessario = _int_seguro(QUESTS_DATA[quest_id].get("req_abates_evento", 0))
+    if quest.get("status") not in ("ativa", "em_andamento") or _int_seguro(quest.get("abates_evento", 0)) < necessario:
+        return {"success": False, "error": "A presença só pode ser encontrada depois de proteger a caravana."}
+    if etapa_anterior[etapa] and quest.get(campo[etapa_anterior[etapa]]) is None:
+        return {"success": False, "error": "Primeiro responda à alma do guardião."}
+    if quest.get(campo[etapa]) is not None:
+        return {"success": False, "error": "Você já tomou essa decisão."}
+    filtro = {
+        "_id": oid,
+        f"quests.{quest_id}.status": {"$in": ["ativa", "em_andamento"]},
+        f"quests.{quest_id}.abates_evento": {"$gte": necessario},
+        f"quests.{quest_id}.{campo[etapa]}": None,
+    }
+    if etapa_anterior[etapa]:
+        filtro[f"quests.{quest_id}.{campo[etapa_anterior[etapa]]}"] = quest.get(campo[etapa_anterior[etapa]])
+    atualizacao = {"$set": {f"quests.{quest_id}.{campo[etapa]}": escolha_id}}
+    sinais = escolha.get("sinais", {})
+    if sinais:
+        atualizacao["$inc"] = {f"jornada.sinais.{sinal}": int(valor) for sinal, valor in sinais.items()}
+    resultado = users_collection.update_one(filtro, atualizacao)
+    if not resultado.modified_count:
+        return {"success": False, "error": "Sua jornada mudou. Fale novamente com Varek para ver a decisão atual."}
+    return {"success": True, "message": "Sua escolha foi guardada na memória da estrada."}
 
 def aceitar_missao(
     user_id: str,

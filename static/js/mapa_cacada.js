@@ -110,12 +110,19 @@ class MotorCacada {
                     this.caravanaQuestViajanteSalvo = true;
                     this.caravanaQuestDestruida = false;
                     this.acalmarViajanteCaravana();
+                    this.removerCaravanaVisual();
                 }
                 window.alertaEldora?.(
                     dados.concluido ? 'Provação da Caravana' : 'Defesa da Caravana',
                     texto,
                     'sucesso'
                 );
+                if (dados.concluido) {
+                    window.setTimeout(() => window.mostrarDialogoRPG?.(
+                        'A Voz da Estrada',
+                        'Uma figura pálida surge por um instante onde a caravana estava. “A estrada… não me deixa partir.” A presença aponta para algo entre os destroços e desaparece. Volte ao Capitão Varek: ele sentirá que algo aconteceu e pedirá sua decisão.'
+                    ), 450);
+                }
             });
 
             this.socket.on('caravanaIAAtualizada', dados => {
@@ -344,7 +351,8 @@ class MotorCacada {
     mostrarCaravanaQuest(dados) {
         const textureKey = 'quest_caravana_varek';
         const animKey = 'quest_caravana_varek_marcha';
-        const viajanteTextureKey = 'quest_viajante_caravana';
+        const viajanteTextureKey = 'npc_elara';
+        const viajanteAnimKey = 'quest_elara_caravana_espera';
         this.caravanaIAEstado = {
             vida_caravana: Number(dados.vida_caravana ?? 100),
             vida_maxima: Number(dados.vida_maxima ?? 100),
@@ -353,92 +361,102 @@ class MotorCacada {
             Number(dados.mob_atual || 0) >= Number(dados.mob_total || 1);
         this.caravanaQuestDestruida = false;
         const desenhar = () => {
-            if (this.caravanaQuestSprite?.active) {
-                this.caravanaQuestMovimiento?.stop();
-                this.caravanaQuestSprite.destroy();
-            }
+            this.removerCaravanaVisual();
             this.removerViajanteCaravana();
 
             const cena = this.scene;
-            const sprite = cena.add.sprite(dados.x, dados.y, textureKey, 0)
-                .setDisplaySize(96, 144)
-                .setOrigin(0.5, 0.5)
-                .setDepth(cena.calcularProfundidadeAtor
-                    ? cena.calcularProfundidadeAtor({
-                        x: dados.x,
-                        y: dados.y,
-                        displayHeight: 144,
-                        originY: 0.5,
-                    })
-                    : 14);
-
-            cena.physics.add.existing(sprite, true);
-            // A carroça passa devagar pelo trecho da estrada onde ocorreu a
-            // emboscada. O corpo segue o sprite para manter a colisão alinhada.
-            sprite.body.setSize(288, 96).setOffset(112, 560);
-            sprite.body.updateFromGameObject();
-            if (cena.player) cena.physics.add.collider(cena.player, sprite);
-            if (!cena.anims.exists(animKey)) {
-                cena.anims.create({
-                    key: animKey,
-                    frames: cena.anims.generateFrameNumbers(textureKey, { start: 0, end: 3 }),
-                    frameRate: 5,
-                    repeat: -1,
-                });
-            }
-            sprite.play(animKey);
-            this.caravanaQuestSprite = sprite;
-
-            this.caravanaQuestMovimiento = cena.tweens.add({
-                targets: sprite,
-                y: dados.y - 40,
-                duration: 2400,
-                ease: 'Sine.easeInOut',
-                yoyo: true,
-                repeat: -1,
-                onUpdate: () => {
-                    if (!sprite.active || !sprite.body) return;
-                    sprite.body.updateFromGameObject();
-                    sprite.setDepth(cena.calcularProfundidadeAtor
+            if (!this.caravanaQuestViajanteSalvo) {
+                const sprite = cena.add.sprite(dados.x, dados.y, textureKey, 0)
+                    .setDisplaySize(96, 144)
+                    .setOrigin(0.5, 0.5)
+                    .setDepth(cena.calcularProfundidadeAtor
                         ? cena.calcularProfundidadeAtor({
-                            x: sprite.x,
-                            y: sprite.y,
+                            x: dados.x,
+                            y: dados.y,
                             displayHeight: 144,
                             originY: 0.5,
                         })
-                        : sprite.y);
-                },
-            });
+                        : 14);
+
+                cena.physics.add.existing(sprite, true);
+                // A carroça passa devagar pelo trecho da estrada onde ocorreu a
+                // emboscada. O corpo segue o sprite para manter a colisão alinhada.
+                sprite.body.setSize(288, 96).setOffset(112, 560);
+                sprite.body.updateFromGameObject();
+                if (cena.player) cena.physics.add.collider(cena.player, sprite);
+                if (!cena.anims.exists(animKey)) {
+                    cena.anims.create({
+                        key: animKey,
+                        frames: cena.anims.generateFrameNumbers(textureKey, { start: 0, end: 3 }),
+                        frameRate: 5,
+                        repeat: -1,
+                    });
+                }
+                sprite.play(animKey);
+                this.caravanaQuestSprite = sprite;
+
+                this.caravanaQuestMovimiento = cena.tweens.add({
+                    targets: sprite,
+                    y: dados.y - 40,
+                    duration: 2400,
+                    ease: 'Sine.easeInOut',
+                    yoyo: true,
+                    repeat: -1,
+                    onUpdate: () => {
+                        if (!sprite.active || !sprite.body) return;
+                        sprite.body.updateFromGameObject();
+                        sprite.setDepth(cena.calcularProfundidadeAtor
+                            ? cena.calcularProfundidadeAtor({
+                                x: sprite.x,
+                                y: sprite.y,
+                                displayHeight: 144,
+                                originY: 0.5,
+                            })
+                            : sprite.y);
+                    },
+                });
+            }
 
             const mostrarViajante = () => {
-                const viajante = cena.add.image(dados.x, dados.y + 104, viajanteTextureKey)
+                const viajante = cena.add.sprite(dados.x, dados.y + 104, viajanteTextureKey, 1)
                     .setDisplaySize(48, 48)
                     .setDepth(dados.y + 120);
+                if (!cena.anims.exists(viajanteAnimKey)) {
+                    cena.anims.create({
+                        key: viajanteAnimKey,
+                        frames: cena.anims.generateFrameNumbers(viajanteTextureKey, { start: 0, end: 2 }),
+                        frameRate: 4,
+                        repeat: -1,
+                    });
+                }
+                viajante.play(viajanteAnimKey);
                 viajante.setInteractive({ useHandCursor: true });
                 viajante.on('pointerdown', () => {
                     window.mostrarDialogoRPG?.(
-                        'Viajante da Caravana',
+                        'Elara, Viajante da Caravana',
                         this.caravanaQuestViajanteSalvo
                             ? 'Obrigado por me salvar. Agora a estrada está segura.'
                             : 'Os goblins estão me cercando! Afaste-os da carroça, por favor!'
                     );
                 });
                 this.caravanaQuestViajante = viajante;
-                this.caravanaQuestIntegridade = cena.add.text(
-                    viajante.x,
-                    viajante.y + 28,
-                    `CARAVANA ${Number(dados.vida_caravana ?? 100)}/${Number(dados.vida_maxima ?? 100)}`,
-                    {
-                        fontFamily: 'Arial',
-                        fontSize: '10px',
-                        fontStyle: 'bold',
-                        color: '#f4ead2',
-                        backgroundColor: '#102128',
-                        padding: { x: 5, y: 3 },
-                        stroke: '#071115',
-                        strokeThickness: 3,
-                    }
-                ).setOrigin(0.5).setDepth(1000);
+                if (!this.caravanaQuestViajanteSalvo) {
+                    this.caravanaQuestIntegridade = cena.add.text(
+                        viajante.x,
+                        viajante.y + 28,
+                        `CARAVANA ${Number(dados.vida_caravana ?? 100)}/${Number(dados.vida_maxima ?? 100)}`,
+                        {
+                            fontFamily: 'Arial',
+                            fontSize: '10px',
+                            fontStyle: 'bold',
+                            color: '#f4ead2',
+                            backgroundColor: '#102128',
+                            padding: { x: 5, y: 3 },
+                            stroke: '#071115',
+                            strokeThickness: 3,
+                        }
+                    ).setOrigin(0.5).setDepth(1000);
+                }
                 if (this.caravanaQuestViajanteSalvo) {
                     const agradecimento = cena.add.text(
                         viajante.x,
@@ -488,7 +506,7 @@ class MotorCacada {
                     yoyo: true,
                     repeat: -1,
                 });
-                if (this.caravanaIAEstado) {
+                if (this.caravanaIAEstado && !this.caravanaQuestViajanteSalvo) {
                     this.atualizarIntegridadeCaravana(
                         this.caravanaIAEstado.vida_caravana,
                         this.caravanaIAEstado.vida_maxima
@@ -516,13 +534,21 @@ class MotorCacada {
             );
         }
         if (!this.scene.textures.exists(viajanteTextureKey)) {
-            loader.image(
+            loader.spritesheet(
                 viajanteTextureKey,
-                '/static/assets/npcs/viajante_caravana_ferido.png'
+                '/static/assets/npcs/npc_elara.png',
+                { frameWidth: 48, frameHeight: 48 }
             );
         }
         loader.once('complete', desenhar);
         loader.start();
+    }
+
+    removerCaravanaVisual() {
+        this.caravanaQuestMovimiento?.stop();
+        this.caravanaQuestSprite?.destroy();
+        this.caravanaQuestMovimiento = null;
+        this.caravanaQuestSprite = null;
     }
 
     atualizarIntegridadeCaravana(vida, maxima) {
@@ -625,9 +651,18 @@ class MotorCacada {
         this.caravanaQuestViajanteAnim?.stop();
         this.caravanaQuestSocorroAnim?.stop();
         this.caravanaQuestViajante?.setAngle(0);
-        if (!this.caravanaQuestDestruida) {
-            this.caravanaQuestSocorro?.destroy();
-            this.caravanaQuestSocorro = null;
+        this.caravanaQuestIntegridade?.destroy();
+        this.caravanaQuestIntegridade = null;
+        if (!this.caravanaQuestDestruida && this.caravanaQuestSocorro?.active) {
+            this.caravanaQuestSocorro.setText('OBRIGADO!');
+            this.caravanaQuestSocorro.setPosition(
+                this.caravanaQuestViajante?.x ?? this.caravanaQuestSocorro.x,
+                (this.caravanaQuestViajante?.y ?? this.caravanaQuestSocorro.y) - 32
+            );
+            this.caravanaQuestSocorro.setStyle({
+                backgroundColor: '#256044',
+                color: '#f4ead2',
+            });
         }
         this.caravanaQuestViajanteAnim = null;
         this.caravanaQuestSocorroAnim = null;

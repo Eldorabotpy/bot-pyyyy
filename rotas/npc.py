@@ -2,7 +2,7 @@
 from flask import Blueprint, request, jsonify
 from bson import ObjectId
 from modules.player.core import users_collection
-from modules.missoes import obter_status_npc, aceitar_missao, entregar_missao
+from modules.missoes import obter_status_npc, aceitar_missao, entregar_missao, registrar_decisao_jornada
 
 npc_bp = Blueprint('npc_bp', __name__)
 
@@ -47,6 +47,18 @@ def npc_aceitar_missao():
         data.get('escolha_id'),
     )
     return jsonify(resultado)
+
+
+@npc_bp.route('/api/npc/missao/decidir', methods=['POST'])
+def npc_decidir_jornada():
+    data = request.get_json() or {}
+    user_id = data.get('user_id')
+    etapa = data.get('etapa')
+    escolha_id = data.get('escolha_id')
+    if not user_id or not etapa or not escolha_id:
+        return jsonify({"success": False, "error": "Faltam dados para registrar sua decisão."}), 400
+    resultado = registrar_decisao_jornada(user_id, etapa, escolha_id)
+    return jsonify(resultado), (200 if resultado.get("success") else 400)
 
 # ==========================================
 # 💰 ROTA 3: ENTREGAR MISSÃO E PEGAR RECOMPENSA

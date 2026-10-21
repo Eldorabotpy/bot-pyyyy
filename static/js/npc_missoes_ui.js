@@ -114,14 +114,39 @@ class MotorDeMissoesNPC {
         const conteudo = document.getElementById('missao-conteudo');
         conteudo.innerHTML = '';
 
+        // A alma e o foco espiritual só surgem depois dos três abates da caravana.
+        const decisaoCaravana = [...(status.prontas_para_entrega || []), ...(status.em_andamento || [])]
+            .find(m => m.id === 'q3_varek_provacao' && m.data?.decisao_ativa)?.data?.decisao_ativa;
+        if (decisaoCaravana) {
+            conteudo.innerHTML = `
+                <h3 class="missao-titulo" style="color:#c084fc">✦ ${decisaoCaravana.etapa === 'alma_guardiao' ? 'A VOZ NA ESTRADA' : 'O FOCO ESPIRITUAL'}</h3>
+                <p class="missao-desc">${decisaoCaravana.pergunta}</p>
+                <fieldset class="missao-escolhas">
+                    <legend>Como você responde?</legend>
+                    ${decisaoCaravana.escolhas.map(escolha => `
+                        <button class="missao-escolha" type="button" style="width:100%;text-align:left;color:#f4ead2"
+                            onclick="window.motorMissoesNPC.registrarDecisao('${decisaoCaravana.etapa}','${escolha.id}','${npc_id}','${nome_npc}','${url_imagem}')">
+                            <span><strong>${escolha.titulo}</strong><small>${escolha.descricao}</small></span>
+                        </button>
+                    `).join('')}
+                </fieldset>
+                <p class="missao-escolha-nota">A estrada guardará essa escolha. Ela pode mudar o que Selene percebe quando sua Centelha despertar.</p>
+            `;
+            return;
+        }
+
         // 🚨 O BYPASS DA MISSÃO DE CLASSE (COM A INTERFACE ÉPICA) 🚨
         let missaoClasse = status.prontas_para_entrega.find(m => m.id === 'q4_selene_classe') 
                         || status.disponiveis.find(m => m.id === 'q4_selene_classe');
 
         if (missaoClasse) {
+            const necromanteRevelado = status.jornada?.necromante_revelado === true;
             conteudo.innerHTML = `
-                <h3 class="missao-titulo" style="color: #c084fc; text-align: center;">✨ O DESPERTAR DA MANA</h3>
-                <p class="missao-desc" style="text-align: center;">Seu corpo suportou a provação. Fale com a Arquimaga para escolher o caminho que guiará seu destino em Eldora.</p>
+                <h3 class="missao-titulo" style="color: #c084fc; text-align: center;">✨ O DESPERTAR DA CENTELHA</h3>
+                <p class="missao-desc" style="text-align: center;">${necromanteRevelado
+                    ? 'A voz que acompanhou sua jornada finalmente se revela. Selene sente em você a Centelha do Necromante: um vínculo raro com as almas que ainda não encontraram descanso. As outras classes continuam disponíveis; essa descoberta não escolhe por você.'
+                    : 'Sua Centelha despertou. Fale com a Arquimaga para escolher um caminho. A presença ouvida na estrada silencia, mas Selene percebe que algo ainda espera por você.'}</p>
+                ${necromanteRevelado ? '<div class="recompensas-box" style="border-left-color:#a855f7;color:#e9d5ff"><strong>CAMINHO REVELADO: NECROMANTE</strong><br><br>Você escutou a alma do guardião e acolheu as vozes sem abandonar os sobreviventes. Selene reconhece essa afinidade.</div>' : ''}
                 
                 <button class="btn-missao" style="background: linear-gradient(to bottom, #a855f7, #7e22ce); color: white;" onclick="document.getElementById('modal-missao-npc').style.display='none'; window.abrirModalClasses();">
                     VER CAMINHOS DO DESPERTAR
@@ -510,6 +535,28 @@ class MotorDeMissoesNPC {
         this.escolhaSelecionada = escolhaId;
         const botao = document.getElementById('btn-aceitar-missao');
         if (botao) botao.disabled = false;
+    }
+
+    async registrarDecisao(etapa, escolha_id, npc_id, nome_npc, url_imagem) {
+        const userId = localStorage.getItem('jogadorEldoraID');
+        const botoes = document.querySelectorAll('.missao-escolha');
+        botoes.forEach(botao => botao.disabled = true);
+        try {
+            const res = await fetch('/api/npc/missao/decidir', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: userId, etapa, escolha_id })
+            });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.error || 'Não foi possível registrar a escolha.');
+            if (typeof window.alertaEldora === 'function') window.alertaEldora('A estrada se lembra', data.message, 'sucesso');
+            if (typeof window.carregarMeuPerfil === 'function') await window.carregarMeuPerfil();
+            await this.interagir(npc_id, nome_npc, url_imagem);
+        } catch (error) {
+            if (typeof window.alertaEldora === 'function') window.alertaEldora('A presença resiste', error.message, 'erro');
+            else window.avisoEldora(error.message);
+            botoes.forEach(botao => botao.disabled = false);
+        }
     }
 
     async aceitar(quest_id, npc_id, nome_npc, url_imagem, escolha_id = null) {

@@ -137,65 +137,32 @@ class NPCsEngine {
             npc.on('pointerdown', () => {
                 const npcId = id.toLowerCase();
                 const p = window.perfilDadosGlobais;
-                
+
                 if (!p) {
                     window.mostrarDialogoRPG("Sistema", "Aguarde, lendo pergaminhos...");
                     return;
                 }
                 if (!p.quests) p.quests = {};
-                
-                // ===============================================
-                // 🛡️ CAPITÃO VAREK: O Guia Inicial (Níveis 1 a 4)
-                // ===============================================
+
+                // Varek usa o motor de missões do servidor, igual aos demais
+                // NPCs. Isso remove o fluxo antigo apenas local e duplica estado.
                 if (npcId.includes('varek')) {
-                    if (p.quests["q0_boas_vindas"] && p.quests["q0_boas_vindas"].status !== 'resgatada') {
-                        p.quests["q0_boas_vindas"].status = 'resgatada';
-                        fetch('/api/quest/completar', {
-                            method: 'POST',
-                            headers: {'Content-Type': 'application/json'},
-                            body: JSON.stringify({ user_id: localStorage.getItem("jogadorEldoraID"), quest_id: "q0_boas_vindas" })
-                        }).catch(()=>{});
+                    if (window.motorMissoesNPC?.interagir) {
+                        window.motorMissoesNPC.interagir(
+                            'varek',
+                            'Capitão Varek',
+                            'https://raw.githubusercontent.com/Eldorabotpy/static-img/refs/heads/main/assets/npcs/npc_varek_rosto.png'
+                        );
+                    } else {
+                        window.mostrarDialogoRPG('Capitão Varek', 'O registro de missões ainda está sendo preparado. Tente novamente em instantes.');
                     }
-
-                    const q1 = p.quests["q1_varek_recruta"];
-                    const q2 = p.quests["q2_varek_defesas"];
-                    const q3 = p.quests["q3_varek_provacao"];
-
-                    if (!q1 || q1.status !== 'resgatada') {
-                        window.interagirComNPC(
-                            "q1_varek_recruta", "Capitão Varek", 
-                            "Pelo Decreto do Despertar do Rei, todo cidadão com potencial deve lutar. Os antigos selos estão fracos. Prove que não vai morrer no primeiro dia: limpe as Gosmas nos arredores e alcance o Nível 2.", 
-                            "Você ainda está muito fraco, recruta. Volte apenas quando atingir o Nível 2.", 
-                            "Bom trabalho. Você sobreviveu ao primeiro dia. Tome 100 de Ouro. Mas as invasões estão piorando...", 
-                            2, null
-                        );
-                    } 
-                    else if (!q2 || q2.status !== 'resgatada') {
-                        window.interagirComNPC(
-                            "q2_varek_defesas", "Capitão Varek",
-                            "O exército real está focado em proteger os nobres no castelo... sobra para nós protegermos os plebeus. Alcance o Nível 4 repelindo as feras nas nossas fronteiras.",
-                            "As feras ainda ameaçam as casas dos plebeus. Volte quando atingir o Nível 4.",
-                            "As barricadas estão seguras por agora. Você lutou bem, recruta. Mas o verdadeiro teste se aproxima.",
-                            4, null
-                        );
-                    } 
-                    else if (!q3 || q3.status !== 'resgatada') {
-                        window.interagirComNPC(
-                            "q3_varek_provacao", "Capitão Varek",
-                            "Alerta! Uma caravana foi emboscada perto da floresta! Sobreviva a esta provação infernal, salve a caravana e alcance o Nível 5.",
-                            "Essa missão é suicídio para o seu nível atual. Vá treinar e volte no Nível 5!",
-                            "Pelos deuses de Eldora... você despertou a Centelha de Batalha! O exército real precisa de você. Leve minha carta de recomendação para a Arquimaga Selene, no pátio do castelo.",
-                            5, null
-                        );
-                    } 
-                    else {
-                        window.mostrarDialogoRPG("Capitão Varek", "Eu já lhe ensinei tudo o que podia para sobreviver. A Arquimaga Selene o aguarda no Castelo Majestoso.");
-                    }
-                } 
+                    return;
+                }
+                
                 // ===============================================
                 // 🔮 ARQUIMAGA SELENE: Mestra das Artes Arcanas
                 // ===============================================
-                else if (npcId.includes('selene')) {
+                if (npcId.includes('selene')) {
                     if (!p.quests["q3_varek_provacao"] || p.quests["q3_varek_provacao"].status !== 'resgatada') {
                         window.mostrarDialogoRPG("Arquimaga Selene", "Sinto potencial em ti, mas o Capitão Varek ainda não atestou o teu valor. Retorne aos arredores da cidade.");
                         return;
@@ -211,9 +178,15 @@ class NPCsEngine {
                     
                     if (!jaTemClasse || !p.quests["q4_selene_classe"] || p.quests["q4_selene_classe"].status !== 'resgatada') {
                         let acaoDaSelene = jaTemClasse ? null : "abrir_menu_classes";
+                        const provacaoCaravana = p.quests["q3_varek_provacao"] || {};
+                        const necromanteRevelado = provacaoCaravana.decisao_alma === 'escutar'
+                            && provacaoCaravana.decisao_foco === 'acolher';
+                        const falaDespertar = necromanteRevelado
+                            ? "Sua alma arde... e há outra voz dentro da Centelha. Selene vê a silhueta do guardião da estrada atrás de você: ‘Ele nos ouviu e não nos abandonou’. A Arquimaga reconhece em você a ressonância do Necromante. As outras classes continuam à sua escolha."
+                            : "Sua alma arde... Escolha seu caminho. Por um instante, Selene também escuta o eco que o acompanhou na estrada, mas ele ainda não encontrou forma. O poder o aguarda: escolha com sabedoria, pois sua alma será moldada por este caminho.";
                         window.interagirComNPC(
                             "q4_selene_classe", "Arquimaga Selene", 
-                            "Sua alma arde... Escolha seu caminho. O poder o aguarda, mas escolha com sabedoria, pois sua alma será moldada por este caminho.", 
+                            falaDespertar, 
                             "A aura ainda oscila... Volte no Nível 5.", 
                             "Sua alma está pronta. Agora, vá e aprenda um ofício com o Mestre Thorek antes de prosseguirmos.", 
                             5, acaoDaSelene
