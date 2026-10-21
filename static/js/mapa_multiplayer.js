@@ -880,7 +880,9 @@ class MotorMultiplayer {
                 balaoNovo = this.scene.add.container(alvo.x, alvo.y - 45, [fundoBalao, textoBalao]).setDepth(100);
             }
             else if (dados.tipo === "emoji") {
-                balaoNovo = this.scene.add.sprite(alvo.x, alvo.y - 50, dados.valor).setDepth(100);
+                balaoNovo = this.scene.add.sprite(alvo.x, alvo.y - 50, dados.valor)
+                    .setDisplaySize(40, 40)
+                    .setDepth(100);
                 try {
                     balaoNovo.play('anim_' + dados.valor); 
                 } catch(e) { console.log("Animação não pronta."); }
@@ -1882,14 +1884,15 @@ window.abrirPerfilJogador = async function(charId) {
 
 // Expressões com sprites próprios: a mesma lista alimenta o menu e o preload do mapa.
 window.EXPRESSOES_EMOJI_MAPA = [
-    { id: 'raiva', nome: 'Raiva', emoji: '😡' },
-    { id: 'sorriso', nome: 'Sorriso', emoji: '😀' },
-    { id: 'choro', nome: 'Choro', emoji: '😭' },
-    { id: 'festa', nome: 'Festa', emoji: '🎉' },
-    { id: 'amor', nome: 'Apaixonado', emoji: '😍' },
-    { id: 'surpresa', nome: 'Surpresa', emoji: '😲' },
-    { id: 'risada', nome: 'Risada', emoji: '😂' },
-    { id: 'sono', nome: 'Sono', emoji: '😴' }
+    { id: 'alegria', nome: 'Alegria', emoji: '😄', asset: 'emoji_alegria.png' },
+    { id: 'sorriso', nome: 'Sorrisos', emoji: '😀', asset: 'emoji_sorrisos.png' },
+    { id: 'choro', nome: 'Choro', emoji: '😭', asset: 'emoji_choro.png' },
+    { id: 'festa', nome: 'Festa', emoji: '🎉', asset: 'emoji_festa.png' },
+    { id: 'amor', nome: 'Apaixonado', emoji: '😍', asset: 'emoji_apaixonado.png' },
+    { id: 'surpresa', nome: 'Surpresa', emoji: '😲', asset: 'emoji_surpresa.png' },
+    { id: 'risada', nome: 'Risada', emoji: '😂', asset: 'emoji_risada.png' },
+    { id: 'sono', nome: 'Sono', emoji: '😴', asset: 'emoji_sono.png' },
+    { id: 'raiva', nome: 'Raiva', emoji: '😡', asset: 'emoji_raiva.png' }
 ];
 
 // O chat transmite um token simples; a imagem só é criada ao renderizar a mensagem.
@@ -1956,9 +1959,12 @@ window.renderizarMenuEmojis = function() {
             const expressao = window.EXPRESSOES_EMOJI_MAPA.find(item => item.id === nomeDoEmoji);
             const icone = expressao?.emoji || '✨';
             const nome = expressao?.nome || nomeDoEmoji;
+            const imagem = expressao?.asset
+                ? `https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/emoji/${expressao.asset}`
+                : `/static/assets/sprites/emoji/emoji_${nomeDoEmoji}.svg`;
             grid.innerHTML += `
                 <button class="emoji-btn ativo" onclick="window.enviarEmojiMapa('${nomeDoEmoji}')" title="${nome}" aria-label="Enviar expressão ${nome}">
-                    <span class="emoji-icon-frame"><img src="/static/assets/sprites/emoji/emoji_${nomeDoEmoji}.svg" alt="" draggable="false" onerror="this.parentElement.textContent='${icone}'"></span>
+                    <span class="emoji-icon-frame"><img src="${imagem}" alt="" draggable="false" onerror="this.parentElement.textContent='${icone}'"></span>
                 </button>
             `;
         }
