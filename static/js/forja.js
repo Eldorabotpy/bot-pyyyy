@@ -1093,30 +1093,56 @@ const ForjaUI = {
         const container = document.getElementById('abas-profissoes-forja');
         if(!container) return;
         container.innerHTML = '';
-        
+
+        const criarGrupo = (titulo, classe) => {
+            const grupo = document.createElement('div');
+            grupo.className = `forja-tab-group ${classe}`;
+            grupo.setAttribute('role', 'group');
+            grupo.setAttribute('aria-label', titulo);
+            const rotulo = document.createElement('span');
+            rotulo.className = 'forja-tab-label';
+            rotulo.textContent = titulo;
+            const botoes = document.createElement('div');
+            botoes.className = 'forja-tab-options';
+            grupo.append(rotulo, botoes);
+            container.appendChild(grupo);
+            return botoes;
+        };
+
         const profs = ForjaEngine.getProfissoesJogador();
-        profs.forEach(prof => {
+        const oficios = profs.filter(prof => !['melhorar', 'desmontar'].includes(prof));
+        const botoesOficio = criarGrupo('OFÍCIOS', 'forja-tab-professions');
+        oficios.forEach(prof => {
             const btn = document.createElement('button');
+            btn.type = 'button';
             btn.className = `aba-forja-btn ${ForjaEngine.profSelecionada === prof ? 'active' : ''}`;
             btn.innerText = prof.toUpperCase();
-            if (prof === 'desmontar') {
-                btn.style.backgroundColor = ForjaEngine.profSelecionada === prof ? '#ef4444' : '#450a0a';
-                btn.style.borderColor = '#991b1b';
-                btn.innerHTML = '♻️ DESMONTAR';
-            }
-            if (prof === 'melhorar') {
-                btn.style.backgroundColor = ForjaEngine.profSelecionada === prof ? '#3b82f6' : '#0f172a';
-                btn.style.borderColor = '#1d4ed8';
-                btn.innerHTML = '⬆️ MELHORAR';
-            }
+            btn.setAttribute('aria-pressed', String(ForjaEngine.profSelecionada === prof));
             btn.onclick = () => ForjaEngine.mudarAba(prof);
-            container.appendChild(btn);
+            botoesOficio.appendChild(btn);
         });
+
+        const botoesAcao = criarGrupo('AÇÕES', 'forja-tab-actions');
+        [
+            { id: 'melhorar', label: '⬆ Melhorar' },
+            { id: 'desmontar', label: '♻ Desmontar' }
+        ].forEach(acao => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = `aba-forja-btn forja-action-${acao.id} ${ForjaEngine.profSelecionada === acao.id ? 'active' : ''}`;
+            btn.textContent = acao.label;
+            btn.setAttribute('aria-pressed', String(ForjaEngine.profSelecionada === acao.id));
+            btn.onclick = () => ForjaEngine.mudarAba(acao.id);
+            botoesAcao.appendChild(btn);
+        });
+
         const runasBtn = document.createElement('button');
-        runasBtn.className = 'aba-forja-btn';
+        runasBtn.type = 'button';
+        runasBtn.className = 'aba-forja-btn forja-action-runas';
         runasBtn.textContent = '◇ RUNAS';
+        runasBtn.setAttribute('aria-label', 'Abrir oficina de runas');
         runasBtn.onclick = () => window.abrirOficinaRunas();
-        container.appendChild(runasBtn);
+        botoesAcao.appendChild(runasBtn);
         this.ativarScrollAbas(container);
     },
     
@@ -1250,14 +1276,19 @@ const ForjaUI = {
 
             card.onclick = () => {
 
-                document.querySelectorAll('#lista-receitas .recipe-card').forEach(el => el.classList.remove('active'));
+                document.querySelectorAll('#lista-receitas .recipe-card').forEach(el => {
+                    el.classList.remove('active');
+                    el.setAttribute('aria-pressed', 'false');
+                });
                 card.classList.add('active');
+                card.setAttribute('aria-pressed', 'true');
                 ForjaEngine.receitaSelecionada = id;
                 this.atualizarDetalhesDaReceita(id, r);
             };
             aplicarImagemItemForja(card.querySelector('img'), {...r, base_id: info.outputId});
             card.tabIndex = 0;
             card.setAttribute('role', 'button');
+            card.setAttribute('aria-pressed', String(ForjaEngine.receitaSelecionada === id));
             card.onkeydown = event => {
                 if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); card.click(); }
             };
@@ -1295,19 +1326,24 @@ const ForjaUI = {
                     <img src="/static/assets/box.png" class="card-icon" style="border-bottom: 2px solid ${corRaridade};">
                     ${nivel > 0 ? `<span style="position:absolute; top:-5px; left:-5px; background:#3b82f6; color:#fff; font-size:10px; font-weight:bold; border-radius:4px; padding:1px 3px;">+${nivel}</span>` : ''}
                 </div>
-                <span class="recipe-name" style="color:${corRaridade}">${item.nome}</span>
+                <span class="recipe-name">${item.nome}</span>
             `;
             aplicarImagemItemForja(card.querySelector("img.card-icon"), item);
 
             card.onclick = () => {
-                document.querySelectorAll('#lista-receitas .recipe-card').forEach(el => el.classList.remove('active'));
+                document.querySelectorAll('#lista-receitas .recipe-card').forEach(el => {
+                    el.classList.remove('active');
+                    el.setAttribute('aria-pressed', 'false');
+                });
                 card.classList.add('active');
+                card.setAttribute('aria-pressed', 'true');
                 ForjaEngine.itemMelhorarSelecionado = item;
                 this.atualizarDetalhesMelhorar(item, corRaridade);
             };
 
             card.tabIndex = 0;
             card.setAttribute('role', 'button');
+            card.setAttribute('aria-pressed', String(ForjaEngine.itemMelhorarSelecionado?.id === item.id));
             card.onkeydown = event => {
                 if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); card.click(); }
             };
@@ -1463,20 +1499,25 @@ const ForjaUI = {
                     <img src="/static/assets/box.png" class="card-icon" style="border-bottom: 2px solid ${corRaridade};">
                     ${nivel > 0 ? `<span style="position:absolute; top:-5px; left:-5px; background:#eab308; color:#000; font-size:10px; font-weight:bold; border-radius:4px; padding:1px 3px;">+${nivel}</span>` : ''}
                 </div>
-                <span class="recipe-name" style="color: ${corRaridade}">${item.nome}</span>
+                <span class="recipe-name">${item.nome}</span>
             `;
 
             aplicarImagemItemForja(card.querySelector("img.card-icon"), item);
 
             card.onclick = () => {
-                document.querySelectorAll('#lista-receitas .recipe-card').forEach(el => el.classList.remove('active'));
+                document.querySelectorAll('#lista-receitas .recipe-card').forEach(el => {
+                    el.classList.remove('active');
+                    el.setAttribute('aria-pressed', 'false');
+                });
                 card.classList.add('active');
+                card.setAttribute('aria-pressed', 'true');
                 ForjaEngine.itemDesmontarSelecionado = item;
                 this.atualizarDetalhesDesmontar(item, corRaridade);
             };
 
             card.tabIndex = 0;
             card.setAttribute('role', 'button');
+            card.setAttribute('aria-pressed', String(ForjaEngine.itemDesmontarSelecionado?.id === item.id));
             card.onkeydown = event => {
                 if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); card.click(); }
             };

@@ -1239,6 +1239,7 @@
 }
 
 </style>
+
 <style>
 #forja-container {background:rgba(5,9,16,.88); color:#ece5d7; font-family:Arial,sans-serif; overscroll-behavior:contain;}
 #forja-container .forja-modern-wrapper {max-width:920px; border-color:#9d8044; background:#101823; box-shadow:0 24px 80px #0009;}
@@ -1353,6 +1354,28 @@
 #forja-container .mat-pill { border-color:var(--forja-border); background:var(--forja-raised); color:var(--forja-text); }
 #forja-container .btn-forge-action:not(:disabled) { border-color:var(--forja-gold); background:var(--forja-gold) !important; color:#1b211b; }
 @media(max-width:768px) {
- #forja-container .forja-sidebar,#forja-container .forja-sidebar.forja-sidebar-compacta { border-right-color:var(--forja-border); }
+    #forja-container .forja-sidebar,
+    #forja-container .forja-sidebar.forja-sidebar-compacta { border-right-color:var(--forja-border); }
+}
+#forja-container .forja-nav-tabs {
+    display:grid;
+    grid-template-columns:minmax(0,1fr) auto;
+    gap:10px;
+    overflow:visible;
+    white-space:normal;
+}
+#forja-container .forja-tab-group { display:flex; min-width:0; align-items:center; gap:7px; }
+#forja-container .forja-tab-label { flex:none; color:var(--forja-muted); font-size:9px; font-weight:800; letter-spacing:.7px; }
+#forja-container .forja-tab-options { display:flex; min-width:0; gap:5px; }
+#forja-container .forja-tab-options .aba-forja-btn { min-width:0; min-height:44px; padding:8px 10px; }
+#forja-container .forja-tab-options .forja-action-runas { border-color:var(--forja-gold); color:var(--forja-gold); }
+#forja-container .recipe-card:focus-visible { outline:2px solid var(--forja-gold); outline-offset:2px; }
+#forja-container .recipe-scroll-list { padding-bottom:76px; scroll-padding-bottom:76px; }
+@media(max-width:768px) {
+    #forja-container .forja-nav-tabs { grid-template-columns:minmax(0,1fr); gap:5px; padding:6px 8px; }
+    #forja-container .forja-tab-group { display:grid; grid-template-columns:58px minmax(0,1fr); gap:5px; }
+    #forja-container .forja-tab-label { font-size:8px; letter-spacing:.35px; }
+    #forja-container .forja-tab-options { display:grid; grid-auto-flow:column; grid-auto-columns:minmax(0,1fr); gap:4px; }
+    #forja-container .forja-tab-options .aba-forja-btn { width:100%; min-height:42px; padding:5px 3px; font-size:9px; }
 }
 </style>

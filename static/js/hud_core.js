@@ -2207,6 +2207,9 @@ setTimeout(() => {
             let btnGM = document.createElement("button");
             btnGM.id = "btn-painel-gm";
             btnGM.innerHTML = "👑GM";
+            btnGM.type = "button";
+            btnGM.setAttribute("aria-label", "Abrir painel GM");
+            btnGM.hidden = true;
             
             // Estilo do botão GM
             btnGM.style.cssText = `
@@ -2231,6 +2234,38 @@ setTimeout(() => {
             };
 
             document.body.appendChild(btnGM);
+
+            // O atalho existe apenas na tela do mapa, nunca sobre menus ou janelas.
+            const modalSelectors = 'dialog[open], [aria-modal="true"], [role="dialog"], .eldora-modal, .modal-moderno, .eventos-overlay, .is-open, #tela-combate-global, #side-menu.aberto, #menu-overlay.ativo';
+            const estaVisivel = elemento => {
+                const estilo = window.getComputedStyle(elemento);
+                return estilo.display !== "none" && estilo.visibility !== "hidden" &&
+                    Number(estilo.opacity) !== 0 && elemento.getClientRects().length > 0;
+            };
+            const atualizarVisibilidadeGM = () => {
+                const mapaAtivo = document.querySelector("#aba-reino.active #game-container");
+                const menuAberto = document.body.classList.contains("menu-aberto") ||
+                    document.body.classList.contains("ui-modal-aberta");
+                const janelaAberta = Array.from(document.querySelectorAll(modalSelectors))
+                    .some(elemento => elemento !== btnGM && estaVisivel(elemento));
+                btnGM.hidden = !(mapaAtivo && estaVisivel(mapaAtivo) && !menuAberto && !janelaAberta);
+            };
+            let atualizarPendente = false;
+            const observerVisibilidadeGM = new MutationObserver(() => {
+                if (atualizarPendente) return;
+                atualizarPendente = true;
+                requestAnimationFrame(() => {
+                    atualizarPendente = false;
+                    atualizarVisibilidadeGM();
+                });
+            });
+            observerVisibilidadeGM.observe(document.body, {
+                subtree: true,
+                childList: true,
+                attributes: true,
+                attributeFilter: ["class", "style", "open", "hidden", "aria-hidden", "aria-modal"]
+            });
+            atualizarVisibilidadeGM();
             
             // Salva na memória para quando você for testar pelo navegador do PC
             localStorage.setItem("souGM", "sim"); 
