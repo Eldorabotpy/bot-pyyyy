@@ -354,8 +354,8 @@ class MotorCacada {
         const viajanteTextureKey = 'npc_elara';
         const viajanteAnimKey = 'quest_elara_caravana_espera';
         this.caravanaIAEstado = {
-            vida_caravana: Number(dados.vida_caravana ?? 100),
-            vida_maxima: Number(dados.vida_maxima ?? 100),
+            vida_caravana: Number(dados.vida_caravana ?? 300),
+            vida_maxima: Number(dados.vida_maxima ?? 300),
         };
         this.caravanaQuestViajanteSalvo =
             Number(dados.mob_atual || 0) >= Number(dados.mob_total || 1);
@@ -444,7 +444,7 @@ class MotorCacada {
                     this.caravanaQuestIntegridade = cena.add.text(
                         viajante.x,
                         viajante.y + 28,
-                        `CARAVANA ${Number(dados.vida_caravana ?? 100)}/${Number(dados.vida_maxima ?? 100)}`,
+                        `CARAVANA ${Number(dados.vida_caravana ?? 300)}/${Number(dados.vida_maxima ?? 300)}`,
                         {
                             fontFamily: 'Arial',
                             fontSize: '10px',
@@ -1133,7 +1133,8 @@ class MotorCacada {
 
         if (typeof window.iniciarCacadaApp === "function") {
             window.iniciarCacadaApp(spawnId, {
-                autoCacada: true
+                autoCacada: true,
+                mobData: alvo.mobData || {}
             });
         } else {
             console.error("ERRO: window.iniciarCacadaApp não encontrada.");
@@ -1374,6 +1375,17 @@ class MotorCacada {
     spawnMob(mobData) {
 
         this.removerMob(mobData.spawn_id);
+
+        if (
+            mobData.quest_event_id === 'q3_varek_provacao'
+            && typeof window.preloadImagemCombate === 'function'
+        ) {
+            const pastaCombate = mobData.asset_region || 'floresta';
+            const imagemCombate = `https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/mob/combate/${pastaCombate}/${mobData.monster_id || 'goblin_batedor'}.png`;
+            window.preloadImagemCombate(imagemCombate).catch(erro => {
+                console.warn('A imagem do Goblin Batedor será tentada novamente ao iniciar o combate.', erro);
+            });
+        }
         
         let regiaoAtual = this.scene.regiaoAtual || localStorage.getItem("eldora_lastRegiao") || "capital_eldora";
 
@@ -1627,7 +1639,7 @@ class MotorCacada {
                 }
 
                 if (typeof window.iniciarCacadaApp === 'function') {
-                    window.iniciarCacadaApp(mobData.spawn_id); 
+                    window.iniciarCacadaApp(mobData.spawn_id, { mobData });
                 } else {
                     console.error("ERRO: A função iniciarCacadaApp não foi encontrada!");
                 }
