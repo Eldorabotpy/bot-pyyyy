@@ -224,13 +224,14 @@ class PerfilVisual {
         let classeBusca = '.card-opcao';
         if (tipo === 'banner') classeBusca = '.card-opcao-banner';
         
+        const prefixo = tipo === 'avatar' ? 'av-' : (tipo === 'skin' ? 'sk-' : 'bn-');
+        
         document.querySelectorAll(classeBusca).forEach(el => {
-            if(el.id.startsWith(tipo.substring(0, 2))) {
+            if (el.id.startsWith(prefixo)) {
                 el.classList.remove('selecionado');
             }
         });
         
-        const prefixo = tipo === 'avatar' ? 'av-' : (tipo === 'skin' ? 'sk-' : 'bn-');
         const idAlvo = prefixo + valor;
         const elemento = document.getElementById(idAlvo);
         if (elemento) elemento.classList.add('selecionado');
