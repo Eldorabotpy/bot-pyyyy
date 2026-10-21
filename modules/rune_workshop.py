@@ -2,7 +2,7 @@
 import copy
 import unicodedata
 from modules.game_data.runes_data import RUNES_DB
-from modules.game_data.rune_rules import SOCKETS_BY_RARITY, EXTRACTION_GOLD, EVOLUTION_COSTS, DUST_YIELD
+from modules.game_data.rune_rules import SOCKETS_BY_RARITY, EXTRACTION_GOLD, EVOLUTION_COSTS, DUST_YIELD, FAMILIES
 
 
 def rarity(value):
@@ -60,8 +60,15 @@ def state_view(player, items):
         info=items.get(item.get('base_id',uid),{}) if isinstance(item,dict) else {}
         if not equipment_item(item,info): continue
         gear.append({'id':uid,'base_id':item.get('base_id',uid),'nome':info.get('display_name',item.get('base_id',uid)),'raridade':item.get('rarity','comum'),'equipado':str(uid) in equipped,**item_view(item)})
+    bonus_por_atributo=equipped_bonuses(player)
+    rotulos={definition[1]:(definition[3],definition[4]) for definition in FAMILIES.values()}
+    bonus_ativos=[
+        {'stat_key':stat,'label':rotulos.get(stat,(stat,''))[0],'value':value,'unit':rotulos.get(stat,(stat,''))[1]}
+        for stat,value in bonus_por_atributo.items()
+    ]
     return {'gold':int(player.get('gold',0)), 'revision':int(player.get('rune_revision',0)), 'equipamentos':gear,
         'runas':[dict(r,id=rid,qtd=quantity(inv,rid)) for rid,r in RUNES_DB.items()],
+        'bonus_ativos':bonus_ativos,
         'materiais':{k:quantity(inv,k) for k in ('po_runico','fragmento_runa_ancestral')},
         'extracao_ouro':EXTRACTION_GOLD,'custos_evolucao':EVOLUTION_COSTS,'po_por_nivel':DUST_YIELD}
 
