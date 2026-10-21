@@ -1880,16 +1880,20 @@ window.abrirPerfilJogador = async function(charId) {
 // 🎭 SISTEMA DE EXPRESSÕES DO MAPA INDEPENDENTE
 // ==========================================
 
-// Dicionário visual para os botões do menu
-const iconesEmojiMenu = {
-    "raiva": "😡",
-    "sorriso": "😀",
-    "choro": "😭",
-    "festa": "🎉"
-};
+// Expressões com sprites próprios: a mesma lista alimenta o menu e o preload do mapa.
+window.EXPRESSOES_EMOJI_MAPA = [
+    { id: 'raiva', nome: 'Raiva', emoji: '😡' },
+    { id: 'sorriso', nome: 'Sorriso', emoji: '😀' },
+    { id: 'choro', nome: 'Choro', emoji: '😭' },
+    { id: 'festa', nome: 'Festa', emoji: '🎉' },
+    { id: 'amor', nome: 'Apaixonado', emoji: '😍' },
+    { id: 'surpresa', nome: 'Surpresa', emoji: '😲' },
+    { id: 'risada', nome: 'Risada', emoji: '😂' },
+    { id: 'sono', nome: 'Sono', emoji: '😴' }
+];
 
-// Seus 6 slots (Por enquanto chumbado aqui para testar. Depois virá do Python!)
-window.meusEmojisEquipados = ["raiva", "sorriso", "choro", "festa", null, null]; 
+// Expressões disponíveis no menu (os slots bloqueados serão ligados ao sistema de coleção).
+window.meusEmojisEquipados = window.EXPRESSOES_EMOJI_MAPA.map(expressao => expressao.id); 
 
 // Função que desenha os botões na tela
 window.renderizarMenuEmojis = function() {
@@ -1898,20 +1902,17 @@ window.renderizarMenuEmojis = function() {
     
     grid.innerHTML = ''; // Limpa a lousa
 
-    // Roda 6 vezes para criar os 6 slots
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < window.meusEmojisEquipados.length; i++) {
         let nomeDoEmoji = window.meusEmojisEquipados[i];
 
         if (nomeDoEmoji) {
-            let icone = iconesEmojiMenu[nomeDoEmoji] || "✨";
+            const expressao = window.EXPRESSOES_EMOJI_MAPA.find(item => item.id === nomeDoEmoji);
+            const icone = expressao?.emoji || '✨';
+            const nome = expressao?.nome || nomeDoEmoji;
             grid.innerHTML += `
-                <button class="emoji-btn ativo" onclick="window.enviarEmojiMapa('${nomeDoEmoji}')" title="${nomeDoEmoji.toUpperCase()}">
-                    ${icone}
+                <button class="emoji-btn ativo" onclick="window.enviarEmojiMapa('${nomeDoEmoji}')" title="${nome}" aria-label="Enviar expressão ${nome}">
+                    <span class="emoji-icon-frame"><img src="/static/assets/sprites/emoji/emoji_${nomeDoEmoji}.svg" alt="" draggable="false" onerror="this.parentElement.textContent='${icone}'"></span>
                 </button>
-            `;
-        } else {
-            grid.innerHTML += `
-                <button class="emoji-btn bloqueado" title="Slot Vazio">🔒</button>
             `;
         }
     }
