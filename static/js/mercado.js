@@ -242,16 +242,159 @@ function aplicarImagemMercado(imgEl, item) {
     imgEl.src = caminhos[0];
 }
 
-// 🔥 MÁGICA DO INVENTÁRIO NO MERCADO (MODERNO) 🔥
+const MERCADO_CATEGORIAS_INVENTARIO = [
+    { id: 'equipamentos', nome: 'Equipamentos', icone: '⚔️' },
+    { id: 'materiais', nome: 'Materiais', icone: '⛏️' },
+    { id: 'runas', nome: 'Runas', icone: '🔮' },
+    { id: 'consumiveis', nome: 'Consumíveis', icone: '🧪' },
+    { id: 'ferramentas', nome: 'Ferramentas', icone: '🛠️' },
+    { id: 'bases', nome: 'Bases', icone: '🧱' },
+    { id: 'outros', nome: 'Outros', icone: '✦' }
+];
+let mercadoInventarioAbaAtiva = 'todos';
+let mercadoInventarioClasseAtiva = 'todas';
+
+function mercadoNormalizarChave(valor) {
+    return String(valor ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+}
+
+function mercadoClassesDoItem(item) {
+    const requisito = item?.class_req ?? item?.classe_req ?? item?.required_class ?? item?.classe ?? item?.class;
+    const valores = Array.isArray(requisito) ? requisito : requisito ? [requisito] : [];
+    const classes = [...new Set(valores.map(mercadoNormalizarChave).filter(Boolean))];
+    if (classes.length || mercadoCategoriaDoItem(item) !== 'equipamentos') return classes;
+
+    const baseId = mercadoNormalizarChave(mercadoItemBaseId(item));
+    const classesConhecidas = [
+        'guerreiro', 'cavaleiro', 'gladiador', 'templario', 'berserker', 'barbaro', 'juggernaut', 'ira_primordial',
+        'cacador', 'patrulheiro', 'franco_atirador', 'mestre_da_selva', 'monge', 'guardiao_do_templo', 'punho_elemental',
+        'ascendente', 'mago', 'feiticeiro', 'elementalista', 'arquimago', 'bardo', 'menestrel', 'encantador', 'maestro',
+        'assassino', 'ladrao_de_sombras', 'ninja', 'mestre_das_laminas', 'samurai', 'kensei', 'ronin', 'shogun',
+        'curandeiro', 'clerigo', 'druida', 'sacerdote'
+    ];
+    const classeInferida = classesConhecidas.find(classe => baseId.endsWith(`_${classe}`) || baseId.includes(`_${classe}_`));
+    return classeInferida ? [classeInferida] : [];
+}
+
+function mercadoNomeClasse(chave) {
+    const nomes = {
+        cacador: 'Caçador', barbaro: 'Bárbaro', templario: 'Templário', ira_primordial: 'Ira Primordial',
+        guardiao_do_templo: 'Guardião do Templo', punho_elemental: 'Punho Elemental', franco_atirador: 'Franco-atirador',
+        mestre_da_selva: 'Mestre da Selva', ladrao_de_sombras: 'Ladrão de Sombras', mestre_das_laminas: 'Mestre das Lâminas',
+        clerigo: 'Clérigo', curandeiro: 'Curandeiro', arqueiro: 'Arqueiro'
+    };
+    return nomes[chave] || chave.split('_').map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(' ');
+}
+
+function mercadoCategoriaDoItem(item) {
+    const tipo = mercadoNormalizarChave(item?.tipo || item?.type);
+    const categoria = mercadoNormalizarChave(item?.categoria || item?.category);
+    const baseId = mercadoNormalizarChave(mercadoItemBaseId(item));
+    const equipamento = ['equipamento', 'equipment', 'weapon', 'arma', 'armor', 'armadura', 'helmet', 'elmo', 'boots', 'botas', 'ring', 'anel', 'necklace', 'colar', 'earring', 'brinco'].includes(tipo);
+
+    if (tipo === 'runa' || tipo === 'rune' || tipo.includes('runico') || categoria === 'runas' || categoria === 'socketable' || baseId.startsWith('runa_') || baseId.startsWith('fragmento_runa') || baseId === 'po_runico') return 'runas';
+    if (tipo === 'equipment_base' || categoria === 'equipment_base' || baseId.startsWith('base_equipamento')) return 'bases';
+    if (tipo === 'tool' || tipo === 'ferramenta' || item?.tool_type || item?.tool_tier) return 'ferramentas';
+    if (equipamento || (item?.slot && tipo !== 'material')) return 'equipamentos';
+    if (['consumivel', 'consumable', 'potion', 'pocao', 'scroll', 'pergaminho', 'chest', 'box'].includes(tipo) || categoria === 'consumivel') return 'consumiveis';
+    if (tipo.includes('material') || ['reagent', 'resource', 'sucata'].includes(tipo) || ['coletavel', 'cacada', 'material', 'reagente'].includes(categoria)) return 'materiais';
+    return 'outros';
+}
+
+function mercadoCriarFiltroInventario(container, id, rotulo, quantidade, ativo, aoClicar, icone = '') {
+    const botao = document.createElement('button');
+    botao.type = 'button';
+    botao.className = `mercado-filtro-inventario${ativo ? ' ativo' : ''}`;
+    botao.setAttribute('role', 'tab');
+    botao.setAttribute('aria-pressed', ativo ? 'true' : 'false');
+    botao.setAttribute('aria-selected', ativo ? 'true' : 'false');
+    botao.innerHTML = `${icone ? `<span aria-hidden="true">${icone}</span>` : ''}<span>${mercadoEscapeHtml(rotulo)}</span><b>${quantidade}</b>`;
+    botao.onclick = aoClicar;
+    container.appendChild(botao);
+}
+
+function mercadoRenderizarOpcoesInventario(lista, itens) {
+    const linhas = lista.querySelector('.mercado-inventario-itens');
+    if (!linhas) return;
+    linhas.innerHTML = '';
+
+    const daAba = mercadoInventarioAbaAtiva === 'todos'
+        ? itens
+        : itens.filter(item => mercadoCategoriaDoItem(item) === mercadoInventarioAbaAtiva);
+    const filtrados = mercadoInventarioAbaAtiva === 'equipamentos' && mercadoInventarioClasseAtiva !== 'todas'
+        ? daAba.filter(item => mercadoClassesDoItem(item).includes(mercadoInventarioClasseAtiva) || (!mercadoClassesDoItem(item).length && mercadoInventarioClasseAtiva === 'livre'))
+        : daAba;
+
+    filtrados.sort((a, b) => String(a.nome || a.display_name || '').localeCompare(String(b.nome || b.display_name || ''), 'pt-BR'));
+    if (!filtrados.length) {
+        const vazio = document.createElement('div');
+        vazio.className = 'mercado-inventario-vazio';
+        vazio.innerHTML = '<span aria-hidden="true">✧</span><strong>Nenhum item nesta aba</strong><small>Escolha outra categoria para ver sua mochila.</small>';
+        linhas.appendChild(vazio);
+        return;
+    }
+
+    const coresRaridade = { comum: '#94a3b8', bom: '#22c55e', incomum: '#22c55e', raro: '#3b82f6', epico: '#a855f7', lendario: '#eab308', unico: '#ef4444', mitico: '#ef4444' };
+    filtrados.forEach(item => {
+        const nome = item.display_name || item.nome || 'Item Desconhecido';
+        const classes = mercadoClassesDoItem(item);
+        const categoria = mercadoCategoriaDoItem(item);
+        const requisitos = classes.length ? classes.map(mercadoNomeClasse).join(' · ') : 'Livre';
+        const cor = coresRaridade[mercadoNormalizarChave(item.raridade || item.rarity || 'comum')] || '#70819a';
+        const quantidade = Number(item.qtd || item.quantity || item.quantidade || 1) || 1;
+        const opcao = document.createElement('button');
+        opcao.type = 'button';
+        opcao.className = 'mercado-opcao-inventario';
+        opcao.innerHTML = `
+            <span class="mercado-opcao-icone" style="--raridade:${cor}"><img data-img-mercado-venda="1" src="/static/assets/box.png" alt=""></span>
+            <span class="mercado-opcao-dados"><strong>${mercadoEscapeHtml(nome)}</strong>${categoria === 'equipamentos' ? `<small class="mercado-opcao-classe">${mercadoEscapeHtml(requisitos)}</small>` : ''}</span>
+            <span class="mercado-opcao-qtd">x${quantidade}</span>`;
+        opcao.onclick = () => selecionarItemDropdown(item, nome, quantidade > 1 ? `<span class="mercado-opcao-qtd">x${quantidade}</span>` : '', cor);
+        linhas.appendChild(opcao);
+        aplicarImagemMercado(opcao.querySelector('[data-img-mercado-venda="1"]'), item);
+    });
+}
+
+function mercadoRenderizarFiltrosInventario(lista, itens) {
+    const categorias = lista.querySelector('.mercado-inventario-categorias');
+    const classes = lista.querySelector('.mercado-inventario-classes');
+    categorias.innerHTML = '';
+    classes.innerHTML = '';
+
+    mercadoCriarFiltroInventario(categorias, 'todos', 'Todos', itens.length, mercadoInventarioAbaAtiva === 'todos', () => {
+        mercadoInventarioAbaAtiva = 'todos'; mercadoInventarioClasseAtiva = 'todas'; mercadoRenderizarFiltrosInventario(lista, itens); mercadoRenderizarOpcoesInventario(lista, itens);
+    }, '✦');
+    MERCADO_CATEGORIAS_INVENTARIO.forEach(categoria => {
+        const quantidade = itens.filter(item => mercadoCategoriaDoItem(item) === categoria.id).length;
+        if (!quantidade) return;
+        mercadoCriarFiltroInventario(categorias, categoria.id, categoria.nome, quantidade, mercadoInventarioAbaAtiva === categoria.id, () => {
+            mercadoInventarioAbaAtiva = categoria.id; mercadoInventarioClasseAtiva = 'todas'; mercadoRenderizarFiltrosInventario(lista, itens); mercadoRenderizarOpcoesInventario(lista, itens);
+        }, categoria.icone);
+    });
+
+    classes.hidden = mercadoInventarioAbaAtiva !== 'equipamentos';
+    if (classes.hidden) return;
+    const equipamentos = itens.filter(item => mercadoCategoriaDoItem(item) === 'equipamentos');
+    const classesDisponiveis = [...new Set(equipamentos.flatMap(item => mercadoClassesDoItem(item).length ? mercadoClassesDoItem(item) : ['livre']))]
+        .sort((a, b) => a === 'livre' ? 1 : b === 'livre' ? -1 : mercadoNomeClasse(a).localeCompare(mercadoNomeClasse(b), 'pt-BR'));
+    mercadoCriarFiltroInventario(classes, 'todas', 'Todas as classes', equipamentos.length, mercadoInventarioClasseAtiva === 'todas', () => {
+        mercadoInventarioClasseAtiva = 'todas'; mercadoRenderizarFiltrosInventario(lista, itens); mercadoRenderizarOpcoesInventario(lista, itens);
+    });
+    classesDisponiveis.forEach(classe => {
+        const quantidade = equipamentos.filter(item => mercadoClassesDoItem(item).includes(classe) || (!mercadoClassesDoItem(item).length && classe === 'livre')).length;
+        mercadoCriarFiltroInventario(classes, classe, mercadoNomeClasse(classe), quantidade, mercadoInventarioClasseAtiva === classe, () => {
+            mercadoInventarioClasseAtiva = classe; mercadoRenderizarFiltrosInventario(lista, itens); mercadoRenderizarOpcoesInventario(lista, itens);
+        });
+    });
+}
+
 function carregarInventarioNoMercado() {
     const listaDropdown = document.getElementById('lista-dropdown-venda');
     const inputEscondido = document.getElementById('select-item-venda');
     const displaySelecionado = document.getElementById('dropdown-venda-selecionado');
     const btnDropdown = document.getElementById('btn-dropdown-venda');
-    
     if (!listaDropdown || !inputEscondido) return;
 
-    // Reseta o formulário visualmente ao carregar a tela
     listaDropdown.innerHTML = '';
     inputEscondido.value = '';
     listaDropdown.style.display = 'none';
@@ -261,73 +404,35 @@ function carregarInventarioNoMercado() {
     quantidade.disabled = false;
     quantidade.value = '1';
     quantidade.removeAttribute('max');
-    displaySelecionado.innerHTML = '<span style="font-size: 1.2em; opacity: 0.3;">📦</span> <span style="color: #cbd5e1;">Selecionar item...</span>';
+    displaySelecionado.innerHTML = '<span style="font-size:1.2em;opacity:.45">📦</span><span style="color:#cbd5e1">Selecionar item...</span>';
     btnDropdown.style.borderColor = '#475569';
     btnDropdown.style.boxShadow = '0 4px 6px rgba(0,0,0,0.4)';
 
-    if (!window.perfilDadosGlobais || !window.perfilDadosGlobais.inventario) {
-        listaDropdown.innerHTML = '<div style="padding: 15px; text-align: center; color: #64748b;">Mochila vazia.</div>';
+    const inventario = window.perfilDadosGlobais?.inventario;
+    if (!Array.isArray(inventario)) {
+        listaDropdown.innerHTML = '<div class="mercado-inventario-vazio"><strong>Mochila indisponível</strong><small>Feche e abra o mercado para atualizar os itens.</small></div>';
         return;
     }
 
-    const inventario = window.perfilDadosGlobais.inventario;
-    const linkBaseNuvem = window.CATALOGO_SISTEMA ? "https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/" : "/static/assets/";
-
-    let itensValidos = 0;
-
-    inventario.forEach(item => {
-        // Bloqueia itens não trocáveis e moedas base (gemas)
-        if (item.tradable === false || item.id === 'gems' || item.base_id === 'gems') {
-            return; 
-        }
-        
-        // Segurança visual: item equipado nem aparece na lista.
-        // A segurança real fica no backend.
-        if (mercadoItemEstaEquipado(item)) {
-            return;
-        }
-
-        itensValidos++;
-
-        let idItem = mercadoItemBaseId(item);
-        let urlImg = mercadoCaminhosImagemItem(item)[0];
-        
-        // Log de debug para você ver no F12 (Console do navegador) se ele está tentando baixar o link certo
-        console.log("Tentando carregar imagem de:", urlImg);
-        
-        let textoQuantidade = item.qtd > 1 ? `<span style="color: #facc15; font-size: 0.85em; font-weight: bold; background: rgba(0,0,0,0.5); padding: 2px 6px; border-radius: 6px;">x${item.qtd}</span>` : '';
-        let nomeItem = item.display_name || item.nome || 'Item Desconhecido';
-        
-        // Sistema de cores por raridade
-        const coresRaridade = {'comum': '#94a3b8', 'incomum': '#22c55e', 'raro': '#3b82f6', 'epico': '#a855f7', 'lendario': '#eab308', 'mitico': '#ef4444'};
-        const corBordaItem = coresRaridade[(item.raridade || 'comum').toLowerCase()] || '#475569';
-
-        // Cria a linha (opção) clicável
-        let divOpcao = document.createElement('div');
-        divOpcao.style.cssText = "padding: 10px 15px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid #0f172a; cursor: pointer; transition: background 0.2s;";
-        divOpcao.onmouseover = () => divOpcao.style.background = 'rgba(59, 130, 246, 0.1)';
-        divOpcao.onmouseout = () => divOpcao.style.background = 'transparent';
-        
-        divOpcao.onclick = () => {
-            selecionarItemDropdown(item, nomeItem, textoQuantidade, corBordaItem);
-        };
-
-        divOpcao.innerHTML = `
-            <div style="width: 38px; height: 38px; background: #000; border-radius: 8px; display: flex; align-items: center; justify-content: center; border: 2px solid ${corBordaItem}; box-shadow: inset 0 0 10px rgba(0,0,0,0.8);">
-                <img data-img-mercado-venda="1" src="/static/assets/box.png" style="max-width: 28px; max-height: 28px; object-fit: contain; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.8));">
-            </div>
-            <div style="color: #f8fafc; font-size: 0.95em; font-weight: bold; flex: 1;">${mercadoEscapeHtml(nomeItem)}</div>
-            <div>${textoQuantidade}</div>
-        `;
-
-        listaDropdown.appendChild(divOpcao);
-        aplicarImagemMercado(divOpcao.querySelector('[data-img-mercado-venda="1"]'), item);
-
-    });
-
-    if (itensValidos === 0) {
-        listaDropdown.innerHTML = '<div style="padding: 20px; text-align: center; color: #64748b; font-size: 0.9em; font-style: italic;">Nenhum item da sua mochila pode ser vendido.</div>';
+    const itens = inventario.filter(item =>
+        item?.tradable !== false && item?.id !== 'gems' && item?.base_id !== 'gems' && !mercadoItemEstaEquipado(item)
+    );
+    if (!itens.length) {
+        listaDropdown.innerHTML = '<div class="mercado-inventario-vazio"><span aria-hidden="true">📦</span><strong>Nenhum item disponível</strong><small>Os itens equipados ou sem troca não podem ser anunciados.</small></div>';
+        return;
     }
+
+    listaDropdown.innerHTML = `
+        <div class="mercado-inventario">
+            <div class="mercado-inventario-titulo"><span>Organize sua mochila</span><small>${itens.length} ${itens.length === 1 ? 'tipo de item' : 'tipos de item'}</small></div>
+            <div class="mercado-inventario-categorias" role="tablist" aria-label="Categorias da mochila"></div>
+            <div class="mercado-inventario-classes" role="tablist" aria-label="Classes dos equipamentos" hidden></div>
+            <div class="mercado-inventario-itens" role="listbox" aria-label="Itens disponíveis para venda"></div>
+        </div>`;
+    mercadoInventarioAbaAtiva = 'todos';
+    mercadoInventarioClasseAtiva = 'todas';
+    mercadoRenderizarFiltrosInventario(listaDropdown, itens);
+    mercadoRenderizarOpcoesInventario(listaDropdown, itens);
 }
 
 // 🖱️ Lógica para abrir/fechar o menu suspenso customizado
