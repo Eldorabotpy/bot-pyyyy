@@ -28,8 +28,18 @@
  const costText=cost=>Object.entries(cost).map(([key,n])=>`${n} ${key==='gold'?'ouro':key==='po_runico'?'pó rúnico':'fragmento ancestral'}`).join(' + ');
  const canPay=cost=>Object.entries(cost).every(([k,n])=>(k==='gold'?state.gold:state.materiais[k]||0)>=n);
  function header(){return `<header><div><small>FORJA · INSCRIÇÕES RÚNICAS</small><h2>Oficina de Runas</h2></div><button data-action="fechar" aria-label="Fechar runas">×</button></header><div class="rune-wallet"><span>${state.gold.toLocaleString('pt-BR')} ouro</span><span>${state.materiais.po_runico} pó rúnico</span><span>${state.materiais.fragmento_runa_ancestral} fragmentos</span></div><nav><button data-page="equipar" class="${page==='equipar'?'active':''}">Equipamentos</button><button data-page="evoluir" class="${page==='evoluir'?'active':''}">Evolução</button></nav>`;}
+ function activeBonusPanel(){
+  const bonuses=state.bonus_ativos||[];
+  const rows=bonuses.map(b=>{
+   const value=Number(b.value)||0;
+   const amount=(Number.isInteger(value)?value:value.toLocaleString('pt-BR',{maximumFractionDigits:2}))+String(b.unit||'');
+   return `<span class="rune-active-chip"><b>+${esc(amount)}</b><small>${esc(b.label)}</small></span>`;
+  }).join('');
+  return `<section class="rune-active-panel"><div class="rune-active-heading"><span aria-hidden="true">✦</span><div><b>Bônus ativos</b><small>Somente runas em equipamentos equipados e íntegros</small></div></div>${rows?'<div class="rune-active-list">'+rows+'</div>':'<p>Nenhum bônus rúnico ativo no momento.</p>'}</section>`;
+ }
  function gearPage(){
-  if(!state.equipamentos.length)return '<p class="rune-notice">Você ainda não possui equipamentos. Os raros têm 1 espaço, épicos 2 e lendários 3.</p>';
+  const activeSummary=activeBonusPanel();
+  if(!state.equipamentos.length)return activeSummary+'<p class="rune-notice">Você ainda não possui equipamentos. Os raros têm 1 espaço, épicos 2 e lendários 3.</p>';
   const item=selectedGear()||state.equipamentos[0];selectedItem=item.id;
   if(selectedSlot>=item.sockets.length)selectedSlot=0;
   const installed=item.rune_slots[selectedSlot];
@@ -39,7 +49,7 @@
    const duplicate=item.rune_slots.some(s=>s?.family===r.family);
    return `<div class="rune-card">${icon(r)}<div><b>${esc(r.name)}</b><small>${esc(r.desc)} · ${r.qtd} na mochila</small></div><button data-action="encaixar" data-rune="${esc(r.id)}" ${duplicate||installed||!item.sockets.length?'disabled':''}>${duplicate?'Já instalada':'Encaixar'}</button></div>`;
   }).join('');
-  return `<label class="rune-label">Equipamento<select id="rune-gear">${state.equipamentos.map(g=>`<option value="${esc(g.id)}" ${g.id===item.id?'selected':''}>${esc(g.nome)} · ${esc(g.raridade)}${g.equipado?' · equipado':''}</option>`).join('')}</select></label>
+  return `${activeSummary}<label class="rune-label">Equipamento<select id="rune-gear">${state.equipamentos.map(g=>`<option value="${esc(g.id)}" ${g.id===item.id?'selected':''}>${esc(g.nome)} · ${esc(g.raridade)}${g.equipado?' · equipado':''}</option>`).join('')}</select></label>
   <p class="rune-notice">${item.equipado?'Bônus ativos enquanto este equipamento estiver equipado e íntegro.':'Equipe este item no personagem para ativar seus bônus.'} Uma runa de cada família por equipamento.</p>
   <div class="rune-slots">${slotRows||'<p>Esta raridade não possui espaços. Raro: 1 · Épico: 2 · Lendário: 3.</p>'}</div>
   ${installed?`<button class="rune-extract" data-action="extrair" ${state.gold<state.extracao_ouro?'disabled':''}>Extrair ${esc(installed.name)} · ${state.extracao_ouro} ouro</button><p class="rune-notice">A runa volta para a mochila. O equipamento é preservado.</p>`:''}
