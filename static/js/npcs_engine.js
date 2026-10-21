@@ -532,6 +532,44 @@ window.abrirModalClasses = function(necromanteRevelado = false) {
                 position: absolute; top: 0; left: 0; z-index: 10;
             }
             .btn-voltar:hover { background: #334155; color: #fff; border-color: #cbd5e1; }
+            .classe-detalhe-tela {
+                display: flex; flex: 1 1 auto; flex-direction: column; width: 100%; min-height: 0;
+                max-height: calc(100vh - 96px); max-height: calc(100dvh - 96px);
+                overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain;
+            }
+            .classe-detalhe-conteudo {
+                display: flex; flex-direction: column; align-items: center; text-align: center;
+                width: 100%; min-width: 0; padding: 26px 1px 10px;
+            }
+            .classe-detalhe-arte {
+                width: 100%; height: clamp(150px, 34dvh, 224px); flex: 0 0 auto;
+                display: flex; justify-content: center; align-items: flex-end; margin-bottom: 8px;
+            }
+            .classe-detalhe-arte img {
+                max-width: 100%; max-height: 100%; object-fit: contain; object-position: bottom;
+                animation: floatImgGigante 4s ease-in-out infinite;
+            }
+            .classe-detalhe-titulo {
+                margin: 2px 0 10px; font-family: 'Cinzel', serif; font-size: clamp(1.45rem, 6vw, 1.8rem);
+                line-height: 1.16; letter-spacing: 0.6px; text-transform: uppercase; text-shadow: 0 2px 5px rgba(0,0,0,0.7);
+            }
+            .classe-detalhe-descricao {
+                width: 100%; padding: clamp(12px, 3.5vw, 16px); margin: 0;
+                color: #d5dedf; font: 400 0.94rem/1.5 'Segoe UI', Arial, sans-serif;
+                background: rgba(7, 18, 25, 0.78); border: 1px solid rgba(211, 190, 132, 0.34); border-radius: 10px;
+            }
+            #btn-confirmar-classe { flex: 0 0 auto; min-height: 48px; margin-top: 12px; font-size: clamp(0.95rem, 4vw, 1.08rem); }
+            @keyframes floatImgGigante {
+                0%, 100% { transform: translateY(0); }
+                50% { transform: translateY(-6px); }
+            }
+            @media (max-height: 560px) {
+                .classe-detalhe-tela { max-height: calc(100vh - 32px); max-height: calc(100dvh - 32px); }
+                .classe-detalhe-arte { height: clamp(120px, 28dvh, 170px); }
+            }
+            @media (prefers-reduced-motion: reduce) {
+                .classe-detalhe-arte img { animation: none; }
+            }
             .btn-confirmar {
                 background: linear-gradient(to bottom, #ca8a04, #a16207); border: 2px solid #fef08a; border-radius: 8px;
                 color: #fff; font-family: 'Cinzel', serif; font-size: 1.2em; font-weight: bold; padding: 12px 20px;
@@ -623,12 +661,12 @@ window.abrirModalClasses = function(necromanteRevelado = false) {
                 <!-- ============================== -->
                 <!-- TELA 2: OS DETALHES DA CLASSE -->
                 <!-- ============================== -->
-                <div id="tela-detalhes-classe" style="display: none; flex-direction: column; width: 100%; position: relative;">
+                <div id="tela-detalhes-classe" class="classe-detalhe-tela" style="display: none; position: relative;">
                     <!-- Botão Pequeno de Voltar -->
                     <button class="btn-voltar" onclick="window.voltarGradeClasses()">⬅ Voltar</button>
                     
                     <!-- Espaço que será preenchido pelo JS -->
-                    <div id="conteudo-detalhes" style="display: flex; flex-direction: column; align-items: center; text-align: center; margin-top: 25px;">
+                    <div id="conteudo-detalhes" class="classe-detalhe-conteudo">
                     </div>
                     
                     <button id="btn-confirmar-classe" class="btn-confirmar" onclick="window.dispararConfirmacao()">Abraçar Destino</button>
@@ -665,26 +703,16 @@ window.selecionarClasseNaUI = function(classeId) {
     const conteudo = document.getElementById('conteudo-detalhes');
     
     conteudo.innerHTML = `
-        <div style="height: min(250px, 34dvh); min-height: 150px; display: flex; justify-content: center; align-items: flex-end; margin-bottom: 15px; width: 100%; flex: 0 0 auto;">
+        <div class="classe-detalhe-arte">
             <img src="${urlImagemPersonagem}" 
                  alt="${classe.nome}" 
                  onerror="this.src='https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/avatares/avatar_padrao_m.png'" 
-                 style="max-height: 100%; max-width: 100%; object-fit: contain; object-position: bottom; filter: drop-shadow(0 10px 20px ${classe.cor}); animation: floatImgGigante 3s ease-in-out infinite;">
+                 style="filter: drop-shadow(0 10px 20px ${classe.cor});">
         </div>
 
-        <h3 style="color: ${classe.cor}; margin: 0 0 10px 0; font-family: 'Cinzel', serif; font-size: 1.8em; text-transform: uppercase; text-shadow: 1px 1px 2px #000; letter-spacing: 1px;">${classe.nome}</h3>
+        <h3 class="classe-detalhe-titulo" style="color: ${classe.cor};">${classe.nome}</h3>
         
-        <div style="background: rgba(0,0,0,0.4); border: 1px inset #334155; border-radius: 8px; padding: 15px; width: 100%;">
-            <p style="color: #cbd5e1; font-size: 0.95em; line-height: 1.5; margin: 0; font-family: 'Segoe UI', Arial;">${classe.desc}</p>
-        </div>
-        
-        <style>
-            @keyframes floatImgGigante { 
-                0% { transform: translateY(0px); } 
-                50% { transform: translateY(-10px); } 
-                100% { transform: translateY(0px); } 
-            }
-        </style>
+        <p class="classe-detalhe-descricao">${classe.desc}</p>
     `;
 };
 
