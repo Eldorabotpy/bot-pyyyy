@@ -1337,6 +1337,7 @@ class MotorMultiplayer {
 
         let skinDesejada = info.skin || 'aventureiro_base';
         let skinAtual = skinDesejada;
+        const arquivoSkin = window.resolverArquivoSkinGenero(skinDesejada);
 
         const linkNuvem =
             "https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/classes/";
@@ -1348,7 +1349,7 @@ class MotorMultiplayer {
 
             this.scene.load.spritesheet(
                 skinDesejada,
-                `${linkNuvem}${skinDesejada}.png`,
+                `${linkNuvem}${arquivoSkin}.png`,
                 {
                     frameWidth: 128,
                     frameHeight: 128
@@ -1454,6 +1455,7 @@ class MotorMultiplayer {
     atualizarSkinOutroJogador(jogador, skin) {
         const skinDesejada = String(skin).trim().toLowerCase();
         if (!skinDesejada || !jogador?.active) return;
+        const arquivoSkin = window.resolverArquivoSkinGenero(skinDesejada);
 
         this.cancelarParadaEspecialRemota(jogador);
         jogador.movimentoTween?.stop();
@@ -1488,7 +1490,7 @@ class MotorMultiplayer {
         }
 
         const linkNuvem = 'https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/classes/';
-        this.scene.load.spritesheet(skinDesejada, `${linkNuvem}${skinDesejada}.png`, {
+        this.scene.load.spritesheet(skinDesejada, `${linkNuvem}${arquivoSkin}.png`, {
             frameWidth: 128,
             frameHeight: 128
         });
@@ -1844,7 +1846,11 @@ window.abrirPerfilJogador = async function(charId) {
         const linkBaseNuvem = window.CATALOGO_SISTEMA ? "https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/" : "/static/assets/";
         
         // 4. Monta o link da imagem (Skins premium geralmente não usam _m ou _f no final da imagem full)
-        let arquivoImg = classeKey.includes('skin_') ? `${classeKey}_full.png` : `${classeKey}_${generoCurto}_full.png`;
+        const classeSkinArquivo = window.resolverArquivoSkinGenero(classeKey);
+        const possuiGeneroNoId = /_(m|f)$/i.test(classeSkinArquivo);
+        let arquivoImg = classeSkinArquivo.includes('skin_') || possuiGeneroNoId
+            ? `${classeSkinArquivo}_full.png`
+            : `${classeSkinArquivo}_${generoCurto}_full.png`;
         
         const fullBodyImgUrl = `${linkBaseNuvem}corpo_completo/${arquivoImg}`;
         const fallbackFullBody = `${linkBaseNuvem}corpo_completo/aventureiro_m_full.png`;

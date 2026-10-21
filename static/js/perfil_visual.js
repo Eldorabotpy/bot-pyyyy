@@ -1,5 +1,14 @@
 const GITHUB_BASE = "https://raw.githubusercontent.com/Eldorabotpy/static-img/refs/heads/main/assets/";
 
+// IDs antigos persistidos usam "_masculino"/"_feminino", mas os arquivos
+// publicados no repositório de imagens usam os sufixos curtos "_m"/"_f".
+window.resolverArquivoSkinGenero = function(idSkin) {
+    return String(idSkin || '')
+        .trim()
+        .replace(/_masculino$/i, '_m')
+        .replace(/_feminino$/i, '_f');
+};
+
 window.CATALOGO_SISTEMA = {
     avatares: {
         'aventureiro_masculino': { nome: 'Aventureiro M', path: `${GITHUB_BASE}avatares/avatar_padrao_m.png` }, 
@@ -122,7 +131,7 @@ class PerfilVisual {
         const nomeGeneroVisual = generoCurto === 'm' ? 'M' : 'F';
         const skinPadrao = {
             nome: `Corpo Padrão · ${nomeClasseVisual} (${nomeGeneroVisual})`,
-            path: `${GITHUB_BASE}corpo_completo/${skinPadraoId}_full.png`
+            path: `${GITHUB_BASE}corpo_completo/${window.resolverArquivoSkinGenero(skinPadraoId)}_full.png`
         };
         const padraoSelecionado =
             !p.equipped_skin ||
@@ -286,14 +295,15 @@ window.salvarCustomizacaoPerfil = async function() {
                     cena.carregarAnimacaoParadaEspecial(idSkin);
                 }
                 const linkNuvem = "https://raw.githubusercontent.com/Eldorabotpy/static-img/refs/heads/main/assets/classes/";
+                const arquivoSkin = window.resolverArquivoSkinGenero(idSkin);
 
                 if (!cena.textures.exists(idSkin)) {
-                    const urlCompleta = `${linkNuvem}${idSkin}.png`;
+                    const urlCompleta = `${linkNuvem}${arquivoSkin}.png`;
                     
                     cena.load.once('loaderror', (fileObj) => {
                         if (fileObj.key === idSkin) {
                             if (typeof window.alertaEldora === 'function') {
-                                window.alertaEldora("Imagem Não Encontrada", `O GitHub falhou ao carregar a skin.\n\nLink buscado:\n${urlCompleta}\n\nVerifique se o nome do arquivo lá é exatamente "${idSkin}.png".`, "erro");
+                                window.alertaEldora("Imagem Não Encontrada", `O GitHub falhou ao carregar a skin.\n\nLink buscado:\n${urlCompleta}\n\nVerifique se o nome do arquivo lá é exatamente "${arquivoSkin}.png".`, "erro");
                             } else {
                                 window.avisoEldora(`Imagem não encontrada no GitHub:\n${urlCompleta}`);
                             }

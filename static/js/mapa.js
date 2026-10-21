@@ -257,7 +257,7 @@ class MapaScene extends Phaser.Scene {
 
         let nomeSkin = this.skinAtiva;
 
-        nomeSkin = nomeSkin.replace('_masculino', '_m').replace('_feminino', '_f');
+        nomeSkin = window.resolverArquivoSkinGenero(nomeSkin);
 
         if (nomeSkin === 'player' || nomeSkin === '') {
             nomeSkin = 'aventureiro';

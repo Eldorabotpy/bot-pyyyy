@@ -726,7 +726,8 @@ async function carregarMeuPerfil() {
         localStorage.setItem("skinEquipada", skinDoCorpo);
 
         // 2. Constrói a URL para puxar a arte de corpo inteiro na pasta 'corpo_completo'
-        const fullBodyImgUrl = `${linkBaseNuvem}corpo_completo/${skinDoCorpo}_full.png`;
+        const arquivoSkinDoCorpo = window.resolverArquivoSkinGenero(skinDoCorpo);
+        const fullBodyImgUrl = `${linkBaseNuvem}corpo_completo/${arquivoSkinDoCorpo}_full.png`;
         const fallbackFullBody = `${linkBaseNuvem}corpo_completo/aventureiro_m_full.png`;
 
         const urlPerfilAssets = 'https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/perfil/';
