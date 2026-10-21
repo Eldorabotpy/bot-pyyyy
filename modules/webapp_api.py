@@ -1024,6 +1024,12 @@ def obter_perfil(user_id):
                     "stackable": info_item.get("stackable"),
                     "tradable": info_item.get("tradable", True) and obj_item.get("tradable", True),
                     "tipo": info_item.get("type", obj_item.get("type", "material")),
+                    "categoria": info_item.get("category", obj_item.get("category", "")),
+                    "slot": info_item.get("slot", obj_item.get("slot", "")),
+                    "class_req": info_item.get(
+                        "class_req",
+                        info_item.get("required_class", obj_item.get("class_req", obj_item.get("required_class", [])))
+                    ),
                     "desc": info_item.get("description", "Um item de Eldora."),
                     "on_use": info_item.get("on_use", {}),
                     "icon_url": info_item.get("icon_url"),

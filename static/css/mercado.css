@@ -246,6 +246,30 @@
 #modal-detalhes-mercado > div:not(.mercado-detalhe-shell) > div:first-of-type > div:nth-child(5) { margin-top:16px !important; padding:13px 14px !important; border:1px solid #2d3d52 !important; border-radius:12px !important; background:#0c1523 !important; }
 #modal-detalhes-mercado > div:not(.mercado-detalhe-shell) > div:last-child { padding:14px 20px !important; border-top:1px solid #ffffff12 !important; background:#0a1320 !important; }
 #modal-detalhes-mercado > div:not(.mercado-detalhe-shell) > div:last-child button { min-height:48px; border:1px solid #7acaa1 !important; border-radius:12px !important; background:linear-gradient(110deg,#51b885,#267957) !important; box-shadow:0 7px 18px #2da66c2b,inset 0 1px #ffffff2b; }
+#ui-mercado #lista-dropdown-venda { top:74px; max-height:min(480px,62dvh); overflow:hidden; padding:0; border-color:#516580; border-radius:14px; background:#0c1625; }
+#ui-mercado #lista-dropdown-venda > .mercado-inventario { display:flex; flex-direction:column; max-height:inherit; padding:0; background:transparent !important; }
+#ui-mercado .mercado-inventario-titulo { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:11px 12px 9px; border-bottom:1px solid #ffffff0d; color:#e7edf6; font-size:11px; font-weight:800; }
+#ui-mercado .mercado-inventario-titulo small { margin:0; color:#8192a9; font-size:9px; font-weight:500; white-space:nowrap; }
+#ui-mercado .mercado-inventario-categorias, #ui-mercado .mercado-inventario-classes { display:flex; gap:6px; overflow-x:auto; padding:8px 9px; scrollbar-width:thin; scrollbar-color:#3d506a transparent; }
+#ui-mercado .mercado-inventario-categorias { border-bottom:1px solid #ffffff0d; }
+#ui-mercado .mercado-inventario-classes { padding-top:7px; padding-bottom:7px; background:linear-gradient(90deg,#152238,#101a29); }
+#ui-mercado .mercado-filtro-inventario { display:inline-flex; flex:0 0 auto; align-items:center; gap:5px; min-height:31px; padding:5px 8px; border:1px solid #35465e !important; border-radius:9px !important; background:#111c2b !important; color:#a9b8cb !important; font-size:9px !important; line-height:1 !important; white-space:nowrap; transition:background .16s ease,border-color .16s ease,color .16s ease; }
+#ui-mercado .mercado-filtro-inventario:hover { border-color:#7e6b48 !important; background:#1a2738 !important; color:#f0dfbb !important; }
+#ui-mercado .mercado-filtro-inventario.ativo { border-color:#c4a05b !important; background:linear-gradient(120deg,#40351f,#22212a) !important; color:#ffe2a0 !important; box-shadow:inset 0 1px #fff2; }
+#ui-mercado .mercado-filtro-inventario b { display:inline-grid; place-items:center; min-width:17px; height:17px; padding:0 4px; border-radius:6px; background:#ffffff0d; color:inherit; font-size:8px; }
+#ui-mercado .mercado-inventario-itens { min-height:74px; overflow:auto; padding:5px; scrollbar-width:thin; scrollbar-color:#40536e #0b1421; overscroll-behavior:contain; }
+#ui-mercado .mercado-opcao-inventario { display:flex; align-items:center; gap:10px; width:100%; min-height:57px; padding:7px 8px; border:1px solid transparent !important; border-bottom-color:#ffffff0a !important; border-radius:10px !important; background:transparent !important; color:#edf2f8 !important; text-align:left; }
+#ui-mercado .mercado-opcao-inventario:hover, #ui-mercado .mercado-opcao-inventario:focus-visible { border-color:#c2a15a55 !important; background:linear-gradient(100deg,#1c2c40,#152131) !important; }
+#ui-mercado .mercado-opcao-icone { display:grid; place-items:center; width:40px; height:40px; flex:0 0 40px; border:1px solid var(--raridade,#51627a); border-radius:10px; background:radial-gradient(circle at 50% 35%,#243248,#0a111c 78%); box-shadow:inset 0 0 12px #0008,0 3px 9px #0003; }
+#ui-mercado .mercado-opcao-icone img { max-width:31px; max-height:31px; object-fit:contain; filter:drop-shadow(0 2px 4px #000b); }
+#ui-mercado .mercado-opcao-dados { display:grid; flex:1; min-width:0; gap:3px; }
+#ui-mercado .mercado-opcao-dados strong { overflow:hidden; color:#e6edf7; font-size:11px; font-weight:700; text-overflow:ellipsis; white-space:nowrap; }
+#ui-mercado .mercado-opcao-classe { overflow:hidden; margin:0; color:#c6aa72; font-size:8px; text-overflow:ellipsis; white-space:nowrap; }
+#ui-mercado .mercado-opcao-qtd { flex:0 0 auto; padding:4px 6px; border:1px solid #d4a92e35; border-radius:7px; background:#080d16; color:#ffd84d; font-size:9px; font-weight:800; font-variant-numeric:tabular-nums; }
+#ui-mercado .mercado-inventario-vazio { display:grid; justify-items:center; gap:5px; padding:24px 14px; color:#8b9ab0; text-align:center; }
+#ui-mercado .mercado-inventario-vazio > span { color:#d9b66b; font-size:24px; }
+#ui-mercado .mercado-inventario-vazio strong { color:#d3dce9; font-size:11px; }
+#ui-mercado .mercado-inventario-vazio small { margin:0; color:#8494a9; font-size:9px; }
 @media(max-width:420px) {
  #ui-mercado .mercado-shell { max-height:94dvh; border-radius:18px; }
  #ui-mercado .mercado-header { min-height:82px; padding:13px 14px; gap:10px; }
@@ -268,6 +292,13 @@
  #ui-mercado .mercado-card-action { min-width:62px; padding:5px 6px; font-size:8px !important; }
  #ui-mercado .mercado-fields { gap:9px; }
  #ui-mercado .mercado-fields label { font-size:9px; }
+ #ui-mercado #lista-dropdown-venda { max-height:min(430px,60dvh); }
+ #ui-mercado .mercado-inventario-categorias { gap:5px; padding:7px; }
+ #ui-mercado .mercado-filtro-inventario { min-height:30px; padding:5px 7px; font-size:8px !important; }
+ #ui-mercado .mercado-inventario-itens { max-height:min(280px,36dvh); }
+ #ui-mercado .mercado-opcao-inventario { min-height:54px; gap:8px; padding:6px; }
+ #ui-mercado .mercado-opcao-icone { width:36px; height:36px; flex-basis:36px; }
+ #ui-mercado .mercado-opcao-icone img { max-width:28px; max-height:28px; }
  #modal-detalhes-mercado .mercado-detalhe-scroll { padding:17px; }
  #modal-detalhes-mercado .mercado-detalhe-hero { gap:12px; padding-right:34px; }
  #modal-detalhes-mercado .mercado-detalhe-art { width:78px; height:78px; flex-basis:78px; border-radius:14px; }
