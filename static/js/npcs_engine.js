@@ -168,7 +168,7 @@ class NPCsEngine {
                         window.motorMissoesNPC.interagir(
                             'selene_arquimaga',
                             'Arquimaga Selene',
-                            'https://raw.githubusercontent.com/Eldorabotpy/static-img/refs/heads/main/assets/classes/npc_selene.png'
+                            'https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/npcs/npc_selene_rosto.png'
                         );
                     } else {
                         window.mostrarDialogoRPG('Arquimaga Selene', 'Os registros da jornada ainda estão sendo preparados. Tente novamente em instantes.');
