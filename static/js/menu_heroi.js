@@ -75,7 +75,7 @@
         if (banner && typeof banner === 'object') banner = banner.path || banner.id || '';
         const catalogo = window.CATALOGO_SISTEMA?.banners || {};
         let url = '';
-        if (typeof banner === 'string' && banner && banner !== 'padrao') {
+        if (typeof banner === 'string' && banner) {
             if (catalogo[banner]?.path) url = catalogo[banner].path;
             else if (/^https?:\/\//i.test(banner) || banner.startsWith('/static/')) url = banner;
         }
