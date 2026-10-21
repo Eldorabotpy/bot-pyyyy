@@ -93,6 +93,25 @@
  #ui-mercado .mercado-notificacao { margin:8px 10px 0; padding:10px 11px 10px 38px; font-size:11px; }
  #ui-mercado .mercado-action { margin-top:12px; }
 }
+
+#ui-mercado .mercado-moeda-picker { position:relative; z-index:15; }
+#ui-mercado .mercado-moeda-trigger { display:flex; align-items:center; gap:8px; width:100%; min-width:0; height:48px; padding:7px 9px; border:1px solid #42536b; border-radius:12px; background:linear-gradient(145deg,#142236,#0a1320); color:#e6edf7; font:700 13px 'Segoe UI',Arial,sans-serif; text-align:left; box-shadow:inset 0 1px #ffffff0b,0 4px 12px #0002; transition:border-color .16s ease,background .16s ease,box-shadow .16s ease; }
+#ui-mercado .mercado-moeda-trigger:hover, #ui-mercado .mercado-moeda-trigger[aria-expanded="true"] { border-color:#c5a35f; background:linear-gradient(145deg,#1c2b40,#101a29); box-shadow:0 0 0 3px #c4a15b16,inset 0 1px #ffffff0b; }
+#ui-mercado .mercado-moeda-icone { display:grid; flex:0 0 28px; place-items:center; width:28px; height:28px; border:1px solid #d8af5a45; border-radius:9px; background:linear-gradient(145deg,#b98d3d30,#5f451522); font-size:15px; }
+#ui-mercado .mercado-moeda-icone.gemas { border-color:#74c9ff55; background:linear-gradient(145deg,#389fdf38,#17375355); }
+#ui-mercado .mercado-moeda-chevron { margin-left:auto; color:#91a2b8; font-size:16px; transition:transform .16s ease; }
+#ui-mercado .mercado-moeda-trigger[aria-expanded="true"] .mercado-moeda-chevron { transform:rotate(180deg); }
+#ui-mercado .mercado-moeda-opcoes { position:absolute; z-index:30; top:calc(100% + 7px); left:0; right:0; display:grid; gap:4px; padding:5px; border:1px solid #53647c; border-radius:13px; background:linear-gradient(145deg,#172438,#0c1522); box-shadow:0 14px 34px #000b,inset 0 1px #ffffff0d; animation:mercado-moeda-abrir .14s ease-out; }
+#ui-mercado .mercado-moeda-opcoes[hidden] { display:none; }
+#ui-mercado .mercado-moeda-opcoes > button { display:flex; align-items:center; gap:8px; min-height:48px; padding:6px 8px; border:1px solid transparent; border-radius:9px; background:transparent; color:#dce5f1; text-align:left; }
+#ui-mercado .mercado-moeda-opcoes > button[hidden] { display:none; }
+#ui-mercado .mercado-moeda-opcoes > button:hover, #ui-mercado .mercado-moeda-opcoes > button[aria-selected="true"] { border-color:#c6a45b66; background:linear-gradient(100deg,#3c321e,#1a2432); }
+#ui-mercado .mercado-moeda-opcoes > button > span:nth-child(2) { display:grid; flex:1; gap:2px; }
+#ui-mercado .mercado-moeda-opcoes strong { color:#f1e1c1; font-size:11px; }
+#ui-mercado .mercado-moeda-opcoes small { color:#8899af; font-size:8px; }
+#ui-mercado .mercado-moeda-selecionada { color:#e5c16e; font-size:13px; opacity:0; }
+#ui-mercado .mercado-moeda-opcoes > button[aria-selected="true"] .mercado-moeda-selecionada { opacity:1; }
+@keyframes mercado-moeda-abrir { from { opacity:0; transform:translateY(-4px) scale(.98); } to { opacity:1; transform:translateY(0) scale(1); } }
 #ui-mercado .mercado-price-help { grid-column:1 / -1; margin-top:-7px; }
 @media (min-width:360px) { #ui-mercado .mercado-fields { grid-template-columns:.7fr 1fr 1.25fr; gap:10px; } #ui-mercado .mercado-price-field { grid-column:auto; } #ui-mercado .mercado-fields label { font-size:11px; white-space:nowrap; } }
 
@@ -270,6 +289,76 @@
 #ui-mercado .mercado-inventario-vazio > span { color:#d9b66b; font-size:24px; }
 #ui-mercado .mercado-inventario-vazio strong { color:#d3dce9; font-size:11px; }
 #ui-mercado .mercado-inventario-vazio small { margin:0; color:#8494a9; font-size:9px; }
+
+/* Base visual Eldora: superfícies em verde-petróleo, ouro para foco e azul reservado às gemas. */
+#ui-mercado {
+ --mercado-bg:#0b1b20;
+ --mercado-raised:#12252b;
+ --mercado-interactive:#183139;
+ --mercado-border:rgba(211,190,132,.22);
+ --mercado-gold:#c9a45c;
+ --mercado-text:#f4ead2;
+ --mercado-muted:#b8c4c2;
+ background:rgba(2,9,11,.78);
+ color:var(--mercado-text);
+}
+#ui-mercado .mercado-shell { background:linear-gradient(145deg,#12252b,#0b1b20 72%); border-color:var(--mercado-border); }
+#ui-mercado .mercado-header { border-bottom-color:var(--mercado-border); background:radial-gradient(ellipse at 0 0,rgba(201,164,92,.12),transparent 75%); }
+#ui-mercado .mercado-emblema { color:var(--mercado-gold); border-color:var(--mercado-border); background:rgba(201,164,92,.08); }
+#ui-mercado .mercado-eyebrow, #ui-mercado .mercado-tab-copy small, #ui-mercado .mercado-section-eyebrow { color:var(--mercado-muted); }
+#ui-mercado h2, #ui-mercado h3 { color:var(--mercado-text); }
+#ui-mercado button:focus-visible, #ui-mercado input:focus-visible, #ui-mercado select:focus-visible { outline-color:var(--mercado-gold); }
+#ui-mercado .mercado-close { color:var(--mercado-muted); border-color:var(--mercado-border); background:rgba(24,49,57,.65); }
+#ui-mercado .mercado-tabs { background:linear-gradient(180deg,#0b1b20,#0b1b20ee); border-bottom-color:var(--mercado-border); }
+#ui-mercado .tab-mercado,
+#ui-mercado .tab-mercado-ouro,
+#ui-mercado .tab-mercado-gemas,
+#ui-mercado .tab-mercado-anunciar { border-color:var(--mercado-border); background:linear-gradient(145deg,#183139,#12252b 82%); color:var(--mercado-muted); }
+#ui-mercado .tab-mercado:hover { border-color:var(--mercado-gold); color:var(--mercado-text); }
+#ui-mercado .tab-mercado[aria-selected="true"],
+#ui-mercado .tab-mercado-gemas[aria-selected="true"],
+#ui-mercado .tab-mercado-anunciar[aria-selected="true"] { border-color:var(--mercado-gold); background:linear-gradient(140deg,#4a3c22,#183139 88%); color:#fff0c8; box-shadow:inset 0 1px #fff3,0 5px 16px rgba(201,164,92,.12); }
+#ui-mercado .mercado-tab-icon { border-color:var(--mercado-border); background:#0b1b20; }
+#ui-mercado .mercado-tab-icon.ouro, #ui-mercado .mercado-tab-icon.anunciar { border-color:rgba(201,164,92,.45); background:rgba(201,164,92,.12); }
+#ui-mercado .mercado-notificacao { border-color:rgba(101,207,114,.38); }
+#ui-mercado .mercado-body { background:radial-gradient(ellipse at 50% 0%,rgba(24,49,57,.5),transparent 58%); scrollbar-color:#48605a #0b1b20; }
+#ui-mercado .mercado-section > span { color:var(--mercado-muted); }
+#ui-mercado label { color:var(--mercado-muted); }
+#ui-mercado .mercado-search-field input,
+#ui-mercado input:not([type=hidden]), #ui-mercado select { border-color:var(--mercado-border); background:linear-gradient(110deg,#0b1b20,#12252b); color:var(--mercado-text); }
+#ui-mercado .mercado-search-field input:focus,
+#ui-mercado input:not([type=hidden]):focus, #ui-mercado select:focus { border-color:var(--mercado-gold); box-shadow:0 0 0 3px rgba(201,164,92,.12),inset 0 2px 8px #0003; }
+#ui-mercado #btn-dropdown-venda { border-color:var(--mercado-border); background:linear-gradient(110deg,#12252b,#0b1b20); color:var(--mercado-text); }
+#ui-mercado #btn-dropdown-venda:hover { border-color:var(--mercado-gold); background:var(--mercado-interactive); }
+#ui-mercado .mercado-resumo { border-color:var(--mercado-border); background:linear-gradient(140deg,#12252b,#0b1b20); }
+#ui-mercado .mercado-lista > p,
+#ui-mercado .mercado-vazio { border-color:var(--mercado-border); background:linear-gradient(145deg,rgba(18,37,43,.8),rgba(11,27,32,.8)); }
+#ui-mercado .mercado-card { border-color:var(--mercado-border) !important; background:linear-gradient(115deg,#183139,#12252b 65%,#0b1b20) !important; }
+#ui-mercado .mercado-card-chip { border-color:var(--mercado-border); background:#0b1b20; color:var(--mercado-muted); }
+#ui-mercado .mercado-card-action { min-height:44px; border-color:var(--mercado-border); background:linear-gradient(145deg,#183139,#12252b); color:var(--mercado-text); }
+#ui-mercado .mercado-card-action:hover { border-color:var(--mercado-gold); background:#23434a; }
+#ui-mercado .mercado-card > div:nth-child(3) button { min-height:44px; border-color:var(--mercado-border) !important; background:linear-gradient(145deg,#183139,#12252b) !important; color:var(--mercado-text) !important; }
+#ui-mercado .mercado-card > div:nth-child(3) button[style*="#ef4444"] { border-color:#a85d58 !important; background:linear-gradient(145deg,#633333,#3a2529) !important; color:#ffd1ca !important; }
+#ui-mercado #lista-dropdown-venda,
+#ui-mercado .mercado-moeda-opcoes { border-color:var(--mercado-border); background:#0b1b20; }
+#ui-mercado .mercado-moeda-trigger { border-color:var(--mercado-border); background:linear-gradient(145deg,#183139,#0b1b20); color:var(--mercado-text); }
+#ui-mercado .mercado-moeda-trigger:hover, #ui-mercado .mercado-moeda-trigger[aria-expanded="true"] { border-color:var(--mercado-gold); background:linear-gradient(145deg,#23434a,#12252b); box-shadow:0 0 0 3px rgba(201,164,92,.1),inset 0 1px #ffffff0b; }
+#ui-mercado .mercado-moeda-opcoes > button { color:var(--mercado-text); }
+#ui-mercado .mercado-moeda-opcoes > button:hover, #ui-mercado .mercado-moeda-opcoes > button[aria-selected="true"] { border-color:rgba(201,164,92,.4); background:linear-gradient(100deg,#40351f,#183139); }
+#ui-mercado .mercado-inventario-classes { background:linear-gradient(90deg,#12252b,#0b1b20); }
+#ui-mercado .mercado-filtro-inventario { border-color:var(--mercado-border) !important; background:#12252b !important; color:var(--mercado-muted) !important; }
+#ui-mercado .mercado-filtro-inventario.ativo { border-color:var(--mercado-gold) !important; background:linear-gradient(120deg,#40351f,#183139) !important; color:#ffe2a0 !important; }
+#ui-mercado .mercado-opcao-inventario:hover, #ui-mercado .mercado-opcao-inventario:focus-visible { border-color:rgba(201,164,92,.4) !important; background:linear-gradient(100deg,#183139,#12252b) !important; }
+#ui-mercado .mercado-opcao-icone { background:radial-gradient(circle at 50% 35%,#183139,#0b1b20 78%); }
+#modal-detalhes-mercado { --mercado-border:rgba(211,190,132,.22); }
+#modal-detalhes-mercado .mercado-detalhe-shell { background:linear-gradient(145deg,#12252b,#0b1b20 72%); }
+#modal-detalhes-mercado .mercado-detalhe-scroll { scrollbar-color:#48605a #0b1b20; }
+#modal-detalhes-mercado .mercado-detalhe-tags span,
+#modal-detalhes-mercado .mercado-detalhe-descricao,
+#modal-detalhes-mercado .mercado-detalhe-stats > span { border-color:var(--mercado-border) !important; background:#12252b !important; }
+#modal-detalhes-mercado .mercado-detalhe-negocio { border-color:var(--mercado-border); background:linear-gradient(135deg,#183139,#0b1b20); }
+#modal-detalhes-mercado .mercado-detalhe-footer { background:#0b1b20; }
+
 @media(max-width:420px) {
  #ui-mercado .mercado-shell { max-height:94dvh; border-radius:18px; }
  #ui-mercado .mercado-header { min-height:82px; padding:13px 14px; gap:10px; }
@@ -289,7 +378,8 @@
  #ui-mercado .mercado-card-title { font-size:12px; }
  #ui-mercado .mercado-card-chip { max-width:90px; font-size:8px; }
  #ui-mercado .mercado-card-preco strong { font-size:12px; }
- #ui-mercado .mercado-card-action { min-width:62px; padding:5px 6px; font-size:8px !important; }
+ #ui-mercado .mercado-card-action { min-width:68px; padding:6px; font-size:9px !important; }
+ #ui-mercado .mercado-card > div:nth-child(3) button { min-width:68px; padding:6px !important; font-size:9px !important; }
  #ui-mercado .mercado-fields { gap:9px; }
  #ui-mercado .mercado-fields label { font-size:9px; }
  #ui-mercado #lista-dropdown-venda { max-height:min(430px,60dvh); }
@@ -306,24 +396,3 @@
  #modal-detalhes-mercado .mercado-detalhe-shell h3 { font-size:16px; }
  #modal-detalhes-mercado .mercado-detalhe-footer { padding:12px 16px; }
 }
-
- 
-#ui-mercado .mercado-moeda-picker { position:relative; z-index:15; }
-#ui-mercado .mercado-moeda-trigger { display:flex; align-items:center; gap:8px; width:100%; min-width:0; height:48px; padding:7px 9px; border:1px solid #42536b; border-radius:12px; background:linear-gradient(145deg,#142236,#0a1320); color:#e6edf7; font:700 13px 'Segoe UI',Arial,sans-serif; text-align:left; box-shadow:inset 0 1px #ffffff0b,0 4px 12px #0002; transition:border-color .16s ease,background .16s ease,box-shadow .16s ease; }
-#ui-mercado .mercado-moeda-trigger:hover, #ui-mercado .mercado-moeda-trigger[aria-expanded="true"] { border-color:#c5a35f; background:linear-gradient(145deg,#1c2b40,#101a29); box-shadow:0 0 0 3px #c4a15b16,inset 0 1px #ffffff0b; }
-#ui-mercado .mercado-moeda-icone { display:grid; flex:0 0 28px; place-items:center; width:28px; height:28px; border:1px solid #d8af5a45; border-radius:9px; background:linear-gradient(145deg,#b98d3d30,#5f451522); font-size:15px; }
-#ui-mercado .mercado-moeda-icone.gemas { border-color:#74c9ff55; background:linear-gradient(145deg,#389fdf38,#17375355); }
-#ui-mercado .mercado-moeda-chevron { margin-left:auto; color:#91a2b8; font-size:16px; transition:transform .16s ease; }
-#ui-mercado .mercado-moeda-trigger[aria-expanded="true"] .mercado-moeda-chevron { transform:rotate(180deg); }
-#ui-mercado .mercado-moeda-opcoes { position:absolute; z-index:30; top:calc(100% + 7px); left:0; right:0; display:grid; gap:4px; padding:5px; border:1px solid #53647c; border-radius:13px; background:linear-gradient(145deg,#172438,#0c1522); box-shadow:0 14px 34px #000b,inset 0 1px #ffffff0d; animation:mercado-moeda-abrir .14s ease-out; }
-#ui-mercado .mercado-moeda-opcoes[hidden] { display:none; }
-#ui-mercado .mercado-moeda-opcoes > button { display:flex; align-items:center; gap:8px; min-height:48px; padding:6px 8px; border:1px solid transparent; border-radius:9px; background:transparent; color:#dce5f1; text-align:left; }
-#ui-mercado .mercado-moeda-opcoes > button:hover, #ui-mercado .mercado-moeda-opcoes > button[aria-selected="true"] { border-color:#c6a45b66; background:linear-gradient(100deg,#3c321e,#1a2432); }
-#ui-mercado .mercado-moeda-opcoes > button > span:nth-child(2) { display:grid; flex:1; gap:2px; }
-#ui-mercado .mercado-moeda-opcoes strong { color:#f1e1c1; font-size:11px; }
-#ui-mercado .mercado-moeda-opcoes small { color:#8899af; font-size:8px; }
-#ui-mercado .mercado-moeda-selecionada { color:#e5c16e; font-size:13px; opacity:0; }
-#ui-mercado .mercado-moeda-opcoes > button[aria-selected="true"] .mercado-moeda-selecionada { opacity:1; }
-@keyframes mercado-moeda-abrir { from { opacity:0; transform:translateY(-4px) scale(.98); } to { opacity:1; transform:translateY(0) scale(1); } }
-
-#ui-mercado .mercado-moeda-opcoes > button[hidden] { display:none; }
