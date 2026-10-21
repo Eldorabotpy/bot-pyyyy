@@ -1,13 +1,13 @@
 /* Menu lateral: drawer leve, legível e consistente entre mouse e toque. */
 :root {
-    --eldora-menu-bg: #101827;
-    --eldora-menu-surface: #172235;
-    --eldora-menu-surface-hover: #1b293b;
-    --eldora-menu-border: #354459;
-    --eldora-menu-gold: #d8b76d;
-    --eldora-menu-gold-light: #f0d79b;
-    --eldora-menu-text: #f4f7fb;
-    --eldora-menu-muted: #a6b2c4;
+    --eldora-menu-bg: #0b1b20;
+    --eldora-menu-surface: #12252b;
+    --eldora-menu-surface-hover: #183139;
+    --eldora-menu-border: rgba(211, 190, 132, .22);
+    --eldora-menu-gold: #c9a45c;
+    --eldora-menu-gold-light: #f4ead2;
+    --eldora-menu-text: #f4ead2;
+    --eldora-menu-muted: #b8c4c2;
 }
 
 #btn-abrir-menu {
@@ -1077,4 +1077,159 @@ background-size: cover;
     box-shadow: none !important;
     -webkit-appearance: none !important;
     appearance: none !important;
+}
+
+/* O menu do herói usa os mesmos tokens visuais da Forja e do Mercado. */
+#side-menu.eldora-menu {
+    color: var(--eldora-menu-text);
+    background:
+        radial-gradient(circle at 100% 1%, rgba(201, 164, 92, .12), transparent 230px),
+        radial-gradient(circle at 0 100%, rgba(101, 207, 114, .06), transparent 250px),
+        linear-gradient(180deg, #12252b 0%, #0b1b20 62%, #09171b 100%);
+    border-left-color: rgba(201, 164, 92, .55);
+}
+
+#side-menu.eldora-menu::before {
+    border-color: rgba(211, 190, 132, .12);
+}
+
+#side-menu .eldora-menu-header {
+    background: linear-gradient(115deg, rgba(24, 49, 57, .94), rgba(18, 37, 43, .88));
+    border-bottom-color: var(--eldora-menu-border);
+}
+
+#side-menu .eldora-menu-brasao {
+    color: var(--eldora-menu-gold-light);
+    background: linear-gradient(145deg, #23434a, #12252b);
+    border-color: rgba(201, 164, 92, .46);
+}
+
+#side-menu .eldora-menu-titulo,
+#side-menu .eldora-menu-rodape > span:first-child {
+    color: var(--eldora-menu-gold-light);
+}
+
+#side-menu .eldora-menu-subtitulo,
+#side-menu .eldora-menu-heroi-texto span {
+    color: var(--eldora-menu-muted);
+}
+
+#side-menu #btn-fechar-menu,
+#side-menu .eldora-menu-fechar {
+    color: var(--eldora-menu-text);
+    background: rgba(11, 27, 32, .72);
+    border-color: var(--eldora-menu-border);
+}
+
+#side-menu #btn-fechar-menu:hover {
+    color: #fff0c8;
+    background: #183139;
+    border-color: var(--eldora-menu-gold);
+}
+
+#side-menu .eldora-menu-resumo {
+    background-color: var(--eldora-menu-bg);
+    background-image: linear-gradient(145deg, rgba(11, 27, 32, .78), rgba(18, 37, 43, .86)), var(--eldora-menu-banner, none);
+    border-color: var(--eldora-menu-border);
+}
+
+#side-menu .eldora-menu-presenca {
+    color: #b9e2c0;
+}
+
+#side-menu .eldora-menu-presenca i {
+    background: #65cf72;
+    box-shadow: 0 0 9px rgba(101, 207, 114, .55);
+}
+
+#side-menu .eldora-menu-heroi-texto strong {
+    color: var(--eldora-menu-text);
+}
+
+#side-menu .eldora-menu-recurso-linha,
+#side-menu .eldora-menu-rodape {
+    color: var(--eldora-menu-muted);
+}
+
+#side-menu .eldora-menu-recurso-trilho {
+    background: rgba(3, 12, 15, .86);
+}
+
+#side-menu .eldora-menu-recurso-hp .eldora-menu-recurso-trilho i {
+    background: #65cf72;
+    box-shadow: 0 0 8px rgba(101, 207, 114, .4);
+}
+
+#side-menu .eldora-menu-recurso-mp .eldora-menu-recurso-trilho i {
+    background: #59bce8;
+    box-shadow: 0 0 8px rgba(89, 188, 232, .4);
+}
+
+#side-menu .eldora-menu-recurso-xp .eldora-menu-recurso-trilho i {
+    background: var(--eldora-menu-gold);
+    box-shadow: 0 0 8px rgba(201, 164, 92, .38);
+}
+
+#side-menu .eldora-menu-itens::-webkit-scrollbar-thumb {
+    background: #48605a;
+}
+
+#side-menu .eldora-menu-grupo {
+    color: var(--eldora-menu-muted);
+}
+
+#side-menu .eldora-menu-grupo::after {
+    background: linear-gradient(90deg, rgba(201, 164, 92, .42), transparent);
+}
+
+#side-menu .eldora-menu-btn {
+    color: var(--eldora-menu-text);
+    background: linear-gradient(110deg, rgba(24, 49, 57, .94), rgba(18, 37, 43, .96));
+    border-color: var(--eldora-menu-border);
+    box-shadow: inset 0 1px rgba(255, 255, 255, .035), 0 3px 9px rgba(0, 0, 0, .13);
+}
+
+#side-menu .eldora-menu-btn:hover {
+    color: #fff7e5;
+    background: linear-gradient(110deg, #23434a, #183139);
+    border-color: rgba(201, 164, 92, .48);
+    box-shadow: inset 0 1px rgba(255, 255, 255, .06), 0 7px 16px rgba(0, 0, 0, .2);
+}
+
+#side-menu .eldora-menu-btn.active {
+    color: #fff0c8;
+    background: linear-gradient(105deg, rgba(74, 60, 34, .88), rgba(24, 49, 57, .98) 76%);
+    border-color: rgba(201, 164, 92, .68);
+    box-shadow: inset 3px 0 0 var(--eldora-menu-gold), inset 0 1px rgba(255, 255, 255, .06), 0 6px 17px rgba(0, 0, 0, .18);
+}
+
+#side-menu .eldora-menu-central {
+    color: #fff0c8;
+    background:
+        radial-gradient(circle at 15% 50%, rgba(201, 164, 92, .19), transparent 135px),
+        linear-gradient(110deg, #4a3c22, #183139 86%);
+    border-color: rgba(201, 164, 92, .64);
+}
+
+#side-menu .eldora-menu-central:hover {
+    color: #fff8e5;
+    background:
+        radial-gradient(circle at 15% 50%, rgba(201, 164, 92, .24), transparent 140px),
+        linear-gradient(110deg, #5a4828, #23434a 86%);
+    border-color: var(--eldora-menu-gold);
+}
+
+#side-menu .eldora-menu-em-breve {
+    color: #ffe2a0;
+    background: rgba(11, 27, 32, .76);
+    border-color: var(--eldora-menu-border);
+}
+
+#side-menu .eldora-menu-rodape {
+    background: linear-gradient(90deg, rgba(18, 37, 43, .96), rgba(11, 27, 32, .98));
+    border-top-color: var(--eldora-menu-border);
+}
+
+#side-menu :focus-visible {
+    outline-color: var(--eldora-menu-gold);
 }
