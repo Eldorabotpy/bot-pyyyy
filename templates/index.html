@@ -24,7 +24,7 @@
     <link rel="stylesheet" href="/static/css/estilos_combate.css?v=115">
     <link rel="stylesheet" href="/static/css/arena_pvp.css">
     <link rel="stylesheet" href="/static/css/coliseu_pvp.css?v=16">
-    <link rel="stylesheet" href="/static/css/social.css?v=1006">
+    <link rel="stylesheet" href="/static/css/social.css?v=1007">
     <link rel="stylesheet" href="/static/css/missoes.css?v9">
     <link rel="stylesheet" href="/static/css/loja_reino.css?v=6">
     <link rel="stylesheet" href="/static/css/guild_missions.css?v=2">
@@ -1148,6 +1148,20 @@
                         <p style="color: #64748b; text-align: center; font-size: 0.8em;">Bem-vindo ao chat global!</p>
                     </div>
                     <div class="chat-input-area">
+                        <button type="button" id="btn-expressoes-chat" class="btn-expressoes-chat" aria-label="Abrir expressões" aria-expanded="false" onclick="window.toggleExpressoesChat(event)">☺</button>
+                        <div id="painel-expressoes-chat" class="painel-expressoes-chat" hidden aria-label="Escolher expressão">
+                            <div class="painel-expressoes-titulo">Expressões</div>
+                            <div class="grade-expressoes-chat">
+                                <button type="button" onclick="window.inserirExpressaoChat('raiva', event)" aria-label="Inserir Raiva" title="Raiva"><span class="chat-expression-sprite" data-expressao="raiva"></span></button>
+                                <button type="button" onclick="window.inserirExpressaoChat('sorriso', event)" aria-label="Inserir Sorriso" title="Sorriso"><span class="chat-expression-sprite" data-expressao="sorriso"></span></button>
+                                <button type="button" onclick="window.inserirExpressaoChat('choro', event)" aria-label="Inserir Choro" title="Choro"><span class="chat-expression-sprite" data-expressao="choro"></span></button>
+                                <button type="button" onclick="window.inserirExpressaoChat('festa', event)" aria-label="Inserir Festa" title="Festa"><span class="chat-expression-sprite" data-expressao="festa"></span></button>
+                                <button type="button" onclick="window.inserirExpressaoChat('amor', event)" aria-label="Inserir Apaixonado" title="Apaixonado"><span class="chat-expression-sprite" data-expressao="amor"></span></button>
+                                <button type="button" onclick="window.inserirExpressaoChat('surpresa', event)" aria-label="Inserir Surpresa" title="Surpresa"><span class="chat-expression-sprite" data-expressao="surpresa"></span></button>
+                                <button type="button" onclick="window.inserirExpressaoChat('risada', event)" aria-label="Inserir Risada" title="Risada"><span class="chat-expression-sprite" data-expressao="risada"></span></button>
+                                <button type="button" onclick="window.inserirExpressaoChat('sono', event)" aria-label="Inserir Sono" title="Sono"><span class="chat-expression-sprite" data-expressao="sono"></span></button>
+                            </div>
+                        </div>
                         <input type="text" id="input-chat" placeholder="Fale com o reino...">
                         <button onclick="enviarMensagemChat()">Enviar</button>
                     </div>
@@ -1237,7 +1251,7 @@
     <script src="/static/js/hud_invasao.js"></script>
     <script src="/static/js/mapa_invasao.js?v=1"></script>
     <script src="/static/js/mapa_interativo.js?v=23"></script>
-    <script src="/static/js/mapa_multiplayer.js?v=37"></script>
+    <script src="/static/js/mapa_multiplayer.js?v=38"></script>
     <script src="/static/js/mercado.js?v=1266"></script>
     <script src="/static/js/central_eldora.js?v=4"></script>
     <script src="/static/js/cla.js?v=8"></script>
