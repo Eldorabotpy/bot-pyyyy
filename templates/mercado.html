@@ -1,4 +1,4 @@
-<link rel="stylesheet" href="/static/css/mercado.css?v=8">
+<link rel="stylesheet" href="/static/css/mercado.css?v=9">
 <div id="ui-mercado" style="display:none;">
     <div class="mercado-shell" role="dialog" aria-modal="true" aria-labelledby="mercado-titulo">
         <div class="mercado-header">
@@ -26,7 +26,7 @@
                 </div>
                 <div class="mercado-fields">
                     <div><label for="input-qtd">Quantidade</label><input type="number" inputmode="numeric" id="input-qtd" min="1" step="1" value="1"></div>
-                    <div><label for="select-moeda">Receber em</label><select id="select-moeda" onchange="calcularTaxaReino()"><option value="ouro">Ouro</option><option value="gema">Gemas</option></select></div>
+                    <div class="mercado-moeda-campo"><label id="label-moeda-mercado">Receber em</label><select id="select-moeda" hidden><option value="ouro">Ouro</option><option value="gema">Gemas</option></select><div class="mercado-moeda-picker" id="mercado-moeda-picker"><button type="button" id="btn-moeda-mercado" class="mercado-moeda-trigger" aria-labelledby="label-moeda-mercado mercado-moeda-nome" aria-haspopup="listbox" aria-expanded="false" onclick="toggleMoedaMercado(event)"><span id="mercado-moeda-icone" class="mercado-moeda-icone ouro" aria-hidden="true">🪙</span><span id="mercado-moeda-nome">Ouro</span><span class="mercado-moeda-chevron" aria-hidden="true">⌄</span></button><div id="lista-moedas-mercado" class="mercado-moeda-opcoes" role="listbox" aria-label="Escolha a moeda para receber" hidden><button type="button" role="option" aria-selected="true" data-moeda="ouro" onclick="selecionarMoedaMercado('ouro')"><span class="mercado-moeda-icone ouro" aria-hidden="true">🪙</span><span><strong>Ouro</strong><small>Moeda do reino</small></span><span class="mercado-moeda-selecionada" aria-hidden="true">✓</span></button><button type="button" role="option" aria-selected="false" data-moeda="gema" onclick="selecionarMoedaMercado('gema')"><span class="mercado-moeda-icone gemas" aria-hidden="true">💎</span><span><strong>Gemas</strong><small>Moeda premium</small></span><span class="mercado-moeda-selecionada" aria-hidden="true">✓</span></button></div></div></div>
                     <div class="mercado-price-field"><label for="input-preco">Preço total do lote</label><input type="number" inputmode="numeric" id="input-preco" oninput="calcularTaxaReino()" min="1" step="1" placeholder="Ex.: 150"></div><small class="mercado-price-help">Valor por todos os itens, não por unidade.</small>
                 </div>
                 <div class="mercado-resumo" aria-live="polite">
