@@ -966,7 +966,7 @@ class MotorMultiplayer {
                                 <strong style="color: ${bordaCor}; font-size: 0.75em; text-transform: uppercase; letter-spacing: 1px;">${msg.remetente}</strong>
                                 <span style="font-size: 0.6em; color: ${bordaCor}; opacity: 0.8;">⚔️ GRUPO</span>
                             </div>
-                            <div style="color: #e2e8f0; font-size: 0.95em; line-height: 1.3;">${msg.texto}</div>
+                            <div style="color: #e2e8f0; font-size: 0.95em; line-height: 1.3;">${window.formatarTextoExpressoesChat(msg.texto)}</div>
                         </div>
                     </div>
                 `;
@@ -979,7 +979,7 @@ class MotorMultiplayer {
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
                                 <strong style="color: ${bordaCor}; font-size: 0.75em; text-transform: uppercase; letter-spacing: 1px;">SAQUE</strong>
                             </div>
-                            <div style="color: #cbd5e1; font-style: italic; font-size: 0.9em; line-height: 1.3;">${msg.texto}</div>
+                            <div style="color: #cbd5e1; font-style: italic; font-size: 0.9em; line-height: 1.3;">${window.formatarTextoExpressoesChat(msg.texto)}</div>
                         </div>
                     </div>
                 `;
@@ -993,7 +993,7 @@ class MotorMultiplayer {
                                 <strong style="color: ${bordaCor}; font-size: 0.75em; text-transform: uppercase; letter-spacing: 1px;">${msg.remetente}</strong>
                                 <span style="font-size: 0.6em; color: ${bordaCor}; opacity: 0.8;">🛡️ CLÃ</span>
                             </div>
-                            <div style="color: #e8daef; font-size: 0.95em; line-height: 1.3;">${msg.texto}</div>
+                            <div style="color: #e8daef; font-size: 0.95em; line-height: 1.3;">${window.formatarTextoExpressoesChat(msg.texto)}</div>
                         </div>
                     </div>
                 `;
@@ -1008,7 +1008,7 @@ class MotorMultiplayer {
                                 <strong style="color: ${bordaCor}; font-size: 0.75em; text-transform: uppercase; letter-spacing: 1px;">O MESTRE MERCADOR</strong>
                                 <span style="font-size: 0.6em; color: ${bordaCor}; opacity: 0.8;">🪙 MERCADO</span>
                             </div>
-                            <div style="color: #fef08a; font-weight: bold; font-size: 0.9em; line-height: 1.3;">${msg.texto}</div>
+                            <div style="color: #fef08a; font-weight: bold; font-size: 0.9em; line-height: 1.3;">${window.formatarTextoExpressoesChat(msg.texto)}</div>
                         </div>
                     </div>
                 `;    
@@ -1041,7 +1041,7 @@ class MotorMultiplayer {
                                 <strong style="color: ${corNome}; font-size: 0.8em; text-transform: uppercase; letter-spacing: 0.5px;">${msg.remetente}</strong>
                                 <span style="font-size: 0.6em; color: ${bordaCor}; opacity: 0.7; letter-spacing: 0.5px; white-space: nowrap;">${prefixo}</span>
                             </div>
-                            <div style="${estiloTexto} font-size: 0.9em; word-wrap: break-word; line-height: 1.3;">${msg.texto}</div>
+                            <div style="${estiloTexto} font-size: 0.9em; word-wrap: break-word; line-height: 1.3;">${window.formatarTextoExpressoesChat(msg.texto)}</div>
                         </div>
                     </div>
                 `;
@@ -1891,6 +1891,53 @@ window.EXPRESSOES_EMOJI_MAPA = [
     { id: 'risada', nome: 'Risada', emoji: '😂' },
     { id: 'sono', nome: 'Sono', emoji: '😴' }
 ];
+
+// O chat transmite um token simples; a imagem só é criada ao renderizar a mensagem.
+window.formatarTextoExpressoesChat = function(texto) {
+    const expressoesValidas = new Set((window.EXPRESSOES_EMOJI_MAPA || []).map(item => item.id));
+    return String(texto ?? '').replace(/\[expressao:([a-z]+)\]/gi, (token, id) => {
+        const idNormalizado = id.toLowerCase();
+        if (!expressoesValidas.has(idNormalizado)) return token;
+        return `<span class="chat-emoji-expression" data-expressao="${idNormalizado}" role="img" aria-label="Expressão ${idNormalizado}"></span>`;
+    });
+};
+
+window.toggleExpressoesChat = function(event) {
+    event?.stopPropagation();
+    const painel = document.getElementById('painel-expressoes-chat');
+    const botao = document.getElementById('btn-expressoes-chat');
+    if (!painel || !botao) return;
+    const vaiAbrir = painel.hidden;
+    painel.hidden = !vaiAbrir;
+    botao.setAttribute('aria-expanded', String(vaiAbrir));
+};
+
+window.inserirExpressaoChat = function(id, event) {
+    event?.stopPropagation();
+    const expressao = (window.EXPRESSOES_EMOJI_MAPA || []).find(item => item.id === id);
+    const input = document.getElementById('input-chat');
+    if (!expressao || !input) return;
+
+    const token = `[expressao:${expressao.id}]`;
+    const inicio = input.selectionStart ?? input.value.length;
+    const fim = input.selectionEnd ?? inicio;
+    input.value = `${input.value.slice(0, inicio)}${token}${input.value.slice(fim)}`;
+    input.focus();
+    input.setSelectionRange(inicio + token.length, inicio + token.length);
+
+    const painel = document.getElementById('painel-expressoes-chat');
+    const botao = document.getElementById('btn-expressoes-chat');
+    if (painel) painel.hidden = true;
+    if (botao) botao.setAttribute('aria-expanded', 'false');
+};
+
+document.addEventListener('click', event => {
+    const painel = document.getElementById('painel-expressoes-chat');
+    const compositor = document.querySelector('#hub-social .chat-input-area');
+    if (!painel || painel.hidden || compositor?.contains(event.target)) return;
+    painel.hidden = true;
+    document.getElementById('btn-expressoes-chat')?.setAttribute('aria-expanded', 'false');
+});
 
 // Expressões disponíveis no menu (os slots bloqueados serão ligados ao sistema de coleção).
 window.meusEmojisEquipados = window.EXPRESSOES_EMOJI_MAPA.map(expressao => expressao.id); 
