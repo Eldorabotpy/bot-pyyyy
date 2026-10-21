@@ -335,11 +335,16 @@ class MapaScene extends Phaser.Scene {
         }
         this.load.spritesheet('circulo_cura', '/static/assets/sprites/efeitos/magic_circle_heal.png', { frameWidth: 64, frameHeight: 64 });
         const expressoesMapa = window.EXPRESSOES_EMOJI_MAPA || [
-            { id: 'raiva' }, { id: 'sorriso' }, { id: 'choro' }, { id: 'festa' },
-            { id: 'amor' }, { id: 'surpresa' }, { id: 'risada' }, { id: 'sono' }
+            { id: 'alegria', asset: 'emoji_alegria.png' }, { id: 'sorriso', asset: 'emoji_sorrisos.png' },
+            { id: 'choro', asset: 'emoji_choro.png' }, { id: 'festa', asset: 'emoji_festa.png' },
+            { id: 'amor', asset: 'emoji_apaixonado.png' }, { id: 'surpresa', asset: 'emoji_surpresa.png' },
+            { id: 'risada', asset: 'emoji_risada.png' }, { id: 'sono', asset: 'emoji_sono.png' },
+            { id: 'raiva', asset: 'emoji_raiva.png' }
         ];
-        expressoesMapa.forEach(({ id }) => {
-            this.load.spritesheet(`emoji_${id}`, `/static/assets/sprites/emoji/emoji_${id}.svg`, { frameWidth: 32, frameHeight: 32 });
+        const baseUrlExpressoes = 'https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/emoji/';
+        expressoesMapa.forEach(({ id, asset }) => {
+            const arquivo = asset || `emoji_${id}.png`;
+            this.load.spritesheet(`emoji_${id}`, `${baseUrlExpressoes}${arquivo}`, { frameWidth: 256, frameHeight: 256 });
         });
         
         this.load.image('npc_atendente', 'https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/npcs/atendente.png'); 
@@ -2302,8 +2307,11 @@ class MapaScene extends Phaser.Scene {
         }
         
         const expressoesMapa = window.EXPRESSOES_EMOJI_MAPA || [
-            { id: 'raiva' }, { id: 'sorriso' }, { id: 'choro' }, { id: 'festa' },
-            { id: 'amor' }, { id: 'surpresa' }, { id: 'risada' }, { id: 'sono' }
+            { id: 'alegria', asset: 'emoji_alegria.png' }, { id: 'sorriso', asset: 'emoji_sorrisos.png' },
+            { id: 'choro', asset: 'emoji_choro.png' }, { id: 'festa', asset: 'emoji_festa.png' },
+            { id: 'amor', asset: 'emoji_apaixonado.png' }, { id: 'surpresa', asset: 'emoji_surpresa.png' },
+            { id: 'risada', asset: 'emoji_risada.png' }, { id: 'sono', asset: 'emoji_sono.png' },
+            { id: 'raiva', asset: 'emoji_raiva.png' }
         ];
         expressoesMapa.forEach(({ id }) => {
             const chave = `emoji_${id}`;

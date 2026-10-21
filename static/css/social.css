@@ -558,17 +558,17 @@
 /* Primeiro quadro dos spritesheets de expressão no menu. */
 .emoji-icon-frame {
     display: block;
-    width: 32px;
-    height: 32px;
+    width: 40px;
+    height: 40px;
     overflow: hidden;
-    flex: 0 0 32px;
+    flex: 0 0 40px;
 }
 
 .emoji-icon-frame img {
     display: block;
-    width: 128px;
+    width: 160px;
     max-width: none;
-    height: 32px;
+    height: 40px;
     object-fit: contain;
 }
 
@@ -654,36 +654,38 @@
 .chat-expression-sprite,
 .chat-emoji-expression {
     display: inline-block;
-    width: 32px;
-    height: 32px;
-    flex: 0 0 32px;
+    width: 40px;
+    height: 40px;
+    flex: 0 0 40px;
     vertical-align: middle;
     background-repeat: no-repeat;
-    background-size: 128px 32px;
+    background-size: 160px 40px;
     animation: animacao-expressao-chat .8s steps(4, end) infinite;
 }
 
 .chat-emoji-expression {
     width: 28px;
     height: 28px;
+    flex: 0 0 28px;
     margin: 0 2px;
     background-size: 112px 28px;
     animation-name: animacao-expressao-chat-inline;
     vertical-align: -7px;
 }
 
-[data-expressao="raiva"] { background-image: url('/static/assets/sprites/emoji/emoji_raiva.svg'); }
-[data-expressao="sorriso"] { background-image: url('/static/assets/sprites/emoji/emoji_sorriso.svg'); }
-[data-expressao="choro"] { background-image: url('/static/assets/sprites/emoji/emoji_choro.svg'); }
-[data-expressao="festa"] { background-image: url('/static/assets/sprites/emoji/emoji_festa.svg'); }
-[data-expressao="amor"] { background-image: url('/static/assets/sprites/emoji/emoji_amor.svg'); }
-[data-expressao="surpresa"] { background-image: url('/static/assets/sprites/emoji/emoji_surpresa.svg'); }
-[data-expressao="risada"] { background-image: url('/static/assets/sprites/emoji/emoji_risada.svg'); }
-[data-expressao="sono"] { background-image: url('/static/assets/sprites/emoji/emoji_sono.svg'); }
+[data-expressao="alegria"] { background-image: url('https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/emoji/emoji_alegria.png'); }
+[data-expressao="raiva"] { background-image: url('https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/emoji/emoji_raiva.png'); }
+[data-expressao="sorriso"] { background-image: url('https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/emoji/emoji_sorrisos.png'); }
+[data-expressao="choro"] { background-image: url('https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/emoji/emoji_choro.png'); }
+[data-expressao="festa"] { background-image: url('https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/emoji/emoji_festa.png'); }
+[data-expressao="amor"] { background-image: url('https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/emoji/emoji_apaixonado.png'); }
+[data-expressao="surpresa"] { background-image: url('https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/emoji/emoji_surpresa.png'); }
+[data-expressao="risada"] { background-image: url('https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/emoji/emoji_risada.png'); }
+[data-expressao="sono"] { background-image: url('https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/emoji/emoji_sono.png'); }
 
 @keyframes animacao-expressao-chat {
     from { background-position: 0 0; }
-    to { background-position: -128px 0; }
+    to { background-position: -160px 0; }
 }
 
 @keyframes animacao-expressao-chat-inline {
