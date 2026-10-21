@@ -334,7 +334,13 @@ class MapaScene extends Phaser.Scene {
 
         }
         this.load.spritesheet('circulo_cura', '/static/assets/sprites/efeitos/magic_circle_heal.png', { frameWidth: 64, frameHeight: 64 });
-        this.load.spritesheet('emoji_raiva', 'https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/emoji/emoji_raiva.png', { frameWidth: 32, frameHeight: 32 });
+        const expressoesMapa = window.EXPRESSOES_EMOJI_MAPA || [
+            { id: 'raiva' }, { id: 'sorriso' }, { id: 'choro' }, { id: 'festa' },
+            { id: 'amor' }, { id: 'surpresa' }, { id: 'risada' }, { id: 'sono' }
+        ];
+        expressoesMapa.forEach(({ id }) => {
+            this.load.spritesheet(`emoji_${id}`, `/static/assets/sprites/emoji/emoji_${id}.svg`, { frameWidth: 32, frameHeight: 32 });
+        });
         
         this.load.image('npc_atendente', 'https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/npcs/atendente.png'); 
         // Carregamento do sprite do Merlin
@@ -2295,11 +2301,21 @@ class MapaScene extends Phaser.Scene {
             }
         }
         
-        this.anims.create({
-            key: 'anim_emoji_raiva',
-            frames: this.anims.generateFrameNumbers('emoji_raiva', { start: 0, end: 3 }), 
-            frameRate: 8, 
-            repeat: -1    
+        const expressoesMapa = window.EXPRESSOES_EMOJI_MAPA || [
+            { id: 'raiva' }, { id: 'sorriso' }, { id: 'choro' }, { id: 'festa' },
+            { id: 'amor' }, { id: 'surpresa' }, { id: 'risada' }, { id: 'sono' }
+        ];
+        expressoesMapa.forEach(({ id }) => {
+            const chave = `emoji_${id}`;
+            const animacao = `anim_${chave}`;
+            if (this.textures.exists(chave) && !this.anims.exists(animacao)) {
+                this.anims.create({
+                    key: animacao,
+                    frames: this.anims.generateFrameNumbers(chave, { start: 0, end: 3 }),
+                    frameRate: 8,
+                    repeat: -1
+                });
+            }
         });
 
         if (this.regiaoAtual === 'capital_eldora') {

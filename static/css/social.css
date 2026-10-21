@@ -553,3 +553,21 @@
     }
 }
 
+
+
+/* Primeiro quadro dos spritesheets de expressão no menu. */
+.emoji-icon-frame {
+    display: block;
+    width: 32px;
+    height: 32px;
+    overflow: hidden;
+    flex: 0 0 32px;
+}
+
+.emoji-icon-frame img {
+    display: block;
+    width: 128px;
+    max-width: none;
+    height: 32px;
+    object-fit: contain;
+}
