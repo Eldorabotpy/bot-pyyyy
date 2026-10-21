@@ -1,9 +1,9 @@
-<link rel="stylesheet" href="/static/css/mercado.css?v=5">
+<link rel="stylesheet" href="/static/css/mercado.css?v=6">
 <div id="ui-mercado" style="display:none;">
     <div class="mercado-shell" role="dialog" aria-modal="true" aria-labelledby="mercado-titulo">
         <div class="mercado-header">
             <div class="mercado-emblema" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 3v17M5 20h14M4 7h16M6 7l-4 7h8L6 7Zm12 0-4 7h8l-4-7Z"/><path d="M2 14c1 4 7 4 8 0m4 0c1 4 7 4 8 0"/></svg></div>
-            <div><span class="mercado-eyebrow">COMÉRCIO ENTRE AVENTUREIROS</span><h2 id="mercado-titulo">Mercado Central</h2></div>
+            <div class="mercado-heading"><span class="mercado-eyebrow">COMÉRCIO ENTRE AVENTUREIROS</span><h2 id="mercado-titulo">Mercado Central</h2><span class="mercado-subtitle">Encontre tesouros e negocie com outros aventureiros</span></div>
             <button class="mercado-close" aria-label="Fechar mercado" onclick="fecharMercado()">×</button>
         </div>
         <div class="mercado-tabs" role="tablist" aria-label="Seções do mercado">
@@ -13,9 +13,9 @@
         </div>
         <div id="mercado-notificacao" class="mercado-notificacao" role="status" aria-live="polite" aria-atomic="true" hidden></div>
         <div class="mercado-body">
-            <div id="mercado-busca-area" class="mercado-busca-area"><label for="mercado-busca">Encontre seu próximo item</label><input id="mercado-busca" type="search" placeholder="Buscar item ou vendedor…" oninput="filtrarMercado()" autocomplete="off"></div>
-            <div id="aba-comprar-ouro" class="conteudo-mercado" role="tabpanel"><div class="mercado-section"><h3>Ofertas em ouro</h3><span>Preço por lote</span></div><div id="lista-ouro" class="mercado-lista"></div><p class="mercado-sem-resultados" hidden>Nenhuma oferta corresponde à busca.</p></div>
-            <div id="aba-comprar-gemas" class="conteudo-mercado" role="tabpanel" style="display:none;"><div class="mercado-section"><h3>Ofertas em gemas</h3><span>Preço por lote</span></div><div id="lista-gemas" class="mercado-lista"></div><p class="mercado-sem-resultados" hidden>Nenhuma oferta corresponde à busca.</p></div>
+            <div id="mercado-busca-area" class="mercado-busca-area"><label for="mercado-busca">BUSCAR NO MERCADO</label><div class="mercado-search-field"><span aria-hidden="true">⌕</span><input id="mercado-busca" type="search" placeholder="Nome do item ou vendedor…" oninput="filtrarMercado()" autocomplete="off"></div></div>
+            <div id="aba-comprar-ouro" class="conteudo-mercado" role="tabpanel"><div class="mercado-section"><div class="mercado-section-mark ouro" aria-hidden="true"><span></span></div><div class="mercado-section-copy"><span class="mercado-section-eyebrow">VITRINE</span><h3>Ofertas em ouro</h3></div><span class="mercado-section-badge">🪙 <span>Preço por lote</span></span></div><div id="lista-ouro" class="mercado-lista"></div><p class="mercado-sem-resultados" hidden>Nenhuma oferta corresponde à busca.</p></div>
+            <div id="aba-comprar-gemas" class="conteudo-mercado" role="tabpanel" style="display:none;"><div class="mercado-section"><div class="mercado-section-mark gemas" aria-hidden="true"><span></span></div><div class="mercado-section-copy"><span class="mercado-section-eyebrow">VITRINE</span><h3>Ofertas em gemas</h3></div><span class="mercado-section-badge gemas">💎 <span>Preço por lote</span></span></div><div id="lista-gemas" class="mercado-lista"></div><p class="mercado-sem-resultados" hidden>Nenhuma oferta corresponde à busca.</p></div>
             <div id="aba-vender" class="conteudo-mercado" role="tabpanel" style="display:none;">
                 <div class="mercado-section"><h3>Crie seu anúncio</h3><span>Da mochila para o mercado</span></div>
                 <div class="mercado-item-field">
