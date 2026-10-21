@@ -1964,7 +1964,7 @@ window.renderizarMenuEmojis = function() {
                 : `/static/assets/sprites/emoji/emoji_${nomeDoEmoji}.svg`;
             grid.innerHTML += `
                 <button class="emoji-btn ativo" onclick="window.enviarEmojiMapa('${nomeDoEmoji}')" title="${nome}" aria-label="Enviar expressão ${nome}">
-                    <span class="emoji-icon-frame"><img src="${imagem}" alt="" draggable="false" onerror="this.parentElement.textContent='${icone}'"></span>
+                    <span class="emoji-icon-frame" data-emocao="${nomeDoEmoji}"><img src="${imagem}" alt="" draggable="false" onerror="this.parentElement.textContent='${icone}'"></span>
                 </button>
             `;
         }
