@@ -1570,6 +1570,7 @@ class GerenciadorCacada(DungeonPersistence):
                         "boss_derrotado": True,
                         "dungeon_concluida": True,
                         "dungeon_instance_id": instance_id,
+                        "membros": sorted(participantes_ativos),
                     }
 
                 # ======================================

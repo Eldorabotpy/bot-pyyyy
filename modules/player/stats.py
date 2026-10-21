@@ -110,6 +110,7 @@ CLASS_PROGRESSIONS = {
     "cacador":     { "BASE": {"max_hp": 50, "attack": 7, "defense": 3, "initiative": 7, "luck": 4}, "PER_LVL": {"max_hp": 6, "attack": 2, "defense": 1, "initiative": 2, "luck": 1}, "mana_stat": "initiative" },
     "monge":       { "BASE": {"max_hp": 55, "attack": 6, "defense": 4, "initiative": 6, "luck": 3}, "PER_LVL": {"max_hp": 7, "attack": 2, "defense": 2, "initiative": 2, "luck": 0}, "mana_stat": "initiative" },
     "mago":        { "BASE": {"max_hp": 45, "attack": 8, "defense": 2, "initiative": 5, "luck": 4}, "PER_LVL": {"max_hp": 5, "attack": 1, "defense": 0, "initiative": 1, "luck": 1}, "mana_stat": "magic_attack" },
+    "necromante":  { "BASE": {"max_hp": 48, "attack": 7, "defense": 3, "initiative": 4, "luck": 5}, "PER_LVL": {"max_hp": 6, "attack": 2, "defense": 1, "initiative": 1, "luck": 1}, "mana_stat": "magic_attack" },
     "bardo":       { "BASE": {"max_hp": 48, "attack": 5, "defense": 3, "initiative": 5, "luck": 7}, "PER_LVL": {"max_hp": 6, "attack": 1, "defense": 1, "initiative": 1, "luck": 3}, "mana_stat": "luck" },
     "assassino":   { "BASE": {"max_hp": 48, "attack": 8, "defense": 2, "initiative": 8, "luck": 5}, "PER_LVL": {"max_hp": 5, "attack": 3, "defense": 0, "initiative": 3, "luck": 1}, "mana_stat": "initiative" },
     "samurai":     { "BASE": {"max_hp": 55, "attack": 7, "defense": 4, "initiative": 6, "luck": 4}, "PER_LVL": {"max_hp": 7, "attack": 3, "defense": 1, "initiative": 2, "luck": 0}, "mana_stat": "defense" },
@@ -126,6 +127,7 @@ CLASS_POINT_GAINS = {
     "cacador":   {"attack": 2, "initiative": 2}, 
     "monge":     {"defense": 2, "initiative": 2}, 
     "mago":      {"max_hp": 2, "attack": 2, "luck": 2}, 
+    "necromante":{"max_hp": 2, "attack": 2, "luck": 1},
     "bardo":     {"max_hp": 3, "luck": 2}, 
     "assassino": {"attack": 2, "initiative": 2, "luck": 2}, 
     "samurai":   {"attack": 2, "defense": 2},
@@ -1523,6 +1525,7 @@ async def processar_turno_combate(
 
     dano_heroi = 0
     acao_suporte_grupo = False
+    player_mp_antes_acao = player_mp
 
     # =============================================================
     # 4. AÇÃO DO JOGADOR
@@ -1768,6 +1771,66 @@ async def processar_turno_combate(
         dano_heroi = hp_mob_antes - mob_hp
         mob_vivo["hp_atual"] = mob_hp
 
+    # A legião é estado privado deste herói e deste encontro. Os esqueletos
+    # não ganham turnos próprios: atacam em conjunto durante a ação do jogador.
+    necromante_combate = player.get("necromante_combate", {}) or {}
+    if not isinstance(necromante_combate, dict) or str(necromante_combate.get("spawn_id")) != str(spawn_id):
+        necromante_combate = {"spawn_id": str(spawn_id), "esqueletos": 0}
+
+    classe_combate = str(player.get("class_key") or player.get("class") or player.get("classe") or "").strip().lower()
+    if classe_combate == "necromante" and mob_hp > 0:
+        efeito_invocacao = (
+            (skill_data_mesclada or {}).get("effects", {}) or {}
+        ).get("summon_skeletons", {}) if acao == "magia" else {}
+
+        if efeito_invocacao and player_mp < player_mp_antes_acao:
+            maximo = max(1, min(8, int(efeito_invocacao.get("cap", 4) or 4)))
+            por_conjuracao = max(1, int(efeito_invocacao.get("per_cast", 1) or 1))
+            antes = int(necromante_combate.get("esqueletos", 0) or 0)
+            ecto = inventory.get("ectoplasma", 0) if isinstance(inventory, dict) else 0
+            qtd_ecto = int(ecto.get("quantity", ecto.get("qtd", 0)) or 0) if isinstance(ecto, dict) else int(ecto or 0)
+            invocados = min(por_conjuracao, maximo - antes, qtd_ecto)
+            if invocados > 0:
+                if isinstance(ecto, dict):
+                    campo_qtd = "quantity" if "quantity" in ecto else "qtd"
+                    ecto[campo_qtd] = qtd_ecto - invocados
+                    if ecto[campo_qtd] <= 0:
+                        inventory.pop("ectoplasma", None)
+                else:
+                    inventory["ectoplasma"] = qtd_ecto - invocados
+                    if inventory["ectoplasma"] <= 0:
+                        inventory.pop("ectoplasma", None)
+                necromante_combate["esqueletos"] = antes + invocados
+                log_turno.append({
+                    "autor": "player",
+                    "texto": f"💀 Você consumiu {invocados} Ectoplasma(s) e ergueu {invocados} esqueleto(s). Legião: {necromante_combate['esqueletos']}/{maximo}.",
+                    "dano": 0,
+                    "tipo": "invocacao",
+                    "anim_effect": "invocacao_sombria",
+                })
+            elif antes >= maximo:
+                log_turno.append({"autor": "sistema", "texto": f"💀 Sua legião já atingiu o limite de {maximo} esqueletos.", "dano": 0, "tipo": "invocacao"})
+            else:
+                log_turno.append({"autor": "sistema", "texto": "👻 Falta 1 Ectoplasma para erguer outro esqueleto.", "dano": 0, "tipo": "invocacao"})
+
+        quantidade_esqueletos = max(0, min(8, int(necromante_combate.get("esqueletos", 0) or 0)))
+        if quantidade_esqueletos:
+            escala = float(efeito_invocacao.get("attack_scale", 0.18) or 0.18)
+            ataque_magico = int(player_stats.get("magic_attack", player_stats.get("attack", 0)) or 0)
+            dano_legiao = max(1, int(ataque_magico * escala * quantidade_esqueletos))
+            dano_legiao = min(dano_legiao, mob_hp)
+            mob_hp -= dano_legiao
+            mob_vivo["hp_atual"] = mob_hp
+            log_turno.append({
+                "autor": "player",
+                "texto": f"💀 A legião ataca em conjunto: -{dano_legiao} HP ({quantidade_esqueletos} esqueletos).",
+                "dano": dano_legiao,
+                "tipo": "invocacao",
+                "anim_effect": "invocacao_sombria",
+            })
+    else:
+        necromante_combate = {}
+
     recompensas = {
         "gold": 0,
         "xp": 0,
@@ -1903,6 +1966,29 @@ async def processar_turno_combate(
             and resultado_morte_mob.get("dungeon_concluida")
         ):
             try:
+                if monster_id_real == "rei_caido_dungeon_01":
+                    participantes = resultado_morte_mob.get("membros", []) or [str(user_id)]
+                    ids_participantes = []
+                    for participante_id in participantes:
+                        try:
+                            ids_participantes.append(ObjectId(str(participante_id)))
+                        except Exception:
+                            continue
+                    try:
+                        ids_participantes.append(ObjectId(str(user_id)))
+                    except Exception:
+                        pass
+                    if ids_participantes:
+                        users_collection.update_many(
+                            {
+                                "_id": {"$in": ids_participantes},
+                                "quests.q8_selene_eco_das_catacumbas.status": {
+                                    "$in": ["ativa", "em_andamento"]
+                                },
+                            },
+                            {"$set": {"quests.q8_selene_eco_das_catacumbas.abates_evento": 1}},
+                        )
+
                 from modules.events.dynamic_event_service import contribute
                 instance_id = resultado_morte_mob.get("dungeon_instance_id")
                 action_key = f"dungeon:{instance_id}:complete"
@@ -2418,6 +2504,7 @@ async def processar_turno_combate(
             "base_stats": player.get("base_stats", {}),
             "bestiario": bestiario,
             "cooldowns": cooldowns_finais,
+            "necromante_combate": None if luta_encerrada else necromante_combate,
             "passe_batalha": player.get("passe_batalha", {}),
         }}
     )

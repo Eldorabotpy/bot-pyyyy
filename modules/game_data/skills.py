@@ -2921,6 +2921,32 @@ SKILL_DATA = {
             }
         }
     },
+
+    "necromante_levantar_esqueletos": {
+        "display_name": "Levantar Esqueletos",
+        "type": "active",
+        "description": "Consome 1 Ectoplasma por invocação. Os lacaios atacam junto com você; todos agem na sua vez e o limite cresce com a raridade da habilidade.",
+        "anim_effect": "invocacao_sombria",
+        "icon": "necromante_levantar_esqueletos",
+        "allowed_classes": ["necromante"],
+        "rarity_effects": {
+            "comum": {
+                "description": "CD 3, Mana 22: golpe arcano (1,1x), consome 1 Ectoplasma e invoca até 4 esqueletos. A legião causa 18% do Ataque Mágico por esqueleto a cada ação.",
+                "mana_cost": 22,
+                "effects": {"cooldown_turns": 3, "damage_multiplier": 1.1, "damage_type": "magic", "summon_skeletons": {"cap": 4, "per_cast": 1, "attack_scale": 0.18}}
+            },
+            "epica": {
+                "description": "CD 3, Mana 20: golpe arcano (1,2x), consome 1 Ectoplasma e invoca até 6 esqueletos. A legião causa 18% do Ataque Mágico por esqueleto a cada ação.",
+                "mana_cost": 20,
+                "effects": {"cooldown_turns": 3, "damage_multiplier": 1.2, "damage_type": "magic", "summon_skeletons": {"cap": 6, "per_cast": 1, "attack_scale": 0.18}}
+            },
+            "lendaria": {
+                "description": "CD 2, Mana 18: golpe arcano (1,3x), consome 1 Ectoplasma e invoca até 8 esqueletos. A legião causa 18% do Ataque Mágico por esqueleto a cada ação.",
+                "mana_cost": 18,
+                "effects": {"cooldown_turns": 2, "damage_multiplier": 1.3, "damage_type": "magic", "summon_skeletons": {"cap": 8, "per_cast": 1, "attack_scale": 0.18}}
+            }
+        }
+    },
     
     
 }

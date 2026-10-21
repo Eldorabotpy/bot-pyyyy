@@ -626,6 +626,7 @@ def obter_perfil(user_id):
                 "samurai_corte_iaijutsu",
                 "monge_rajada_de_punhos",
                 "bardo_nota_cortante",
+                "necromante_levantar_esqueletos",
             }
 
             # -----------------------------------------
@@ -806,6 +807,7 @@ def obter_perfil(user_id):
                 "samurai_corte_iaijutsu",
                 "monge_rajada_de_punhos",
                 "bardo_nota_cortante",
+                "necromante_levantar_esqueletos",
             }
 
             # -----------------------------------------

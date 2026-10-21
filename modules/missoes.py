@@ -98,8 +98,9 @@ QUESTS_DATA = {
         "npc": "thorek_mestre",
         "level_req": 7,
         "pre_req": "q4_selene_classe",
-        "objetivo": "Escolha um ofício com Thorek e receba o seu Kit de Ferramentas Iniciante.",
+        "objetivo": "Escolha um ofício com Thorek, receba sua ferramenta inicial e depois volte para prestar contas.",
         "req_itens": {},
+        "exige_profissao": True,
         "recompensas": {"xp": 300, "gold": 200}
     },
 
@@ -109,6 +110,7 @@ QUESTS_DATA = {
         "npc": "selene_arquimaga",
         "level_req": 17,
         "pre_req": "q5_thorek_profissao",
+        "requires_profession": True,
         "objetivo": "Sobreviva à Floresta Sombria. Traga 15 Ectoplasmas e 30 Couro de lobo Alfa para Selene.",
         "req_itens": {"ectoplasma": 15, "couro_de_lobo_alfa": 30},
         "recompensas": {"xp": 1000, "gold": 500} # A Skill será injetada via npc.py
@@ -152,6 +154,27 @@ QUESTS_DATA = {
                 "carta_recomendacao": 1
             }
         }
+    },
+
+    # Rota universal: quem não revelou a Centelha na caravana pode encontrar
+    # o caminho do Necromante depois de concluir a jornada da Capital.
+    "q8_selene_eco_das_catacumbas": {
+        "titulo": "O Eco das Catacumbas",
+        "npc": "selene_arquimaga",
+        "level_req": 25,
+        "pre_req": "q7_selene_guildas",
+        "objetivo": (
+            "Volte às Catacumbas do Rei Caído. Derrote o Rei Caído e traga "
+            "10 Ectoplasmas para que Selene possa conduzir o ritual de despertar."
+        ),
+        "regiao_objetivo": "dungeon_01",
+        "regiao_nome": "Catacumbas do Rei Caído",
+        "req_itens": {"ectoplasma": 10},
+        "req_abates_evento": 1,
+        "nome_abates_evento": "Rei Caído",
+        "recompensas": {"xp": 2500, "gold": 1800},
+        "fala_aceite": "Selene reconhece o eco que você trouxe das Catacumbas. ‘O Rei Caído guarda uma alma que não se rendeu à morte. Enfrente-o e traga o Ectoplasma; então veremos se sua Centelha pode suportar esse vínculo.’",
+        "fala_conclusao": "Quando o Rei Caído enfim repousa, os ecos se unem ao redor de Selene. ‘Você não forçou as almas a obedecer; ofereceu a elas um propósito.’ O ritual abre o caminho do Necromante. A decisão de atravessá-lo agora pertence a você."
     }
 }
 
@@ -313,6 +336,14 @@ def obter_status_npc(player_data: dict, npc_id: str) -> dict:
         if q_data["npc"] != npc_id:
             continue
 
+        classe_atual = str(
+            player_data.get("class_key") or player_data.get("class") or player_data.get("classe") or ""
+        ).strip().lower()
+        if q_id == "q8_selene_eco_das_catacumbas" and classe_atual == "necromante":
+            # A rota épica existe para revelar o Necromante a quem escolheu
+            # outra classe no despertar inicial, sem repetir o ritual para ele.
+            continue
+
         quest_salva = (
             my_quests.get(q_id, {})
             or {}
@@ -344,10 +375,21 @@ def obter_status_npc(player_data: dict, npc_id: str) -> dict:
             missoes_bloqueadas.append({
                 "id": q_id,
                 "data": q_data,
+                "tipo": "nivel",
                 "nivel_atual": my_level,
                 "nivel_necessario": level_req,
             })
             continue
+
+        if q_data.get("requires_profession"):
+            profissao = player_data.get("profession") or {}
+            if not isinstance(profissao, dict) or not (profissao.get("key") or profissao.get("type")):
+                missoes_bloqueadas.append({
+                    "id": q_id,
+                    "data": q_data,
+                    "tipo": "profissao",
+                })
+                continue
 
         # Aceita tanto o formato oficial deste motor
         # quanto o formato legado usado pelo NPCsEngine.
@@ -426,6 +468,16 @@ def obter_status_npc(player_data: dict, npc_id: str) -> dict:
                     progresso_nivel,
             }
 
+            if q_data.get("exige_profissao"):
+                profissao = player_data.get("profession") or {}
+                tem_profissao = isinstance(profissao, dict) and bool(profissao.get("key") or profissao.get("type"))
+                pacote["progresso_profissao"] = {
+                    "concluido": tem_profissao,
+                    "nome": profissao.get("display_name") or profissao.get("key") or "Nenhum ofício escolhido",
+                }
+                if not tem_profissao:
+                    pode_entregar = False
+
             abates_evento_necessarios = _int_seguro(
                 q_data.get("req_abates_evento", 0)
             )
@@ -470,6 +522,20 @@ def obter_status_npc(player_data: dict, npc_id: str) -> dict:
                 "data": q_data,
             })
 
+    quest_caravana = my_quests.get("q3_varek_provacao", {}) or {}
+    necromante_revelado = (
+        quest_caravana.get("status") == "resgatada"
+        and quest_caravana.get("decisao_alma") == "escutar"
+        and quest_caravana.get("decisao_foco") == "acolher"
+    )
+    classe_player = str(
+        player_data.get("class_key") or player_data.get("class") or player_data.get("classe") or "aventureiro"
+    ).strip().lower()
+    necromante_inicial = classe_player in ("", "aventureiro", "aprendiz")
+    ritual_necromante_concluido = (
+        (my_quests.get("q8_selene_eco_das_catacumbas", {}) or {}).get("status") == "resgatada"
+    )
+
     return {
         "disponiveis":
             missoes_disponiveis,
@@ -483,10 +549,11 @@ def obter_status_npc(player_data: dict, npc_id: str) -> dict:
         "bloqueadas":
             missoes_bloqueadas,
         "jornada": {
-            "necromante_revelado": (
-                (my_quests.get("q3_varek_provacao", {}) or {}).get("decisao_alma") == "escutar"
-                and (my_quests.get("q3_varek_provacao", {}) or {}).get("decisao_foco") == "acolher"
-            )
+            "necromante_revelado": necromante_revelado,
+            "necromante_desbloqueado": (necromante_revelado and necromante_inicial) or ritual_necromante_concluido,
+            "caravana_concluida": quest_caravana.get("status") == "resgatada",
+            "classe_desperta": (my_quests.get("q4_selene_classe", {}) or {}).get("status") == "resgatada",
+            "profissao_concluida": (my_quests.get("q5_thorek_profissao", {}) or {}).get("status") == "resgatada"
         },
     }
 
@@ -637,6 +704,23 @@ def aceitar_missao(
                 "A etapa anterior da sua jornada "
                 "ainda não foi concluída."
         }
+
+    if (
+        quest_id == "q8_selene_eco_das_catacumbas"
+        and str(player.get("class_key") or player.get("class") or player.get("classe") or "").strip().lower() == "necromante"
+    ):
+        return {
+            "success": False,
+            "error": "Você já despertou como Necromante; este ritual é destinado a quem escolheu outra classe."
+        }
+
+    if q_data.get("requires_profession"):
+        profissao = player.get("profession") or {}
+        if not isinstance(profissao, dict) or not (profissao.get("key") or profissao.get("type")):
+            return {
+                "success": False,
+                "error": "Escolha primeiro um ofício com Mestre Thorek para prosseguir no Grimório."
+            }
 
     escolha = None
     escolhas_validas = q_data.get("escolhas", []) or []
@@ -790,6 +874,15 @@ def entregar_missao(
                 "Esta missão ainda não foi aceita."
         }
 
+    if (
+        quest_id == "q8_selene_eco_das_catacumbas"
+        and str(player_data.get("class_key") or player_data.get("class") or player_data.get("classe") or "").strip().lower() == "necromante"
+    ):
+        return {
+            "success": False,
+            "error": "Você já despertou como Necromante; este ritual é destinado a quem escolheu outra classe."
+        }
+
     caravana_integridade = _int_seguro(estado_quest.get("caravana_integridade", 300), 300)
     if q_data.get("req_abates_evento") and caravana_integridade <= 0:
         return {
@@ -804,6 +897,14 @@ def entregar_missao(
             "success": False,
             "error": f"Alcance o Nível {nivel_conclusao} antes de prestar contas desta missão."
         }
+
+    if q_data.get("exige_profissao") or q_data.get("requires_profession"):
+        profissao = player_data.get("profession") or {}
+        if not isinstance(profissao, dict) or not (profissao.get("key") or profissao.get("type")):
+            return {
+                "success": False,
+                "error": "Escolha primeiro um ofício com Mestre Thorek antes de prosseguir com o Grimório."
+            }
 
     abates_evento_necessarios = _int_seguro(q_data.get("req_abates_evento", 0))
     abates_evento_feitos = _int_seguro(estado_quest.get("abates_evento", 0))

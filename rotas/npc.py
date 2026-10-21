@@ -75,7 +75,7 @@ def npc_entregar_missao():
     player = users_collection.find_one({"_id": ObjectId(user_id)})
     if not player:
         return jsonify({"success": False, "error": "Herói não encontrado."}), 404
-        
+
     # Executa a entrega consumindo os itens e dando o ouro/xp/carta de recomendação
     resultado = entregar_missao(user_id, player, quest_id)
     # 🌟 LÓGICA ESPECIAL DA PRIMEIRA SKILL 🌟
@@ -92,19 +92,31 @@ def npc_entregar_missao():
             "samurai": "samurai_corte_iaijutsu",
             "berserker": "berserker_golpe_selvagem",
             "curandeiro": "curandeiro_chama_sagrada",
-            "bardo": "bardo_nota_cortante"
+            "bardo": "bardo_nota_cortante",
+            "necromante": "necromante_levantar_esqueletos"
         }
         
         skill_id = skills_iniciais.get(classe_do_player)
         
         if skill_id:
+            skill_instancia = {"unlocked": True, "rarity": "comum", "level": 1}
+            skills_jogador = player.get("skills", {})
+            skills_jogador = dict(skills_jogador) if isinstance(skills_jogador, dict) else {}
+            skills_jogador[skill_id] = skill_instancia
+            skills_desbloqueadas = player.get("skills_desbloqueadas", {})
+            skills_desbloqueadas = dict(skills_desbloqueadas) if isinstance(skills_desbloqueadas, dict) else {}
+            skills_desbloqueadas[skill_id] = skill_instancia
+            database_skills = player.get("database_skills", {})
+            database_skills = dict(database_skills) if isinstance(database_skills, dict) else {}
+            database_skills[skill_id] = skill_instancia
             # Injeta a skill desbloqueada no banco de dados
             users_collection.update_one(
                 {"_id": ObjectId(user_id)},
                 {
                     "$set": {
-                        f"skills_desbloqueadas.{skill_id}": {"rarity": "comum", "level": 1},
-                        f"database_skills.{skill_id}": {"rarity": "comum", "level": 1}
+                        "skills_desbloqueadas": skills_desbloqueadas,
+                        "database_skills": database_skills,
+                        "skills": skills_jogador,
                     }
                 }
             )
@@ -128,6 +140,30 @@ def npc_despertar_classe():
     player = users_collection.find_one({"_id": ObjectId(user_id)})
     if not player:
         return jsonify({"success": False, "error": "Herói não encontrado."}), 404
+
+    from modules.game_data.classes import CLASSES_DATA
+    nova_classe = str(nova_classe or "").strip().lower()
+    if quest_id != "q4_selene_classe" or nova_classe not in CLASSES_DATA or int(player.get("level", 1) or 1) < 5:
+        return jsonify({"success": False, "error": "O despertar exige uma classe válida, o Nível 5 e a etapa de Selene."}), 403
+    quests = player.get("quests", {}) or {}
+    if (quests.get("q3_varek_provacao", {}) or {}).get("status") != "resgatada":
+        return jsonify({"success": False, "error": "Conclua a provação da caravana antes do despertar."}), 403
+    classe_atual = str(player.get("class_key") or player.get("class") or player.get("classe") or "aventureiro").strip().lower()
+    if classe_atual not in ("", "aventureiro", "aprendiz"):
+        return jsonify({"success": False, "error": "Seu despertar de classe já foi concluído."}), 409
+
+    if nova_classe == "necromante":
+        caravana = quests.get("q3_varek_provacao", {}) or {}
+        caminho_revelado = (
+            caravana.get("status") == "resgatada"
+            and caravana.get("decisao_alma") == "escutar"
+            and caravana.get("decisao_foco") == "acolher"
+        )
+        if not caminho_revelado:
+            return jsonify({
+                "success": False,
+                "error": "Selene ainda não reconhece a Centelha do Necromante na sua jornada."
+            }), 403
         
     # 1. Muda a classe do jogador no banco
     # 2. Marca a q4_selene_classe como resgatada
@@ -136,6 +172,7 @@ def npc_despertar_classe():
         {
             "$set": {
                 "class": nova_classe,
+                "class_key": nova_classe,
                 f"quests.{quest_id}.status": "resgatada"
             }
         }

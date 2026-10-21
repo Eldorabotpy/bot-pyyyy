@@ -235,7 +235,7 @@ class MotorDeMissoesNPC {
                     : 'Sua Centelha despertou. Fale com a Arquimaga para escolher um caminho. A presença ouvida na estrada silencia, mas Selene percebe que algo ainda espera por você.'}</p>
                 ${necromanteRevelado ? '<div class="recompensas-box" style="border-left-color:#a855f7;color:#e9d5ff"><strong>CAMINHO REVELADO: NECROMANTE</strong><br><br>Você escutou a alma do guardião e acolheu as vozes sem abandonar os sobreviventes. Selene reconhece essa afinidade.</div>' : ''}
                 
-                <button class="btn-missao" style="background: linear-gradient(to bottom, #a855f7, #7e22ce); color: white;" onclick="document.getElementById('modal-missao-npc').style.display='none'; window.abrirModalClasses();">
+                <button class="btn-missao" style="background: linear-gradient(to bottom, #a855f7, #7e22ce); color: white;" onclick="document.getElementById('modal-missao-npc').style.display='none'; window.abrirModalClasses(${necromanteRevelado});">
                     VER CAMINHOS DO DESPERTAR
                 </button>
                 <button class="btn-missao btn-fechar-missao" onclick="document.getElementById('modal-missao-npc').style.display='none'">
@@ -243,6 +243,23 @@ class MotorDeMissoesNPC {
                 </button>
             `;
             return; 
+        }
+
+        const classeAtual = String(
+            window.perfilDadosGlobais?.class_key
+            || window.perfilDadosGlobais?.class
+            || window.perfilDadosGlobais?.classe
+            || ''
+        ).toLowerCase();
+        if (npc_id === 'selene_arquimaga' && status.jornada?.necromante_desbloqueado === true && classeAtual !== 'necromante') {
+            conteudo.innerHTML = `
+                <h3 class="missao-titulo" style="color:#c084fc;text-align:center">✦ O RITUAL DAS ALMAS</h3>
+                <p class="missao-desc" style="text-align:center">O eco das Catacumbas encontrou você. Selene pode conduzir o despertar do Necromante; seu caminho atual será preservado até você aceitar a mudança.</p>
+                <div class="recompensas-box" style="border-left-color:#a855f7;color:#e9d5ff"><strong>RITUAL CONCLUÍDO</strong><br><br>A Centelha do Necromante está disponível para você.</div>
+                <button class="btn-missao" style="background:linear-gradient(to bottom,#a855f7,#7e22ce);color:white" onclick="document.getElementById('modal-missao-npc').style.display='none';window.abrirModalClasses(true)">ESCOLHER O NECROMANTE</button>
+                <button class="btn-missao btn-fechar-missao" onclick="document.getElementById('modal-missao-npc').style.display='none'">CONTINUAR MEU CAMINHO</button>
+            `;
+            return;
         }
 
         // Prioridade 1: Missões prontas para entrega
@@ -293,6 +310,15 @@ class MotorDeMissoesNPC {
                     <div class="recompensas-box">
                         <strong>🌟 PREPARAÇÃO DO HERÓI</strong><br><br>
                         Nível ${m.progresso_nivel.atual}/${m.progresso_nivel.necessario}
+                    </div>
+                `;
+            }
+
+            if (m.progresso_profissao && !m.progresso_profissao.concluido) {
+                htmlProgresso += `
+                    <div class="recompensas-box" style="border-left-color:#c9a45c">
+                        <strong>🛠️ ESCOLHA SEU OFÍCIO</strong><br><br>
+                        Fale com Mestre Thorek e escolha uma profissão. Depois, volte aqui para concluir esta etapa.
                     </div>
                 `;
             }
@@ -459,6 +485,10 @@ class MotorDeMissoesNPC {
 
                 ${htmlProgresso}
 
+                ${m.id === 'q5_thorek_profissao' && m.progresso_profissao?.concluido !== true ? `
+                    <button class="btn-missao" onclick="window.abrirModalProfissoes?.('thorek')">ESCOLHER OFÍCIO COM THOREK</button>
+                ` : ''}
+
                 <p style="
                     color:#94a3b8;
                     font-family:Arial,sans-serif;
@@ -580,6 +610,14 @@ class MotorDeMissoesNPC {
             ? status.bloqueadas[0]
             : null;
         if (missaoBloqueada) {
+            if (missaoBloqueada.tipo === 'profissao') {
+                conteudo.innerHTML = `
+                    <h3 class="missao-titulo">📜 ${missaoBloqueada.data.titulo}</h3>
+                    <p class="missao-desc">Antes de romper os selos do Grimório, escolha um ofício com Mestre Thorek e retorne à Arquimaga Selene.</p>
+                    <button class="btn-missao btn-fechar-missao" onclick="document.getElementById('modal-missao-npc').style.display='none'">VOLTAR À JORNADA</button>
+                `;
+                return;
+            }
             conteudo.innerHTML = `
                 <h3 class="missao-titulo">📜 ${missaoBloqueada.data.titulo}</h3>
                 <p class="missao-desc">${missaoBloqueada.data.objetivo}</p>
@@ -589,10 +627,24 @@ class MotorDeMissoesNPC {
             return;
         }
 
-        // Prioridade 3: Sem missões no momento
+        // Selene só orienta a etapa seguinte quando a etapa anterior foi
+        // realmente concluída no servidor. Isso evita o diálogo antigo que
+        // encaminhava o jogador à próxima missão apenas por atingir o nível.
+        let falaSemMissao = '"O firmamento está calmo hoje. Continue sua jornada, retorne quando estiver mais experiente."';
+        if (npc_id === 'selene_arquimaga') {
+            if (status.jornada?.caravana_concluida !== true) {
+                falaSemMissao = '"O Capitão Varek ainda precisa concluir seu relato da caravana. Volte a falar com ele quando a estrada estiver segura."';
+            } else if (status.jornada?.classe_desperta === true && status.jornada?.profissao_concluida !== true) {
+                falaSemMissao = '"Sua Centelha já despertou. Agora procure Mestre Thorek; a próxima etapa começa quando ele registrar seu ofício."';
+            } else if (status.jornada?.profissao_concluida === true) {
+                falaSemMissao = '"Seu caminho continua aberto. Quando houver um novo selo para romper, eu chamarei você."';
+            }
+        }
+
+        // Prioridade 4: Sem missões no momento
         conteudo.innerHTML = `
             <p class="missao-desc" style="text-align:center;">
-                "O firmamento está calmo hoje. Continue sua jornada, retorne quando estiver mais experiente."
+                ${falaSemMissao}
             </p>
             <button class="btn-missao btn-fechar-missao" onclick="document.getElementById('modal-missao-npc').style.display='none'">DESPEDIR-SE</button>
         `;
