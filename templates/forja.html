@@ -1321,3 +1321,38 @@
  #forja-container .btn-forge-action {position:sticky; bottom:0; min-height:46px; padding:9px 5px; font-size:12px; margin:0;}
 }
 </style>
+
+<style>
+/* Tokens Eldora aplicados somente à interface da forja. */
+#forja-container {
+    --forja-panel: #0b1b20;
+    --forja-raised: #12252b;
+    --forja-interactive: #183139;
+    --forja-border: rgba(211, 190, 132, .22);
+    --forja-gold: #c9a45c;
+    --forja-text: #f4ead2;
+    --forja-muted: #b8c4c2;
+    color: var(--forja-text);
+    font-family: Arial, sans-serif;
+}
+#forja-container .forja-modern-wrapper { border-color:var(--forja-gold); background:var(--forja-panel); color:var(--forja-text); box-shadow:0 24px 80px #000a; }
+#forja-container .forja-top-bar { background:var(--forja-raised); border-bottom:1px solid var(--forja-border); }
+#forja-container .forja-title { color:var(--forja-text); }
+#forja-container .forja-subtitle { color:var(--forja-muted); }
+#forja-container .forja-nav-tabs { background:var(--forja-raised); }
+#forja-container .aba-forja-btn { min-height:44px; border-color:var(--forja-border); background:var(--forja-interactive); color:var(--forja-text); }
+#forja-container .aba-forja-btn.active { border-color:var(--forja-gold); background:var(--forja-gold); color:#1b211b; }
+#forja-container .forja-search { color:var(--forja-muted); }
+#forja-container input { border-color:var(--forja-border); background:var(--forja-panel); color:var(--forja-text); }
+#forja-container :focus-visible { outline-color:var(--forja-gold); }
+#forja-container .recipe-card { border-color:var(--forja-border); background:var(--forja-raised); color:var(--forja-text); }
+#forja-container .recipe-card.active { border-color:var(--forja-gold); box-shadow:inset 3px 0 var(--forja-gold); background:var(--forja-interactive); }
+#forja-container .forja-details-view { background:var(--forja-panel); color:var(--forja-text); }
+#forja-container .forja-back { color:var(--forja-gold); }
+#forja-container .item-header-display { border-color:var(--forja-border); background:var(--forja-raised); }
+#forja-container .mat-pill { border-color:var(--forja-border); background:var(--forja-raised); color:var(--forja-text); }
+#forja-container .btn-forge-action:not(:disabled) { border-color:var(--forja-gold); background:var(--forja-gold) !important; color:#1b211b; }
+@media(max-width:768px) {
+ #forja-container .forja-sidebar,#forja-container .forja-sidebar.forja-sidebar-compacta { border-right-color:var(--forja-border); }
+}
+</style>

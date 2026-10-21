@@ -2,7 +2,13 @@
 SOCKETS_BY_RARITY = {"comum": 0, "bom": 0, "incomum": 0, "raro": 1, "epico": 2, "lendario": 3}
 EXTRACTION_GEMS = 5
 EVOLUTION_COSTS = {1: {"gold": 500, "po_runico": 5}, 2: {"gold": 1500, "po_runico": 15, "fragmento_runa_ancestral": 1}}
+EVOLUTION_SUCCESS_CHANCE = {1: 70, 2: 50}
 DUST_YIELD = {1: 2, 2: 6, 3: 18}
+
+RUNE_NAME_PREFIXES = {
+    "crueldade": "da Crueldade", "precisao": "da Precisão", "vampiro": "do Vampiro",
+    "rocha": "da Rocha", "mente": "da Mente", "eco": "do Eco", "midas": "de Midas", "sabio": "do Sábio",
+}
 
 # Completa os níveis das famílias existentes, mantendo os valores já publicados.
 FAMILIES = {
@@ -20,6 +26,7 @@ def complete_catalog(runes):
     for family, (name, stat, values, label, unit, color) in FAMILIES.items():
         for tier, suffix in enumerate(("menor", "maior", "ancestral"), 1):
             rid = f"runa_{family}_{suffix}"
-            row = runes.setdefault(rid, {"name": f"Runa de {name} {suffix.title()}", "stat_key": stat, "value": values[tier-1], "type": "percent" if unit else "flat", "tier": tier, "desc": f"+{values[tier-1]}{unit} {label}"})
-            row.update({"family": family, "family_name": name, "color": color, "icon": f"/static/assets/runas/{family}.svg"})
+            row = runes.setdefault(rid, {"name": f"Runa {RUNE_NAME_PREFIXES[family]} {suffix.title()}", "stat_key": stat, "value": values[tier-1], "type": "percent" if unit else "flat", "tier": tier, "desc": f"+{values[tier-1]}{unit} {label}"})
+            icon_url = f"https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/runas/{rid}.png"
+            row.update({"family": family, "family_name": name, "color": color, "icon": icon_url, "icon_url": icon_url})
             row["next_id"] = f"runa_{family}_{('maior' if tier == 1 else 'ancestral')}" if tier < 3 else None

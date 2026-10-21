@@ -208,6 +208,12 @@ function mercadoCaminhosImagemItem(item) {
     const pasta = mercadoObterPastaItem(item);
     const caminhos = [];
 
+    const iconUrl = typeof item?.icon_url === "string" ? item.icon_url.trim() : "";
+    if (/^(https?:\/\/|\/static\/)/i.test(iconUrl)) caminhos.push(iconUrl);
+    if (/^runa_(crueldade|precisao|vampiro|rocha|mente|eco|midas|sabio)_(menor|maior|ancestral)$/.test(id)) {
+        caminhos.push(`https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/runas/${id}.png`);
+    }
+
     if (pasta === "equipamentos") {
         caminhos.push(`${base}itens/equipamentos/work_${id}.png`);
         caminhos.push(`${base}itens/equipamentos/${id}.png`);
@@ -840,6 +846,7 @@ function mercadoItemLikeFromAnuncio(anuncio) {
         id: anuncio.item_id || d.base_id,
         tipo: d.tipo || anuncio.tipo,
         type: d.tipo || anuncio.tipo,
+        icon_url: d.icon_url,
         raridade: d.raridade,
         rarity: d.raridade
     };
@@ -875,6 +882,12 @@ function mercadoCaminhosImagem(item) {
 
     const pasta = mercadoPastaItem(item);
     const caminhos = [];
+
+    const iconUrl = typeof item?.icon_url === "string" ? item.icon_url.trim() : "";
+    if (/^(https?:\/\/|\/static\/)/i.test(iconUrl)) caminhos.push(iconUrl);
+    if (/^runa_(crueldade|precisao|vampiro|rocha|mente|eco|midas|sabio)_(menor|maior|ancestral)$/.test(id)) {
+        caminhos.push(`https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/runas/${id}.png`);
+    }
 
     if (pasta === "equipamentos") {
         caminhos.push(`${base}itens/equipamentos/work_${id}.png`);

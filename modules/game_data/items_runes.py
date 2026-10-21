@@ -137,3 +137,4 @@ from modules.game_data.runes_data import RUNES_DB
 for _rid, _rune in RUNES_DB.items():
     RUNE_ITEMS_DATA.setdefault(_rid, {"display_name": _rune["name"], "type": "runa", "category": "socketable", "stackable": True, "rarity": {1:"raro",2:"epico",3:"lendario"}[_rune["tier"]]})
     RUNE_ITEMS_DATA[_rid]["description"] = _rune["desc"]
+    RUNE_ITEMS_DATA[_rid]["icon_url"] = _rune["icon_url"]

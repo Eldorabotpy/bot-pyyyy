@@ -2,7 +2,7 @@
 import copy
 import unicodedata
 from modules.game_data.runes_data import RUNES_DB
-from modules.game_data.rune_rules import SOCKETS_BY_RARITY, EXTRACTION_GEMS, EVOLUTION_COSTS, DUST_YIELD, FAMILIES
+from modules.game_data.rune_rules import SOCKETS_BY_RARITY, EXTRACTION_GEMS, EVOLUTION_COSTS, EVOLUTION_SUCCESS_CHANCE, DUST_YIELD, FAMILIES
 
 
 def rarity(value):
@@ -70,14 +70,15 @@ def state_view(player, items):
         'runas':[dict(r,id=rid,qtd=quantity(inv,rid)) for rid,r in RUNES_DB.items()],
         'bonus_ativos':bonus_ativos,
         'materiais':{k:quantity(inv,k) for k in ('po_runico','fragmento_runa_ancestral')},
-        'extracao_gemas':EXTRACTION_GEMS,'custos_evolucao':EVOLUTION_COSTS,'po_por_nivel':DUST_YIELD}
+        'extracao_gemas':EXTRACTION_GEMS,'custos_evolucao':EVOLUTION_COSTS,
+        'chance_evolucao':EVOLUTION_SUCCESS_CHANCE,'po_por_nivel':DUST_YIELD}
 
 
 def apply_operation(player, data, items):
     if (player.get('player_state') or {}).get('action') not in (None,'','idle'):
         raise ValueError('Finalize sua atividade antes de alterar runas.')
     inv=copy.deepcopy(player.get('inventory') or {})
-    gold=int(player.get('gold',0));gems=int(player.get('gems',0) or 0);cost=0;gem_cost=0
+    gold=int(player.get('gold',0));gems=int(player.get('gems',0) or 0);cost=0;gem_cost=0;operation_message=None
     action=data.get('action');rid=data.get('rune_id');rune=RUNES_DB.get(rid)
     if action in ('encaixar','extrair'):
         uid=data.get('item_id');item=inv.get(uid)
@@ -99,10 +100,17 @@ def apply_operation(player, data, items):
     elif action=='evoluir':
         if not rune or not rune['next_id']: raise ValueError('Esta runa não possui outra evolução.')
         recipe=EVOLUTION_COSTS[rune['tier']];cost=recipe['gold']
-        consume(inv,rid,3)
+        if quantity(inv,rid)<3: raise ValueError(f'Material insuficiente: {rid}.')
         for material,count in recipe.items():
             if material!='gold': consume(inv,material,count)
-        grant(inv,rune['next_id'],1)
+        chance=EVOLUTION_SUCCESS_CHANCE[rune['tier']]
+        import secrets
+        if secrets.randbelow(100)<chance:
+            consume(inv,rid,3)
+            grant(inv,rune['next_id'],1)
+            operation_message=f'Evolução concluída com sucesso ({chance}% de chance).'
+        else:
+            operation_message=f'A evolução falhou ({100-chance}% de chance). Ouro e materiais foram consumidos; suas 3 runas foram preservadas.'
     elif action=='forjar':
         import secrets
         consume(inv,'fragmento_runa_ancestral',7)
@@ -114,17 +122,18 @@ def apply_operation(player, data, items):
     else: raise ValueError('Operação rúnica inválida.')
     if gold<cost: raise ValueError(f'Ouro insuficiente. Custo: {cost}.')
     if gems<gem_cost: raise ValueError(f'Gemas insuficientes. Custo: {gem_cost}.')
-    return inv,gold-cost,gems-gem_cost
+    return inv,gold-cost,gems-gem_cost,operation_message
 
 
 def save_operation(collection, player, data, items):
     if int(data.get('revision',-1))!=int(player.get('rune_revision',0)): raise ValueError('A mochila mudou. Atualize a janela e tente novamente.')
-    inv,gold,gems=apply_operation(player,data,items)
+    inv,gold,gems,operation_message=apply_operation(player,data,items)
     query={'_id':player['_id']}
     for key in ('inventory','gold','gems','equipment','player_state','rune_revision','rune_hunt_active'):
         query[key]=player[key] if key in player else {'$exists':False}
     result=collection.update_one(query,{'$set':{'inventory':inv,'gold':gold,'gems':gems},'$inc':{'rune_revision':1}})
     if result.modified_count!=1: raise ValueError('A mochila mudou durante a operação. Atualize antes de tentar novamente.')
+    return operation_message
 
 
 def equipped_bonuses(player):

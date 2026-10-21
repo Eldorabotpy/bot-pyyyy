@@ -13,7 +13,7 @@
   await inFlight;
   if(dialog?.open){dialog.close();dialog.remove();window.__oficinaRunasAberta=false;}
  };
- const icon=r=>{if(!r?.icon)return '<span class="rune-empty">◇</span>';const src=String(r.icon).startsWith('/static/assets/runas/')?String(r.icon)+'?v=2':r.icon;return '<img src="'+esc(src)+'" alt="" width="32" height="32">';};
+ const icon=r=>{if(!r?.icon)return '<span class="rune-empty">◇</span>';const src=String(r.icon).startsWith('/static/assets/runas/')?String(r.icon)+'?v=3':r.icon;const fallback=/^(crueldade|precisao|vampiro|rocha|mente|eco|midas|sabio)$/.test(r.family||'')?` onerror="this.onerror=null;this.src='/static/assets/runas/${esc(r.family)}.svg?v=2'"`:'';return '<img src="'+esc(src)+'"'+fallback+' alt="" width="32" height="32">';};
  window.renderRuneSockets = item => {
   const slots=item?.rune_slots;
   if(!slots?.length)return '';
@@ -59,9 +59,9 @@
   const families=[...new Map(state.runas.map(r=>[r.family,r.family_name])).entries()];
   const runes=state.runas.filter(r=>r.family===family).sort((a,b)=>a.tier-b.tier);
   return `<button data-action="forjar" ${state.materiais.fragmento_runa_ancestral<7?'disabled':''}>Forjar runa menor aleatória · 7 fragmentos</button><label class="rune-label">Família<select id="rune-family">${families.map(([id,name])=>`<option value="${id}" ${id===family?'selected':''}>${esc(name)}</option>`).join('')}</select></label>
-  <p class="rune-notice">3 runas iguais + materiais → 1 runa do próximo nível. Sucesso garantido. Apenas runas da mochila são consumidas.</p><div class="rune-tree">${runes.map(r=>{
+  <p class="rune-notice">3 runas iguais + materiais tentam criar 1 runa do próximo nível. A chance depende do tier; se falhar, ouro e materiais são consumidos, mas as 3 runas são preservadas.</p><div class="rune-tree">${runes.map(r=>{
    const cost=state.custos_evolucao[r.tier];
-   return `<article class="rune-tier">${icon(r)}<div><small>NÍVEL ${r.tier} · ${r.qtd} na mochila</small><h3>${esc(r.name)}</h3><p>${esc(r.desc)}</p></div>${r.next_id?`<p class="rune-cost">3 × ${esc(r.name)} + ${costText(cost)}</p><button data-action="evoluir" data-rune="${r.id}" ${r.qtd<3||!canPay(cost)?'disabled':''}>Evoluir para ${esc(runeById(r.next_id).name)}</button>`:'<p class="rune-notice">Evolução máxima desta família.</p>'}${r.qtd?`<button class="rune-secondary" data-action="dissolver" data-rune="${r.id}">Dissolver 1 → ${state.po_por_nivel[r.tier]} pó rúnico</button>`:''}</article>`;
+   return `<article class="rune-tier">${icon(r)}<div><small>NÍVEL ${r.tier} · ${r.qtd} na mochila</small><h3>${esc(r.name)}</h3><p>${esc(r.desc)}</p></div>${r.next_id?`<p class="rune-cost">3 × ${esc(r.name)} + ${costText(cost)}</p><p class="rune-notice">Chance de sucesso: ${state.chance_evolucao[r.tier]}%. Se falhar, ouro e materiais são consumidos, mas as 3 runas são preservadas.</p><button data-action="evoluir" data-rune="${r.id}" ${r.qtd<3||!canPay(cost)?'disabled':''}>Evoluir para ${esc(runeById(r.next_id).name)}</button>`:'<p class="rune-notice">Evolução máxima desta família.</p>'}${r.qtd?`<button class="rune-secondary" data-action="dissolver" data-rune="${r.id}">Dissolver 1 → ${state.po_por_nivel[r.tier]} pó rúnico</button>`:''}</article>`;
   }).join('<div class="rune-branch" aria-hidden="true">↓</div>')}</div>`;
  }
  function render(){
@@ -72,14 +72,14 @@
  async function operate(action,rid){
   if(busy)return;busy=true;
   const item=selectedGear(),rune=runeById(rid);
-  const message={forjar:'Consumir 7 fragmentos para criar uma runa menor de uma família aleatória?',encaixar:`Encaixar ${rune?.name} em ${item?.nome}, espaço ${selectedSlot+1}? Uma runa será retirada da mochila.`,extrair:`Extrair a runa do espaço ${selectedSlot+1}? Custo: ${state.extracao_gemas} gemas. A runa voltará à mochila.`,evoluir:`Consumir 3 ${rune?.name} + ${rune?.next_id?costText(state.custos_evolucao[rune.tier]):''} para criar 1 ${rune?.next_id?runeById(rune.next_id).name:''}?`,dissolver:`Dissolver 1 ${rune?.name} para receber ${state.po_por_nivel[rune?.tier]} pó rúnico? A runa será consumida.`}[action];
+  const message={forjar:'Consumir 7 fragmentos para criar uma runa menor de uma família aleatória?',encaixar:`Encaixar ${rune?.name} em ${item?.nome}, espaço ${selectedSlot+1}? Uma runa será retirada da mochila.`,extrair:`Extrair a runa do espaço ${selectedSlot+1}? Custo: ${state.extracao_gemas} gemas. A runa voltará à mochila.`,evoluir:`Tentar evoluir 3 ${rune?.name} para 1 ${rune?.next_id?runeById(rune.next_id).name:''}? Chance: ${state.chance_evolucao[rune?.tier]}%. Se falhar, ouro e materiais serão consumidos, mas as 3 runas serão preservadas.`,dissolver:`Dissolver 1 ${rune?.name} para receber ${state.po_por_nivel[rune?.tier]} pó rúnico? A runa será consumida.`}[action];
   try{
    if(!await window.confirmarEldora(message,'Oficina de Runas'))return;
    dialog.querySelectorAll('button,select').forEach(e=>e.disabled=true);
    const response=await boundedFetch('/api/runas/operar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user_id:localStorage.getItem('jogadorEldoraID'),action,rune_id:rid,item_id:selectedItem,slot:selectedSlot,revision:state.revision})});
    const result=await response.json();
    if(!result.success){await load();throw new Error(result.error||'Não foi possível concluir.');}
-   state=result;render();dialog.querySelector('#rune-status').textContent='Operação concluída. Seus equipamentos foram atualizados.';
+   state=result;render();dialog.querySelector('#rune-status').textContent=result.operation_message||'Operação concluída. Seus equipamentos foram atualizados.';
    await window.carregarMeuPerfil?.();
    if(window.perfilDadosGlobais&&document.getElementById('modal-item')?.style.display==='flex')window.fecharModalItem?.();
   }catch(error){render();dialog.querySelector('#rune-status').textContent=error.message;}

@@ -1215,6 +1215,7 @@ def obter_perfil(user_id):
                     "emoji": SLOT_EMOJI.get(slot, "🔲"),
                     "nome": info_item.get("display_name", obj_item.get("display_name", base_id.replace("_", " ").title())),
                     "icon": info_item.get("emoji", obj_item.get("emoji", "📦")),
+                    "icon_url": info_item.get("icon_url"),
                     "vazio": False,
                     "raridade": obj_item.get("rarity", info_item.get("rarity", "comum")),
                     "refino": obj_item.get("upgrade_level", obj_item.get("refino", 0)),
@@ -2390,6 +2391,7 @@ def api_listar_mercado():
                 "refino": detalhe.get('upgrade_level', detalhe.get('refino', 0)),
                 "classe": detalhe.get('class_req', info_real.get('class_req', info_real.get('class', 'Livre'))),
                 "descricao": info_real.get('description', detalhe.get('description', '')),
+                "icon_url": info_real.get('icon_url'),
                 "stats": _formatar_stats_item_para_front(detalhe or info_real),
                 **_rune_item_view(detalhe, info_real),
             })
@@ -7321,10 +7323,10 @@ def api_runas_operar():
         solo_active=bool(hunt and (not world or int(mob.get('hp_atual',0))>0) and int(player.get('current_hp',0))>0)
         if solo_active or (room and room.get('estado') in ('aguardando','em_andamento')):
             raise ValueError('Volte ao mapa antes de alterar runas.')
-        save_operation(users_collection,player,data,items_data.ITEMS_DATA)
+        operation_message=save_operation(users_collection,player,data,items_data.ITEMS_DATA)
         _run_async(player_manager.clear_player_cache(str(uid)))
         updated=users_collection.find_one({'_id':uid})
-        return jsonify({'success':True, **state_view(updated,items_data.ITEMS_DATA)})
+        return jsonify({'success':True,'operation_message':operation_message, **state_view(updated,items_data.ITEMS_DATA)})
     except (ValueError,TypeError) as error:
         return jsonify({'success':False,'error':str(error)}),409
 

@@ -42,6 +42,10 @@ window.getCaminhosImagemItemEldora = function(item) {
     }
 
     const caminhos = [];
+    const runeId = String(idReal).trim();
+    if (/^runa_(crueldade|precisao|vampiro|rocha|mente|eco|midas|sabio)_(menor|maior|ancestral)$/.test(runeId)) {
+        caminhos.push(`${linkBaseNuvem}runas/${runeId}.png`);
+    }
     if (typeof item?.icon_url === 'string' && /^(https?:\/\/|\/static\/)/.test(item.icon_url)) {
         caminhos.push(item.icon_url);
     }
@@ -72,8 +76,6 @@ window.getCaminhosImagemItemEldora = function(item) {
 window.aplicarImagemItemEldora = function(imgEl, item) {
     if (!imgEl) return;
 
-    const runeFamily = String(item?.base_id || item?.id || '').match(/^runa_(crueldade|precisao|vampiro|rocha|mente|eco|midas|sabio)_/);
-    if (runeFamily) { imgEl.src = `/static/assets/runas/${runeFamily[1]}.svg?v=2`; return; }
     const caminhos = window.getCaminhosImagemItemEldora(item);
     let index = 0;
 
@@ -105,6 +107,11 @@ window.getCaminhosImagemPerfilEldora = function(item) {
     const urlIcone = typeof item?.icon_url === "string" ? item.icon_url.trim() : "";
     const iconePlaceholder = /(?:seuusuario|seurepositorio|example\.com|placeholder)/i.test(urlIcone);
     if (!iconePlaceholder && /^(https?:\/\/|\/static\/)/i.test(urlIcone)) caminhos.push(urlIcone);
+
+    const runeId = String(item?.base_id || item?.item_id || item?.uid || item?.id || "").trim();
+    if (/^runa_(crueldade|precisao|vampiro|rocha|mente|eco|midas|sabio)_(menor|maior|ancestral)$/.test(runeId)) {
+        caminhos.unshift(base + "runas/" + runeId + ".png", "/static/assets/runas/" + runeId.split("_")[1] + ".svg?v=2");
+    }
 
     // Os itens de forja têm chaves "work_*" no índice, embora o base_id não tenha esse prefixo.
     for (const id of ids) {
@@ -147,9 +154,7 @@ window.getCaminhosImagemPerfilEldora = function(item) {
 
 window.aplicarImagemPerfilEldora = function(imgEl, item) {
     if (!imgEl) return;
-    const runeFamily = String(item?.base_id || item?.id || "").match(/^runa_(crueldade|precisao|vampiro|rocha|mente|eco|midas|sabio)_/);
     const caminhos = window.getCaminhosImagemPerfilEldora(item);
-    if (runeFamily) caminhos.unshift("/static/assets/runas/" + runeFamily[1] + ".svg?v=2");
     let index = 0;
 
     imgEl.alt = item?.nome || item?.display_name || item?.base_id || "Item";
