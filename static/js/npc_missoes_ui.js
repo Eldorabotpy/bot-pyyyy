@@ -8,56 +8,126 @@ class MotorDeMissoesNPC {
     criarModal() {
         const estilo = document.createElement('style');
         estilo.innerHTML = `
-            .modal-missao-overlay {
-                display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-                background: rgba(0,0,0,0.85); z-index: 10000; justify-content: center; align-items: center;
-                backdrop-filter: blur(3px);
+            #modal-missao-npc {
+                --missao-panel: #0b1b20;
+                --missao-raised: #12252b;
+                --missao-interactive: #183139;
+                --missao-gold: #c9a45c;
+                --missao-text: #f4ead2;
+                --missao-muted: #b8c4c2;
+                display: none; position: fixed; inset: 0; z-index: 10000;
+                justify-content: center; align-items: center; padding: 14px;
+                background: rgba(2, 9, 12, .76); backdrop-filter: blur(4px);
+                font-family: Arial, sans-serif;
             }
-            .modal-missao-box {
-                background: linear-gradient(to bottom, #1e293b, #0f172a);
-                border: 3px solid #d4af37; border-radius: 12px; width: 90%; max-width: 420px;
-                padding: 20px; color: #fff; font-family: 'Cinzel', serif; 
-                box-shadow: 0 0 30px rgba(212, 175, 55, 0.3);
+            #modal-missao-npc * { box-sizing: border-box; }
+            #modal-missao-npc .modal-missao-box {
+                display: flex; flex-direction: column; width: min(100%, 470px);
+                max-height: min(86dvh, 740px); overflow: hidden;
+                background: var(--missao-panel); border: 1px solid rgba(201,164,92,.55);
+                border-radius: 16px; color: var(--missao-text);
+                box-shadow: 0 18px 54px rgba(0,0,0,.62), 0 0 0 1px rgba(255,255,255,.025) inset;
             }
-            .npc-header { 
-                display: flex; align-items: center; border-bottom: 2px solid #d4af37; 
-                padding-bottom: 15px; margin-bottom: 20px; 
+            #modal-missao-npc .npc-header {
+                display: flex; align-items: center; gap: 12px; flex: 0 0 auto;
+                min-height: 82px; padding: 14px 16px;
+                background: linear-gradient(110deg, #14243b, #10252b 72%);
+                border-bottom: 1px solid rgba(201,164,92,.4);
             }
-            .npc-portrait { 
-                width: 70px; height: 70px; border: 2px solid #d4af37; border-radius: 50%; 
-                margin-right: 15px; background: #000; object-fit: cover;
-                box-shadow: 0 0 10px #d4af37;
+            #modal-missao-npc .npc-portrait {
+                width: 52px; height: 52px; flex: 0 0 52px; margin: 0;
+                object-fit: cover; border-radius: 50%; background: #091317;
+                border: 1px solid var(--missao-gold); box-shadow: 0 3px 12px rgba(0,0,0,.35);
             }
-            .npc-nome { font-size: 22px; font-weight: 900; color: #facc15; margin: 0; text-shadow: 2px 2px 4px #000; }
-            .missao-titulo { font-size: 19px; color: #60a5fa; margin-bottom: 10px; font-weight: bold; }
-            .missao-desc { 
-                font-size: 15px; color: #e2e8f0; margin-bottom: 20px; 
-                font-family: Arial, sans-serif; line-height: 1.5; 
+            #modal-missao-npc .npc-identidade { min-width: 0; flex: 1; }
+            #modal-missao-npc .npc-contexto {
+                margin: 0 0 3px; color: var(--missao-muted); font: 700 10px/1.2 Arial,sans-serif;
+                letter-spacing: 1.3px; text-transform: uppercase;
             }
-            .btn-missao { 
-                display: block; width: 100%; padding: 12px; margin-top: 10px; 
-                background: linear-gradient(to bottom, #d4af37, #b48608); 
-                color: #000; border: none; font-weight: 900; cursor: pointer; 
-                border-radius: 6px; font-family: 'Cinzel', serif; font-size: 16px;
-                text-transform: uppercase; transition: 0.2s;
+            #modal-missao-npc .npc-nome {
+                margin: 0; color: var(--missao-text); font: 700 clamp(17px, 5vw, 21px)/1.2 'Cinzel', Georgia, serif;
+                text-shadow: 0 2px 4px rgba(0,0,0,.4);
             }
-            .btn-missao:hover { filter: brightness(1.2); }
-            .btn-missao:disabled { opacity: .5; cursor: not-allowed; filter: saturate(.45); }
-            .missao-escolhas { border: 1px solid rgba(211,190,132,.35); border-radius: 8px; padding: 10px; margin: 0 0 14px; background: rgba(11,27,32,.75); }
-            .missao-escolhas legend { color: #c9a45c; padding: 0 6px; font-size: 14px; }
-            .missao-escolha { display: flex; align-items: flex-start; gap: 10px; padding: 10px; margin: 5px 0; border: 1px solid rgba(211,190,132,.2); border-radius: 6px; background: #12252b; cursor: pointer; font-family: Arial,sans-serif; }
-            .missao-escolha input { margin-top: 3px; accent-color: #c9a45c; width: 18px; height: 18px; flex: 0 0 auto; }
-            .missao-escolha span { display: grid; gap: 4px; }
-            .missao-escolha strong { color: #f4ead2; }
-            .missao-escolha small, .missao-escolha-nota { color: #b8c4c2; line-height: 1.4; }
-            .missao-escolha-nota { margin: 8px 3px 0; font: 12px Arial,sans-serif; }
-            .btn-fechar-missao { background: linear-gradient(to bottom, #ef4444, #b91c1c); color: #fff; }
-            .recompensas-box { 
-                background: rgba(0,0,0,0.6); padding: 12px; border-radius: 6px; 
-                font-family: Arial, sans-serif; font-size: 14px; color: #a7f3d0; 
-                margin-bottom: 20px; border-left: 3px solid #34d399;
+            #modal-missao-npc .npc-fechar {
+                display: grid; place-items: center; width: 44px; height: 44px; flex: 0 0 44px;
+                padding: 0; border: 1px solid rgba(211,190,132,.3); border-radius: 10px;
+                background: rgba(11,27,32,.72); color: var(--missao-text); font: 24px/1 Arial,sans-serif;
+                cursor: pointer; transition: background .16s ease, border-color .16s ease;
             }
-            .loader-magico { text-align: center; color: #a855f7; font-weight: bold; padding: 20px; }
+            #modal-missao-npc .npc-fechar:hover, #modal-missao-npc .npc-fechar:focus-visible {
+                background: var(--missao-interactive); border-color: var(--missao-gold); outline: 2px solid transparent;
+            }
+            #modal-missao-npc #missao-conteudo {
+                min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 18px 18px 20px;
+                scrollbar-color: rgba(201,164,92,.65) transparent; scrollbar-width: thin;
+            }
+            #modal-missao-npc .missao-titulo {
+                margin: 0 0 8px; color: var(--missao-text); font: 700 19px/1.25 'Cinzel', Georgia, serif;
+            }
+            #modal-missao-npc .missao-desc {
+                margin: 0 0 16px; color: #d6dfdc; font: 15px/1.5 Arial,sans-serif;
+            }
+            #modal-missao-npc .missao-escolhas {
+                margin: 0 0 12px; padding: 10px; border: 1px solid rgba(211,190,132,.24);
+                border-radius: 12px; background: rgba(7,18,22,.62);
+            }
+            #modal-missao-npc .missao-escolhas legend {
+                padding: 0 7px; color: var(--missao-gold); font: 700 11px/1.2 Arial,sans-serif;
+                letter-spacing: 1.1px; text-transform: uppercase;
+            }
+            #modal-missao-npc .missao-escolha {
+                display: flex; align-items: center; gap: 11px; min-height: 58px; width: 100%;
+                margin: 5px 0; padding: 10px 11px; border: 1px solid rgba(211,190,132,.2);
+                border-radius: 9px; background: var(--missao-raised); color: var(--missao-text);
+                cursor: pointer; text-align: left; font: inherit; transition: background .15s ease, border-color .15s ease;
+            }
+            #modal-missao-npc .missao-escolha:hover { background: var(--missao-interactive); border-color: rgba(201,164,92,.58); }
+            #modal-missao-npc .missao-escolha:focus-within { border-color: var(--missao-gold); outline: 2px solid rgba(201,164,92,.25); }
+            #modal-missao-npc .missao-escolha:has(input:checked) {
+                background: #1b3538; border-color: var(--missao-gold); box-shadow: inset 3px 0 var(--missao-gold);
+            }
+            #modal-missao-npc .missao-escolha input {
+                appearance: none; display: grid; place-items: center; width: 20px; height: 20px; flex: 0 0 20px;
+                margin: 0; border: 1px solid #8f9a96; border-radius: 50%; background: #091317; cursor: pointer;
+            }
+            #modal-missao-npc .missao-escolha input::before {
+                content: ''; width: 9px; height: 9px; border-radius: 50%; background: var(--missao-gold);
+                transform: scale(0); transition: transform .12s ease;
+            }
+            #modal-missao-npc .missao-escolha input:checked { border-color: var(--missao-gold); }
+            #modal-missao-npc .missao-escolha input:checked::before { transform: scale(1); }
+            #modal-missao-npc .missao-escolha span { display: grid; gap: 3px; }
+            #modal-missao-npc .missao-escolha strong { color: var(--missao-text); font: 700 14px/1.25 Arial,sans-serif; }
+            #modal-missao-npc .missao-escolha small { color: var(--missao-muted); font: 12px/1.35 Arial,sans-serif; }
+            #modal-missao-npc .missao-escolha-nota { margin: 8px 2px 14px; color: var(--missao-muted); font: 12px/1.4 Arial,sans-serif; }
+            #modal-missao-npc .missao-acoes { display: grid; gap: 8px; margin-top: 14px; }
+            #modal-missao-npc .btn-missao {
+                display: block; width: 100%; min-height: 46px; margin: 0; padding: 11px 14px;
+                border: 1px solid transparent; border-radius: 9px; background: linear-gradient(180deg,#d3b16a,#b68b3d);
+                color: #172126; font: 700 13px/1.2 'Cinzel', Georgia, serif; letter-spacing: .35px;
+                cursor: pointer; transition: filter .15s ease, transform .15s ease;
+            }
+            #modal-missao-npc .btn-missao:hover:not(:disabled) { filter: brightness(1.08); }
+            #modal-missao-npc .btn-missao:active:not(:disabled) { transform: translateY(1px); }
+            #modal-missao-npc .btn-missao:focus-visible { outline: 2px solid #f4ead2; outline-offset: 2px; }
+            #modal-missao-npc .btn-missao:disabled { opacity: .48; cursor: not-allowed; filter: saturate(.55); }
+            #modal-missao-npc .btn-fechar-missao {
+                background: #12252b; color: var(--missao-muted); border-color: rgba(211,190,132,.24);
+            }
+            #modal-missao-npc .btn-fechar-missao:hover { background: var(--missao-interactive); color: var(--missao-text); }
+            #modal-missao-npc .recompensas-box {
+                margin: 0 0 14px; padding: 12px; border: 1px solid rgba(211,190,132,.2);
+                border-left: 3px solid #65cf72; border-radius: 8px; background: var(--missao-raised);
+                color: #d7ead8; font: 13px/1.5 Arial,sans-serif;
+            }
+            #modal-missao-npc .loader-magico { padding: 24px 10px; color: var(--missao-muted); text-align: center; font: 700 14px Arial,sans-serif; }
+            @media (max-height: 620px) {
+                #modal-missao-npc { padding: 8px; }
+                #modal-missao-npc .modal-missao-box { max-height: 94dvh; }
+                #modal-missao-npc .npc-header { min-height: 68px; padding: 9px 12px; }
+                #modal-missao-npc .npc-portrait { width: 46px; height: 46px; flex-basis: 46px; }
+                #modal-missao-npc #missao-conteudo { padding: 13px 14px 16px; }
+            }
         `;
         document.head.appendChild(estilo);
 
@@ -65,16 +135,32 @@ class MotorDeMissoesNPC {
         div.id = 'modal-missao-npc';
         div.className = 'modal-missao-overlay';
         div.innerHTML = `
-            <div class="modal-missao-box">
+            <div class="modal-missao-box" role="dialog" aria-modal="true" aria-labelledby="npc-nome-missao">
                 <div class="npc-header">
                     <img id="npc-img-missao" class="npc-portrait" src="">
-                    <h2 id="npc-nome-missao" class="npc-nome">Nome</h2>
+                    <div class="npc-identidade">
+                        <p class="npc-contexto">Jornada de Eldora</p>
+                        <h2 id="npc-nome-missao" class="npc-nome">Nome</h2>
+                    </div>
+                    <button class="npc-fechar" type="button" aria-label="Fechar missões" title="Fechar"
+                        onclick="window.motorMissoesNPC.fecharModal()">×</button>
                 </div>
-                <div id="missao-conteudo">
+                <div id="missao-conteudo" tabindex="0">
                 </div>
             </div>
         `;
         document.body.appendChild(div);
+        div.addEventListener('click', event => {
+            if (event.target === div) this.fecharModal();
+        });
+        document.addEventListener('keydown', event => {
+            if (event.key === 'Escape' && div.style.display === 'flex') this.fecharModal();
+        });
+    }
+
+    fecharModal() {
+        const modal = document.getElementById('modal-missao-npc');
+        if (modal) modal.style.display = 'none';
     }
 
     async interagir(npc_id, nome_npc, url_imagem) {
@@ -86,6 +172,7 @@ class MotorDeMissoesNPC {
         
         conteudo.innerHTML = `<div class="loader-magico">Consultando os astros... ⏳</div>`;
         modal.style.display = 'flex';
+        requestAnimationFrame(() => document.querySelector('#modal-missao-npc .npc-fechar')?.focus());
 
         const userId = localStorage.getItem("jogadorEldoraID");
         
@@ -130,7 +217,7 @@ class MotorDeMissoesNPC {
                         </button>
                     `).join('')}
                 </fieldset>
-                <p class="missao-escolha-nota">A estrada guardará essa escolha. Ela pode mudar o que Selene percebe quando sua Centelha despertar.</p>
+                <p class="missao-escolha-nota">A estrada guardará sua resposta para o encontro com Selene.</p>
             `;
             return;
         }
@@ -425,7 +512,7 @@ class MotorDeMissoesNPC {
                             <span><strong>${escolha.titulo}</strong><small>${escolha.descricao}</small></span>
                         </label>
                     `).join('')}
-                    <p class="missao-escolha-nota">Sua resposta fica registrada na jornada. Todos os caminhos de classe continuam disponíveis.</p>
+                    <p class="missao-escolha-nota">Sua resposta fica registrada na jornada. Ela não escolhe uma classe por você.</p>
                 </fieldset>`
                 : '';
 
@@ -459,33 +546,31 @@ class MotorDeMissoesNPC {
 
                 ${htmlEscolhas}
 
-                <button
-                    class="btn-missao"
-                    id="btn-aceitar-missao"
-                    ${aceiteDesabilitado}
-                    onclick="
-                        window.motorMissoesNPC.aceitar(
-                            '${m.id}',
-                            '${npc_id}',
-                            '${nome_npc}',
-                            '${url_imagem}',
-                            window.motorMissoesNPC.escolhaSelecionada
-                        )
-                    "
-                >
-                    ACEITAR MISSÃO
-                </button>
+                <div class="missao-acoes">
+                    <button
+                        class="btn-missao"
+                        id="btn-aceitar-missao"
+                        ${aceiteDesabilitado}
+                        onclick="
+                            window.motorMissoesNPC.aceitar(
+                                '${m.id}',
+                                '${npc_id}',
+                                '${nome_npc}',
+                                '${url_imagem}',
+                                window.motorMissoesNPC.escolhaSelecionada
+                            )
+                        "
+                    >
+                        ${escolhas.length ? 'ESCOLHA UMA RESPOSTA' : 'ACEITAR MISSÃO'}
+                    </button>
 
-                <button
-                    class="btn-missao btn-fechar-missao"
-                    onclick="
-                        document
-                            .getElementById('modal-missao-npc')
-                            .style.display='none'
-                    "
-                >
-                    RECUSAR
-                </button>
+                    <button
+                        class="btn-missao btn-fechar-missao"
+                        onclick="window.motorMissoesNPC.fecharModal()"
+                    >
+                        VOLTAR AO MAPA
+                    </button>
+                </div>
             `;
 
             return;
@@ -534,7 +619,10 @@ class MotorDeMissoesNPC {
     selecionarEscolha(escolhaId) {
         this.escolhaSelecionada = escolhaId;
         const botao = document.getElementById('btn-aceitar-missao');
-        if (botao) botao.disabled = false;
+        if (botao) {
+            botao.disabled = false;
+            botao.textContent = 'ACEITAR MISSÃO';
+        }
     }
 
     async registrarDecisao(etapa, escolha_id, npc_id, nome_npc, url_imagem) {
