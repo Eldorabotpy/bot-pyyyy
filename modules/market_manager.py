@@ -125,7 +125,7 @@ def _deliver(doc, payload, quantity):
 def create_listing(*, seller_id, item_id, total_price, quantity=1, currency='ouro'):
     price = _positive(total_price, 'Preço')
     quantity = _positive(quantity, 'Quantidade')
-    currency = {'gema': 'gemas', 'gemas': 'gemas', 'ouro': 'ouro'}.get(currency)
+    currency = {'gema': 'gemas', 'gemas': 'gemas', 'gems': 'gemas', 'ouro': 'ouro', 'gold': 'ouro'}.get(str(currency).strip().lower())
     if not currency: raise InvalidListing('Moeda inválida.')
     if not isinstance(item_id, str) or not item_id: raise InvalidListing('Selecione um item.')
 
@@ -142,8 +142,28 @@ def create_listing(*, seller_id, item_id, total_price, quantity=1, currency='our
         if not info: raise InvalidListing('Item não cadastrado no catálogo.')
         if info.get('tradable') is False or item.get('tradable') is False or base in {'gems', 'sigilo_protecao', 'ticket_arena', 'chave_da_catacumba', 'cristal_de_abertura'}:
             raise InvalidListing('Este item não pode ser comercializado.')
-        if base in EVOLUTION_ITEMS_DATA:
-            raise InvalidListing('Venda itens de evolução no Comércio de Relíquias.')
+        moeda_configurada = str(info.get('market_currency', '')).strip().lower()
+        moeda_obrigatoria = {
+            'gold': 'ouro', 'ouro': 'ouro',
+            'gem': 'gemas', 'gems': 'gemas', 'gema': 'gemas', 'gemas': 'gemas',
+        }.get(moeda_configurada)
+        categoria_item = str(info.get('category', '')).strip().lower()
+        tipo_item = str(info.get('type', '')).strip().lower()
+        somente_gemas = (
+            base in EVOLUTION_ITEMS_DATA
+            or categoria_item in {'runas', 'runa', 'socketable', 'evolucao', 'evolução', 'aprendizado'}
+            or tipo_item in {'rune', 'runa', 'skill_book'}
+            or moeda_obrigatoria == 'gemas'
+        )
+        if somente_gemas:
+            moeda_obrigatoria = 'gemas'
+        if moeda_obrigatoria and currency != moeda_obrigatoria:
+            rotulo_moeda = 'Gemas' if moeda_obrigatoria == 'gemas' else 'Ouro'
+            raise InvalidListing(f'Este item só pode ser anunciado por {rotulo_moeda}.')
+        if somente_gemas:
+            preco_minimo = _positive(info.get('market_min_price', 30), 'Preço mínimo')
+            if price < preco_minimo:
+                raise InvalidListing(f'O preço mínimo deste item é {preco_minimo} Gemas.')
         item['base_id'] = base
         unique = info.get('stackable') is False or info.get('type') in {'weapon','armor','helmet','boots','ring','necklace','earring','tool'} or (info.get('stackable') is not True and bool(item.get('durability') or item.get('upgrade_level') or item.get('enchantments')))
         if unique:

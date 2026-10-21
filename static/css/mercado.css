@@ -325,3 +325,5 @@
 #ui-mercado .mercado-moeda-selecionada { color:#e5c16e; font-size:13px; opacity:0; }
 #ui-mercado .mercado-moeda-opcoes > button[aria-selected="true"] .mercado-moeda-selecionada { opacity:1; }
 @keyframes mercado-moeda-abrir { from { opacity:0; transform:translateY(-4px) scale(.98); } to { opacity:1; transform:translateY(0) scale(1); } }
+
+#ui-mercado .mercado-moeda-opcoes > button[hidden] { display:none; }
