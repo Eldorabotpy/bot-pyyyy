@@ -727,6 +727,13 @@ def iniciar_combate():
             mob_vivo = sistema_cacada.mobs_vivos[regiao_atual][spawn_id]
             monster_id_real = mob_vivo.get("monster_id", "slime_verde")
 
+        if (
+            mob_vivo
+            and mob_vivo.get("quest_event_id")
+            and str(mob_vivo.get("event_owner_id")) != str(user_id)
+        ):
+            return jsonify({"erro": "Esse encontro pertence a outro aventureiro."}), 403
+
         # ==========================================
         # 🏰 MOB ESPECIAL DE EVENTO DA DUNGEON
         # ==========================================
@@ -1925,6 +1932,26 @@ def handle_entrar_regiao(data):
     # ==========================================
     # 👹 CARREGAR MOBS
     # ==========================================
+    if nova_regiao == "pradaria_inicial":
+        try:
+            from modules.quest_caravana import preparar_encontro, iniciar_ia_caravana
+
+            caravana = preparar_encontro(character, sistema_cacada)
+            if caravana:
+                emit("caravanaQuestAtiva", caravana, to=player_sid)
+                iniciar_ia_caravana(
+                    char_id,
+                    player_sid,
+                    sistema_cacada,
+                    socketio,
+                    lambda: (
+                        str((jogadores_online.get(player_sid) or {}).get("char_id")) == str(char_id)
+                        and (jogadores_online.get(player_sid) or {}).get("regiao") == "pradaria_inicial"
+                    ),
+                )
+        except Exception:
+            app.logger.exception("Falha ao preparar o encontro da caravana")
+
     mobs_da_regiao = (
         sistema_cacada.obter_mobs_regiao(
             data.get(

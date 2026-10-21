@@ -29,6 +29,16 @@ class MotorCacada {
         // Segurança contra travamento no caminho.
         this.autoCacadaUltimoReenvioMovimento = 0;
         this.autoCacadaIgnorarSpawnIds = {};
+        this.caravanaQuestSprite = null;
+        this.caravanaQuestMovimiento = null;
+        this.caravanaQuestViajante = null;
+        this.caravanaQuestViajanteAnim = null;
+        this.caravanaQuestSocorro = null;
+        this.caravanaQuestSocorroAnim = null;
+        this.caravanaQuestIntegridade = null;
+        this.caravanaQuestViajanteSalvo = false;
+        this.caravanaQuestDestruida = false;
+        this.caravanaIAEstado = null;
         
         this.iniciarEscutas();
 
@@ -49,6 +59,9 @@ class MotorCacada {
             this.socket.off('mobMapaAtualizado');
             this.socket.off('convocarCombateGrupo');
             this.socket.off('dungeonConcluida');
+            this.socket.off('caravanaQuestAtiva');
+            this.socket.off('caravanaQuestAtualizada');
+            this.socket.off('caravanaIAAtualizada');
 
             this.socket.on('convocarCombateGrupo', async (dados) => {
                 console.log("🤝 [MAPA] Convocado para combate em grupo:", dados);
@@ -74,6 +87,66 @@ class MotorCacada {
             // 1. Carrega todos os mobs ao entrar no mapa
             this.socket.on('carregarMobsMapa', (mobs) => {
                 Object.values(mobs).forEach(mob => this.spawnMob(mob));
+            });
+
+            this.socket.on('caravanaQuestAtiva', dados => {
+                if (
+                    String(dados?.owner_id || '') !==
+                    String(localStorage.getItem('jogadorEldoraID') || '')
+                ) return;
+                this.mostrarCaravanaQuest(dados);
+            });
+
+            this.socket.on('caravanaQuestAtualizada', dados => {
+                if (
+                    String(dados?.owner_id || '') !==
+                    String(localStorage.getItem('jogadorEldoraID') || '')
+                ) return;
+
+                const texto = dados.concluido
+                    ? 'A caravana está segura. Alcance o Nível 5 e volte ao Capitão Varek.'
+                    : `Goblins afastados da caravana: ${dados.mob_atual}/${dados.mob_total}.`;
+                if (dados.concluido) {
+                    this.caravanaQuestViajanteSalvo = true;
+                    this.caravanaQuestDestruida = false;
+                    this.acalmarViajanteCaravana();
+                }
+                window.alertaEldora?.(
+                    dados.concluido ? 'Provação da Caravana' : 'Defesa da Caravana',
+                    texto,
+                    'sucesso'
+                );
+            });
+
+            this.socket.on('caravanaIAAtualizada', dados => {
+                if (
+                    String(dados?.owner_id || '') !==
+                    String(localStorage.getItem('jogadorEldoraID') || '')
+                ) return;
+                this.caravanaIAEstado = dados;
+                this.atualizarIntegridadeCaravana(dados.vida_caravana, dados.vida_maxima);
+                (dados.mobs || []).forEach(mobEstado => {
+                    const sprite = this.mobsNoMapa.getChildren().find(mob =>
+                        String(mob.spawn_id) === String(mobEstado.spawn_id)
+                    );
+                    if (sprite) this.aplicarEstadoIACaravana(sprite, mobEstado);
+                });
+                if (dados.caravana_destruida && !this.caravanaQuestDestruida) {
+                    this.caravanaQuestDestruida = true;
+                    this.caravanaQuestViajanteSalvo = false;
+                    this.acalmarViajanteCaravana();
+                    this.caravanaQuestViajante?.setTint(0x777777);
+                    this.caravanaQuestSocorro?.setText('CARAVANA DESTRUÍDA');
+                    this.caravanaQuestSocorro?.setStyle({
+                        backgroundColor: '#54242a',
+                        color: '#ffe1d5',
+                    });
+                    window.alertaEldora?.(
+                        'A caravana caiu',
+                        'Os goblins destruíram a caravana. Saia da Pradaria e volte para tentar o resgate novamente.',
+                        'erro'
+                    );
+                }
             });
 
             // 2. Apaga o monstro do mapa quando ele morre
@@ -266,6 +339,298 @@ class MotorCacada {
                 }
             );
         }
+    }
+
+    mostrarCaravanaQuest(dados) {
+        const textureKey = 'quest_caravana_varek';
+        const animKey = 'quest_caravana_varek_marcha';
+        const viajanteTextureKey = 'quest_viajante_caravana';
+        this.caravanaIAEstado = {
+            vida_caravana: Number(dados.vida_caravana ?? 100),
+            vida_maxima: Number(dados.vida_maxima ?? 100),
+        };
+        this.caravanaQuestViajanteSalvo =
+            Number(dados.mob_atual || 0) >= Number(dados.mob_total || 1);
+        this.caravanaQuestDestruida = false;
+        const desenhar = () => {
+            if (this.caravanaQuestSprite?.active) {
+                this.caravanaQuestMovimiento?.stop();
+                this.caravanaQuestSprite.destroy();
+            }
+            this.removerViajanteCaravana();
+
+            const cena = this.scene;
+            const sprite = cena.add.sprite(dados.x, dados.y, textureKey, 0)
+                .setDisplaySize(96, 144)
+                .setOrigin(0.5, 0.5)
+                .setDepth(cena.calcularProfundidadeAtor
+                    ? cena.calcularProfundidadeAtor({
+                        x: dados.x,
+                        y: dados.y,
+                        displayHeight: 144,
+                        originY: 0.5,
+                    })
+                    : 14);
+
+            cena.physics.add.existing(sprite, true);
+            // A carroça passa devagar pelo trecho da estrada onde ocorreu a
+            // emboscada. O corpo segue o sprite para manter a colisão alinhada.
+            sprite.body.setSize(288, 96).setOffset(112, 560);
+            sprite.body.updateFromGameObject();
+            if (cena.player) cena.physics.add.collider(cena.player, sprite);
+            if (!cena.anims.exists(animKey)) {
+                cena.anims.create({
+                    key: animKey,
+                    frames: cena.anims.generateFrameNumbers(textureKey, { start: 0, end: 3 }),
+                    frameRate: 5,
+                    repeat: -1,
+                });
+            }
+            sprite.play(animKey);
+            this.caravanaQuestSprite = sprite;
+
+            this.caravanaQuestMovimiento = cena.tweens.add({
+                targets: sprite,
+                y: dados.y - 40,
+                duration: 2400,
+                ease: 'Sine.easeInOut',
+                yoyo: true,
+                repeat: -1,
+                onUpdate: () => {
+                    if (!sprite.active || !sprite.body) return;
+                    sprite.body.updateFromGameObject();
+                    sprite.setDepth(cena.calcularProfundidadeAtor
+                        ? cena.calcularProfundidadeAtor({
+                            x: sprite.x,
+                            y: sprite.y,
+                            displayHeight: 144,
+                            originY: 0.5,
+                        })
+                        : sprite.y);
+                },
+            });
+
+            const mostrarViajante = () => {
+                const viajante = cena.add.image(dados.x, dados.y + 104, viajanteTextureKey)
+                    .setDisplaySize(48, 48)
+                    .setDepth(dados.y + 120);
+                viajante.setInteractive({ useHandCursor: true });
+                viajante.on('pointerdown', () => {
+                    window.mostrarDialogoRPG?.(
+                        'Viajante da Caravana',
+                        this.caravanaQuestViajanteSalvo
+                            ? 'Obrigado por me salvar. Agora a estrada está segura.'
+                            : 'Os goblins estão me cercando! Afaste-os da carroça, por favor!'
+                    );
+                });
+                this.caravanaQuestViajante = viajante;
+                this.caravanaQuestIntegridade = cena.add.text(
+                    viajante.x,
+                    viajante.y + 28,
+                    `CARAVANA ${Number(dados.vida_caravana ?? 100)}/${Number(dados.vida_maxima ?? 100)}`,
+                    {
+                        fontFamily: 'Arial',
+                        fontSize: '10px',
+                        fontStyle: 'bold',
+                        color: '#f4ead2',
+                        backgroundColor: '#102128',
+                        padding: { x: 5, y: 3 },
+                        stroke: '#071115',
+                        strokeThickness: 3,
+                    }
+                ).setOrigin(0.5).setDepth(1000);
+                if (this.caravanaQuestViajanteSalvo) {
+                    const agradecimento = cena.add.text(
+                        viajante.x,
+                        viajante.y - 32,
+                        'OBRIGADO!',
+                        {
+                            fontFamily: 'Arial',
+                            fontSize: '11px',
+                            fontStyle: 'bold',
+                            color: '#f4ead2',
+                            backgroundColor: '#256044',
+                            padding: { x: 6, y: 3 },
+                            stroke: '#18241c',
+                            strokeThickness: 3,
+                        }
+                    ).setOrigin(0.5).setDepth(1000);
+                    this.caravanaQuestSocorro = agradecimento;
+                    return;
+                }
+
+                this.caravanaQuestViajanteAnim = cena.tweens.add({
+                    targets: viajante,
+                    x: viajante.x + 3,
+                    angle: 2,
+                    duration: 220,
+                    yoyo: true,
+                    repeat: -1,
+                    ease: 'Sine.easeInOut',
+                });
+
+                const socorro = cena.add.text(viajante.x, viajante.y - 32, 'SOCORRO!', {
+                    fontFamily: 'Arial',
+                    fontSize: '12px',
+                    fontStyle: 'bold',
+                    color: '#fff1d4',
+                    backgroundColor: '#8b2635',
+                    padding: { x: 6, y: 3 },
+                    stroke: '#241217',
+                    strokeThickness: 3,
+                }).setOrigin(0.5).setDepth(1000);
+                this.caravanaQuestSocorro = socorro;
+                this.caravanaQuestSocorroAnim = cena.tweens.add({
+                    targets: socorro,
+                    y: socorro.y - 6,
+                    alpha: 0.65,
+                    duration: 550,
+                    yoyo: true,
+                    repeat: -1,
+                });
+                if (this.caravanaIAEstado) {
+                    this.atualizarIntegridadeCaravana(
+                        this.caravanaIAEstado.vida_caravana,
+                        this.caravanaIAEstado.vida_maxima
+                    );
+                }
+            };
+
+            mostrarViajante();
+        };
+
+        if (
+            this.scene.textures.exists(textureKey)
+            && this.scene.textures.exists(viajanteTextureKey)
+        ) {
+            desenhar();
+            return;
+        }
+
+        const loader = this.scene.load;
+        if (!this.scene.textures.exists(textureKey)) {
+            loader.spritesheet(
+                textureKey,
+                '/static/assets/npcs/caravana_provacao_walk.png',
+                { frameWidth: 512, frameHeight: 768 }
+            );
+        }
+        if (!this.scene.textures.exists(viajanteTextureKey)) {
+            loader.image(
+                viajanteTextureKey,
+                '/static/assets/npcs/viajante_caravana_ferido.png'
+            );
+        }
+        loader.once('complete', desenhar);
+        loader.start();
+    }
+
+    atualizarIntegridadeCaravana(vida, maxima) {
+        if (!this.caravanaQuestIntegridade?.active) return;
+        const atual = Math.max(0, Number(vida ?? 100));
+        const total = Math.max(1, Number(maxima ?? 100));
+        this.caravanaQuestIntegridade.setText(`CARAVANA ${atual}/${total}`);
+        this.caravanaQuestIntegridade.setColor(atual <= total * 0.3 ? '#ff8b78' : '#f4ead2');
+    }
+
+    aplicarEstadoIACaravana(sprite, estado) {
+        if (!sprite?.active || !estado) return;
+
+        sprite.mobData = {
+            ...(sprite.mobData || {}),
+            x: estado.x,
+            y: estado.y,
+            ai_state: estado.estado,
+        };
+        sprite.caravanaAIMovimento?.stop();
+        sprite.caravanaAIMovimento = this.scene.tweens.add({
+            targets: sprite,
+            x: Number(estado.x),
+            y: Number(estado.y),
+            duration: 240,
+            ease: 'Linear',
+            onUpdate: () => {
+                if (!sprite.active) return;
+                sprite.indicadorAlvo?.setPosition(sprite.x, sprite.y - 30);
+                sprite.corruptionAura?.setPosition(sprite.x, sprite.y);
+                if (this.scene.calcularProfundidadeAtor) {
+                    sprite.setDepth(this.scene.calcularProfundidadeAtor({
+                        x: sprite.x,
+                        y: sprite.y,
+                        displayHeight: sprite.displayHeight || 48,
+                        originY: 0.5,
+                    }));
+                }
+            },
+        });
+
+        const sequencia = Number(estado.sequencia_ataque || 0);
+        if (estado.ataque && sequencia > Number(sprite.caravanaUltimoGolpe || 0)) {
+            sprite.caravanaUltimoGolpe = sequencia;
+            this.animarGolpeNaCaravana(sprite);
+        }
+    }
+
+    animarGolpeNaCaravana(spriteAtacante) {
+        const viajante = this.caravanaQuestViajante;
+        if (!viajante?.active) return;
+
+        viajante.setTint(0xff7777);
+        this.scene.time.delayedCall(180, () => {
+            if (viajante.active) viajante.clearTint();
+        });
+
+        const impacto = this.scene.add.text(
+            viajante.x + Phaser.Math.Between(-10, 10),
+            viajante.y - 18,
+            '✦',
+            {
+                fontFamily: 'Arial',
+                fontSize: '24px',
+                fontStyle: 'bold',
+                color: '#ff5b61',
+                stroke: '#42151b',
+                strokeThickness: 4,
+            }
+        ).setOrigin(0.5).setDepth(1001);
+
+        this.scene.tweens.add({
+            targets: impacto,
+            y: impacto.y - 20,
+            alpha: 0,
+            scale: 1.25,
+            duration: 360,
+            onComplete: () => impacto.destroy(),
+        });
+        if (spriteAtacante?.active) spriteAtacante.setTint(0xffb6a6);
+        this.scene.time.delayedCall(180, () => {
+            if (spriteAtacante?.active) spriteAtacante.clearTint();
+        });
+    }
+
+    removerViajanteCaravana() {
+        this.caravanaQuestViajanteAnim?.stop();
+        this.caravanaQuestSocorroAnim?.stop();
+        this.caravanaQuestViajante?.destroy();
+        this.caravanaQuestSocorro?.destroy();
+        this.caravanaQuestIntegridade?.destroy();
+        this.caravanaQuestViajanteAnim = null;
+        this.caravanaQuestViajante = null;
+        this.caravanaQuestSocorro = null;
+        this.caravanaQuestIntegridade = null;
+        this.caravanaQuestSocorroAnim = null;
+    }
+
+    acalmarViajanteCaravana() {
+        this.caravanaQuestViajanteAnim?.stop();
+        this.caravanaQuestSocorroAnim?.stop();
+        this.caravanaQuestViajante?.setAngle(0);
+        if (!this.caravanaQuestDestruida) {
+            this.caravanaQuestSocorro?.destroy();
+            this.caravanaQuestSocorro = null;
+        }
+        this.caravanaQuestViajanteAnim = null;
+        this.caravanaQuestSocorroAnim = null;
     }
 
     pararAutoCacada(motivo = "cancelado", pararMovimento = true) {
@@ -988,7 +1353,7 @@ class MotorCacada {
         };
 
         // Ele busca no tradutor. Se não tiver no tradutor, ele tenta usar o próprio nome da região.
-        let pastaRegiao = tradutorPastas[regiaoAtual] || regiaoAtual;
+        let pastaRegiao = mobData.asset_region || tradutorPastas[regiaoAtual] || regiaoAtual;
 
         // Monta o link apontando para a pasta traduzida!
         const linkNuvem = `https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/mob/${pastaRegiao}/`;
@@ -1278,6 +1643,12 @@ class MotorCacada {
 
             this.mobsNoMapa.add(sprite);
             this.aplicarAuraCorrompida(sprite, mobData);
+            if (mobData.quest_event_id === 'q3_varek_provacao') {
+                const estadoIA = this.caravanaIAEstado?.mobs?.find(mob =>
+                    String(mob.spawn_id) === String(mobData.spawn_id)
+                );
+                if (estadoIA) this.aplicarEstadoIACaravana(sprite, estadoIA);
+            }
             
         } catch (e) {
             console.error("Erro ao desenhar mob:", e);

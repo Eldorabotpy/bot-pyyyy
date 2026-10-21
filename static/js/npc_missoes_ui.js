@@ -42,6 +42,15 @@ class MotorDeMissoesNPC {
                 text-transform: uppercase; transition: 0.2s;
             }
             .btn-missao:hover { filter: brightness(1.2); }
+            .btn-missao:disabled { opacity: .5; cursor: not-allowed; filter: saturate(.45); }
+            .missao-escolhas { border: 1px solid rgba(211,190,132,.35); border-radius: 8px; padding: 10px; margin: 0 0 14px; background: rgba(11,27,32,.75); }
+            .missao-escolhas legend { color: #c9a45c; padding: 0 6px; font-size: 14px; }
+            .missao-escolha { display: flex; align-items: flex-start; gap: 10px; padding: 10px; margin: 5px 0; border: 1px solid rgba(211,190,132,.2); border-radius: 6px; background: #12252b; cursor: pointer; font-family: Arial,sans-serif; }
+            .missao-escolha input { margin-top: 3px; accent-color: #c9a45c; width: 18px; height: 18px; flex: 0 0 auto; }
+            .missao-escolha span { display: grid; gap: 4px; }
+            .missao-escolha strong { color: #f4ead2; }
+            .missao-escolha small, .missao-escolha-nota { color: #b8c4c2; line-height: 1.4; }
+            .missao-escolha-nota { margin: 8px 3px 0; font: 12px Arial,sans-serif; }
             .btn-fechar-missao { background: linear-gradient(to bottom, #ef4444, #b91c1c); color: #fff; }
             .recompensas-box { 
                 background: rgba(0,0,0,0.6); padding: 12px; border-radius: 6px; 
@@ -69,6 +78,7 @@ class MotorDeMissoesNPC {
     }
 
     async interagir(npc_id, nome_npc, url_imagem) {
+        this.escolhaSelecionada = null;
         const modal = document.getElementById('modal-missao-npc');
         document.getElementById('npc-img-missao').src = url_imagem;
         document.getElementById('npc-nome-missao').innerText = nome_npc;
@@ -84,6 +94,7 @@ class MotorDeMissoesNPC {
             const data = await res.json();
             
             if (data.success) {
+                this.notificarMissoesProntas(data.status);
                 this.renderizarMissao(data.status, npc_id, nome_npc, url_imagem);
             } else {
                 conteudo.innerHTML = `
@@ -144,7 +155,7 @@ class MotorDeMissoesNPC {
                 <h3 class="missao-titulo">✅ ${m.data.titulo}</h3>
                 <p class="missao-desc">Excelente trabalho. Você trouxe o que eu pedi?</p>
                 ${htmlRecompensas}
-                <button class="btn-missao" onclick="window.motorMissoesNPC.entregar('${m.id}', '${npc_id}', '${nome_npc}', '${url_imagem}')">ENTREGAR ITENS</button>
+                <button class="btn-missao" onclick="window.motorMissoesNPC.entregar('${m.id}', '${npc_id}', '${nome_npc}', '${url_imagem}')">PRESTAR CONTAS</button>
                 <button class="btn-missao btn-fechar-missao" onclick="document.getElementById('modal-missao-npc').style.display='none'">VOLTAR DEPOIS</button>
             `;
             return;
@@ -164,6 +175,24 @@ class MotorDeMissoesNPC {
             const m = missoesEmAndamento[0];
 
             let htmlProgresso = '';
+
+            if (m.progresso_nivel) {
+                htmlProgresso += `
+                    <div class="recompensas-box">
+                        <strong>🌟 PREPARAÇÃO DO HERÓI</strong><br><br>
+                        Nível ${m.progresso_nivel.atual}/${m.progresso_nivel.necessario}
+                    </div>
+                `;
+            }
+
+            if (m.progresso_evento) {
+                htmlProgresso += `
+                    <div class="recompensas-box">
+                        <strong>🛡️ ${m.progresso_evento.nome.toUpperCase()}</strong><br><br>
+                        ${m.progresso_evento.atual}/${m.progresso_evento.necessario} derrotados
+                    </div>
+                `;
+            }
 
             // =====================================================
             // ⚔️ PROGRESSO DE ABATES
@@ -357,6 +386,26 @@ class MotorDeMissoesNPC {
             const m =
                 missoesDisponiveis[0];
 
+            const escolhas = Array.isArray(m.data.escolhas)
+                ? m.data.escolhas
+                : [];
+            this.escolhaSelecionada = null;
+            const htmlEscolhas = escolhas.length
+                ? `<fieldset class="missao-escolhas">
+                    <legend>Como você responde?</legend>
+                    ${escolhas.map(escolha => `
+                        <label class="missao-escolha">
+                            <input type="radio" name="escolha-missao" value="${escolha.id}"
+                                onchange="window.motorMissoesNPC.selecionarEscolha('${escolha.id}')">
+                            <span><strong>${escolha.titulo}</strong><small>${escolha.descricao}</small></span>
+                        </label>
+                    `).join('')}
+                    <p class="missao-escolha-nota">Sua resposta fica registrada na jornada. Todos os caminhos de classe continuam disponíveis.</p>
+                </fieldset>`
+                : '';
+
+            const aceiteDesabilitado = escolhas.length ? 'disabled' : '';
+
             conteudo.innerHTML = `
                 <h3 class="missao-titulo">
                     📜 ${m.data.titulo}
@@ -383,14 +432,19 @@ class MotorDeMissoesNPC {
                     </div>
                 ` : ''}
 
+                ${htmlEscolhas}
+
                 <button
                     class="btn-missao"
+                    id="btn-aceitar-missao"
+                    ${aceiteDesabilitado}
                     onclick="
                         window.motorMissoesNPC.aceitar(
                             '${m.id}',
                             '${npc_id}',
                             '${nome_npc}',
-                            '${url_imagem}'
+                            '${url_imagem}',
+                            window.motorMissoesNPC.escolhaSelecionada
                         )
                     "
                 >
@@ -412,6 +466,19 @@ class MotorDeMissoesNPC {
             return;
         }
 
+        const missaoBloqueada = Array.isArray(status.bloqueadas)
+            ? status.bloqueadas[0]
+            : null;
+        if (missaoBloqueada) {
+            conteudo.innerHTML = `
+                <h3 class="missao-titulo">📜 ${missaoBloqueada.data.titulo}</h3>
+                <p class="missao-desc">${missaoBloqueada.data.objetivo}</p>
+                <div class="recompensas-box">Seu nível: <strong>${missaoBloqueada.nivel_atual}</strong><br>Necessário: <strong>Nível ${missaoBloqueada.nivel_necessario}</strong></div>
+                <button class="btn-missao btn-fechar-missao" onclick="document.getElementById('modal-missao-npc').style.display='none'">VOLTAR À JORNADA</button>
+            `;
+            return;
+        }
+
         // Prioridade 3: Sem missões no momento
         conteudo.innerHTML = `
             <p class="missao-desc" style="text-align:center;">
@@ -421,13 +488,37 @@ class MotorDeMissoesNPC {
         `;
     }
 
-    async aceitar(quest_id, npc_id, nome_npc, url_imagem) {
+    notificarMissoesProntas(status) {
+        const prontas = Array.isArray(status?.prontas_para_entrega)
+            ? status.prontas_para_entrega
+            : [];
+        if (!prontas.length || typeof window.alertaEldora !== 'function') return;
+
+        const missao = prontas[0];
+        const usuario = localStorage.getItem('jogadorEldoraID') || 'anonimo';
+        const chave = `eldora-missao-pronta-${usuario}-${missao.id}`;
+        if (localStorage.getItem(chave) === '1') return;
+        localStorage.setItem(chave, '1');
+        window.alertaEldora(
+            'Objetivo concluído',
+            `Você cumpriu os requisitos de “${missao.data.titulo}”. Fale com ${document.getElementById('npc-nome-missao')?.textContent || 'o NPC'} para prestar contas.`,
+            'sucesso'
+        );
+    }
+
+    selecionarEscolha(escolhaId) {
+        this.escolhaSelecionada = escolhaId;
+        const botao = document.getElementById('btn-aceitar-missao');
+        if (botao) botao.disabled = false;
+    }
+
+    async aceitar(quest_id, npc_id, nome_npc, url_imagem, escolha_id = null) {
         const userId = localStorage.getItem("jogadorEldoraID");
         
         const res = await fetch('/api/npc/missao/aceitar', {
             method: 'POST', 
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ user_id: userId, quest_id: quest_id })
+            body: JSON.stringify({ user_id: userId, quest_id: quest_id, escolha_id })
         });
         const data = await res.json();
         
@@ -490,8 +581,11 @@ class MotorDeMissoesNPC {
             }
             
             if (typeof window.carregarMeuPerfil === 'function') {
-                window.carregarMeuPerfil();
+                await window.carregarMeuPerfil();
             }
+
+            const usuario = localStorage.getItem('jogadorEldoraID') || 'anonimo';
+            localStorage.removeItem(`eldora-missao-pronta-${usuario}-${quest_id}`);
 
             this.interagir(npc_id, nome_npc, url_imagem);
         } else {

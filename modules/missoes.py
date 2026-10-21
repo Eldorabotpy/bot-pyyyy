@@ -8,6 +8,61 @@ from modules.player.core import users_collection
 # modules/missoes.py
 
 QUESTS_DATA = {
+    # Jornada inicial de Varek: as escolhas registram sinais de comportamento,
+    # sem bloquear nenhuma classe nem alterar o combate atual.
+    "q1_varek_recruta": {
+        "titulo": "O Primeiro Dever",
+        "npc": "varek",
+        "level_req": 1,
+        "conclusao_nivel": 2,
+        "pre_req": None,
+        "objetivo": "Conquiste experiência nos arredores, alcance o Nível 2 e volte ao Capitão Varek.",
+        "req_itens": {},
+        "recompensas": {"gold": 100},
+        "escolhas": [
+            {"id": "proteger", "titulo": "Proteger os moradores", "descricao": "Priorizar quem está perto do perigo.", "sinais": {"protecao": 1, "compaixao": 1}},
+            {"id": "investigar", "titulo": "Observar as criaturas", "descricao": "Entender a ameaça antes de agir.", "sinais": {"curiosidade": 1, "prudencia": 1}},
+            {"id": "avancar", "titulo": "Ir direto ao combate", "descricao": "Enfrentar o risco sem hesitar.", "sinais": {"coragem": 1, "determinacao": 1}},
+        ],
+        "fala_aceite": "Varek anotou como você pretende enfrentar o primeiro perigo.",
+        "fala_conclusao": "Você voltou mais experiente. Varek registra seu primeiro serviço e paga a recompensa."
+    },
+    "q2_varek_defesas": {
+        "titulo": "As Defesas da Fronteira",
+        "npc": "varek",
+        "level_req": 2,
+        "conclusao_nivel": 4,
+        "pre_req": "q1_varek_recruta",
+        "objetivo": "Continue sua jornada, alcance o Nível 4 e retorne ao Capitão Varek para receber a avaliação da fronteira.",
+        "req_itens": {},
+        "recompensas": {"gold": 150},
+        "escolhas": [
+            {"id": "barricada", "titulo": "Reforçar as barricadas", "descricao": "Manter a rota segura para os moradores.", "sinais": {"protecao": 1, "dever": 1}},
+            {"id": "rastrear", "titulo": "Rastrear a ameaça", "descricao": "Procurar de onde vêm as feras.", "sinais": {"curiosidade": 1, "prudencia": 1}},
+            {"id": "patrulhar", "titulo": "Patrulhar a linha de frente", "descricao": "Conter o perigo onde ele aparecer.", "sinais": {"coragem": 1, "dever": 1}},
+        ],
+        "fala_aceite": "Varek registrou sua prioridade para a defesa da fronteira.",
+        "fala_conclusao": "A fronteira resistiu enquanto você amadurecia. Varek reconhece sua disciplina e paga a recompensa."
+    },
+    "q3_varek_provacao": {
+        "titulo": "O Sinal da Caravana",
+        "npc": "varek",
+        "level_req": 4,
+        "conclusao_nivel": 5,
+        "pre_req": "q2_varek_defesas",
+        "objetivo": "Proteja o viajante na Pradaria: derrote os 3 Goblins Batedores antes que a caravana seja destruída. Alcance o Nível 5 e volte ao Capitão Varek.",
+        "req_itens": {},
+        "req_abates_evento": 3,
+        "nome_abates_evento": "Goblin Batedor",
+        "recompensas": {"gold": 250},
+        "escolhas": [
+            {"id": "resgatar", "titulo": "Priorizar os viajantes", "descricao": "A vida de quem está na caravana vem primeiro.", "sinais": {"compaixao": 1, "protecao": 1}},
+            {"id": "conter", "titulo": "Conter a ameaça", "descricao": "Impedir que a emboscada alcance a estrada e a cidade.", "sinais": {"coragem": 1, "dever": 1}},
+            {"id": "planejar", "titulo": "Avaliar o terreno", "descricao": "Procurar uma forma segura de ajudar os sobreviventes.", "sinais": {"prudencia": 1, "curiosidade": 1}},
+        ],
+        "fala_aceite": "Varek anotou sua decisão. Quando estiver pronto, volte para prestar contas da provação.",
+        "fala_conclusao": "Varek registrou sua decisão e reconheceu sua jornada. Agora, apresente-se à Arquimaga Selene."
+    },
     # 1. O Despertar (Nível 5)
     "q4_selene_classe": {
         "titulo": "O Despertar da Centelha",
@@ -18,7 +73,7 @@ QUESTS_DATA = {
         "req_itens": {},
         "recompensas": {}
     },
-    
+
     ## 2. A Forja do Destino (Nível 7)
     "q5_thorek_profissao": {
         "titulo": "A Voz do Aço e da Terra",
@@ -233,6 +288,7 @@ def obter_status_npc(player_data: dict, npc_id: str) -> dict:
     missoes_disponiveis = []
     missoes_em_andamento = []
     missoes_concluidas = []
+    missoes_bloqueadas = []
 
     for q_id, q_data in QUESTS_DATA.items():
 
@@ -265,11 +321,14 @@ def obter_status_npc(player_data: dict, npc_id: str) -> dict:
         ):
             continue
 
-        # Nível mínimo.
-        if my_level < _int_seguro(
-            q_data.get("level_req", 1),
-            1
-        ):
+        level_req = _int_seguro(q_data.get("level_req", 1), 1)
+        if my_level < level_req:
+            missoes_bloqueadas.append({
+                "id": q_id,
+                "data": q_data,
+                "nivel_atual": my_level,
+                "nivel_necessario": level_req,
+            })
             continue
 
         # Aceita tanto o formato oficial deste motor
@@ -280,6 +339,17 @@ def obter_status_npc(player_data: dict, npc_id: str) -> dict:
         ):
 
             pode_entregar = True
+
+            nivel_conclusao = _int_seguro(q_data.get("conclusao_nivel", 0))
+            progresso_nivel = None
+            if nivel_conclusao:
+                progresso_nivel = {
+                    "atual": min(my_level, nivel_conclusao),
+                    "necessario": nivel_conclusao,
+                    "concluido": my_level >= nivel_conclusao,
+                }
+                if my_level < nivel_conclusao:
+                    pode_entregar = False
 
             progresso_itens = {}
 
@@ -333,7 +403,26 @@ def obter_status_npc(player_data: dict, npc_id: str) -> dict:
                     progresso_itens,
                 "progresso_abates":
                     progresso_abates,
+                "progresso_nivel":
+                    progresso_nivel,
             }
+
+            abates_evento_necessarios = _int_seguro(
+                q_data.get("req_abates_evento", 0)
+            )
+            if abates_evento_necessarios:
+                abates_evento_feitos = min(
+                    _int_seguro(quest_salva.get("abates_evento", 0)),
+                    abates_evento_necessarios,
+                )
+                pacote["progresso_evento"] = {
+                    "nome": q_data.get("nome_abates_evento", "Alvos do evento"),
+                    "atual": abates_evento_feitos,
+                    "necessario": abates_evento_necessarios,
+                    "concluido": abates_evento_feitos >= abates_evento_necessarios,
+                }
+                if abates_evento_feitos < abates_evento_necessarios:
+                    pode_entregar = False
 
             if pode_entregar:
                 missoes_concluidas.append(
@@ -360,11 +449,15 @@ def obter_status_npc(player_data: dict, npc_id: str) -> dict:
 
         "prontas_para_entrega":
             missoes_concluidas,
+
+        "bloqueadas":
+            missoes_bloqueadas,
     }
 
 def aceitar_missao(
     user_id: str,
     quest_id: str,
+    escolha_id: str = None,
 ) -> dict:
 
     q_data = QUESTS_DATA.get(
@@ -465,6 +558,19 @@ def aceitar_missao(
                 "ainda não foi concluída."
         }
 
+    escolha = None
+    escolhas_validas = q_data.get("escolhas", []) or []
+    if escolhas_validas:
+        escolha = next(
+            (item for item in escolhas_validas if item.get("id") == escolha_id),
+            None,
+        )
+        if not escolha:
+            return {
+                "success": False,
+                "error": "Escolha uma resposta para registrar antes de aceitar a missão."
+            }
+
     dados_missao = {
         "titulo":
             q_data["titulo"],
@@ -475,6 +581,23 @@ def aceitar_missao(
         "status":
             "ativa",
     }
+
+    if escolha:
+        dados_missao["escolha"] = escolha["id"]
+        dados_missao["sinais_jornada"] = escolha.get("sinais", {})
+
+    abates_evento_necessarios = _int_seguro(
+        q_data.get("req_abates_evento", 0)
+    )
+    if abates_evento_necessarios:
+        dados_missao["abates_evento"] = 0
+        dados_missao["abates_evento_registrados"] = []
+        dados_missao["tentativa_evento"] = 1
+        dados_missao["caravana_integridade"] = 100
+        dados_missao["event_spawn_ids"] = [
+            f"q3_caravana_{user_id}_1_{indice}"
+            for indice in range(1, abates_evento_necessarios + 1)
+        ]
 
     # =====================================================
     # ⚔️ MARCO INICIAL DOS ABATES
@@ -507,22 +630,27 @@ def aceitar_missao(
             in req_abates.keys()
         }
 
+    atualizacao = {
+        "$set": {
+            f"quests.{quest_id}": dados_missao
+        }
+    }
+    if escolha:
+        atualizacao["$inc"] = {
+            f"jornada.sinais.{sinal}": int(valor)
+            for sinal, valor in escolha.get("sinais", {}).items()
+        }
+
     users_collection.update_one(
         {
             "_id": oid
         },
-        {
-            "$set": {
-                f"quests.{quest_id}":
-                    dados_missao
-            }
-        }
+        atualizacao
     )
 
     return {
         "success": True,
-        "message":
-            f"Missão Aceita: {q_data['titulo']}"
+        "message": q_data.get("fala_aceite") or f"Missão aceita: {q_data['titulo']}"
     }
 
 def entregar_missao(
@@ -579,6 +707,32 @@ def entregar_missao(
             "success": False,
             "error":
                 "Esta missão ainda não foi aceita."
+        }
+
+    caravana_integridade = _int_seguro(estado_quest.get("caravana_integridade", 100), 100)
+    if q_data.get("req_abates_evento") and caravana_integridade <= 0:
+        return {
+            "success": False,
+            "error": "A caravana foi destruída. Volte à Pradaria para tentar resgatar o viajante novamente."
+        }
+
+    nivel_conclusao = _int_seguro(q_data.get("conclusao_nivel", 0))
+    nivel_atual = _int_seguro(player_data.get("level", 1), 1)
+    if nivel_conclusao and nivel_atual < nivel_conclusao:
+        return {
+            "success": False,
+            "error": f"Alcance o Nível {nivel_conclusao} antes de prestar contas desta missão."
+        }
+
+    abates_evento_necessarios = _int_seguro(q_data.get("req_abates_evento", 0))
+    abates_evento_feitos = _int_seguro(estado_quest.get("abates_evento", 0))
+    if abates_evento_feitos < abates_evento_necessarios:
+        return {
+            "success": False,
+            "error": (
+                f"A caravana ainda está cercada. Derrote {q_data.get('nome_abates_evento', 'os inimigos')} "
+                f"({abates_evento_feitos}/{abates_evento_necessarios})."
+            )
         }
 
     inventario = (
@@ -868,9 +1022,9 @@ def entregar_missao(
     return {
         "success": True,
 
-        "message":
-            "Missão Concluída! "
-            "Você recebeu suas recompensas.",
+        "message": q_data.get("fala_conclusao") or (
+            "Missão concluída! Você recebeu suas recompensas."
+        ),
 
         "recompensas_entregues":
             recompensas,
