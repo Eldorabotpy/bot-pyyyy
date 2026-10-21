@@ -11,7 +11,7 @@ def build_catalog():
     from modules.game_data.items import ITEMS_DATA
     from modules.game_data.monsters import MONSTERS_DATA
     from modules.game_data.map_spawns import MAP_SPAWNS
-    from modules.game_data.rune_rules import FAMILIES, EVOLUTION_COSTS, EXTRACTION_GOLD
+    from modules.game_data.rune_rules import FAMILIES, EVOLUTION_COSTS, EXTRACTION_GEMS
     from modules.game_data.refining import REFINING_RECIPES
     from modules.alchemy.bruxa_pocoes import RECEITAS_BRUXA
     from modules.crafting_registry import _RECIPES
@@ -142,7 +142,7 @@ def build_catalog():
             add('ferramenta:' + key, 'profissao:' + item['tool_type'], name(key), 'Ferramenta deste ofício.', sections, '🔧')
 
     for family, (title, stat, values, label, unit, color) in FAMILIES.items():
-        fid = add('runa:' + family, 'runas', 'Runa de ' + title, label, [('Extração', f'{EXTRACTION_GOLD} Ouro'), ('Encaixes', 'Raro: 1 • Épico: 2 • Lendário: 3')], '🔮')
+        fid = add('runa:' + family, 'runas', 'Runa de ' + title, label, [('Extração', f'{EXTRACTION_GEMS} Gemas'), ('Encaixes', 'Raro: 1 • Épico: 2 • Lendário: 3')], '🔮')
         for i, value in enumerate(values):
             add(f'runa:{family}:{i}', fid, ['Menor', 'Maior', 'Ancestral'][i], f'+{value}{unit} {label}', [('Efeito', f'+{value}{unit} {label}'), ('Próxima evolução', quantities(EVOLUTION_COSTS[i+1]) if i+1 in EVOLUTION_COSTS else 'Nível máximo desta família.')])
 

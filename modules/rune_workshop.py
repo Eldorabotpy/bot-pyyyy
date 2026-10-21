@@ -2,7 +2,7 @@
 import copy
 import unicodedata
 from modules.game_data.runes_data import RUNES_DB
-from modules.game_data.rune_rules import SOCKETS_BY_RARITY, EXTRACTION_GOLD, EVOLUTION_COSTS, DUST_YIELD, FAMILIES
+from modules.game_data.rune_rules import SOCKETS_BY_RARITY, EXTRACTION_GEMS, EVOLUTION_COSTS, DUST_YIELD, FAMILIES
 
 
 def rarity(value):
@@ -66,18 +66,18 @@ def state_view(player, items):
         {'stat_key':stat,'label':rotulos.get(stat,(stat,''))[0],'value':value,'unit':rotulos.get(stat,(stat,''))[1]}
         for stat,value in bonus_por_atributo.items()
     ]
-    return {'gold':int(player.get('gold',0)), 'revision':int(player.get('rune_revision',0)), 'equipamentos':gear,
+    return {'gold':int(player.get('gold',0)), 'gems':int(player.get('gems',0) or 0), 'revision':int(player.get('rune_revision',0)), 'equipamentos':gear,
         'runas':[dict(r,id=rid,qtd=quantity(inv,rid)) for rid,r in RUNES_DB.items()],
         'bonus_ativos':bonus_ativos,
         'materiais':{k:quantity(inv,k) for k in ('po_runico','fragmento_runa_ancestral')},
-        'extracao_ouro':EXTRACTION_GOLD,'custos_evolucao':EVOLUTION_COSTS,'po_por_nivel':DUST_YIELD}
+        'extracao_gemas':EXTRACTION_GEMS,'custos_evolucao':EVOLUTION_COSTS,'po_por_nivel':DUST_YIELD}
 
 
 def apply_operation(player, data, items):
     if (player.get('player_state') or {}).get('action') not in (None,'','idle'):
         raise ValueError('Finalize sua atividade antes de alterar runas.')
     inv=copy.deepcopy(player.get('inventory') or {})
-    gold=int(player.get('gold',0));cost=0
+    gold=int(player.get('gold',0));gems=int(player.get('gems',0) or 0);cost=0;gem_cost=0
     action=data.get('action');rid=data.get('rune_id');rune=RUNES_DB.get(rid)
     if action in ('encaixar','extrair'):
         uid=data.get('item_id');item=inv.get(uid)
@@ -94,7 +94,7 @@ def apply_operation(player, data, items):
             consume(inv,rid,1);slots[index]=rid
         else:
             if not slots[index]: raise ValueError('Este espaço já está vazio.')
-            cost=EXTRACTION_GOLD;grant(inv,slots[index],1);slots[index]=None
+            gem_cost=EXTRACTION_GEMS;grant(inv,slots[index],1);slots[index]=None
         item['sockets']=slots
     elif action=='evoluir':
         if not rune or not rune['next_id']: raise ValueError('Esta runa não possui outra evolução.')
@@ -113,16 +113,17 @@ def apply_operation(player, data, items):
         consume(inv,rid,1);grant(inv,'po_runico',DUST_YIELD[rune['tier']])
     else: raise ValueError('Operação rúnica inválida.')
     if gold<cost: raise ValueError(f'Ouro insuficiente. Custo: {cost}.')
-    return inv,gold-cost
+    if gems<gem_cost: raise ValueError(f'Gemas insuficientes. Custo: {gem_cost}.')
+    return inv,gold-cost,gems-gem_cost
 
 
 def save_operation(collection, player, data, items):
     if int(data.get('revision',-1))!=int(player.get('rune_revision',0)): raise ValueError('A mochila mudou. Atualize a janela e tente novamente.')
-    inv,gold=apply_operation(player,data,items)
+    inv,gold,gems=apply_operation(player,data,items)
     query={'_id':player['_id']}
-    for key in ('inventory','gold','equipment','player_state','rune_revision','rune_hunt_active'):
+    for key in ('inventory','gold','gems','equipment','player_state','rune_revision','rune_hunt_active'):
         query[key]=player[key] if key in player else {'$exists':False}
-    result=collection.update_one(query,{'$set':{'inventory':inv,'gold':gold},'$inc':{'rune_revision':1}})
+    result=collection.update_one(query,{'$set':{'inventory':inv,'gold':gold,'gems':gems},'$inc':{'rune_revision':1}})
     if result.modified_count!=1: raise ValueError('A mochila mudou durante a operação. Atualize antes de tentar novamente.')
 
 

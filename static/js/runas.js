@@ -27,7 +27,7 @@
  const selectedGear=()=>state.equipamentos.find(i=>i.id===selectedItem);
  const costText=cost=>Object.entries(cost).map(([key,n])=>`${n} ${key==='gold'?'ouro':key==='po_runico'?'pó rúnico':'fragmento ancestral'}`).join(' + ');
  const canPay=cost=>Object.entries(cost).every(([k,n])=>(k==='gold'?state.gold:state.materiais[k]||0)>=n);
- function header(){return `<header><div><small>FORJA · INSCRIÇÕES RÚNICAS</small><h2>Oficina de Runas</h2></div><button data-action="fechar" aria-label="Fechar runas">×</button></header><div class="rune-wallet"><span>${state.gold.toLocaleString('pt-BR')} ouro</span><span>${state.materiais.po_runico} pó rúnico</span><span>${state.materiais.fragmento_runa_ancestral} fragmentos</span></div><nav><button data-page="equipar" class="${page==='equipar'?'active':''}">Equipamentos</button><button data-page="evoluir" class="${page==='evoluir'?'active':''}">Evolução</button></nav>`;}
+ function header(){return `<header><div><small>FORJA · INSCRIÇÕES RÚNICAS</small><h2>Oficina de Runas</h2></div><button data-action="fechar" aria-label="Fechar runas">×</button></header><div class="rune-wallet"><span>${state.gold.toLocaleString('pt-BR')} ouro</span><span>${Number(state.gems||0).toLocaleString('pt-BR')} gemas</span><span>${state.materiais.po_runico} pó rúnico</span><span>${state.materiais.fragmento_runa_ancestral} fragmentos</span></div><nav><button data-page="equipar" class="${page==='equipar'?'active':''}">Equipamentos</button><button data-page="evoluir" class="${page==='evoluir'?'active':''}">Evolução</button></nav>`;}
  function activeBonusPanel(){
   const bonuses=state.bonus_ativos||[];
   const rows=bonuses.map(b=>{
@@ -52,7 +52,7 @@
   return `${activeSummary}<label class="rune-label">Equipamento<select id="rune-gear">${state.equipamentos.map(g=>`<option value="${esc(g.id)}" ${g.id===item.id?'selected':''}>${esc(g.nome)} · ${esc(g.raridade)}${g.equipado?' · equipado':''}</option>`).join('')}</select></label>
   <p class="rune-notice">${item.equipado?'Bônus ativos enquanto este equipamento estiver equipado e íntegro.':'Equipe este item no personagem para ativar seus bônus.'} Uma runa de cada família por equipamento.</p>
   <div class="rune-slots">${slotRows||'<p>Esta raridade não possui espaços. Raro: 1 · Épico: 2 · Lendário: 3.</p>'}</div>
-  ${installed?`<button class="rune-extract" data-action="extrair" ${state.gold<state.extracao_ouro?'disabled':''}>Extrair ${esc(installed.name)} · ${state.extracao_ouro} ouro</button><p class="rune-notice">A runa volta para a mochila. O equipamento é preservado.</p>`:''}
+  ${installed?`<button class="rune-extract" data-action="extrair" ${Number(state.gems||0)<state.extracao_gemas?'disabled':''}>Extrair ${esc(installed.name)} · ${state.extracao_gemas} gemas</button><p class="rune-notice">A runa volta para a mochila. O equipamento é preservado.</p>`:''}
   <h3>Suas runas disponíveis</h3>${candidates||'<p class="rune-notice">Nenhuma runa solta na mochila. Runas instaladas devem ser extraídas antes de evoluir.</p>'}`;
  }
  function evolutionPage(){
@@ -72,7 +72,7 @@
  async function operate(action,rid){
   if(busy)return;busy=true;
   const item=selectedGear(),rune=runeById(rid);
-  const message={forjar:'Consumir 7 fragmentos para criar uma runa menor de uma família aleatória?',encaixar:`Encaixar ${rune?.name} em ${item?.nome}, espaço ${selectedSlot+1}? Uma runa será retirada da mochila.`,extrair:`Extrair a runa do espaço ${selectedSlot+1}? Custo: ${state.extracao_ouro} ouro. A runa voltará à mochila.`,evoluir:`Consumir 3 ${rune?.name} + ${rune?.next_id?costText(state.custos_evolucao[rune.tier]):''} para criar 1 ${rune?.next_id?runeById(rune.next_id).name:''}?`,dissolver:`Dissolver 1 ${rune?.name} para receber ${state.po_por_nivel[rune?.tier]} pó rúnico? A runa será consumida.`}[action];
+  const message={forjar:'Consumir 7 fragmentos para criar uma runa menor de uma família aleatória?',encaixar:`Encaixar ${rune?.name} em ${item?.nome}, espaço ${selectedSlot+1}? Uma runa será retirada da mochila.`,extrair:`Extrair a runa do espaço ${selectedSlot+1}? Custo: ${state.extracao_gemas} gemas. A runa voltará à mochila.`,evoluir:`Consumir 3 ${rune?.name} + ${rune?.next_id?costText(state.custos_evolucao[rune.tier]):''} para criar 1 ${rune?.next_id?runeById(rune.next_id).name:''}?`,dissolver:`Dissolver 1 ${rune?.name} para receber ${state.po_por_nivel[rune?.tier]} pó rúnico? A runa será consumida.`}[action];
   try{
    if(!await window.confirmarEldora(message,'Oficina de Runas'))return;
    dialog.querySelectorAll('button,select').forEach(e=>e.disabled=true);
