@@ -529,6 +529,9 @@ function renderizarPreviewItemVendaMercado(item) {
 
     if (stats && Object.keys(stats).length > 0) {
         for (const [key, raw] of Object.entries(stats)) {
+            const chaveNormalizada = String(key).trim().toLowerCase().replace(/[\\s_-]/g, "");
+            if (chaveNormalizada === "dmg" || chaveNormalizada === "damage") continue;
+
             let valor = raw;
 
             if (typeof raw === "object" && raw !== null) {
