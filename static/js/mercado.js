@@ -839,6 +839,9 @@ function mercadoStatsHtml(stats) {
     let html = "";
 
     for (const [key, raw] of Object.entries(stats)) {
+        const chaveNormalizada = String(key).trim().toLowerCase().replace(/[\\s_-]/g, "");
+        if (chaveNormalizada === "dmg" || chaveNormalizada === "damage") continue;
+
         let valor = raw;
 
         if (typeof raw === "object" && raw !== null) {
