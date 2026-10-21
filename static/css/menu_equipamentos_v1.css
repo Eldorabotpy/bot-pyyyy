@@ -58,30 +58,36 @@
     box-shadow: inset 0 1px rgba(255, 255, 255, .08), 0 4px 10px rgba(0, 0, 0, .36) !important;
 }
 
-#aba-perfil #conteudo-perf-equips .eldora-slot-icon {
+#aba-perfil #conteudo-perf-equips .eldora-slot-sprite {
     display: block;
-    width: 34px;
-    height: 34px;
-    overflow: visible;
-    fill: rgba(107, 160, 164, .13);
-    stroke: #d5bd7d;
-    stroke-width: 1.8;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-    filter: drop-shadow(0 2px 3px rgba(0, 0, 0, .55));
-    opacity: .9;
+    width: 42px;
+    height: 42px;
+    background-image: url("/static/images/ui/equipment_slots_pixel_v1.png?v=20261021-1");
+    background-repeat: no-repeat;
+    background-size: 300% 300%;
+    filter: saturate(.72) brightness(.84) drop-shadow(0 2px 3px rgba(0, 0, 0, .42));
+    opacity: .72;
     pointer-events: none;
 }
 
-#aba-perfil #conteudo-perf-equips .eldora-slot-icon .eldora-slot-icon-accent {
-    fill: none;
-    stroke: #78b7b2;
-    stroke-width: 2.2;
+#aba-perfil #conteudo-perf-equips .eldora-slot-sprite--elmo { background-position: 0 0; }
+#aba-perfil #conteudo-perf-equips .eldora-slot-sprite--arma { background-position: 50% 0; }
+#aba-perfil #conteudo-perf-equips .eldora-slot-sprite--armadura { background-position: 100% 0; }
+#aba-perfil #conteudo-perf-equips .eldora-slot-sprite--calca { background-position: 0 50%; }
+#aba-perfil #conteudo-perf-equips .eldora-slot-sprite--luvas { background-position: 50% 50%; }
+#aba-perfil #conteudo-perf-equips .eldora-slot-sprite--botas { background-position: 100% 50%; }
+#aba-perfil #conteudo-perf-equips .eldora-slot-sprite--colar { background-position: 0 100%; }
+#aba-perfil #conteudo-perf-equips .eldora-slot-sprite--anel { background-position: 50% 100%; }
+#aba-perfil #conteudo-perf-equips .eldora-slot-sprite--brinco { background-position: 100% 100%; }
+
+#aba-perfil #conteudo-perf-equips .eldora-slot-sprite--fallback {
+    border: 1px dashed rgba(201, 164, 92, .58);
+    border-radius: 9px;
+    opacity: .45;
 }
 
-#aba-perfil #conteudo-perf-equips .eldora-equipment-slot[data-empty="true"]:hover .eldora-slot-icon {
-    opacity: 1;
-    filter: drop-shadow(0 0 5px rgba(201, 164, 92, .34));
+#aba-perfil #conteudo-perf-equips .eldora-equipment-slot[data-empty="true"]:hover .eldora-slot-sprite:not(.eldora-slot-sprite--fallback) {
+    filter: saturate(.82) brightness(.92) drop-shadow(0 2px 5px rgba(201, 164, 92, .3));
 }
 
 #aba-perfil #conteudo-perf-equips .eldora-equipment-slot:active {

@@ -794,26 +794,22 @@ async function carregarMeuPerfil() {
             return !slot.startsWith('tool_') && slot !== 'tool';
         });
 
-        const iconesSlotsVazios = {
-            elmo: '<path d="M12 21h24l-2-5V13a10 10 0 0 0-20 0v3z"/><path d="M14 16h20M18 8l3 3m9-3-3 3M10 21v3m28-3v3"/><path class="eldora-slot-icon-accent" d="M21 17h6"/>',
-            armadura: '<path d="m14 8 5-3 5 3 5-3 5 3 4 6-5 3-3-4v14H13V13l-3 4-5-3 4-6z"/><path d="M19 5v7m10-7v7M13 15h20"/><path class="eldora-slot-icon-accent" d="M21 18h6"/>',
-            calca: '<path d="M14 6h20l2 7-4 23h-8l-2-15-2 15h-8l-2-23z"/><path d="M14 13h20m-10 0v8"/><path class="eldora-slot-icon-accent" d="M12 18h6m12 0h6"/>',
-            luvas: '<path d="M13 22v-9a2 2 0 0 1 4 0v4-9a2 2 0 0 1 4 0v8-7a2 2 0 0 1 4 0v7-5a2 2 0 0 1 4 0v8l-2 8-5 3h-7l-4-5z"/><path class="eldora-slot-icon-accent" d="m10 18-3 3 4 6"/>',
-            botas: '<path d="M13 6h10v15l4 4 9 3a3 3 0 0 1-1 6H12a4 4 0 0 1-4-4v-4l5-3z"/><path d="M13 26h12m-9 4h18"/><path class="eldora-slot-icon-accent" d="M18 10v7"/>',
-            colar: '<path d="M11 8c2 12 5 17 13 17S35 20 37 8"/><path d="M12 9h4m18 0h4"/><path class="eldora-slot-icon-accent" d="m24 19 4 4-4 7-4-7z"/><circle cx="24" cy="23" r="1.5"/>',
-            anel: '<ellipse cx="24" cy="28" rx="12" ry="8" transform="rotate(-35 24 28)"/><path d="m28 17 5-5 6 1 1 6-5 5"/><path class="eldora-slot-icon-accent" d="m33 13 4 4"/>',
-            brinco: '<path d="M24 7a5 5 0 0 0-5 5v5m10-5a5 5 0 0 0-5-5"/><path d="M19 17v3a5 5 0 0 0 10 0v-3"/><path class="eldora-slot-icon-accent" d="M24 25v4m-4 3 4-3 4 3-4 5z"/>',
-            arma: '<path d="m11 35 20-20m-4-4 8 8m-4-12 8 8-5 5-8-8zM8 34l6 6m-9-3 6 6"/><path class="eldora-slot-icon-accent" d="m28 12 4-4"/>'
-        };
         const rotulosSlots = {
             elmo: 'Elmo', armadura: 'Armadura', calca: 'Calças', luvas: 'Luvas',
             botas: 'Botas', colar: 'Colar', anel: 'Anel', brinco: 'Brinco', arma: 'Arma'
         };
+        const classesSpriteSlots = {
+            elmo: 'eldora-slot-sprite--elmo', armadura: 'eldora-slot-sprite--armadura',
+            calca: 'eldora-slot-sprite--calca', luvas: 'eldora-slot-sprite--luvas',
+            botas: 'eldora-slot-sprite--botas', colar: 'eldora-slot-sprite--colar',
+            anel: 'eldora-slot-sprite--anel', brinco: 'eldora-slot-sprite--brinco',
+            arma: 'eldora-slot-sprite--arma'
+        };
         const renderIconeSlotVazio = slot => {
-            const desenho = iconesSlotsVazios[slot];
-            if (!desenho) return '<span class="eldora-slot-icon-fallback" aria-hidden="true">✦</span>';
+            const classeSprite = classesSpriteSlots[slot];
+            if (!classeSprite) return '<span class="eldora-slot-sprite eldora-slot-sprite--fallback" aria-hidden="true"></span>';
             const rotulo = rotulosSlots[slot] || 'Equipamento';
-            return `<svg class="eldora-slot-icon" viewBox="0 0 48 48" role="img" aria-label="Espaço vazio: ${rotulo}" focusable="false"><title>${rotulo} vazio</title>${desenho}</svg>`;
+            return `<span class="eldora-slot-sprite ${classeSprite}" role="img" aria-label="Espaço vazio: ${rotulo}"></span>`;
         };
 
         const ferramentasProfissao = (p.equipamentos || []).filter(eq => {
