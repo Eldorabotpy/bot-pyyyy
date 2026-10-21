@@ -495,21 +495,35 @@ window.abrirModalClasses = function(necromanteRevelado = false) {
     const estiloRPG = `
         <style id="estilo-modal-escolha-classe">
             #modal-escolha-classe * { box-sizing: border-box; }
+            .classe-modal-overlay {
+                position: fixed; inset: 0; z-index: 100005; display: flex; justify-content: center; align-items: center;
+                width: 100%; height: 100vh; height: 100dvh; padding: 12px; overflow: hidden;
+                background: rgba(3, 10, 16, 0.82); backdrop-filter: blur(8px);
+            }
+            .classe-modal-painel {
+                width: min(100%, 500px); max-height: calc(100vh - 24px); max-height: calc(100dvh - 24px);
+                min-height: 0; padding: clamp(16px, 4vw, 24px); display: flex; flex-direction: column; overflow: hidden;
+                background: linear-gradient(150deg, #10202a 0%, #14243b 58%, #0b1b20 100%);
+                border: 1px solid rgba(201, 164, 92, 0.82); border-radius: 18px;
+                box-shadow: 0 18px 54px rgba(0, 0, 0, 0.62), inset 0 1px rgba(244, 234, 210, 0.06);
+            }
+            .classe-grade-tela { display: flex; flex: 1 1 auto; flex-direction: column; width: 100%; min-height: 0; overflow: hidden; }
+            #tela-detalhes-classe { min-height: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; }
             .classe-btn {
                 background: linear-gradient(180deg, rgba(30,41,59,0.9) 0%, rgba(15,23,42,0.9) 100%);
-                border: 2px solid #475569; border-radius: 10px; padding: 12px 5px; cursor: pointer;
+                min-width: 0; border: 1px solid #49606d; border-radius: 12px; padding: 10px 4px; cursor: pointer;
                 display: flex; flex-direction: column; align-items: center; justify-content: center;
                 transition: all 0.2s; color: #cbd5e1; box-shadow: 0 4px 6px rgba(0,0,0,0.4);
             }
             .classe-btn:hover {
-                transform: translateY(-3px) scale(1.02); border-color: var(--cor-classe, #facc15);
+                transform: translateY(-2px); border-color: var(--cor-classe, #facc15);
                 box-shadow: 0 0 15px var(--cor-classe, #facc15); color: #fff;
             }
             .classe-btn-necromante { border-color: rgba(192,132,252,0.75); background: linear-gradient(180deg, rgba(53,35,79,0.96), rgba(15,23,42,0.96)); }
             .classe-selo-necromante { color: #e9d5ff; font: 700 0.58em Arial,sans-serif; margin-top: 5px; text-align: center; }
             .classe-nome { 
-                font-size: 0.8em; font-weight: 900; font-family: 'Cinzel', serif; 
-                letter-spacing: 0.5px; text-transform: uppercase; margin-top: 8px; text-align: center;
+                max-width: 100%; font-size: clamp(0.62rem, 2.8vw, 0.8rem); line-height: 1.2; font-weight: 900; font-family: 'Cinzel', serif;
+                letter-spacing: 0.25px; text-transform: uppercase; margin-top: 7px; text-align: center; overflow-wrap: anywhere;
             }
             .btn-voltar {
                 background: transparent; border: 1px solid #64748b; border-radius: 6px;
@@ -530,6 +544,13 @@ window.abrirModalClasses = function(necromanteRevelado = false) {
             #grid-classes::-webkit-scrollbar { width: 6px; }
             #grid-classes::-webkit-scrollbar-track { background: rgba(0,0,0,0.3); border-radius: 4px; }
             #grid-classes::-webkit-scrollbar-thumb { background: #ca8a04; border-radius: 4px; }
+            #grid-classes::-webkit-scrollbar:horizontal { display: none; height: 0; }
+            #grid-classes { scrollbar-width: thin; scrollbar-color: #8b6f3c rgba(0,0,0,0.18); }
+            @media (max-height: 560px) {
+                .classe-modal-overlay { align-items: flex-start; overflow-y: auto; }
+                .classe-modal-painel { max-height: none; }
+                #grid-classes { max-height: 42vh; max-height: 42dvh; }
+            }
             
             .fade-in { animation: fadeInUI 0.3s forwards; }
             @keyframes fadeInUI { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
@@ -572,7 +593,7 @@ window.abrirModalClasses = function(necromanteRevelado = false) {
         return `
         <button class="classe-btn${c.id === 'necromante' ? ' classe-btn-necromante' : ''}" style="--cor-classe: ${c.cor};" onclick="window.selecionarClasseNaUI('${c.id}')">
             <img src="${urlIconeRosto}" alt="${c.nome}" 
-                 style="width: 60px; height: 60px; object-fit: contain; object-position: center; display: block; filter: drop-shadow(0 3px 3px rgba(0,0,0,0.8));" 
+                 style="width: min(60px, 16vw); height: min(60px, 16vw); object-fit: contain; object-position: center; display: block; filter: drop-shadow(0 3px 3px rgba(0,0,0,0.8));"
                  onerror="this.src='https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/avatares/avatar_padrao_m.png'">
             <span class="classe-nome" style="color: ${c.cor}">${c.nome}</span>
                     ${c.id === 'necromante' ? `<span class="classe-selo-necromante">${rotaNecromanteEpica ? 'RITUAL CONCLUÍDO' : 'CAMINHO REVELADO'}</span>` : ''}
@@ -582,21 +603,21 @@ window.abrirModalClasses = function(necromanteRevelado = false) {
 
     const htmlModal = `
         ${estiloRPG}
-        <div id="modal-escolha-classe" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 100005; display: flex; justify-content: center; align-items: center; backdrop-filter: blur(5px);">
-            <div style="background: linear-gradient(145deg, #0f172a, #1e293b); border: 2px solid #ca8a04; border-radius: 12px; padding: 25px; width: 95%; max-width: 500px; display: flex; flex-direction: column; box-shadow: 0 10px 30px rgba(0,0,0,0.9); position: relative;">
+        <div id="modal-escolha-classe" class="classe-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="titulo-escolha-classe">
+            <div class="classe-modal-painel" style="position: relative;">
                 
                 <!-- ============================== -->
                 <!-- TELA 1: A GRADE DE ROSTOS -->
                 <!-- ============================== -->
-                <div id="tela-grade-classes" class="fade-in" style="display: flex; flex-direction: column; width: 100%;">
-                    <h2 style="color: #facc15; font-family: 'Cinzel', serif; margin: 0 0 5px 0; text-align: center; font-size: 1.8em; text-shadow: 1px 1px 2px #000;">O Despertar da Alma</h2>
-                    <p style="color: #cbd5e1; font-size: 0.9em; text-align: center; margin-bottom: 20px;">${rotaNecromanteEpica ? 'O ritual das Catacumbas revelou um novo caminho. Você pode abraçar a Centelha do Necromante.' : necromanteRevelado ? 'A jornada revelou um caminho raro. Qual destino você escolhe?' : 'Qual caminho guiará seu destino?'}</p>
+                <div id="tela-grade-classes" class="classe-grade-tela fade-in">
+                    <h2 id="titulo-escolha-classe" style="color: #facc15; font-family: 'Cinzel', serif; margin: 0 0 5px 0; text-align: center; font-size: clamp(1.45rem, 6vw, 1.8rem); line-height: 1.2; text-shadow: 1px 1px 1px #000;">O Despertar da Alma</h2>
+                    <p style="color: #b8c4c2; font-size: 0.9em; text-align: center; margin: 8px 0 14px; line-height: 1.45;">${rotaNecromanteEpica ? 'O ritual das Catacumbas revelou um novo caminho. Você pode abraçar a Centelha do Necromante.' : necromanteRevelado ? 'A jornada revelou um caminho raro. Qual destino você escolhe?' : 'Qual caminho guiará seu destino?'}</p>
                     
-                    <div id="grid-classes" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; max-height: 50vh; overflow-y: auto; padding: 5px;">
+                    <div id="grid-classes" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(8px, 2vw, 12px); flex: 1 1 auto; min-height: 0; max-height: 100%; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; align-content: start; width: 100%; min-width: 0; padding: 4px;">
                         ${botoesHtml}
                     </div>
                     
-                    <button onclick="document.getElementById('modal-escolha-classe').style.display='none'" style="margin-top: 20px; align-self: center; padding: 8px 25px; background: transparent; border: 1px solid #ef4444; color: #ef4444; border-radius: 6px; cursor: pointer; font-weight: bold; font-family: 'Cinzel', serif;">Pensar Mais</button>
+                    <button onclick="document.getElementById('modal-escolha-classe').style.display='none'" style="margin-top: 12px; flex: 0 0 auto; align-self: center; min-height: 42px; padding: 8px 25px; background: rgba(11,27,32,0.72); border: 1px solid #e66b62; color: #f4ead2; border-radius: 8px; cursor: pointer; font-weight: bold; font-family: 'Cinzel', serif;">Pensar Mais</button>
                 </div>
 
                 <!-- ============================== -->
@@ -644,7 +665,7 @@ window.selecionarClasseNaUI = function(classeId) {
     const conteudo = document.getElementById('conteudo-detalhes');
     
     conteudo.innerHTML = `
-        <div style="height: 250px; display: flex; justify-content: center; align-items: flex-end; margin-bottom: 15px; width: 100%;">
+        <div style="height: min(250px, 34dvh); min-height: 150px; display: flex; justify-content: center; align-items: flex-end; margin-bottom: 15px; width: 100%; flex: 0 0 auto;">
             <img src="${urlImagemPersonagem}" 
                  alt="${classe.nome}" 
                  onerror="this.src='https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/avatares/avatar_padrao_m.png'" 
