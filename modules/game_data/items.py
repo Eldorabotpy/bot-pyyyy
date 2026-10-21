@@ -60,6 +60,15 @@ except ImportError as e:
 ITEMS_DATA = {}
 MARKET_ITEMS = {} 
 
+for _item_data in EVOLUTION_ITEMS_DATA.values():
+    _item_data.setdefault("tradable", True)
+    _item_data.setdefault("market_currency", "gems")
+    _item_data.setdefault("market_min_price", 30)
+
+for _rune_data in RUNE_ITEMS_DATA.values():
+    _rune_data["market_currency"] = "gems"
+    _rune_data["market_min_price"] = 30
+
 ITEMS_DATA.update(MATERIALS_DATA)
 ITEMS_DATA.update(CONSUMABLES_DATA)
 ITEMS_DATA.update(EQUIPMENTS_DATA)
@@ -127,10 +136,9 @@ def _generate_auto_items():
                     "description": f"Ensina a habilidade: {skill_name}.",
                     "stackable": True, 
                     
-                    # 🔴 ALTERADO: Impede venda no mercado
-                    "tradable": False, 
-                    
+                    "tradable": True,
                     "market_currency": "gems",
+                    "market_min_price": 30,
                     "price": 100, 
                     "class_req": classes,
                     "effects": {
