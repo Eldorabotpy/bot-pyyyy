@@ -188,6 +188,8 @@
 #ui-mercado .mercado-fields label { min-height:16px; margin-bottom:7px; color:#9eacc0; font-size:10px; letter-spacing:.2px; }
 #ui-mercado input:not([type=hidden]), #ui-mercado select { height:48px; padding:10px 13px; border-color:#34465f; border-radius:11px; background:linear-gradient(110deg,#0a1320,#0d1726); box-shadow:inset 0 2px 8px #0003,0 1px #ffffff05; transition:border-color .18s ease,box-shadow .18s ease; }
 #ui-mercado input:not([type=hidden]):focus, #ui-mercado select:focus { border-color:#b89759; box-shadow:0 0 0 3px #c4a15b18,inset 0 2px 8px #0003; }
+#ui-mercado select option, #ui-mercado select optgroup { background:#101b2a; color:#e5edf7; }
+#ui-mercado select option:checked { background:#29405a; color:#fff; }
 #ui-mercado #input-preco { border-color:#8e7140; color:#ffdc8d; }
 #ui-mercado .mercado-price-help { margin-top:-5px; color:#71829a; font-size:9px; }
 #ui-mercado .mercado-resumo { padding:15px 16px; border-color:#354861; border-radius:14px; background:linear-gradient(140deg,#101d2d,#0a1320); box-shadow:inset 0 1px #ffffff08,0 8px 20px #0002; }
