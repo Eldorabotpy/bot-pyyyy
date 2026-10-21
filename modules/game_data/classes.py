@@ -143,6 +143,14 @@ CLASSES_DATA = {
         'file_id_name': 'classe_mago_media',
         'tier': 3
     },
+    'necromante': {
+        'display_name': 'Necromante', 'emoji': '💀',
+        'description': 'Canaliza energia arcana e estabelece vínculos com as almas que ainda não encontraram descanso.',
+        'stat_modifiers': {'hp': 2.9, 'max_mana': 2.5, 'attack': 1.6, 'defense': 0.9, 'initiative': 0.9, 'luck': 1.1},
+        'file_id_name': 'classe_mago_media',
+        'tier': 1,
+        'is_special': True,
+    },
     
     # ========================= BARDO =========================
     'bardo': {
@@ -269,6 +277,7 @@ CLASS_PRIMARY_DAMAGE = {
     "assassino": {"stat_key": "letalidade",  "type": "perfuracao", "scales_with": "letalidade"},
     "monge":     {"stat_key": "foco",        "type": "impacto",    "scales_with": "foco"},
     "mago":      {"stat_key": "inteligencia","type": "arcano",     "scales_with": "inteligencia"},
+    "necromante":{"stat_key": "inteligencia","type": "arcano",     "scales_with": "inteligencia"},
     "bardo":     {"stat_key": "carisma",     "type": "sonoro",     "scales_with": "carisma"},
     "berserker": {"stat_key": "furia",       "type": "impacto",    "scales_with": "furia"},
     "cacador":   {"stat_key": "precisao",    "type": "perfuracao", "scales_with": "precisao"},
@@ -281,6 +290,7 @@ CLASS_DMG_EMOJI = {
     "cacador": "🏹",
     "monge": "🧘",
     "mago": "🪄",
+    "necromante": "💀",
     "bardo": "🎶",
     "assassino": "🔪",
     "samurai": "🥷",
@@ -296,6 +306,10 @@ CLASS_AVATARS_BOT = {
     "aventureiro": {
         "masculino": "https://github.com/user-attachments/assets/44a0ced3-7e87-4792-8b89-1500442d45c8",
         "feminino": "https://github.com/user-attachments/assets/43cf1251-7902-4a0b-a4e2-b34a1b95ed7a"
+    },
+    "necromante": {
+        "masculino": "https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/avatares/avatar_necromante_m.png",
+        "feminino": "https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/avatares/avatar_necromante_f.png"
     },
     
 }
@@ -384,6 +398,10 @@ CLASS_AVATARS_WEB = {
     "mago": {
         "masculino": "https://github.com/user-attachments/assets/0acf0255-e003-4dc2-86ec-26513a574c7c",
         "feminino": "https://github.com/user-attachments/assets/9ca00492-0551-45af-b4fd-0b40e963b695"
+    },
+    "necromante": {
+        "masculino": "https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/avatares/avatar_necromante_m.png",
+        "feminino": "https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/avatares/avatar_necromante_f.png"
     },
     "feiticeiro": {
         "masculino": "https://github.com/seulink/aventureiro_masculino.png",

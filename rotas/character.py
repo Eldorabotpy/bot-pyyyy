@@ -132,7 +132,8 @@ def obter_personagem_info(personagem_id):
                 "berserker": "berserker_golpe_selvagem",
                 "samurai": "samurai_corte_iaijutsu",
                 "monge": "monge_rajada_de_punhos",
-                "bardo": "bardo_nota_cortante"
+                "bardo": "bardo_nota_cortante",
+                "necromante": "necromante_levantar_esqueletos"
             }
             id_certo = SKILL_INICIAL.get(classe_atual, "ataque_basico")
             skills_certas[id_certo] = {"unlocked": True, "rarity": "comum"}
@@ -262,92 +263,13 @@ def api_equipar_skill():
     
 @character_bp.route('/api/npc/missao/grimorio', methods=['POST'])
 def api_missao_grimorio():
-    from bson import ObjectId
-    from flask import request, jsonify
-    from modules.player.core import users_collection
+    # Rota legada desativada: concluir o Grimório agora passa pelo registro
+    # oficial de Selene, que valida a sequência completa da missão.
+    return jsonify({
+        "sucesso": False,
+        "erro": "Use a entrega oficial da missão com a Arquimaga Selene."
+    }), 410
 
-    try:
-        dados = request.json
-        user_id = dados.get("user_id")
-
-        jogador = users_collection.find_one({"_id": ObjectId(user_id)})
-        if not jogador:
-            return jsonify({"sucesso": False, "erro": "Jogador não encontrado."})
-
-        # Trava de Segurança: Nível
-        if jogador.get("level", 1) < 17:
-            return jsonify({"sucesso": False, "erro": "Sua alma ainda é fraca. Volte no Nível 17."})
-
-        inv = jogador.get("inventory", {})
-
-        def pegar_qtd(item_id):
-            item = inv.get(item_id)
-            if item is None: return 0 # Blindagem anti-erro
-            if isinstance(item, dict): return int(item.get("quantity", 0))
-            return int(item)
-
-        # ✨ CORREÇÃO CRÍTICA: ID igual ao do seu banco de dados (JSON)
-        qtd_ecto = pegar_qtd("ectoplasma")
-        qtd_couro = pegar_qtd("couro_de_lobo_alfa") 
-
-        if qtd_ecto < 15 or qtd_couro < 30:
-            return jsonify({"sucesso": False, "erro": f"Faltam reagentes! Você possui {qtd_ecto}/15 Ectoplasmas e {qtd_couro}/30 Couros de Lobo Alfa."})
-
-        # Consome os itens com segurança
-        def reduzir_qtd(item_id, valor):
-            item_atual = inv.get(item_id)
-            if item_atual is None: return
-            if isinstance(item_atual, dict):
-                qtd_num = int(item_atual.get("quantity", 0))
-                if qtd_num <= valor: del inv[item_id]
-                else: inv[item_id]["quantity"] = qtd_num - valor
-            else:
-                if int(item_atual) <= valor: del inv[item_id]
-                else: inv[item_id] -= valor
-
-        reduzir_qtd("ectoplasma", 15)
-        reduzir_qtd("couro_de_lobo_alfa", 30)
-
-        # IDs EXATOS do seu skills.py
-        SKILL_INICIAL = {
-            "guerreiro": "guerreiro_corte_perfurante",
-            "mago": "mago_bola_de_fogo",
-            "assassino": "assassino_ataque_furtivo",
-            "cacador": "cacador_flecha_precisa",
-            "curandeiro": "curandeiro_chama_sagrada",
-            "berserker": "berserker_golpe_selvagem",
-            "samurai": "samurai_corte_iaijutsu",
-            "monge": "monge_rajada_de_punhos",
-            "bardo": "bardo_nota_cortante"
-        }
-
-        classe_atual = jogador.get("class", "aventureiro").lower()
-        id_skill_ganha = SKILL_INICIAL.get(classe_atual, "ataque_basico")
-
-        # 🛠️ CORREÇÃO DO MONGODB: Transforma a lista vazia [] em dicionário {}
-        skills_atuais = jogador.get("skills", {})
-        if isinstance(skills_atuais, list):
-            skills_atuais = {} # Converte para o formato certo
-            
-        skills_atuais[id_skill_ganha] = {"unlocked": True, "rarity": "comum"}
-
-        # Injeta a habilidade no Grimório e conclui a quest
-        users_collection.update_one(
-            {"_id": ObjectId(user_id)},
-            {
-                "$set": {
-                    "inventory": inv,
-                    "skills": skills_atuais, # 👈 Agora enviamos a gaveta completa consertada
-                    "quests.q6_selene_grimorio.status": "resgatada"
-                }
-            }
-        )
-
-        return jsonify({"sucesso": True, "skill_ganha": id_skill_ganha})
-
-    except Exception as e:
-        return jsonify({"sucesso": False, "erro": str(e)})
-          
 @character_bp.route('/api/save_position', methods=['POST'])
 def save_position():
     try:

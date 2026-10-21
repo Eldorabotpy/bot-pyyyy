@@ -2402,7 +2402,9 @@ window.toggleDiarioQuests = async function() {
 
             "q6_selene_grimorio",
 
-            "q7_selene_guildas"
+            "q7_selene_guildas",
+
+            "q8_selene_eco_das_catacumbas"
         ];
 
 

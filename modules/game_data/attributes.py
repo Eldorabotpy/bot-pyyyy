@@ -43,6 +43,7 @@ AFFIX_POOLS = {
     # Pools de classe
     "guerreiro": ["forca"],
     "mago": ["inteligencia"],
+    "necromante": ["inteligencia"],
     "berserker": ["furia"],
     "cacador": ["precisao"],
     "assassino": ["letalidade"],

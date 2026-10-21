@@ -1365,4 +1365,15 @@ EQUIPMENTS_DATA = {
         "media_key": "item_elmo_aventureiro_guilda",
         "icon_url": "",
     },
+
+    # -- NECROMANTE T1: VIGÍLIA DAS ALMAS --
+    "cajado_vigilia_necromante": {"display_name": "Cajado da Vigília", "emoji": "🪄", "slot": "arma", "type": "equipamento", "category": "arma", "description": "Cajado de madeira marcado por ecos espirituais.", "stackable": False, "icon_url": "", "class_req": ["necromante"]},
+    "capuz_vigilia_necromante": {"display_name": "Capuz da Vigília", "emoji": "🧢", "slot": "elmo", "type": "equipamento", "category": "armadura", "description": "Capuz leve usado para ouvir os ecos das almas.", "stackable": False, "icon_url": "", "class_req": ["necromante"]},
+    "veste_vigilia_necromante": {"display_name": "Veste da Vigília", "emoji": "🥼", "slot": "armadura", "type": "equipamento", "category": "armadura", "description": "Veste de linho reforçada com fibras resistentes.", "stackable": False, "icon_url": "", "class_req": ["necromante"]},
+    "calcas_vigilia_necromante": {"display_name": "Calças da Vigília", "emoji": "👖", "slot": "calca", "type": "equipamento", "category": "armadura", "description": "Calças flexíveis para atravessar as catacumbas.", "stackable": False, "icon_url": "", "class_req": ["necromante"]},
+    "botas_vigilia_necromante": {"display_name": "Botas da Vigília", "emoji": "🥾", "slot": "botas", "type": "equipamento", "category": "armadura", "description": "Botas firmes para caminhar entre ruínas e túmulos.", "stackable": False, "icon_url": "", "class_req": ["necromante"]},
+    "luvas_vigilia_necromante": {"display_name": "Luvas da Vigília", "emoji": "🧤", "slot": "luvas", "type": "equipamento", "category": "armadura", "description": "Luvas que protegem as mãos durante os rituais.", "stackable": False, "icon_url": "", "class_req": ["necromante"]},
+    "anel_vigilia_necromante": {"display_name": "Anel da Vigília", "emoji": "💍", "slot": "anel", "type": "equipamento", "category": "acessorio", "description": "Anel de prata que ancora um fragmento de energia espiritual.", "stackable": False, "icon_url": "", "class_req": ["necromante"]},
+    "colar_vigilia_necromante": {"display_name": "Colar da Vigília", "emoji": "📿", "slot": "colar", "type": "equipamento", "category": "acessorio", "description": "Amuleto simples para manter o vínculo sob controle.", "stackable": False, "icon_url": "", "class_req": ["necromante"]},
+    "brinco_vigilia_necromante": {"display_name": "Brinco da Vigília", "emoji": "🧿", "slot": "brinco", "type": "equipamento", "category": "acessorio", "description": "Pequena gema que retém um eco das catacumbas.", "stackable": False, "icon_url": "", "class_req": ["necromante"]},
 }

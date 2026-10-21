@@ -438,6 +438,13 @@ def completar_quest():
         data = request.json
         uid = data.get('user_id')
         qid = data.get('quest_id')
+
+        from modules.missoes import QUESTS_DATA
+        if qid in QUESTS_DATA:
+            return jsonify({
+                "sucesso": False,
+                "erro": "Esta missão deve ser entregue pelo registro oficial do NPC, que valida nível, pré-requisitos e objetivos."
+            }), 400
         
         player = users_collection.find_one({"_id": ObjectId(uid)})
         
@@ -468,6 +475,13 @@ def iniciar_quest():
         uid = data.get('user_id')
         qid = data.get('quest_id')
         qdata = data.get('quest_data')
+
+        from modules.missoes import QUESTS_DATA
+        if qid in QUESTS_DATA:
+            return jsonify({
+                "sucesso": False,
+                "erro": "Esta missão deve ser aceita pelo registro oficial do NPC."
+            }), 400
 
         if not uid or not qid or not qdata:
             return jsonify({"sucesso": False, "erro": "Dados incompletos enviados ao servidor."}), 400
@@ -502,10 +516,40 @@ def escolher_classe():
             return jsonify({"sucesso": False, "erro": "Você precisa do Nível 5 para o ritual!"})
 
         from modules.game_data.classes import CLASSES_DATA, get_class_avatar
+        nova_classe = str(nova_classe or "").strip().lower()
         dados_classe = CLASSES_DATA.get(nova_classe)
 
         if not dados_classe:
             return jsonify({"sucesso": False, "erro": "Esta classe não existe nos pergaminhos."})
+
+        classe_atual = str(
+            player.get("class_key") or player.get("class") or player.get("classe") or "aventureiro"
+        ).strip().lower()
+        classe_inicial = classe_atual in ("", "aventureiro", "aprendiz")
+        jornada = player.get("quests", {}) or {}
+        if (jornada.get("q3_varek_provacao", {}) or {}).get("status") != "resgatada":
+            return jsonify({"sucesso": False, "erro": "Conclua a provação da caravana antes do despertar da classe."}), 403
+        if nova_classe != "necromante" and not classe_inicial:
+            return jsonify({"sucesso": False, "erro": "Seu despertar de classe já foi concluído."}), 409
+
+        if nova_classe == "necromante":
+            quests = player.get("quests", {}) or {}
+            caravana = quests.get("q3_varek_provacao", {}) or {}
+            caminho_revelado = (
+                caravana.get("status") == "resgatada"
+                and caravana.get("decisao_alma") == "escutar"
+                and caravana.get("decisao_foco") == "acolher"
+            )
+            caminho_epico = (
+                (quests.get("q8_selene_eco_das_catacumbas", {}) or {}).get("status") == "resgatada"
+            )
+            if classe_atual == "necromante":
+                return jsonify({"sucesso": False, "erro": "Você já despertou como Necromante."}), 409
+            if not caminho_epico and not (caminho_revelado and classe_inicial):
+                return jsonify({
+                    "sucesso": False,
+                    "erro": "Conclua o ritual de Selene ou revele a Centelha na jornada da caravana para despertar como Necromante."
+                }), 403
 
         mods = dados_classe.get("stat_modifiers", {})
         level_atual = player.get("level", 5)
@@ -523,22 +567,38 @@ def escolher_classe():
         nova_skin_id = f"{nova_classe}_{genero_curto}"
         novo_avatar_id = f"{nova_classe}_{genero_curto}"
 
+        atualizacao_classe = {
+            "class": nova_classe,
+            "class_key": nova_classe,
+            "skin": nova_skin,
+            "avatar": novo_avatar_url,
+            "equipped_skin": nova_skin_id,
+            "avatar_customizado": novo_avatar_id,
+            "max_hp": novo_max_hp,
+            "current_hp": novo_max_hp,
+            "max_mana": novo_max_mp,
+            "current_mp": novo_max_mp,
+            "quests.q4_selene_classe.status": "resgatada",
+        }
+
+        # Quem desperta pelo ritual tardio já concluiu q6 com outra classe.
+        # Entregue a habilidade inicial do Necromante nesse caminho também.
+        if nova_classe == "necromante" and caminho_epico:
+            habilidade_necromante = {
+                "unlocked": True,
+                "rarity": "comum",
+                "level": 1,
+            }
+            for campo_skill in ("skills", "skills_desbloqueadas", "database_skills"):
+                habilidades = player.get(campo_skill, {})
+                habilidades = dict(habilidades) if isinstance(habilidades, dict) else {}
+                habilidades.setdefault("necromante_levantar_esqueletos", habilidade_necromante)
+                atualizacao_classe[campo_skill] = habilidades
+
         users_collection.update_one(
             {"_id": ObjectId(user_id)},
             {
-                "$set": {
-                    "class": nova_classe,
-                    "skin": nova_skin,         
-                    "avatar": novo_avatar_url, 
-                    # 👇 2. FORÇA A TROCA NO SISTEMA DE COSMÉTICOS 👇
-                    "equipped_skin": nova_skin_id,        
-                    "avatar_customizado": novo_avatar_id, 
-                    "max_hp": novo_max_hp,
-                    "current_hp": novo_max_hp, 
-                    "max_mana": novo_max_mp,
-                    "current_mp": novo_max_mp,
-                    "quests.q4_selene_classe.status": "resgatada"
-                },
+                "$set": atualizacao_classe,
                 # 👇 3. DESBLOQUEIA PARA SEMPRE NO GUARDA-ROUPA 👇
                 "$addToSet": {
                     "unlocked_skins": nova_skin_id,

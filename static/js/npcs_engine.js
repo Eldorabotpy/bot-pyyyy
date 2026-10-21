@@ -158,122 +158,23 @@ class NPCsEngine {
                     }
                     return;
                 }
-                
+
                 // ===============================================
-                // 🔮 ARQUIMAGA SELENE: Mestra das Artes Arcanas
-                // ===============================================
+                // Selene consulta o mesmo motor de missões usado por Varek.
+                // O servidor decide a etapa elegível e valida nível, pré-requisitos,
+                // abates e materiais antes de liberar qualquer avanço.
                 if (npcId.includes('selene')) {
-                    if (!p.quests["q3_varek_provacao"] || p.quests["q3_varek_provacao"].status !== 'resgatada') {
-                        window.mostrarDialogoRPG("Arquimaga Selene", "Sinto potencial em ti, mas o Capitão Varek ainda não atestou o teu valor. Retorne aos arredores da cidade.");
-                        return;
-                    }
-
-                    let classeAtual =
-                        p.class_key ||
-                        p.class ||
-                        p.classe ||
-                        "aventureiro";
-
-                    let jaTemClasse = (classeAtual.toLowerCase() !== 'aventureiro' && classeAtual.toLowerCase() !== 'aprendiz');
-                    
-                    if (!jaTemClasse || !p.quests["q4_selene_classe"] || p.quests["q4_selene_classe"].status !== 'resgatada') {
-                        let acaoDaSelene = jaTemClasse ? null : "abrir_menu_classes";
-                        const provacaoCaravana = p.quests["q3_varek_provacao"] || {};
-                        const necromanteRevelado = provacaoCaravana.decisao_alma === 'escutar'
-                            && provacaoCaravana.decisao_foco === 'acolher';
-                        const falaDespertar = necromanteRevelado
-                            ? "Sua alma arde... e há outra voz dentro da Centelha. Selene vê a silhueta do guardião da estrada atrás de você: ‘Ele nos ouviu e não nos abandonou’. A Arquimaga reconhece em você a ressonância do Necromante. As outras classes continuam à sua escolha."
-                            : "Sua alma arde... Escolha seu caminho. Por um instante, Selene também escuta o eco que o acompanhou na estrada, mas ele ainda não encontrou forma. O poder o aguarda: escolha com sabedoria, pois sua alma será moldada por este caminho.";
-                        window.interagirComNPC(
-                            "q4_selene_classe", "Arquimaga Selene", 
-                            falaDespertar, 
-                            "A aura ainda oscila... Volte no Nível 5.", 
-                            "Sua alma está pronta. Agora, vá e aprenda um ofício com o Mestre Thorek antes de prosseguirmos.", 
-                            5, acaoDaSelene
+                    if (window.motorMissoesNPC?.interagir) {
+                        window.motorMissoesNPC.interagir(
+                            'selene_arquimaga',
+                            'Arquimaga Selene',
+                            'https://raw.githubusercontent.com/Eldorabotpy/static-img/refs/heads/main/assets/classes/npc_selene.png'
                         );
-                        return;
+                    } else {
+                        window.mostrarDialogoRPG('Arquimaga Selene', 'Os registros da jornada ainda estão sendo preparados. Tente novamente em instantes.');
                     }
-
-                    let fezThorek = p.quests["q5_thorek_profissao"] && p.quests["q5_thorek_profissao"].status === 'resgatada';
-                    if (!fezThorek) {
-                        window.mostrarDialogoRPG("Arquimaga Selene", "Mãos macias não conseguem segurar o conhecimento arcano. Vá falar com Thorek na capital e consiga um ofício primeiro.");
-                        return;
-                    }
-
-                    if (!p.quests["q6_selene_grimorio"] || p.quests["q6_selene_grimorio"].status !== 'resgatada') {
-                        window.interagirComNPC(
-                            "q6_selene_grimorio", "Arquimaga Selene", 
-                            "A centelha brilha em ti! É o momento de romper os selos do seu Grimório. Mas o conhecimento exige tributo: traga-me 15 Ectoplasmas e 30 Couros de Lobo Alfa. Além disso, seu corpo precisa da têmpera do Nível 17.", 
-                            "A tua aura vacila... Volta quando fores Nível 17 e tiveres os 15 Ectoplasmas e 30 Couros de Lobo Alfa!", 
-                            "Sente o poder! Os antigos selos foram estraçalhados. A tua primeira habilidade de classe foi gravada na tua alma. Use-a com sabedoria!", 
-                            17, "abrir_menu_magias"
-                        );
-                        return;
-                    }
-
-                    // =====================================================
-                    // 🏰 Q7 — O RECONHECIMENTO DA CAPITAL
-                    // =====================================================
-
-                    const q7Guilda =
-                        p.quests["q7_selene_guildas"];
-
-                    if (
-                        !q7Guilda ||
-                        q7Guilda.status !== 'resgatada'
-                    ) {
-
-                        // Ainda não atingiu o nível necessário.
-                        if (p.level < 20) {
-
-                            window.mostrarDialogoRPG(
-                                "Arquimaga Selene",
-                                "O Grimório respondeu ao seu chamado, mas poder recém-desperto é instável. Treine, fortaleça seu corpo e retorne quando alcançar o Nível 20. Então decidirei se está pronto para carregar o nome de Eldora diante da Guilda dos Aventureiros."
-                            );
-
-                            return;
-                        }
-
-                        // =================================================
-                        // 📜 ABRE A MISSÃO OFICIAL Q7
-                        // =================================================
-
-                        if (
-                            window.motorMissoesNPC &&
-                            typeof window.motorMissoesNPC.interagir === 'function'
-                        ) {
-
-                            const rostoSelene =
-                                "https://raw.githubusercontent.com/Eldorabotpy/static-img/refs/heads/main/assets/npcs/npc_selene_rosto.png";
-
-                            window.motorMissoesNPC.interagir(
-                                "selene_arquimaga",
-                                "Arquimaga Selene",
-                                rostoSelene
-                            );
-
-                            return;
-                        }
-
-                        // Fallback caso a interface de missão não esteja carregada.
-                        window.mostrarDialogoRPG(
-                            "Arquimaga Selene",
-                            "Seu treinamento chegou ao momento decisivo. Há uma prova que deve cumprir antes que eu possa recomendá-lo à Guilda dos Aventureiros."
-                        );
-
-                        return;
-                    }
-
-                    // =====================================================
-                    // ✅ Q7 JÁ CONCLUÍDA
-                    // =====================================================
-
-                    window.mostrarDialogoRPG(
-                        "Arquimaga Selene",
-                        "Você conquistou meu reconhecimento. A Carta de Recomendação leva meu selo e confirma seu valor perante a Capital. Apresente-se agora à Guilda dos Aventureiros. A partir daqui, sua jornada deixa de ser apenas sobrevivência."
-                    );
+                    return;
                 }
-                // ===============================================
                 // 🧠 LÓGICA INTELIGENTE DOS MESTRES DE GUILDA
                 // ===============================================
                 const interagirMestre = (idMestre, nomeMestre, falaAprender, falaSeuMestre, falaOutraGuilda) => {
@@ -338,13 +239,16 @@ class NPCsEngine {
                         return;
                     }
                     if (!p.quests["q5_thorek_profissao"] || p.quests["q5_thorek_profissao"].status !== 'resgatada') {
-                        window.interagirComNPC(
-                            "q5_thorek_profissao", "Mestre-Artesão Thorek", 
-                            "Magia e fúria não bastam se sua armadura for de papel. Fale comigo e eu te darei uma Licença de Guilda.",
-                            "Ainda não tem calos nas mãos suficientes. Volte no Nível 7.",
-                            "Finalmente. Aqui está sua Licença de Guilda. Eu ensino Ferreiro e Armeiro. Se quiser dominar a natureza, procure os outros mestres nos mapas!",
-                            7, "abrir_menu_profissoes"
-                        );
+                        if (window.motorMissoesNPC?.interagir) {
+                            window.motorMissoesNPC.interagir(
+                                'thorek_mestre',
+                                'Mestre-Artesão Thorek',
+                                'https://raw.githubusercontent.com/Eldorabotpy/static-img/refs/heads/main/assets/classes/npc_thorek.png'
+                            );
+                        } else {
+                            window.mostrarDialogoRPG('Mestre-Artesão Thorek', 'Os registros da guilda ainda estão sendo preparados. Tente novamente em instantes.');
+                        }
+                        return;
                     } else {
                         interagirMestre('thorek', "Mestre-Artesão Thorek", 
                             "A forja aguarda. Quer aprender a moldar o metal?",
@@ -453,9 +357,9 @@ window.interagirComNPC = async function(idMissao, nomeNPC, falaInicial, falaInco
         const questAtual = p.quests[idMissao];
 
         const executarAcaoEspecial = () => {
-            if (acaoEspecial === 'abrir_menu_classes') {
+            if (acaoEspecial === 'abrir_menu_classes' || acaoEspecial === 'abrir_menu_classes_necromante') {
                 if (typeof window.abrirModalClasses === 'function') {
-                    window.abrirModalClasses();
+                    window.abrirModalClasses(acaoEspecial === 'abrir_menu_classes_necromante');
                 }
             } 
             // 🔨 CORREÇÃO DO THOREK (Profissões)
@@ -573,16 +477,23 @@ window.interagirComNPC = async function(idMissao, nomeNPC, falaInicial, falaInco
 // SISTEMA DE ESCOLHA DE CLASSES (ARQUIMAGA SELENE)
 // ==========================================
 
-window.abrirModalClasses = function() {
+window.abrirModalClasses = function(necromanteRevelado = false) {
     // Se já existe, apenas mostra e garante que volta para a tela inicial de grade
-    if (document.getElementById('modal-escolha-classe')) {
-        document.getElementById('modal-escolha-classe').style.display = 'flex';
+    const modalExistente = document.getElementById('modal-escolha-classe');
+    if (modalExistente && !necromanteRevelado) {
+        modalExistente.style.display = 'flex';
         if (typeof window.voltarGradeClasses === 'function') window.voltarGradeClasses();
         return;
     }
+    if (modalExistente) {
+        modalExistente.remove();
+        document.getElementById('estilo-modal-escolha-classe')?.remove();
+    }
+
+    const rotaNecromanteEpica = window.perfilDadosGlobais?.quests?.q8_selene_eco_das_catacumbas?.status === 'resgatada';
 
     const estiloRPG = `
-        <style>
+        <style id="estilo-modal-escolha-classe">
             #modal-escolha-classe * { box-sizing: border-box; }
             .classe-btn {
                 background: linear-gradient(180deg, rgba(30,41,59,0.9) 0%, rgba(15,23,42,0.9) 100%);
@@ -594,6 +505,8 @@ window.abrirModalClasses = function() {
                 transform: translateY(-3px) scale(1.02); border-color: var(--cor-classe, #facc15);
                 box-shadow: 0 0 15px var(--cor-classe, #facc15); color: #fff;
             }
+            .classe-btn-necromante { border-color: rgba(192,132,252,0.75); background: linear-gradient(180deg, rgba(53,35,79,0.96), rgba(15,23,42,0.96)); }
+            .classe-selo-necromante { color: #e9d5ff; font: 700 0.58em Arial,sans-serif; margin-top: 5px; text-align: center; }
             .classe-nome { 
                 font-size: 0.8em; font-weight: 900; font-family: 'Cinzel', serif; 
                 letter-spacing: 0.5px; text-transform: uppercase; margin-top: 8px; text-align: center;
@@ -634,6 +547,18 @@ window.abrirModalClasses = function() {
         { id: 'monge', nome: 'Monge', cor: '#f97316', desc: 'Lutadores espirituais que combinam artes marciais fluídas com energia vital interior.' },
         { id: 'bardo', nome: 'Bardo', cor: '#ec4899', desc: 'Inspiram aliados com melodias mágicas, concedendo vantagens e fortalecendo o grupo.' }
     ];
+    if (rotaNecromanteEpica) {
+        classes.length = 0;
+        classes.push({
+            id: 'necromante', nome: 'Necromante', cor: '#c084fc',
+            desc: 'O ritual das Catacumbas permite trocar sua classe atual pelo caminho do Necromante.'
+        });
+    } else if (necromanteRevelado) {
+        classes.push({
+            id: 'necromante', nome: 'Necromante', cor: '#c084fc',
+            desc: 'Canaliza energia arcana e estabelece vínculos com as almas que ainda não encontraram descanso.'
+        });
+    }
 
     window.dadosClassesEldora = classes;
     window.classeSelecionadaEldora = null;
@@ -645,11 +570,12 @@ window.abrirModalClasses = function() {
     let botoesHtml = classes.map(c => {
         let urlIconeRosto = `${LINK_GITHUB_ROSTOS}${c.id}${sufixo}.png`;
         return `
-        <button class="classe-btn" style="--cor-classe: ${c.cor};" onclick="window.selecionarClasseNaUI('${c.id}')">
+        <button class="classe-btn${c.id === 'necromante' ? ' classe-btn-necromante' : ''}" style="--cor-classe: ${c.cor};" onclick="window.selecionarClasseNaUI('${c.id}')">
             <img src="${urlIconeRosto}" alt="${c.nome}" 
                  style="width: 60px; height: 60px; object-fit: contain; object-position: center; display: block; filter: drop-shadow(0 3px 3px rgba(0,0,0,0.8));" 
                  onerror="this.src='https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/avatares/avatar_padrao_m.png'">
             <span class="classe-nome" style="color: ${c.cor}">${c.nome}</span>
+                    ${c.id === 'necromante' ? `<span class="classe-selo-necromante">${rotaNecromanteEpica ? 'RITUAL CONCLUÍDO' : 'CAMINHO REVELADO'}</span>` : ''}
         </button>
         `;
     }).join('');
@@ -664,7 +590,7 @@ window.abrirModalClasses = function() {
                 <!-- ============================== -->
                 <div id="tela-grade-classes" class="fade-in" style="display: flex; flex-direction: column; width: 100%;">
                     <h2 style="color: #facc15; font-family: 'Cinzel', serif; margin: 0 0 5px 0; text-align: center; font-size: 1.8em; text-shadow: 1px 1px 2px #000;">O Despertar da Alma</h2>
-                    <p style="color: #cbd5e1; font-size: 0.9em; text-align: center; margin-bottom: 20px;">Qual caminho guiará seu destino?</p>
+                    <p style="color: #cbd5e1; font-size: 0.9em; text-align: center; margin-bottom: 20px;">${rotaNecromanteEpica ? 'O ritual das Catacumbas revelou um novo caminho. Você pode abraçar a Centelha do Necromante.' : necromanteRevelado ? 'A jornada revelou um caminho raro. Qual destino você escolhe?' : 'Qual caminho guiará seu destino?'}</p>
                     
                     <div id="grid-classes" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; max-height: 50vh; overflow-y: auto; padding: 5px;">
                         ${botoesHtml}
@@ -745,6 +671,8 @@ window.selecionarClasseNaUI = function(classeId) {
 window.dispararConfirmacao = function() {
     const classe = window.classeSelecionadaEldora;
     if (!classe) return;
+    const ritualNecromanteEpico = window.perfilDadosGlobais?.quests?.q8_selene_eco_das_catacumbas?.status === 'resgatada'
+        && classe.id === 'necromante';
 
     // Cria um modal de confirmação estilo RPG (sem usar o alert do navegador!)
     let modalConfirm = document.getElementById('modal-confirm-rpg');
@@ -757,8 +685,8 @@ window.dispararConfirmacao = function() {
 
     modalConfirm.innerHTML = `
         <div style="background: linear-gradient(145deg, #0f172a, #1e293b); border: 2px solid #ca8a04; border-radius: 12px; padding: 30px; text-align: center; max-width: 400px; box-shadow: 0 0 30px rgba(202, 138, 4, 0.4);">
-            <h3 style="color: #ef4444; font-family: 'Cinzel', serif; font-size: 1.5em; margin-top: 0; text-shadow: 2px 2px 4px #000;">Caminho Sem Volta</h3>
-            <p style="color: #cbd5e1; font-size: 1.1em; margin-bottom: 25px; line-height: 1.5;">Tem certeza que deseja abraçar o caminho do <strong style="color: ${classe.cor}; text-transform: uppercase;">${classe.nome}</strong>?<br><br>Esta escolha moldará seus atributos para sempre!</p>
+            <h3 style="color: ${ritualNecromanteEpico ? '#c084fc' : '#ef4444'}; font-family: 'Cinzel', serif; font-size: 1.5em; margin-top: 0; text-shadow: 2px 2px 4px #000;">${ritualNecromanteEpico ? 'Ritual das Almas' : 'Caminho Sem Volta'}</h3>
+            <p style="color: #cbd5e1; font-size: 1.1em; margin-bottom: 25px; line-height: 1.5;">${ritualNecromanteEpico ? 'O ritual permitirá trocar sua classe atual pelo caminho do ' : 'Tem certeza que deseja abraçar o caminho do '}<strong style="color: ${classe.cor}; text-transform: uppercase;">${classe.nome}</strong>?<br><br>${ritualNecromanteEpico ? 'Seus atributos e aparência serão recalculados para a nova classe.' : 'Esta escolha moldará seus atributos para sempre!'}</p>
             <div style="display: flex; gap: 15px; justify-content: center;">
                 <button onclick="document.getElementById('modal-confirm-rpg').style.display='none'" style="padding: 10px 20px; background: #334155; border: 1px solid #64748b; color: #f8fafc; border-radius: 6px; cursor: pointer; font-weight: bold; flex: 1; font-family: 'Cinzel', serif;">Repensar</button>
                 <button onclick="window.executarEscolhaClasse('${classe.id}', '${classe.nome}')" style="padding: 10px 20px; background: linear-gradient(180deg, #10b981, #059669); border: 1px solid #047857; color: white; border-radius: 6px; cursor: pointer; font-weight: bold; flex: 1; box-shadow: 0 4px 6px rgba(0,0,0,0.5); font-family: 'Cinzel', serif;">Aceitar Destino</button>
