@@ -68,7 +68,9 @@ function mercadoIsolarEventos(modal) {
             if (evento === 'click') {
                 const lista = document.getElementById('lista-dropdown-venda');
                 const botao = document.getElementById('btn-dropdown-venda');
-                if (lista && !lista.contains(e.target) && !botao?.contains(e.target)) lista.style.display = 'none';
+                const caminhoOriginal = e.composedPath?.() || [];
+                const cliqueDentroDaLista = lista && (caminhoOriginal.includes(lista) || lista.contains(e.target));
+                if (lista && !cliqueDentroDaLista && !botao?.contains(e.target)) lista.style.display = 'none';
             }
             e.stopPropagation();
         });
