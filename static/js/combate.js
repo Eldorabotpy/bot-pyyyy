@@ -312,6 +312,37 @@ async function avisarProntoCombateGrupo() {
 // ==========================================
 // INICIAR COMBATE (DOM MANIPULATION) 
 // ==========================================
+const imagensMobEmPreload = new Map();
+
+function preloadImagemCombate(url) {
+    if (!url) return Promise.reject(new Error("URL de imagem ausente."));
+    if (imagensMobEmPreload.has(url)) return imagensMobEmPreload.get(url);
+
+    const carregamento = new Promise((resolve, reject) => {
+        const imagem = new Image();
+        const timeout = setTimeout(() => {
+            imagem.src = "";
+            reject(new Error("Tempo limite ao carregar a imagem do mob."));
+        }, 15000);
+
+        imagem.onload = () => {
+            clearTimeout(timeout);
+            if (imagem.naturalWidth > 0) resolve(true);
+            else reject(new Error("A imagem carregada está vazia."));
+        };
+        imagem.onerror = () => {
+            clearTimeout(timeout);
+            reject(new Error("Falha ao carregar a imagem do mob."));
+        };
+        imagem.src = url;
+    });
+
+    imagensMobEmPreload.set(url, carregamento);
+    carregamento.catch(() => imagensMobEmPreload.delete(url));
+    return carregamento;
+}
+window.preloadImagemCombate = preloadImagemCombate;
+
 window.iniciarCacadaApp = async function(spawnId, opcoesGrupo = {}) {
     await window.fecharOficinaRunasParaCombate?.();
     // ==========================================
@@ -419,6 +450,22 @@ window.iniciarCacadaApp = async function(spawnId, opcoesGrupo = {}) {
         if (partyHud) partyHud.style.display = 'none';
 
         document.getElementById('combate-arena').style.display = 'none';
+
+        const mobInicial = opcoesGrupo.mobData || {};
+        const ehCaravana = mobInicial.quest_event_id === 'q3_varek_provacao';
+        if (ehCaravana) {
+            const idMob = mobInicial.monster_id || 'goblin_batedor';
+            const pastaMob = mobInicial.asset_region || 'floresta';
+            const imagemEvento = `https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/mob/combate/${pastaMob}/${idMob}.png`;
+            try {
+                await preloadImagemCombate(imagemEvento);
+            } catch (erroImagem) {
+                console.warn("Não foi possível preparar a imagem do evento da caravana:", erroImagem);
+                window.avisoEldora("A imagem do Goblin Batedor não carregou. O combate não foi iniciado; tente novamente quando a conexão estiver estável.");
+                if (typeof sairDaArena === 'function') sairDaArena(true);
+                return;
+            }
+        }
         
         const charId = localStorage.getItem("jogadorEldoraID");
         if (!charId) {

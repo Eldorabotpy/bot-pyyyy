@@ -740,6 +740,10 @@ def iniciar_combate():
         eh_evento_dungeon = is_dungeon_event_mob(
             mob_vivo
         )
+        eh_evento_caravana = bool(
+            mob_vivo
+            and mob_vivo.get("quest_event_id") == "q3_varek_provacao"
+        )
 
         # O Mímico criado pelo puzzle pertence somente
         # ao jogador que despertou aquele encontro.
@@ -920,6 +924,7 @@ def iniciar_combate():
         if (
             eh_evento_dungeon
             or eh_boss_dungeon
+            or eh_evento_caravana
         ):
             nivel_conhecimento = 3
 
@@ -938,7 +943,11 @@ def iniciar_combate():
         lvl_mob_tela = mob_level_final if nivel_conhecimento > 0 else "??"
 
         pastas_github = {"capital_eldora": "capital", "pradaria_inicial": "pradaria", "floresta_sombria": "floresta", "pedreira_granito": "pedreira"}
-        nome_da_pasta = pastas_github.get(regiao_atual, regiao_atual)
+        nome_da_pasta = (
+            "floresta"
+            if eh_evento_caravana
+            else pastas_github.get(regiao_atual, regiao_atual)
+        )
         link_imagem_monstro = f"https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/mob/combate/{nome_da_pasta}/{mob_data.get('id')}.png"
         
         # Estado final enviado para o combate.js
@@ -951,6 +960,7 @@ def iniciar_combate():
             # 🏰 EVENTO ESPECIAL DE DUNGEON
             # ==========================================
             "evento_dungeon": eh_evento_dungeon,
+            "evento_caravana": eh_evento_caravana,
 
             # ==========================================
             # 👑 IDENTIFICAÇÃO DO BOSS

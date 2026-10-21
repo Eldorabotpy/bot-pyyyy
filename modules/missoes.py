@@ -673,7 +673,8 @@ def aceitar_missao(
         dados_missao["abates_evento"] = 0
         dados_missao["abates_evento_registrados"] = []
         dados_missao["tentativa_evento"] = 1
-        dados_missao["caravana_integridade"] = 100
+        dados_missao["caravana_integridade"] = 300
+        dados_missao["caravana_vida_maxima"] = 300
         dados_missao["event_spawn_ids"] = [
             f"q3_caravana_{user_id}_1_{indice}"
             for indice in range(1, abates_evento_necessarios + 1)
@@ -789,7 +790,7 @@ def entregar_missao(
                 "Esta missão ainda não foi aceita."
         }
 
-    caravana_integridade = _int_seguro(estado_quest.get("caravana_integridade", 100), 100)
+    caravana_integridade = _int_seguro(estado_quest.get("caravana_integridade", 300), 300)
     if q_data.get("req_abates_evento") and caravana_integridade <= 0:
         return {
             "success": False,

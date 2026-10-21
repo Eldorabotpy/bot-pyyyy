@@ -25,8 +25,9 @@ AI_ROUTES = {
 }
 AI_VELOCIDADE = 38.0
 AI_INTERVALO_ATAQUE = 3.2
-CARAVANA_VIDA_MAXIMA = 100
-DANO_CARAVANA_POR_ATAQUE = 4
+CARAVANA_VIDA_MAXIMA = 300
+DANO_CARAVANA_POR_ATAQUE = 1
+IA_DURACAO_MAXIMA = 900
 _IA_ATIVA = {}
 _IA_LOCK = threading.RLock()
 
@@ -46,7 +47,12 @@ def preparar_encontro(player: dict, sistema_cacada) -> dict | None:
     vivos = sistema_cacada.mobs_vivos.setdefault(REGIAO, {})
     try:
         tentativa = max(1, int(quest.get("tentativa_evento", 1) or 1))
-        integridade = max(0, min(CARAVANA_VIDA_MAXIMA, int(quest.get("caravana_integridade", CARAVANA_VIDA_MAXIMA))))
+        integridade_salva = max(0, int(quest.get("caravana_integridade", CARAVANA_VIDA_MAXIMA)))
+        vida_maxima_salva = max(1, int(quest.get("caravana_vida_maxima", 100) or 100))
+        integridade = min(
+            CARAVANA_VIDA_MAXIMA,
+            round(integridade_salva * CARAVANA_VIDA_MAXIMA / vida_maxima_salva),
+        )
     except (TypeError, ValueError):
         tentativa, integridade = 1, CARAVANA_VIDA_MAXIMA
 
@@ -61,6 +67,7 @@ def preparar_encontro(player: dict, sistema_cacada) -> dict | None:
         quest["abates_evento_registrados"] = []
         quest["tentativa_evento"] = tentativa
         quest["caravana_integridade"] = integridade
+        quest["caravana_vida_maxima"] = CARAVANA_VIDA_MAXIMA
         quest["event_spawn_ids"] = [
             f"q3_caravana_{player_id}_{tentativa}_{index}"
             for index in range(1, required + 1)
@@ -72,6 +79,7 @@ def preparar_encontro(player: dict, sistema_cacada) -> dict | None:
                 f"quests.{QUEST_ID}.abates_evento_registrados": [],
                 f"quests.{QUEST_ID}.tentativa_evento": tentativa,
                 f"quests.{QUEST_ID}.caravana_integridade": integridade,
+                f"quests.{QUEST_ID}.caravana_vida_maxima": CARAVANA_VIDA_MAXIMA,
                 f"quests.{QUEST_ID}.event_spawn_ids": quest["event_spawn_ids"],
             }},
         )
@@ -94,6 +102,7 @@ def preparar_encontro(player: dict, sistema_cacada) -> dict | None:
         not quest.get("event_spawn_ids")
         or "abates_evento" not in quest
         or "caravana_integridade" not in quest
+        or quest.get("caravana_vida_maxima") != CARAVANA_VIDA_MAXIMA
         or "tentativa_evento" not in quest
     ):
         users_collection.update_one(
@@ -103,6 +112,7 @@ def preparar_encontro(player: dict, sistema_cacada) -> dict | None:
                 f"quests.{QUEST_ID}.abates_evento": defeated,
                 f"quests.{QUEST_ID}.abates_evento_registrados": registered,
                 f"quests.{QUEST_ID}.caravana_integridade": integridade,
+                f"quests.{QUEST_ID}.caravana_vida_maxima": CARAVANA_VIDA_MAXIMA,
                 f"quests.{QUEST_ID}.tentativa_evento": tentativa,
             }},
         )
@@ -210,7 +220,7 @@ def _executar_ia_caravana(player_id, player_sid, sistema_cacada, socketio, jogad
     """Move os goblins por rotas ao redor da carroça e os faz golpear o viajante."""
     ultimo_tick = time.monotonic()
     proxima_validacao = 0.0
-    encerramento = ultimo_tick + 300
+    encerramento = ultimo_tick + IA_DURACAO_MAXIMA
     missao_ativa = True
     vida_caravana = CARAVANA_VIDA_MAXIMA
 
