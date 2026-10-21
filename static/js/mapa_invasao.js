@@ -7,6 +7,8 @@ class MotorDeInvasao {
         this.scene = scene;
         this.socket = socket;
         this.monstrosNaTela = {};
+        this.monstrosAguardandoTextura = new Map();
+        this.texturasInvasaoCarregando = new Map();
 
         // 👇 CONECTANDO O NOVO ARQUIVO DE HUD 👇
         this.hud = new HudInvasao();
@@ -407,6 +409,12 @@ class MotorDeInvasao {
         // ========================================================
         this.socket.on('danoMonstroInvasao', (dados) => {
             const m = this.monstrosNaTela[dados.id];
+            const pendente = this.monstrosAguardandoTextura.get(String(dados.id));
+            if (!m && pendente) {
+                pendente.dados.hp = dados.hp;
+                if (dados.hp <= 0) this.monstrosAguardandoTextura.delete(String(dados.id));
+                return;
+            }
             if (m) {
                 let pct = Math.max(0, dados.hp / m.max_hp);
                 m.atualizarBarra(pct);
@@ -770,6 +778,7 @@ class MotorDeInvasao {
     }
 
     removerMonstroInvasao(id) {
+        this.monstrosAguardandoTextura.delete(String(id));
         const m = this.monstrosNaTela[id];
         if (!m) return;
 
@@ -784,6 +793,7 @@ class MotorDeInvasao {
     }
 
     limparMonstrosInvasao() {
+        this.monstrosAguardandoTextura.clear();
         Object.keys(this.monstrosNaTela).forEach(id => {
             this.removerMonstroInvasao(id);
         });
@@ -815,8 +825,70 @@ class MotorDeInvasao {
         });
     }
 
+    carregarTexturaMonstroInvasao(chave, url, tamanhoDoCorte) {
+        if (this.scene.textures.exists(chave)) return Promise.resolve();
+
+        const carregamentoExistente = this.texturasInvasaoCarregando.get(chave);
+        if (carregamentoExistente) return carregamentoExistente;
+
+        const loader = this.scene.load;
+        let resolver;
+        let rejeitar;
+        const promessa = new Promise((resolve, reject) => {
+            resolver = resolve;
+            rejeitar = reject;
+        });
+        this.texturasInvasaoCarregando.set(chave, promessa);
+
+        const eventoArquivo = `filecomplete-spritesheet-${chave}`;
+        const limparListeners = () => {
+            loader.off(eventoArquivo, aoCompletar);
+            loader.off('loaderror', aoFalhar);
+        };
+        const aoCompletar = () => {
+            limparListeners();
+            if (this.scene.textures.exists(chave)) resolver();
+            else rejeitar(new Error(`A textura ${chave} terminou sem entrar no cache.`));
+        };
+        const aoFalhar = (arquivo) => {
+            if (arquivo && arquivo.key !== chave) return;
+            limparListeners();
+            rejeitar(new Error(`Falha ao carregar ${url}`));
+        };
+
+        loader.on(eventoArquivo, aoCompletar);
+        loader.on('loaderror', aoFalhar);
+
+        try {
+            loader.spritesheet(chave, url, {
+                frameWidth: tamanhoDoCorte,
+                frameHeight: tamanhoDoCorte
+            });
+            if (!loader.isLoading()) loader.start();
+        } catch (erro) {
+            limparListeners();
+            rejeitar(erro);
+        }
+
+        promessa.then(
+            () => {
+                if (this.texturasInvasaoCarregando.get(chave) === promessa) {
+                    this.texturasInvasaoCarregando.delete(chave);
+                }
+            },
+            () => {
+                if (this.texturasInvasaoCarregando.get(chave) === promessa) {
+                    this.texturasInvasaoCarregando.delete(chave);
+                }
+            }
+        );
+
+        return promessa;
+    }
+
     desenharMonstro(dados) {
-        if (this.monstrosNaTela[dados.id]) return;
+        const idMonstro = String(dados.id);
+        if (this.monstrosNaTela[idMonstro] || this.monstrosAguardandoTextura.has(idMonstro)) return;
 
         // 👇 PROTEÇÃO ANTI-F5 BLINDADA (Lê o CSS real!) 👇
         let elementoHud = document.getElementById('hud-invasao');
@@ -838,11 +910,32 @@ class MotorDeInvasao {
         // Isso dita o quão grande o bicho aparece na tela (ignora o tamanho original da foto)
         let tamanhoDesejado = dados.is_boss ? 112 : 48;
 
+        if (!this.scene.textures.exists(chaveTextura)) {
+            const pendencia = { dados: { ...dados } };
+            this.monstrosAguardandoTextura.set(idMonstro, pendencia);
+            const urlImagem = `https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/mob/invasao/${nomeDoArquivo}.png`;
+
+            this.carregarTexturaMonstroInvasao(chaveTextura, urlImagem, tamanhoDoCorteDaImagemOriginal)
+                .then(() => {
+                    if (this.monstrosAguardandoTextura.get(idMonstro) !== pendencia) return;
+                    this.monstrosAguardandoTextura.delete(idMonstro);
+                    if (Number(pendencia.dados.hp) <= 0) return;
+                    this.desenharMonstro(pendencia.dados);
+                })
+                .catch((erro) => {
+                    if (this.monstrosAguardandoTextura.get(idMonstro) === pendencia) {
+                        this.monstrosAguardandoTextura.delete(idMonstro);
+                    }
+                    console.warn("Não foi possível preparar a imagem do monstro da invasão:", erro);
+                });
+            return;
+        }
+
         const criarSpriteMonstro = () => {
             if (this.monstrosNaTela[dados.id]) return;
 
-            // Cria o sprite com a chave, se não existir, o Phaser usa um quadrado verde automaticamente
-            let texturaUsada = this.scene.textures.exists(chaveTextura) ? chaveTextura : 'player';
+            // O sprite só é criado depois que a textura já está no cache do Phaser.
+            let texturaUsada = chaveTextura;
             let auraFrente = null;
 
             if (dados.is_boss) {
@@ -891,11 +984,6 @@ class MotorDeInvasao {
             };
 
             tentarAnimar();
-
-            // Se a textura carregou depois, atualiza
-            if (!this.scene.textures.exists(chaveTextura)) {
-                sprite.setData('aguardandoTextura', chaveTextura);
-            }
 
             // Textos e Barras
             let offsetTextoY = dados.is_boss ? 50 : 36;
@@ -993,42 +1081,7 @@ class MotorDeInvasao {
             };
         };
 
-        // CHAMA A CRIAÇÃO IMEDIATAMENTE (mesmo se a textura não existir, usa fallback)
+        // A textura foi preparada acima; agora o monstro pode aparecer sem o sprite de erro do Phaser.
         criarSpriteMonstro();
-
-        if (!this.scene.textures.exists(chaveTextura)) {
-            if (!window.texturasCarregando) window.texturasCarregando = {};
-
-            // Só manda carregar se ainda não estiver na fila
-            if (!window.texturasCarregando[chaveTextura]) {
-                window.texturasCarregando[chaveTextura] = true;
-
-                let urlImagem = `https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/mob/invasao/${nomeDoArquivo}.png`;
-                this.scene.load.spritesheet(chaveTextura, urlImagem, {
-                    frameWidth: tamanhoDoCorteDaImagemOriginal,
-                    frameHeight: tamanhoDoCorteDaImagemOriginal
-                });
-
-                this.scene.load.once(`filecomplete-spritesheet-${chaveTextura}`, () => {
-                    // Quando a imagem baixar, atualiza todos os monstros que estavam esperando por ela
-                    Object.values(this.monstrosNaTela).forEach(m => {
-                        if (m.sprite && m.sprite.getData('aguardandoTextura') === chaveTextura) {
-                            m.sprite.setTexture(chaveTextura);
-
-                            const tamanho = m.is_boss ? 96 : 48;
-                            m.sprite.setDisplaySize(tamanho, tamanho);
-
-                            if (m.sprite.body) {
-                                m.sprite.body.setSize(m.is_boss ? 64 : 32, m.is_boss ? 64 : 32);
-                            }
-
-                            m.sprite.setData('aguardandoTextura', null);
-                            if (typeof m.tentarAnimar === 'function') m.tentarAnimar();
-                        }
-                    });
-                });
-                this.scene.load.start();
-            }
-        }
     }
 }
