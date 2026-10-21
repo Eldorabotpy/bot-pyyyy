@@ -71,6 +71,8 @@ function mercadoIsolarEventos(modal) {
                 const caminhoOriginal = e.composedPath?.() || [];
                 const cliqueDentroDaLista = lista && (caminhoOriginal.includes(lista) || lista.contains(e.target));
                 if (lista && !cliqueDentroDaLista && !botao?.contains(e.target)) lista.style.display = 'none';
+                const seletorMoeda = document.getElementById('mercado-moeda-picker');
+                if (seletorMoeda && !seletorMoeda.contains(e.target)) fecharSeletorMoedaMercado();
             }
             e.stopPropagation();
         });
@@ -445,6 +447,42 @@ function toggleDropdownVenda() {
     } else {
         lista.style.display = 'none';
     }
+}
+
+function fecharSeletorMoedaMercado() {
+    const lista = document.getElementById('lista-moedas-mercado');
+    const botao = document.getElementById('btn-moeda-mercado');
+    if (lista) lista.hidden = true;
+    if (botao) botao.setAttribute('aria-expanded', 'false');
+}
+
+function toggleMoedaMercado(event) {
+    event?.stopPropagation();
+    const lista = document.getElementById('lista-moedas-mercado');
+    const botao = document.getElementById('btn-moeda-mercado');
+    if (!lista || !botao) return;
+    lista.hidden = !lista.hidden;
+    botao.setAttribute('aria-expanded', String(!lista.hidden));
+}
+
+function selecionarMoedaMercado(moeda) {
+    const valor = moeda === 'gema' ? 'gema' : 'ouro';
+    const simbolo = valor === 'ouro' ? '🪙' : '💎';
+    const seletor = document.getElementById('select-moeda');
+    const nome = document.getElementById('mercado-moeda-nome');
+    const icone = document.getElementById('mercado-moeda-icone');
+    if (seletor) seletor.value = valor;
+    if (nome) nome.textContent = valor === 'ouro' ? 'Ouro' : 'Gemas';
+    if (icone) {
+        icone.textContent = simbolo;
+        icone.classList.toggle('ouro', valor === 'ouro');
+        icone.classList.toggle('gemas', valor === 'gema');
+    }
+    document.querySelectorAll('#lista-moedas-mercado [data-moeda]').forEach(opcao => {
+        opcao.setAttribute('aria-selected', String(opcao.dataset.moeda === valor));
+    });
+    fecharSeletorMoedaMercado();
+    calcularTaxaReino();
 }
 
 // ✅ Lógica que roda ao clicar em um item da lista

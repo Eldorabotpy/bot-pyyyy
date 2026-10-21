@@ -306,3 +306,22 @@
  #modal-detalhes-mercado .mercado-detalhe-shell h3 { font-size:16px; }
  #modal-detalhes-mercado .mercado-detalhe-footer { padding:12px 16px; }
 }
+
+ 
+#ui-mercado .mercado-moeda-picker { position:relative; z-index:15; }
+#ui-mercado .mercado-moeda-trigger { display:flex; align-items:center; gap:8px; width:100%; min-width:0; height:48px; padding:7px 9px; border:1px solid #42536b; border-radius:12px; background:linear-gradient(145deg,#142236,#0a1320); color:#e6edf7; font:700 13px 'Segoe UI',Arial,sans-serif; text-align:left; box-shadow:inset 0 1px #ffffff0b,0 4px 12px #0002; transition:border-color .16s ease,background .16s ease,box-shadow .16s ease; }
+#ui-mercado .mercado-moeda-trigger:hover, #ui-mercado .mercado-moeda-trigger[aria-expanded="true"] { border-color:#c5a35f; background:linear-gradient(145deg,#1c2b40,#101a29); box-shadow:0 0 0 3px #c4a15b16,inset 0 1px #ffffff0b; }
+#ui-mercado .mercado-moeda-icone { display:grid; flex:0 0 28px; place-items:center; width:28px; height:28px; border:1px solid #d8af5a45; border-radius:9px; background:linear-gradient(145deg,#b98d3d30,#5f451522); font-size:15px; }
+#ui-mercado .mercado-moeda-icone.gemas { border-color:#74c9ff55; background:linear-gradient(145deg,#389fdf38,#17375355); }
+#ui-mercado .mercado-moeda-chevron { margin-left:auto; color:#91a2b8; font-size:16px; transition:transform .16s ease; }
+#ui-mercado .mercado-moeda-trigger[aria-expanded="true"] .mercado-moeda-chevron { transform:rotate(180deg); }
+#ui-mercado .mercado-moeda-opcoes { position:absolute; z-index:30; top:calc(100% + 7px); left:0; right:0; display:grid; gap:4px; padding:5px; border:1px solid #53647c; border-radius:13px; background:linear-gradient(145deg,#172438,#0c1522); box-shadow:0 14px 34px #000b,inset 0 1px #ffffff0d; animation:mercado-moeda-abrir .14s ease-out; }
+#ui-mercado .mercado-moeda-opcoes[hidden] { display:none; }
+#ui-mercado .mercado-moeda-opcoes > button { display:flex; align-items:center; gap:8px; min-height:48px; padding:6px 8px; border:1px solid transparent; border-radius:9px; background:transparent; color:#dce5f1; text-align:left; }
+#ui-mercado .mercado-moeda-opcoes > button:hover, #ui-mercado .mercado-moeda-opcoes > button[aria-selected="true"] { border-color:#c6a45b66; background:linear-gradient(100deg,#3c321e,#1a2432); }
+#ui-mercado .mercado-moeda-opcoes > button > span:nth-child(2) { display:grid; flex:1; gap:2px; }
+#ui-mercado .mercado-moeda-opcoes strong { color:#f1e1c1; font-size:11px; }
+#ui-mercado .mercado-moeda-opcoes small { color:#8899af; font-size:8px; }
+#ui-mercado .mercado-moeda-selecionada { color:#e5c16e; font-size:13px; opacity:0; }
+#ui-mercado .mercado-moeda-opcoes > button[aria-selected="true"] .mercado-moeda-selecionada { opacity:1; }
+@keyframes mercado-moeda-abrir { from { opacity:0; transform:translateY(-4px) scale(.98); } to { opacity:1; transform:translateY(0) scale(1); } }
