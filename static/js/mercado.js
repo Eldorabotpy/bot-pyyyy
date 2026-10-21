@@ -250,6 +250,8 @@ const MERCADO_CATEGORIAS_INVENTARIO = [
     { id: 'equipamentos', nome: 'Equipamentos', icone: '⚔️' },
     { id: 'materiais', nome: 'Materiais', icone: '⛏️' },
     { id: 'runas', nome: 'Runas', icone: '🔮' },
+    { id: 'evolucao', nome: 'Evolução', icone: '✧' },
+    { id: 'aprendizado', nome: 'Aprendizado', icone: '📘' },
     { id: 'consumiveis', nome: 'Consumíveis', icone: '🧪' },
     { id: 'ferramentas', nome: 'Ferramentas', icone: '🛠️' },
     { id: 'bases', nome: 'Bases', icone: '🧱' },
@@ -297,6 +299,8 @@ function mercadoCategoriaDoItem(item) {
     const equipamento = ['equipamento', 'equipment', 'weapon', 'arma', 'armor', 'armadura', 'helmet', 'elmo', 'boots', 'botas', 'ring', 'anel', 'necklace', 'colar', 'earring', 'brinco'].includes(tipo);
 
     if (tipo === 'runa' || tipo === 'rune' || tipo.includes('runico') || categoria === 'runas' || categoria === 'socketable' || baseId.startsWith('runa_') || baseId.startsWith('fragmento_runa') || baseId === 'po_runico') return 'runas';
+    if (categoria === 'evolucao' || item?.evolution_item) return 'evolucao';
+    if (categoria === 'aprendizado' || tipo === 'skill_book') return 'aprendizado';
     if (tipo === 'equipment_base' || categoria === 'equipment_base' || baseId.startsWith('base_equipamento')) return 'bases';
     if (tipo === 'tool' || tipo === 'ferramenta' || item?.tool_type || item?.tool_tier) return 'ferramentas';
     if (equipamento || (item?.slot && tipo !== 'material')) return 'equipamentos';
@@ -402,6 +406,7 @@ function carregarInventarioNoMercado() {
     listaDropdown.innerHTML = '';
     inputEscondido.value = '';
     listaDropdown.style.display = 'none';
+    configurarMoedaAnuncio(null);
     const preview = document.getElementById('preview-item-venda-mercado');
     if (preview) preview.style.display = 'none';
     const quantidade = document.getElementById('input-qtd');
@@ -485,12 +490,43 @@ function selecionarMoedaMercado(moeda) {
     calcularTaxaReino();
 }
 
+function mercadoMoedaObrigatoriaDoItem(item) {
+    const moeda = mercadoNormalizarChave(item?.market_currency).replace(/_/g, '');
+    if (['gem', 'gema', 'gemas', 'gems'].includes(moeda)) return 'gema';
+    if (['ouro', 'gold'].includes(moeda)) return 'ouro';
+    const categoria = mercadoCategoriaDoItem(item || {});
+    return ['runas', 'evolucao', 'aprendizado'].includes(categoria) ? 'gema' : '';
+}
+
+function configurarMoedaAnuncio(item = null) {
+    const obrigatoria = item ? mercadoMoedaObrigatoriaDoItem(item) : '';
+    const ouro = document.querySelector('#lista-moedas-mercado [data-moeda="ouro"]');
+    const gemas = document.querySelector('#lista-moedas-mercado [data-moeda="gema"]');
+    if (ouro) ouro.hidden = obrigatoria === 'gema';
+    if (gemas) gemas.hidden = obrigatoria === 'ouro';
+
+    const minimo = obrigatoria ? Math.max(1, Number(item?.market_min_price) || 30) : 1;
+    const preco = document.getElementById('input-preco');
+    const ajuda = document.querySelector('.mercado-price-help');
+    if (preco) {
+        preco.min = String(minimo);
+        preco.placeholder = minimo > 1 ? `Mínimo: ${minimo}` : 'Ex.: 150';
+    }
+    if (ajuda) ajuda.textContent = minimo > 1
+        ? `Preço mínimo: ${minimo} Gemas pelo lote.`
+        : 'Valor por todos os itens, não por unidade.';
+
+    if (obrigatoria) selecionarMoedaMercado(obrigatoria);
+    else if (!item) selecionarMoedaMercado('ouro');
+}
+
 // ✅ Lógica que roda ao clicar em um item da lista
 function selecionarItemDropdown(item, nomeItem, textoQuantidade, corBorda) {
     const idItem = mercadoItemUid(item);
     const urlImg = mercadoCaminhosImagemItem(item)[0];
 
     document.getElementById('select-item-venda').value = idItem;
+    configurarMoedaAnuncio(item);
 
     const display = document.getElementById('dropdown-venda-selecionado');
 
@@ -1323,6 +1359,13 @@ async function confirmarVenda() {
 
     if (!itemSelecionado || !preco || preco <= 0 || !qtd || qtd <= 0) {
         mercadoNotificar("Selecione um item e informe uma quantidade e um preço válidos.", "erro");
+        return;
+    }
+
+    const precoMinimo = Number(document.getElementById('input-preco')?.min || 1);
+    if (preco < precoMinimo) {
+        const moedaMinima = moeda === 'gema' ? 'Gemas' : 'Ouro';
+        mercadoNotificar(`O preço mínimo para este item é ${precoMinimo} ${moedaMinima}.`, 'erro');
         return;
     }
 
