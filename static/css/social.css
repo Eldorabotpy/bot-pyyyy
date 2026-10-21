@@ -571,3 +571,121 @@
     height: 32px;
     object-fit: contain;
 }
+
+/* Expressões animadas para inserir no chat da Taverna. */
+#hub-social .chat-input-area {
+    position: relative;
+}
+
+#hub-social .chat-input-area > .btn-expressoes-chat {
+    flex: 0 0 38px;
+    width: 38px;
+    min-width: 38px;
+    min-height: 36px;
+    padding: 0 !important;
+    color: #f3d58e !important;
+    font-size: 21px !important;
+    line-height: 1;
+    text-transform: none !important;
+    text-shadow: none !important;
+    background: #0b1420 !important;
+    border: 1px solid #665334 !important;
+    border-radius: 9px !important;
+    box-shadow: inset 0 1px rgba(255, 255, 255, .05) !important;
+}
+
+#hub-social .chat-input-area > .btn-expressoes-chat:hover {
+    border-color: #d2ad61 !important;
+    background: #182334 !important;
+}
+
+#hub-social .painel-expressoes-chat[hidden] {
+    display: none !important;
+}
+
+#hub-social .painel-expressoes-chat {
+    position: absolute;
+    z-index: 10020;
+    left: 10px;
+    bottom: calc(100% + 9px);
+    width: 204px;
+    padding: 10px;
+    border: 1px solid rgba(210, 173, 97, .55);
+    border-radius: 12px;
+    background: linear-gradient(160deg, #182538, #0b1420 75%);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, .55), inset 0 1px rgba(255, 255, 255, .06);
+}
+
+#hub-social .painel-expressoes-titulo {
+    margin: 0 0 8px;
+    color: #e9d6a5;
+    font: 700 11px/1.2 'Cinzel', serif;
+    letter-spacing: .6px;
+}
+
+#hub-social .grade-expressoes-chat {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+}
+
+#hub-social .grade-expressoes-chat > button {
+    display: grid;
+    place-items: center;
+    min-width: 0;
+    min-height: 42px;
+    padding: 4px !important;
+    background: rgba(8, 17, 29, .85) !important;
+    border: 1px solid #34445a !important;
+    border-radius: 8px !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+    cursor: pointer;
+}
+
+#hub-social .grade-expressoes-chat > button:hover,
+#hub-social .grade-expressoes-chat > button:focus-visible {
+    border-color: #d2ad61 !important;
+    background: rgba(93, 70, 32, .5) !important;
+    outline: none;
+}
+
+.chat-expression-sprite,
+.chat-emoji-expression {
+    display: inline-block;
+    width: 32px;
+    height: 32px;
+    flex: 0 0 32px;
+    vertical-align: middle;
+    background-repeat: no-repeat;
+    background-size: 128px 32px;
+    animation: animacao-expressao-chat .8s steps(4, end) infinite;
+}
+
+.chat-emoji-expression {
+    width: 28px;
+    height: 28px;
+    margin: 0 2px;
+    background-size: 112px 28px;
+    animation-name: animacao-expressao-chat-inline;
+    vertical-align: -7px;
+}
+
+[data-expressao="raiva"] { background-image: url('/static/assets/sprites/emoji/emoji_raiva.svg'); }
+[data-expressao="sorriso"] { background-image: url('/static/assets/sprites/emoji/emoji_sorriso.svg'); }
+[data-expressao="choro"] { background-image: url('/static/assets/sprites/emoji/emoji_choro.svg'); }
+[data-expressao="festa"] { background-image: url('/static/assets/sprites/emoji/emoji_festa.svg'); }
+[data-expressao="amor"] { background-image: url('/static/assets/sprites/emoji/emoji_amor.svg'); }
+[data-expressao="surpresa"] { background-image: url('/static/assets/sprites/emoji/emoji_surpresa.svg'); }
+[data-expressao="risada"] { background-image: url('/static/assets/sprites/emoji/emoji_risada.svg'); }
+[data-expressao="sono"] { background-image: url('/static/assets/sprites/emoji/emoji_sono.svg'); }
+
+@keyframes animacao-expressao-chat {
+    from { background-position: 0 0; }
+    to { background-position: -128px 0; }
+}
+
+@keyframes animacao-expressao-chat-inline {
+    from { background-position: 0 0; }
+    to { background-position: -112px 0; }
+}
