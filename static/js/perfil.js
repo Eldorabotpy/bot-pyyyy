@@ -681,7 +681,7 @@ async function carregarMeuPerfil() {
 
         let bannerImgCss = 'linear-gradient(135deg, #2c3e50, #1a1a1a)';
         let bannerRawUrl = '';
-        if (bannerCaminho && bannerCaminho !== 'padrao' && bannerCaminho !== '') {
+        if (bannerCaminho && bannerCaminho !== '') {
             if (window.CATALOGO_SISTEMA && window.CATALOGO_SISTEMA.banners[bannerCaminho]) {
                 bannerRawUrl = window.CATALOGO_SISTEMA.banners[bannerCaminho].path;
                 bannerImgCss = `url('${bannerRawUrl}')`;
