@@ -526,46 +526,63 @@ window.abrirModalClasses = function(necromanteRevelado = false) {
                 letter-spacing: 0.25px; text-transform: uppercase; margin-top: 7px; text-align: center; overflow-wrap: anywhere;
             }
             .btn-voltar {
-                background: transparent; border: 1px solid #64748b; border-radius: 6px;
-                color: #94a3b8; font-family: 'Segoe UI', Arial; font-size: 0.8em; font-weight: bold;
-                padding: 4px 10px; cursor: pointer; transition: 0.2s;
-                position: absolute; top: 0; left: 0; z-index: 10;
+                position: static; align-self: flex-start; display: inline-flex; align-items: center; gap: 7px;
+                margin: 0 0 4px; padding: 9px 13px; cursor: pointer; transition: 0.2s;
+                background: rgba(18, 37, 43, 0.88); border: 1px solid rgba(211, 190, 132, 0.3); border-radius: 10px;
+                color: #d8e0df; font-family: 'Segoe UI', Arial, sans-serif; font-size: 0.84rem; font-weight: 700;
             }
-            .btn-voltar:hover { background: #334155; color: #fff; border-color: #cbd5e1; }
+            .btn-voltar:hover { background: #183139; color: #f4ead2; border-color: #c9a45c; }
             .classe-detalhe-tela {
-                display: flex; flex: 1 1 auto; flex-direction: column; width: 100%; min-height: 0;
-                max-height: calc(100vh - 96px); max-height: calc(100dvh - 96px);
+                display: flex; flex: 1 1 auto; flex-direction: column; gap: 10px; width: 100%; min-height: 0;
+                max-height: calc(100vh - 72px); max-height: calc(100dvh - 72px);
                 overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain;
             }
             .classe-detalhe-conteudo {
-                display: flex; flex-direction: column; align-items: center; text-align: center;
-                width: 100%; min-width: 0; padding: 26px 1px 10px;
+                display: flex; flex-direction: column; align-items: stretch; gap: 12px; text-align: center;
+                width: 100%; min-width: 0; padding: 0 1px 4px;
             }
             .classe-detalhe-arte {
-                width: 100%; height: clamp(150px, 34dvh, 224px); flex: 0 0 auto;
-                display: flex; justify-content: center; align-items: flex-end; margin-bottom: 8px;
+                position: relative; width: 100%; height: clamp(144px, 27dvh, 188px); flex: 0 0 auto;
+                display: flex; justify-content: center; align-items: flex-end; overflow: hidden;
+                background: radial-gradient(ellipse at 50% 72%, rgba(122, 67, 184, 0.25), rgba(20, 36, 59, 0.24) 48%, rgba(11, 27, 32, 0.4) 78%);
+                border: 1px solid rgba(169, 129, 220, 0.26); border-radius: 16px;
+                box-shadow: inset 0 1px rgba(244, 234, 210, 0.04), 0 10px 24px rgba(0, 0, 0, 0.2);
             }
             .classe-detalhe-arte img {
-                max-width: 100%; max-height: 100%; object-fit: contain; object-position: bottom;
+                position: relative; z-index: 1; max-width: 100%; max-height: 100%; object-fit: contain; object-position: bottom;
                 animation: floatImgGigante 4s ease-in-out infinite;
             }
+            .classe-detalhe-identidade { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+            .classe-detalhe-selo {
+                color: #b8c4c2; font: 700 0.66rem/1.2 'Segoe UI', Arial, sans-serif;
+                letter-spacing: 0.16em; text-transform: uppercase;
+            }
             .classe-detalhe-titulo {
-                margin: 2px 0 10px; font-family: 'Cinzel', serif; font-size: clamp(1.45rem, 6vw, 1.8rem);
-                line-height: 1.16; letter-spacing: 0.6px; text-transform: uppercase; text-shadow: 0 2px 5px rgba(0,0,0,0.7);
+                margin: 0; font-family: 'Cinzel', serif; font-size: clamp(1.4rem, 5.8vw, 1.72rem);
+                line-height: 1.12; letter-spacing: 0.04em; text-transform: uppercase; text-shadow: 0 2px 8px rgba(0,0,0,0.58);
             }
             .classe-detalhe-descricao {
-                width: 100%; padding: clamp(12px, 3.5vw, 16px); margin: 0;
-                color: #d5dedf; font: 400 0.94rem/1.5 'Segoe UI', Arial, sans-serif;
-                background: rgba(7, 18, 25, 0.78); border: 1px solid rgba(211, 190, 132, 0.34); border-radius: 10px;
+                width: 100%; padding: 12px 14px; margin: 0; text-align: left;
+                color: #d5dedf; font: 400 0.91rem/1.48 'Segoe UI', Arial, sans-serif;
+                background: linear-gradient(130deg, rgba(18, 37, 43, 0.92), rgba(11, 27, 32, 0.96));
+                border: 1px solid rgba(201, 164, 92, 0.3); border-left: 3px solid #c9a45c; border-radius: 10px;
             }
-            #btn-confirmar-classe { flex: 0 0 auto; min-height: 48px; margin-top: 12px; font-size: clamp(0.95rem, 4vw, 1.08rem); }
+            .classe-detalhe-descricao strong {
+                display: block; margin-bottom: 5px; color: #c9a45c; font: 700 0.64rem/1.2 'Segoe UI', Arial, sans-serif;
+                letter-spacing: 0.12em; text-transform: uppercase;
+            }
+            #btn-confirmar-classe {
+                flex: 0 0 auto; min-height: 50px; margin-top: 0; border-radius: 12px;
+                font-size: clamp(0.9rem, 3.8vw, 1.02rem); letter-spacing: 0.035em;
+            }
             @keyframes floatImgGigante {
                 0%, 100% { transform: translateY(0); }
                 50% { transform: translateY(-6px); }
             }
             @media (max-height: 560px) {
-                .classe-detalhe-tela { max-height: calc(100vh - 32px); max-height: calc(100dvh - 32px); }
-                .classe-detalhe-arte { height: clamp(120px, 28dvh, 170px); }
+                .classe-detalhe-tela { max-height: calc(100vh - 48px); max-height: calc(100dvh - 48px); }
+                .classe-detalhe-arte { height: clamp(112px, 25dvh, 148px); }
+                .classe-detalhe-conteudo { gap: 8px; }
             }
             @media (prefers-reduced-motion: reduce) {
                 .classe-detalhe-arte img { animation: none; }
@@ -666,6 +683,10 @@ window.abrirModalClasses = function(necromanteRevelado = false) {
                     <button class="btn-voltar" onclick="window.voltarGradeClasses()">⬅ Voltar</button>
                     
                     <!-- Espaço que será preenchido pelo JS -->
+                    <div class="classe-detalhe-identidade">
+                        <span class="classe-detalhe-selo">Caminho selecionado</span>
+                        <h3 id="titulo-detalhe-classe" class="classe-detalhe-titulo"></h3>
+                    </div>
                     <div id="conteudo-detalhes" class="classe-detalhe-conteudo">
                     </div>
                     
@@ -710,10 +731,16 @@ window.selecionarClasseNaUI = function(classeId) {
                  style="filter: drop-shadow(0 10px 20px ${classe.cor});">
         </div>
 
-        <h3 class="classe-detalhe-titulo" style="color: ${classe.cor};">${classe.nome}</h3>
-        
-        <p class="classe-detalhe-descricao">${classe.desc}</p>
+        <div class="classe-detalhe-descricao">
+            <strong>Sobre este caminho</strong>
+            <span>${classe.desc}</span>
+        </div>
     `;
+    const tituloDetalhe = document.getElementById('titulo-detalhe-classe');
+    if (tituloDetalhe) {
+        tituloDetalhe.textContent = classe.nome;
+        tituloDetalhe.style.color = classe.cor;
+    }
 };
 
 // Não esqueça de manter a função de disparo abaixo delas:
