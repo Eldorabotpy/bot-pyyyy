@@ -246,7 +246,7 @@
 #modal-detalhes-mercado > div:not(.mercado-detalhe-shell) > div:first-of-type > div:nth-child(5) { margin-top:16px !important; padding:13px 14px !important; border:1px solid #2d3d52 !important; border-radius:12px !important; background:#0c1523 !important; }
 #modal-detalhes-mercado > div:not(.mercado-detalhe-shell) > div:last-child { padding:14px 20px !important; border-top:1px solid #ffffff12 !important; background:#0a1320 !important; }
 #modal-detalhes-mercado > div:not(.mercado-detalhe-shell) > div:last-child button { min-height:48px; border:1px solid #7acaa1 !important; border-radius:12px !important; background:linear-gradient(110deg,#51b885,#267957) !important; box-shadow:0 7px 18px #2da66c2b,inset 0 1px #ffffff2b; }
-#ui-mercado #lista-dropdown-venda { top:74px; max-height:min(480px,62dvh); overflow:hidden; padding:0; border-color:#516580; border-radius:14px; background:#0c1625; }
+#ui-mercado #lista-dropdown-venda { top:74px; z-index:40; max-height:min(480px,62dvh); overflow:hidden; padding:0; border-color:#516580; border-radius:14px; background:#0c1625; }
 #ui-mercado #lista-dropdown-venda > .mercado-inventario { display:flex; flex-direction:column; max-height:inherit; padding:0; background:transparent !important; }
 #ui-mercado .mercado-inventario-titulo { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:11px 12px 9px; border-bottom:1px solid #ffffff0d; color:#e7edf6; font-size:11px; font-weight:800; }
 #ui-mercado .mercado-inventario-titulo small { margin:0; color:#8192a9; font-size:9px; font-weight:500; white-space:nowrap; }
