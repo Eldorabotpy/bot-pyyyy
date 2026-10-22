@@ -8,6 +8,7 @@ class MotorCacada {
         this.scene = scene;
         this.socket = socket;
         this.mobsNoMapa = this.scene.add.group();
+        this.texturasMobsCarregando = new Map();
 
         // ==========================================
         // 🤖 AUTO CAÇADA — ESTADO INICIAL
@@ -84,9 +85,22 @@ class MotorCacada {
                 }
             });
 
-            // 1. Carrega todos os mobs ao entrar no mapa
+            // O mapa só é liberado depois que todas as imagens do snapshot
+            // inicial estiverem prontas no cache do Phaser.
             this.socket.on('carregarMobsMapa', (mobs) => {
-                Object.values(mobs).forEach(mob => this.spawnMob(mob));
+                const listaMobs = Array.isArray(mobs)
+                    ? mobs
+                    : Object.values(mobs || {});
+                const carregamentosInvasao = this.scene.carregamentosMobsIniciais || [];
+                const carregamentosMapa = listaMobs.map(mob => this.spawnMob(mob));
+
+                Promise.allSettled([
+                    ...carregamentosInvasao,
+                    ...carregamentosMapa
+                ]).then(resultados => {
+                    const falhas = resultados.filter(resultado => resultado.status === 'rejected').length;
+                    this.scene.concluirCarregamentoMobsMapa?.(listaMobs.length, falhas);
+                });
             });
 
             this.socket.on('caravanaQuestAtiva', dados => {
@@ -1374,6 +1388,8 @@ class MotorCacada {
 
     spawnMob(mobData) {
 
+        if (!mobData || !mobData.spawn_id) return Promise.resolve(false);
+
         this.removerMob(mobData.spawn_id);
 
         if (
@@ -1395,43 +1411,80 @@ class MotorCacada {
         // Ensina para o código qual é o nome exato da pasta no GitHub para cada mapa!
         const tradutorPastas = {
             "capital_eldora": "capital",             // O mapa capital_eldora usa a pasta 'capital'
-            "pradaria_inicial": "pradaria_inicial",  // O mapa pradaria_inicial usa a pasta 'pradaria_inicial'
-            "floresta_sombria": "floresta",           // (Exemplo futuro) A floresta usa a pasta 'floresta'
+            "pradaria_inicial": "pradaria_inicial",  // A pradaria usa a pasta 'pradaria_inicial'
+            "floresta_sombria": "floresta",           // A floresta usa a pasta 'floresta'
         };
 
-        // Ele busca no tradutor. Se não tiver no tradutor, ele tenta usar o próprio nome da região.
-        let pastaRegiao = mobData.asset_region || tradutorPastas[regiaoAtual] || regiaoAtual;
-
-        // Monta o link apontando para a pasta traduzida!
+        // Ele busca no tradutor. Se não tiver no tradutor, usa a região atual.
+        const pastaRegiao = mobData.asset_region || tradutorPastas[regiaoAtual] || regiaoAtual;
         const linkNuvem = `https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/mob/${pastaRegiao}/`;
-        
         const textureKey = `ss_mob_${pastaRegiao}_${mobData.monster_id}`;
 
         if (!this.scene.textures.exists(textureKey)) {
-            
-            this.scene.load.spritesheet(
+            return this.carregarTexturaMob(
                 textureKey,
-                `${linkNuvem}${mobData.monster_id}.png`,
-                {
-                    frameWidth: 256,
-                    frameHeight: 256
-                }
-            );
-            
-            this.scene.load.once(`filecomplete-spritesheet-${textureKey}`, () => {
+                `${linkNuvem}${mobData.monster_id}.png`
+            ).then(() => {
                 this.desenharSprite(mobData, textureKey);
+                return true;
+            }).catch(erro => {
+                console.warn(`Não foi possível carregar a imagem do mob ${mobData.monster_id}:`, erro);
+                window.avisoEldora?.(`❌ Não foi possível carregar a imagem do mob ${mobData.monster_id}.`);
+                throw erro;
             });
-
-            this.scene.load.once('loaderror', (fileObj) => {
-                if(fileObj.key === textureKey) {
-                    window.avisoEldora("❌ Link não encontrado no GitHub:\n" + fileObj.url);
-                }
-            });
-
-            this.scene.load.start();
-        } else {
-            this.desenharSprite(mobData, textureKey);
         }
+
+        this.desenharSprite(mobData, textureKey);
+        return Promise.resolve(true);
+    }
+
+    carregarTexturaMob(textureKey, url) {
+        if (this.scene.textures.exists(textureKey)) return Promise.resolve();
+        const existente = this.texturasMobsCarregando.get(textureKey);
+        if (existente) return existente;
+
+        const loader = this.scene.load;
+        const eventoCompleto = `filecomplete-spritesheet-${textureKey}`;
+        let promessa;
+        promessa = new Promise((resolve, reject) => {
+            const limpar = () => {
+                loader.off(eventoCompleto, aoCompletar);
+                loader.off('loaderror', aoFalhar);
+            };
+            const aoCompletar = () => {
+                limpar();
+                if (this.scene.textures.exists(textureKey)) resolve();
+                else reject(new Error(`A textura ${textureKey} não entrou no cache.`));
+            };
+            const aoFalhar = arquivo => {
+                if (arquivo && arquivo.key !== textureKey) return;
+                limpar();
+                reject(new Error(`Falha ao baixar ${url}`));
+            };
+
+            loader.once(eventoCompleto, aoCompletar);
+            loader.on('loaderror', aoFalhar);
+            loader.spritesheet(textureKey, url, {
+                frameWidth: 256,
+                frameHeight: 256
+            });
+            if (!loader.isLoading()) loader.start();
+        });
+
+        this.texturasMobsCarregando.set(textureKey, promessa);
+        promessa.then(
+            () => {
+                if (this.texturasMobsCarregando.get(textureKey) === promessa) {
+                    this.texturasMobsCarregando.delete(textureKey);
+                }
+            },
+            () => {
+                if (this.texturasMobsCarregando.get(textureKey) === promessa) {
+                    this.texturasMobsCarregando.delete(textureKey);
+                }
+            }
+        );
+        return promessa;
     }
 
     aplicarAuraCorrompida(sprite, mobData) {
