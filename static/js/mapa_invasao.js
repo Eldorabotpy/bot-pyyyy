@@ -915,7 +915,11 @@ class MotorDeInvasao {
             this.monstrosAguardandoTextura.set(idMonstro, pendencia);
             const urlImagem = `https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/mob/invasao/${nomeDoArquivo}.png`;
 
-            this.carregarTexturaMonstroInvasao(chaveTextura, urlImagem, tamanhoDoCorteDaImagemOriginal)
+            const carregamentoTextura = this.carregarTexturaMonstroInvasao(
+                chaveTextura,
+                urlImagem,
+                tamanhoDoCorteDaImagemOriginal
+            )
                 .then(() => {
                     if (this.monstrosAguardandoTextura.get(idMonstro) !== pendencia) return;
                     this.monstrosAguardandoTextura.delete(idMonstro);
@@ -927,7 +931,9 @@ class MotorDeInvasao {
                         this.monstrosAguardandoTextura.delete(idMonstro);
                     }
                     console.warn("Não foi possível preparar a imagem do monstro da invasão:", erro);
+                    throw erro;
                 });
+            this.scene.registrarCarregamentoMobInicial?.(carregamentoTextura);
             return;
         }
 
