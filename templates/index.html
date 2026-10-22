@@ -24,7 +24,7 @@
     <link rel="stylesheet" href="/static/css/estilos_combate.css?v=115">
     <link rel="stylesheet" href="/static/css/arena_pvp.css">
     <link rel="stylesheet" href="/static/css/coliseu_pvp.css?v=16">
-    <link rel="stylesheet" href="/static/css/social.css?v=1010">
+    <link rel="stylesheet" href="/static/css/social.css?v=central-news-20261021">
     <link rel="stylesheet" href="/static/css/missoes.css?v9">
     <link rel="stylesheet" href="/static/css/loja_reino.css?v=6">
     <link rel="stylesheet" href="/static/css/guild_missions.css?v=2">
@@ -1144,6 +1144,14 @@
                 </div>
 
                 <div id="conteudo-social" class="social-content">
+                    <section id="aviso-central-eldora" class="aviso-central-eldora" hidden aria-live="polite">
+                        <span class="aviso-central-icone" aria-hidden="true">📜</span>
+                        <div class="aviso-central-texto">
+                            <strong id="aviso-central-titulo"></strong>
+                            <p id="aviso-central-mensagem"></p>
+                        </div>
+                        <button id="aviso-central-abrir" type="button">Ver novidade</button>
+                    </section>
                     <div id="chat-box" class="chat-historico">
                         <p style="color: #64748b; text-align: center; font-size: 0.8em;">Bem-vindo ao chat global!</p>
                     </div>
@@ -1255,6 +1263,7 @@
     <script src="/static/js/mapa_multiplayer.js?v=41"></script>
     <script src="/static/js/mercado.js?v=1267"></script>
     <script src="/static/js/central_eldora.js?v=7"></script>
+    <script src="/static/js/central_eldora_notifications.js?v=20261021-1"></script>
     <script src="/static/js/cla.js?v=8"></script>
     <script src="/static/js/guild_missions.js?v=3"></script>
     <script src="/static/js/loja_aventureiro.js?v=5"></script>
@@ -1448,6 +1457,9 @@
             window.eldoraCharacterName = personagem.nome || localStorage.getItem('jogadorEldoraNome') || 'Aventureiro';
             localStorage.setItem('jogadorEldoraID', charId);
             localStorage.setItem('jogadorEldoraNome', window.eldoraCharacterName);
+            if (typeof window.carregarNovidadesCentralEldora === 'function') {
+                window.carregarNovidadesCentralEldora();
+            }
 
             try {
                 window.atualizarCarregamento(30, "Consultando os Deuses de Eldora...");

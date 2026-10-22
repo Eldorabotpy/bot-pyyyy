@@ -109,6 +109,51 @@ def require_csrf():
         raise ValueError('Sessão expirada. Atualize a página e tente novamente.')
 
 
+def _jogador_selecionado():
+    """Obtém o personagem ativo da sessão validada do portal."""
+    character_id = str(session.get('portal_character') or '')
+    if not ObjectId.is_valid(character_id):
+        raise PlayerSessionError('Selecione um personagem antes de continuar.', 401)
+    return require_player_identity(character_id)
+
+
+@portal_auth_bp.get('/api/central-eldora/novidades')
+def central_eldora_novidades():
+    try:
+        player = _jogador_selecionado()
+        from modules.central_eldora_news import obter_novidades_nao_lidas
+        from modules.player.core import users_collection
+        leitura = users_collection.database['central_eldora_news_reads'].find_one(
+            {'_id': player['_id']}, {'ids_lidos': 1}
+        ) or {}
+        response = jsonify(novidades=obter_novidades_nao_lidas(leitura.get('ids_lidos', [])))
+        response.headers['Cache-Control'] = 'no-store'
+        return response
+    except PlayerSessionError as exc:
+        return jsonify(erro=str(exc)), exc.status_code
+
+
+@portal_auth_bp.post('/api/central-eldora/novidades/lida')
+def marcar_novidade_central_eldora_lida():
+    try:
+        require_csrf()
+        player = _jogador_selecionado()
+        novidade_id = str((request.get_json(silent=True) or {}).get('id') or '')
+        from modules.central_eldora_news import CENTRAL_ELDORA_NEWS
+        if novidade_id not in {item['id'] for item in CENTRAL_ELDORA_NEWS}:
+            return jsonify(erro='Novidade não encontrada.'), 404
+        from modules.player.core import users_collection
+        users_collection.database['central_eldora_news_reads'].update_one(
+            {'_id': player['_id']},
+            {'$addToSet': {'ids_lidos': novidade_id}},
+            upsert=True,
+        )
+        return jsonify(sucesso=True)
+    except PlayerSessionError as exc:
+        return jsonify(erro=str(exc)), exc.status_code
+    except ValueError as exc:
+        return jsonify(erro=str(exc)), 403
+
 def limit_attempts():
     from modules.player.core import db
     bucket = int(time.time()) // 900
