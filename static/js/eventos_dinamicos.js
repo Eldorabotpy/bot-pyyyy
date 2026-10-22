@@ -13,7 +13,7 @@
         if(!response.ok || data.success===false) throw new Error(data.error||'Não foi possível concluir a solicitação.');
         return data;
     }
-    window.abrirEventosEldora = async function(){
+    window.abrirEventosEldora = async function(eventId){
         const overlay=$('modal-eventos-eldora'); if(!overlay)return;
         clearInterval(countdownTimer);
         overlay.classList.add('aberto'); overlay.setAttribute('aria-hidden','false');
@@ -22,7 +22,7 @@
             const data=await getJson('/api/eventos');
             const list=data.events||[];
             if(!list.length){$('eventos-conteudo').innerHTML='<p class="eventos-empty">Nenhum evento está programado neste momento. Volte em breve, aventureiro.</p>';return;}
-            currentEvent=list.find(e=>e.state==='active')||list[0]; activeTab='overview'; rankingPage=1; await renderEvent();
+            currentEvent=list.find(e=>String(e.id)===String(eventId))||list.find(e=>e.state==='active')||list[0]; activeTab='overview'; rankingPage=1; await renderEvent();
         }catch(error){$('eventos-conteudo').innerHTML=`<p class="eventos-error">${esc(error.message)}</p>`;}
     };
     window.fecharEventosEldora = function(){const el=$('modal-eventos-eldora');if(el){el.classList.remove('aberto');el.setAttribute('aria-hidden','true');document.body.style.overflow='';}clearInterval(countdownTimer);};
@@ -35,7 +35,7 @@
         $('eventos-conteudo').innerHTML=`
           <header class="eventos-hero"><span class="eventos-kicker">Evento comunitário · ${state}</span><h2 id="eventos-titulo">${esc(ev.title)}</h2><p class="eventos-desc">${esc(ev.description||'')}</p></header>
           <div class="eventos-meta"><span>⏳ <b data-event-end="${esc(ev.ends_at)}">${dateRemaining(ev.ends_at)}</b></span><span>🛡️ ${Number(ev.participant_count||0).toLocaleString('pt-BR')} participantes</span><span>🌑 Sua contribuição: ${Number(personal.points||0).toLocaleString('pt-BR')} pts</span><span>📅 Hoje: ${Number(personal.points_today||0).toLocaleString('pt-BR')} / ${Number(ev.daily_cap||0)}</span></div>
-          <div class="eventos-progress-label"><span>Integridade da Fenda Sombria</span><b>${Number(ev.global_points||0).toLocaleString('pt-BR')} / ${Number(ev.global_goal||0).toLocaleString('pt-BR')}</b></div><div class="eventos-progress" aria-label="Progresso coletivo"><i style="width:${pct}%"></i></div>
+          <div class="eventos-progress-label"><span>Progresso coletivo</span><b>${Number(ev.global_points||0).toLocaleString('pt-BR')} / ${Number(ev.global_goal||0).toLocaleString('pt-BR')}</b></div><div class="eventos-progress" aria-label="Progresso coletivo"><i style="width:${pct}%"></i></div>
           <nav class="eventos-tabs"><button class="${activeTab==='overview'?'active':''}" data-tab="overview">Visão geral</button><button class="${activeTab==='missions'?'active':''}" data-tab="missions">Missões</button><button class="${activeTab==='rewards'?'active':''}" data-tab="rewards">Recompensas</button><button class="${activeTab==='ranking'?'active':''}" data-tab="ranking">Ranking</button></nav>
           <div class="eventos-panel" id="eventos-panel"></div>`;
         if(ev.banner && /^https:\/\//i.test(ev.banner)) $('eventos-conteudo').querySelector('.eventos-hero').style.backgroundImage=`linear-gradient(100deg,#130d20ee,#2b1639aa),url("${ev.banner.replace(/["\\\\\n\r]/g,'')}")`;
@@ -49,7 +49,7 @@
     async function renderTab(){
         const panel=$('eventos-panel'), ev=currentEvent, personal=ev.personal||{};
         if(activeTab==='overview'){
-            panel.innerHTML=`<div class="eventos-row"><div><b>${ev.global_completed_at?'A fenda foi estabilizada!':'A fenda ainda ameaça Eldora'}</b><small>Derrote criaturas corrompidas no mapa. Elites corrompidos concedem mais pontos.</small></div><span class="eventos-pill">Meta ${Number(ev.global_goal).toLocaleString('pt-BR')} pts</span></div><div class="eventos-row"><div><b>Seu limite diário</b><small>Caçada manual e Premium compartilham o mesmo limite.</small></div><span class="eventos-pill">${Number(personal.points_today||0)} / ${Number(ev.daily_cap)} pts</span></div>`;
+            panel.innerHTML=`<div class="eventos-row"><div><b>${ev.global_completed_at?'Meta coletiva alcançada!':'Evento em andamento'}</b><small>${esc(ev.description||'Contribua para alcançar a meta coletiva do evento.')}</small></div><span class="eventos-pill">Meta ${Number(ev.global_goal).toLocaleString('pt-BR')} pts</span></div><div class="eventos-row"><div><b>Seu limite diário</b><small>Caçada manual e Premium compartilham o mesmo limite.</small></div><span class="eventos-pill">${Number(personal.points_today||0)} / ${Number(ev.daily_cap)} pts</span></div>`;
         } else if(activeTab==='missions'){
             const names={creature:'Derrotar criatura elegível',elite:'Derrotar monstro elite',dungeon:'Concluir masmorra elegível',event_boss:'Derrotar chefe do evento'};
             panel.innerHTML=Object.entries(ev.rules||{}).map(([key,points])=>`<div class="eventos-row"><div><b>${names[key]||esc(key)}</b><small>Pontuação definida pelo servidor. Limite diário de ${Number(ev.daily_cap)} pontos.</small></div><span class="eventos-pill">+${Number(points)} pts</span></div>`).join('')||'<p class="eventos-empty">Nenhuma atividade configurada.</p>';

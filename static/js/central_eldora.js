@@ -104,8 +104,66 @@
     let centralHeroTrocaId =
     0;
 
+    let centralEventosRequestId = 0;
+
     function elemento(id) {
         return document.getElementById(id);
+    }
+
+    function escaparHtmlEvento(valor) {
+        return String(valor ?? "").replace(/[&<>"']/g, function (caractere) {
+            return { "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[caractere];
+        });
+    }
+
+    function dataEventoCentral(valor) {
+        const data = new Date(valor);
+        if (!Number.isFinite(data.getTime())) return "Data a confirmar";
+        return data.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
+    }
+
+    async function carregarEventosCentral() {
+        const lista = elemento("central-eventos-lista");
+        if (!lista) return;
+        const requestId = ++centralEventosRequestId;
+        lista.innerHTML = '<p class="central-eventos-mensagem">Consultando os eventos do reino…</p>';
+        try {
+            const resposta = await fetch("/api/eventos", { credentials: "same-origin" });
+            const dados = await resposta.json();
+            if (!resposta.ok || dados.success === false) throw new Error(dados.error || "Não foi possível consultar os eventos.");
+            if (requestId !== centralEventosRequestId) return;
+            const eventos = Array.isArray(dados.events) ? dados.events : [];
+            eventos.sort((a, b) => a.state !== b.state ? (a.state === "active" ? -1 : 1) : new Date(a.starts_at) - new Date(b.starts_at));
+            const cards = eventos.map(function (evento) {
+                const estado = evento.state === "active" ? "active" : "scheduled";
+                const dataReferencia = estado === "active" ? evento.ends_at : evento.starts_at;
+                const prefixoData = estado === "active" ? "Termina" : "Começa";
+                const rotuloEstado = estado === "active" ? "Em andamento" : "Programado";
+                const icone = estado === "active" ? "🔥" : "📅";
+                return `
+                    <article class="central-card central-evento-card">
+                        <div class="central-card-icone" aria-hidden="true">${icone}</div>
+                        <div class="central-evento-card-conteudo">
+                            <h4>${escaparHtmlEvento(evento.title || "Evento do Reino")}</h4>
+                            <p>${escaparHtmlEvento(evento.description || "Um novo acontecimento movimenta Eldora.")}</p>
+                            <span class="central-evento-status" data-state="${estado}">${rotuloEstado} · ${prefixoData} ${dataEventoCentral(dataReferencia)}</span>
+                        </div>
+                        <button type="button" class="central-evento-acao" data-evento-id="${escaparHtmlEvento(evento.id)}">Ver detalhes</button>
+                    </article>`;
+            }).join("");
+            lista.innerHTML = (cards || '<p class="central-eventos-mensagem">Nenhum evento está programado no momento. Volte em breve, aventureiro.</p>')
+                + '<button type="button" class="central-eventos-atualizar">↻ Atualizar eventos</button>';
+            lista.querySelector(".central-eventos-atualizar")?.addEventListener("click", carregarEventosCentral);
+            lista.querySelectorAll("[data-evento-id]").forEach(function (botao) {
+                botao.addEventListener("click", function () {
+                    if (typeof window.abrirEventosEldora === "function") window.abrirEventosEldora(botao.dataset.eventoId);
+                });
+            });
+        } catch (erro) {
+            if (requestId !== centralEventosRequestId) return;
+            lista.innerHTML = `<p class="central-eventos-mensagem">${escaparHtmlEvento(erro.message || "Não foi possível carregar os eventos.")}</p><button type="button" class="central-eventos-atualizar">Tentar novamente</button>`;
+            lista.querySelector(".central-eventos-atualizar")?.addEventListener("click", carregarEventosCentral);
+        }
     }
 
     function escaparHtmlCentral(
@@ -900,6 +958,7 @@
         );
 
         if (abaId === 'enciclopedia') carregarEnciclopediaCentral();
+        if (abaId === 'eventos') carregarEventosCentral();
 
 
         // ====================================================

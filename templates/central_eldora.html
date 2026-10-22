@@ -652,6 +652,95 @@
     }
 
 
+    .central-grade-eventos {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 10px;
+    }
+
+    .central-evento-card {
+        display: grid;
+        grid-template-columns: 40px minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .central-evento-card .central-card-icone { margin: 0; }
+    .central-evento-card-conteudo { min-width: 0; }
+    .central-evento-card-conteudo p {
+        display: -webkit-box;
+        overflow: hidden;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+    }
+    .central-evento-status {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        margin-top: 7px;
+        color: #b9c4d2;
+        font-size: 0.64rem;
+        font-weight: 800;
+        text-transform: uppercase;
+    }
+    .central-evento-status::before {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: #e7b94f;
+        content: "";
+    }
+    .central-evento-status[data-state="active"]::before {
+        background: #43d18b;
+        box-shadow: 0 0 8px rgba(67, 209, 139, 0.65);
+    }
+    .central-evento-acao {
+        min-height: 36px;
+        padding: 0 10px;
+        border: 1px solid rgba(216, 184, 90, 0.42);
+        border-radius: 9px;
+        background: rgba(139, 108, 36, 0.24);
+        color: #fff0bd;
+        font-size: 0.68rem;
+        font-weight: 800;
+        cursor: pointer;
+    }
+    .central-eventos-mensagem {
+        grid-column: 1 / -1;
+        margin: 0;
+        padding: 14px;
+        border: 1px solid var(--ce-border);
+        border-radius: 12px;
+        color: #aab5c4;
+        background: rgba(20, 30, 46, 0.72);
+        font-size: 0.75rem;
+        line-height: 1.5;
+    }
+    .central-eventos-atualizar {
+        justify-self: start;
+        min-height: 34px;
+        margin-top: 2px;
+        padding: 0 12px;
+        border: 1px solid rgba(148, 163, 184, 0.2);
+        border-radius: 9px;
+        background: rgba(20, 30, 46, 0.86);
+        color: #d8e0ea;
+        font-size: 0.68rem;
+        font-weight: 800;
+        cursor: pointer;
+    }
+    @media (max-width: 420px) {
+        .central-evento-card { grid-template-columns: 36px minmax(0, 1fr); }
+        .central-evento-card .central-card-icone {
+            width: 36px;
+            height: 36px;
+        }
+        .central-evento-acao {
+            grid-column: 2;
+            justify-self: start;
+        }
+    }
+
     .central-card {
         position: relative;
 
@@ -2449,6 +2538,14 @@
                 <button
                     type="button"
                     class="central-eldora-aba-btn"
+                    data-central-tab="eventos"
+                >
+                    📅 Eventos
+                </button>
+
+                <button
+                    type="button"
+                    class="central-eldora-aba-btn"
                     data-central-tab="enciclopedia"
                 >
                     📚 Enciclopédia
@@ -2476,14 +2573,6 @@
                     data-central-tab="pvp"
                 >
                     🥊 PvP
-                </button>
-
-                <button
-                    type="button"
-                    class="central-eldora-aba-btn"
-                    data-central-tab="eventos"
-                >
-                    📅 Eventos
                 </button>
 
             </nav>
@@ -3558,35 +3647,8 @@
                     </p>
 
 
-                    <div class="central-grade">
-
-                        <article class="central-card">
-                            <div class="central-card-icone">
-                                🔥
-                            </div>
-
-                            <h4>Invasão do Reino</h4>
-
-                            <p>
-                                Defenda Eldora das forças
-                                invasoras.
-                            </p>
-                        </article>
-
-
-                        <article class="central-card">
-                            <div class="central-card-icone">
-                                🌌
-                            </div>
-
-                            <h4>Fenda Dimensional</h4>
-
-                            <p>
-                                Enfrente ameaças vindas
-                                além das fronteiras do mundo.
-                            </p>
-                        </article>
-
+                    <div id="central-eventos-lista" class="central-grade-eventos" aria-live="polite">
+                        <p class="central-eventos-mensagem">Consultando os eventos do reino…</p>
                     </div>
                 </section>
 
