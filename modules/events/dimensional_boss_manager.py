@@ -10,6 +10,7 @@ from datetime import datetime
 from typing import Any, Dict, Optional
 
 from bson import ObjectId
+from pymongo import ReturnDocument
 
 from modules.player.core import users_collection
 from modules.player.combat_stats import get_combat_stats_sync
@@ -18,6 +19,105 @@ from modules.events.dimensional_boss_registry import BOSS_DIMENSIONAL_CONFIG
 
 _evento_dimensional_ativo: Optional[Dict[str, Any]] = None
 _contadores_abates_dimensional: Dict[str, Dict[str, Any]] = {}
+_CONTADOR_DIMENSIONAL_ID = "abates_global"
+
+
+def _colecao_estado_dimensional():
+    try:
+        return users_collection.database["dimensional_boss_state"]
+    except Exception:
+        return None
+
+
+def _ler_contador_global_dimensional() -> Dict[str, Any]:
+    memoria = _contadores_abates_dimensional.get("__global__") or {}
+    colecao = _colecao_estado_dimensional()
+    if colecao is not None:
+        try:
+            salvo = colecao.find_one({"_id": _CONTADOR_DIMENSIONAL_ID})
+            if salvo:
+                salvo.pop("_id", None)
+                contador = {**memoria, **salvo}
+                _contadores_abates_dimensional["__global__"] = contador
+                return contador
+        except Exception:
+            pass
+    return memoria
+
+
+def _incrementar_contador_global_dimensional(regiao, spawn_id, monster_id, limite, chance):
+    colecao = _colecao_estado_dimensional()
+    agora = _agora()
+    if colecao is not None:
+        try:
+            contador = colecao.find_one_and_update(
+                {"_id": _CONTADOR_DIMENSIONAL_ID},
+                {
+                    "$inc": {"abates": 1},
+                    "$set": {
+                        "tipo": "global",
+                        "limite_abates": limite,
+                        "chance_percent": chance,
+                        "ultimo_mapa": regiao,
+                        "ultimo_spawn_id": spawn_id,
+                        "ultimo_monster_id": monster_id,
+                        "atualizado_em": agora,
+                    },
+                    "$setOnInsert": {"eventos_criados": 0},
+                },
+                upsert=True,
+                return_document=ReturnDocument.AFTER,
+            )
+            contador.pop("_id", None)
+            _contadores_abates_dimensional["__global__"] = contador
+            return contador
+        except Exception as exc:
+            print(f"⚠️ [DIMENSIONAL ABATES] Não foi possível persistir o contador: {exc}")
+
+    contador = _contadores_abates_dimensional.setdefault("__global__", {
+        "tipo": "global",
+        "abates": 0,
+        "limite_abates": limite,
+        "chance_percent": chance,
+        "eventos_criados": 0,
+    })
+    contador.update({
+        "limite_abates": limite,
+        "chance_percent": chance,
+        "ultimo_mapa": regiao,
+        "ultimo_spawn_id": spawn_id,
+        "ultimo_monster_id": monster_id,
+        "atualizado_em": agora,
+    })
+    contador["abates"] = int(contador.get("abates", 0) or 0) + 1
+    return contador
+
+
+def _resetar_contador_apos_meta(limite):
+    colecao = _colecao_estado_dimensional()
+    agora = _agora()
+    if colecao is not None:
+        try:
+            contador = colecao.find_one_and_update(
+                {"_id": _CONTADOR_DIMENSIONAL_ID, "abates": {"$gte": limite}},
+                {"$set": {"abates": 0, "ultimo_reset_em": agora, "atualizado_em": agora}},
+                return_document=ReturnDocument.AFTER,
+            )
+            if not contador:
+                return None
+            contador.pop("_id", None)
+            _contadores_abates_dimensional["__global__"] = contador
+            return contador
+        except Exception as exc:
+            print(f"⚠️ [DIMENSIONAL ABATES] Não foi possível resetar o contador: {exc}")
+
+    contador = _contadores_abates_dimensional.get("__global__")
+    if not contador or int(contador.get("abates", 0) or 0) < limite:
+        return None
+    contador["abates"] = 0
+    contador["ultimo_reset_em"] = agora
+    contador["atualizado_em"] = agora
+    return contador
 
 def _agora() -> float:
     return time.time()
@@ -304,7 +404,7 @@ def registrar_abate_mapa(
 
     # Se já existe Fenda ativa, não cria outra e não soma.
     if obter_evento_ativo():
-        contador_atual = _contadores_abates_dimensional.get("__global__", {}).get("abates", 0)
+        contador_atual = int(_ler_contador_global_dimensional().get("abates", 0) or 0)
 
         return {
             "success": True,
@@ -314,37 +414,14 @@ def registrar_abate_mapa(
             "abates": contador_atual
         }
 
-    contador = _contadores_abates_dimensional.setdefault("__global__", {
-        "tipo": "global",
-        "abates": 0,
-        "limite_abates": int(conf.get("limite_abates", 500)),
-        "chance_percent": float(conf.get("chance_percent", 100)),
-        "ultimo_mapa": None,
-        "ultimo_spawn_id": None,
-        "ultimo_monster_id": None,
-        "atualizado_em": _agora(),
-        "eventos_criados": 0
-    })
-
     limite = int(
-        conf.get(
-            "limite_abates",
-            contador.get("limite_abates", 500)
-        ) or 500
+        conf.get("limite_abates", 500) or 500
     )
 
-    chance = float(conf.get("chance_percent", contador.get("chance_percent", 100)) or 100)
-
-    contador["limite_abates"] = limite
-    contador["chance_percent"] = chance
-    contador["abates"] = int(contador.get("abates", 0) or 0) + 1
-
-    # Este mapa é importante:
-    # se bater o limite agora, a Fenda nasce aqui.
-    contador["ultimo_mapa"] = regiao
-    contador["ultimo_spawn_id"] = spawn_id
-    contador["ultimo_monster_id"] = monster_id
-    contador["atualizado_em"] = _agora()
+    chance = float(conf.get("chance_percent", 100) or 100)
+    contador = _incrementar_contador_global_dimensional(
+        regiao, spawn_id, monster_id, limite, chance
+    )
 
     if contador["abates"] < limite:
         return {
@@ -359,9 +436,20 @@ def registrar_abate_mapa(
             "faltam": max(0, limite - contador["abates"])
         }
 
-    # Bateu o limite: reseta o contador e rola a chance.
-    contador["abates"] = 0
-    contador["ultimo_reset_em"] = _agora()
+    # Um único processo reivindica o marco e reseta a contagem persistida.
+    contador = _resetar_contador_apos_meta(limite)
+    if not contador:
+        contador_atual = int(_ler_contador_global_dimensional().get("abates", 0) or 0)
+        return {
+            "success": True,
+            "contou": True,
+            "evento_criado": False,
+            "tipo": "global",
+            "regiao": regiao,
+            "abates": contador_atual,
+            "limite": limite,
+            "faltam": max(0, limite - contador_atual),
+        }
 
     rolagem = random.random() * 100
 
@@ -406,6 +494,19 @@ def registrar_abate_mapa(
 
     contador["eventos_criados"] = int(contador.get("eventos_criados", 0) or 0) + 1
     contador["ultimo_evento_id"] = evento.get("evento_id") if evento else None
+    colecao_contador = _colecao_estado_dimensional()
+    if colecao_contador is not None and evento:
+        try:
+            colecao_contador.update_one(
+                {"_id": _CONTADOR_DIMENSIONAL_ID},
+                {"$set": {
+                    "eventos_criados": contador["eventos_criados"],
+                    "ultimo_evento_id": contador["ultimo_evento_id"],
+                    "atualizado_em": _agora(),
+                }},
+            )
+        except Exception as exc:
+            print(f"⚠️ [DIMENSIONAL ABATES] Não foi possível salvar o evento criado: {exc}")
 
     _emitir_fenda_dimensional_surgiu(socketio, evento, "contador_abates_global")
 
@@ -427,7 +528,7 @@ def obter_status_abates_dimensional() -> Dict[str, Any]:
     mapas = BOSS_DIMENSIONAL_CONFIG.get("mapas_permitidos", [])
     conf = _config_abates_dimensional("default")
 
-    contador = _contadores_abates_dimensional.get("__global__") or {}
+    contador = _ler_contador_global_dimensional()
 
     return {
         "success": True,
@@ -803,4 +904,5 @@ def encerrar_evento_debug() -> Dict[str, Any]:
         "message": "Fenda Dimensional encerrada.",
         "evento_id": evento_id
     }
+
 

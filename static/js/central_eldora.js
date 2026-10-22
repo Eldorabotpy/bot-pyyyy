@@ -125,20 +125,39 @@
     async function carregarEventosCentral() {
         const lista = elemento("central-eventos-lista");
         if (!lista) return;
+
         const requestId = ++centralEventosRequestId;
         lista.innerHTML = '<p class="central-eventos-mensagem">Consultando os eventos do reino…</p>';
+
         try {
-            const resposta = await fetch("/api/eventos", { credentials: "same-origin" });
+            const [resposta, respostaDimensional] = await Promise.all([
+                fetch("/api/eventos", { credentials: "same-origin" }),
+                fetch("/api/dimensional/abates_status", { credentials: "same-origin" }).catch(() => null),
+            ]);
             const dados = await resposta.json();
-            if (!resposta.ok || dados.success === false) throw new Error(dados.error || "Não foi possível consultar os eventos.");
+            if (!resposta.ok || dados.success === false) {
+                throw new Error(dados.error || "Não foi possível consultar os eventos.");
+            }
             if (requestId !== centralEventosRequestId) return;
+
+            let statusDimensional = null;
+            if (respostaDimensional?.ok) {
+                const payloadDimensional = await respostaDimensional.json().catch(() => null);
+                if (payloadDimensional?.success) statusDimensional = payloadDimensional;
+            }
+
             const eventos = Array.isArray(dados.events) ? dados.events : [];
-            eventos.sort((a, b) => a.state !== b.state ? (a.state === "active" ? -1 : 1) : new Date(a.starts_at) - new Date(b.starts_at));
+            eventos.sort(function (a, b) {
+                if (a.state !== b.state) return a.state === "active" ? -1 : 1;
+                return new Date(a.starts_at) - new Date(b.starts_at);
+            });
+
+            const rotulosEstado = { active: "Em andamento", scheduled: "Programado" };
             const cards = eventos.map(function (evento) {
+                const id = escaparHtmlEvento(evento.id);
                 const estado = evento.state === "active" ? "active" : "scheduled";
                 const dataReferencia = estado === "active" ? evento.ends_at : evento.starts_at;
                 const prefixoData = estado === "active" ? "Termina" : "Começa";
-                const rotuloEstado = estado === "active" ? "Em andamento" : "Programado";
                 const icone = estado === "active" ? "🔥" : "📅";
                 return `
                     <article class="central-card central-evento-card">
@@ -146,17 +165,63 @@
                         <div class="central-evento-card-conteudo">
                             <h4>${escaparHtmlEvento(evento.title || "Evento do Reino")}</h4>
                             <p>${escaparHtmlEvento(evento.description || "Um novo acontecimento movimenta Eldora.")}</p>
-                            <span class="central-evento-status" data-state="${estado}">${rotuloEstado} · ${prefixoData} ${dataEventoCentral(dataReferencia)}</span>
+                            <span class="central-evento-status" data-state="${estado}">${rotulosEstado[estado]} · ${prefixoData} ${dataEventoCentral(dataReferencia)}</span>
                         </div>
-                        <button type="button" class="central-evento-acao" data-evento-id="${escaparHtmlEvento(evento.id)}">Ver detalhes</button>
+                        <button type="button" class="central-evento-acao" data-evento-id="${id}">Ver detalhes</button>
                     </article>`;
             }).join("");
-            lista.innerHTML = (cards || '<p class="central-eventos-mensagem">Nenhum evento está programado no momento. Volte em breve, aventureiro.</p>')
+
+            const contadorDimensional = statusDimensional?.contador_global;
+            const fendaAtiva = statusDimensional?.evento_ativo;
+            const progressoDisponivel = !!contadorDimensional;
+            const limiteAbates = Math.max(1, Number(contadorDimensional?.limite_abates || 500));
+            const abates = Math.max(0, Math.min(limiteAbates, Number(contadorDimensional?.abates || 0)));
+            const progressoAbates = Math.round((abates / limiteAbates) * 100);
+            const nomesMapas = {
+                capital_eldora: "Capital de Eldora",
+                pradaria_inicial: "Pradaria Inicial",
+                floresta_sombria: "Floresta Sombria",
+                pedreira_granito: "Pedreira de Granito",
+            };
+            const mapaFenda = nomesMapas[fendaAtiva?.mapa || fendaAtiva?.regiao] || "um dos mapas do reino";
+            const estadosFenda = {
+                aguardando_jogadores: "Portal aberto para entrada",
+                em_combate: "Batalha em andamento",
+                vitoria: "Fenda purificada",
+                derrota: "A Fenda venceu",
+            };
+            const estadoFenda = estadosFenda[fendaAtiva?.status] || "Fenda ativa";
+            const cardDimensional = `
+                <article class="central-card central-evento-card central-evento-dimensional">
+                    <div class="central-card-icone" aria-hidden="true">🌌</div>
+                    <div class="central-evento-card-conteudo">
+                        <h4>Fenda Dimensional</h4>
+                        <p>${fendaAtiva
+                            ? `${estadoFenda} em ${escaparHtmlEvento(mapaFenda)}.`
+                            : "Abates de mobs nos mapas permitidos alimentam o surgimento de uma nova Fenda."}</p>
+                        ${fendaAtiva
+                            ? `<span class="central-evento-status" data-state="active">Em andamento · ${escaparHtmlEvento(mapaFenda)}</span>`
+                            : progressoDisponivel
+                                ? `<div class="central-evento-progresso"><div class="central-evento-progresso-label"><span>Abates coletivos</span><b>${abates.toLocaleString("pt-BR")} / ${limiteAbates.toLocaleString("pt-BR")}</b></div><div class="central-evento-progresso-barra" role="progressbar" aria-label="Progresso dos abates para a Fenda Dimensional" aria-valuemin="0" aria-valuemax="${limiteAbates}" aria-valuenow="${abates}"><i style="width:${progressoAbates}%"></i></div></div>`
+                                : `<span class="central-evento-status">Progresso indisponível · tente atualizar</span>`}
+                    </div>
+                    ${fendaAtiva ? '<button type="button" class="central-evento-acao" data-abrir-fenda-dimensional>Ver Fenda</button>' : ""}
+                </article>`;
+
+            lista.innerHTML = cardDimensional + (cards || '<p class="central-eventos-mensagem">Nenhum outro evento está programado no momento. Volte em breve, aventureiro.</p>')
                 + '<button type="button" class="central-eventos-atualizar">↻ Atualizar eventos</button>';
+
             lista.querySelector(".central-eventos-atualizar")?.addEventListener("click", carregarEventosCentral);
+            lista.querySelector("[data-abrir-fenda-dimensional]")?.addEventListener("click", function () {
+                if (typeof window.abrirTelaBossDimensional === "function") {
+                    window.abrirTelaBossDimensional();
+                }
+            });
             lista.querySelectorAll("[data-evento-id]").forEach(function (botao) {
                 botao.addEventListener("click", function () {
-                    if (typeof window.abrirEventosEldora === "function") window.abrirEventosEldora(botao.dataset.eventoId);
+                    if (typeof window.abrirEventosEldora === "function") {
+                        window.abrirEventosEldora(botao.dataset.eventoId);
+                    }
                 });
             });
         } catch (erro) {

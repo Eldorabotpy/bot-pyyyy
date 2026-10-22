@@ -2055,11 +2055,8 @@ def handle_entrar_regiao(data):
                 "evento_id": evento_dimensional.get("evento_id"),
                 "mapa": mapa_fenda,
                 "regiao": mapa_fenda,
+                "silencioso": True,
                 "mensagem": f"🌌 Uma Fenda Dimensional está ativa em {mapa_fenda}!"
-            }, to=player_sid)
-        else:
-            emit("fendaDimensionalEncerrada", {
-                "mensagem": "Nenhuma Fenda Dimensional ativa."
             }, to=player_sid)
 
     except Exception as e:

@@ -2178,11 +2178,13 @@
             atualizarBotaoDimensional();
             sincronizarDimensionalNoMapa();
 
-            dimensionalNotificar(
-                "Fenda Dimensional",
-                payload.mensagem || `Uma Fenda Dimensional surgiu em ${mapaNome}!`,
-                "🌌"
-            );
+            if (!payload.silencioso) {
+                dimensionalNotificar(
+                    "Fenda Dimensional",
+                    payload.mensagem || `Uma Fenda Dimensional surgiu em ${mapaNome}!`,
+                    "🌌"
+                );
+            }
 
             console.log("🌌 [DIMENSIONAL SOCKET] Fenda surgiu:", payload);
         });

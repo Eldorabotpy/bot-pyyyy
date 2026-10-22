@@ -694,6 +694,40 @@
         background: #43d18b;
         box-shadow: 0 0 8px rgba(67, 209, 139, 0.65);
     }
+    .central-evento-progresso {
+        margin-top: 8px;
+    }
+
+    .central-evento-progresso-label {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        margin-bottom: 5px;
+        color: #b9c4d2;
+        font-size: 0.64rem;
+    }
+
+    .central-evento-progresso-label b {
+        color: #ead7ff;
+        white-space: nowrap;
+    }
+
+    .central-evento-progresso-barra {
+        height: 6px;
+        overflow: hidden;
+        border: 1px solid rgba(167, 139, 250, 0.35);
+        border-radius: 999px;
+        background: rgba(15, 23, 42, 0.9);
+    }
+
+    .central-evento-progresso-barra i {
+        display: block;
+        height: 100%;
+        border-radius: inherit;
+        background: linear-gradient(90deg, #7c3aed, #c4b5fd);
+        transition: width 180ms ease;
+    }
+
     .central-evento-acao {
         min-height: 36px;
         padding: 0 10px;
