@@ -1079,7 +1079,7 @@ background-size: cover;
     appearance: none !important;
 }
 
-/* Mobile: painel flutuante, sem ocupar a altura inteira do Telegram. */
+/* Mobile: painel lateral encostado à borda externa da tela. */
 @media (max-width: 600px) and (orientation: portrait) {
     #menu-overlay {
         background: rgba(3, 8, 14, .46);
@@ -1088,35 +1088,37 @@ background-size: cover;
     }
 
     #side-menu.eldora-menu {
-        inset: 50% 12px auto auto;
+        inset: 0 0 0 auto;
         width: min(320px, calc(100vw - 32px));
         max-width: 320px;
-        height: min(520px, 82dvh);
-        max-height: calc(100dvh - 40px);
+        height: 100dvh;
+        max-height: 100dvh;
         border: 1px solid rgba(224, 188, 102, .72);
-        border-radius: 22px;
-        transform: translate(110%, -50%);
-        box-shadow: 0 18px 54px rgba(0, 0, 0, .62), inset 0 1px rgba(255, 247, 221, .06);
+        border-right: 0;
+        border-radius: 22px 0 0 22px;
+        transform: translateX(110%);
+        box-shadow: -18px 0 54px rgba(0, 0, 0, .62), inset 1px 0 rgba(255, 247, 221, .06);
     }
 
     #side-menu.eldora-menu.aberto {
-        transform: translate(0, -50%);
+        transform: translateX(0);
     }
 }
 
-/* Em paisagem com pouca altura, preserve espaço para o jogo e os controles. */
+/* Em paisagem, a gaveta também acompanha toda a altura disponível. */
 @media (max-width: 600px) and (orientation: landscape) and (max-height: 520px) {
     #side-menu.eldora-menu {
-        inset: 50% 8px auto auto;
+        inset: 0 0 0 auto;
         width: min(320px, calc(100vw - 24px));
-        height: calc(100dvh - 20px);
-        max-height: calc(100dvh - 20px);
+        height: 100dvh;
+        max-height: 100dvh;
         border: 1px solid rgba(224, 188, 102, .72);
-        border-radius: 18px;
-        transform: translate(110%, -50%);
+        border-right: 0;
+        border-radius: 18px 0 0 18px;
+        transform: translateX(110%);
     }
 
     #side-menu.eldora-menu.aberto {
-        transform: translate(0, -50%);
+        transform: translateX(0);
     }
 }
