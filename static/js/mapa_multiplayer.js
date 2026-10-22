@@ -501,7 +501,6 @@ class MotorMultiplayer {
         this.socket.off('solicitarRegistro');
         
         // 👇 ADICIONE ESTAS LINHAS AQUI PARA BLINDAR OS MONSTROS E JOGADORES:
-        this.socket.off('carregarMobsMapa');
         this.socket.off('jogadoresAtuais');
         this.socket.off('registroRegiaoConfirmado');
         this.socket.off('registroRegiaoFalhou');
