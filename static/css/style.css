@@ -20,6 +20,15 @@ input, textarea {
 
 body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--tg-theme-bg-color, #121212); color: var(--tg-theme-text-color, #e0e0e0); margin: 0; padding: 0; padding-bottom: 0 !important; }
 header { background-color: var(--tg-theme-secondary-bg-color, #1a1a1a); padding: 12px; text-align: center; border-bottom: 2px solid #f39c12; box-shadow: 0 2px 10px rgba(0,0,0,0.5); }
+.eldora-topbar {
+    box-sizing: border-box;
+    display: block;
+    height: 50px;
+    padding: 0;
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+}
 header h1 { margin: 0; font-size: 1.1em; color: #f39c12; text-transform: uppercase; letter-spacing: 2px; }
 /* Removemos os 90px de baixo */
 .tab-content { display: none; padding: 20px 20px 20px 20px; animation: fadeIn 0.3s; }
