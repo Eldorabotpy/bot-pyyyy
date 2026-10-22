@@ -2186,6 +2186,9 @@ class MapaScene extends Phaser.Scene {
         
         this.input.on('pointerdown', (pointer) => {
 
+            const taverna = document.getElementById('hub-social');
+            if (taverna && getComputedStyle(taverna).display !== 'none') return;
+
             if (this.isDead || window.BruxaPocoes?.aberta || window.__mercadoAberto || window.__guildaAberta || window.combateAbertoBloqueandoMapa || window.__eldoraDialogAberto || window.__oficinaRunasAberta) return;
 
             // O clique no selo do Mercado é tratado pelo próprio emblema, sem
@@ -2478,6 +2481,11 @@ class MapaScene extends Phaser.Scene {
         }
         // ==========================================
         this.input.on('gameobjectdown', (pointer, gameObject, event) => {
+            const taverna = document.getElementById('hub-social');
+            if (taverna && getComputedStyle(taverna).display !== 'none') {
+                if (event) event.stopPropagation();
+                return;
+            }
             
             // 🔥 TRAVA DE AÇÃO: Bloqueia clique em NPCs ou Monstros durante a coleta
             if (this.player && this.player.isGathering) {
