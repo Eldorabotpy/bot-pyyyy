@@ -130,9 +130,10 @@
         lista.innerHTML = '<p class="central-eventos-mensagem">Consultando os eventos do reino…</p>';
 
         try {
-            const [resposta, respostaDimensional] = await Promise.all([
+            const [resposta, respostaDimensional, respostaInvasao] = await Promise.all([
                 fetch("/api/eventos", { credentials: "same-origin" }),
                 fetch("/api/dimensional/abates_status", { credentials: "same-origin" }).catch(() => null),
+                fetch("/api/invasao_reino/status", { credentials: "same-origin" }).catch(() => null),
             ]);
             const dados = await resposta.json();
             if (!resposta.ok || dados.success === false) {
@@ -144,6 +145,12 @@
             if (respostaDimensional?.ok) {
                 const payloadDimensional = await respostaDimensional.json().catch(() => null);
                 if (payloadDimensional?.success) statusDimensional = payloadDimensional;
+            }
+
+            let statusInvasaoReino = null;
+            if (respostaInvasao?.ok) {
+                const payloadInvasao = await respostaInvasao.json().catch(() => null);
+                if (payloadInvasao?.success) statusInvasaoReino = payloadInvasao;
             }
 
             const eventos = Array.isArray(dados.events) ? dados.events : [];
@@ -208,7 +215,28 @@
                     ${fendaAtiva ? '<button type="button" class="central-evento-acao" data-abrir-fenda-dimensional>Ver Fenda</button>' : ""}
                 </article>`;
 
-            lista.innerHTML = cardDimensional + (cards || '<p class="central-eventos-mensagem">Nenhum outro evento está programado no momento. Volte em breve, aventureiro.</p>')
+            const segundosInvasao = Math.max(0, Number(statusInvasaoReino?.remaining_seconds || 0));
+            const duracaoInvasao = segundosInvasao >= 3600
+                ? `${Math.floor(segundosInvasao / 3600)}h ${Math.floor((segundosInvasao % 3600) / 60)}min`
+                : `${Math.ceil(segundosInvasao / 60)}min`;
+            const estadoInvasao = statusInvasaoReino?.state === "active"
+                ? `Em andamento · Onda ${Number(statusInvasaoReino.wave || 1)} · restam ${duracaoInvasao}`
+                : statusInvasaoReino?.state === "preparing"
+                    ? `Preparação · começa em ${duracaoInvasao}`
+                    : `Próxima invasão · ${statusInvasaoReino?.next_at ? dataEventoCentral(statusInvasaoReino.next_at) : "horário a confirmar"}`;
+            const cardInvasaoReino = `
+                <article class="central-card central-evento-card">
+                    <div class="central-card-icone" aria-hidden="true">🔥</div>
+                    <div class="central-evento-card-conteudo">
+                        <h4>Invasão do Reino</h4>
+                        <p>Defenda a Capital de Eldora contra as ondas de criaturas invasoras.</p>
+                        <span class="central-evento-status" data-state="${statusInvasaoReino?.state === "active" || statusInvasaoReino?.state === "preparing" ? "active" : "scheduled"}">${escaparHtmlEvento(estadoInvasao)}</span>
+                        <span class="central-evento-status">Diariamente · 08h, 14h, 19h e 23h · horário de Brasília</span>
+                    </div>
+                </article>`;
+
+
+            lista.innerHTML = cardInvasaoReino + cardDimensional + (cards || '<p class="central-eventos-mensagem">Nenhum outro evento está programado no momento. Volte em breve, aventureiro.</p>')
                 + '<button type="button" class="central-eventos-atualizar">↻ Atualizar eventos</button>';
 
             lista.querySelector(".central-eventos-atualizar")?.addEventListener("click", carregarEventosCentral);

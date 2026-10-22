@@ -1,10 +1,49 @@
 from datetime import datetime, timedelta, timezone
+import time
+try:
+    from zoneinfo import ZoneInfo
+except ImportError:
+    ZoneInfo = None
 
 from flask import Blueprint, current_app, jsonify, request
 
 from modules.events import dynamic_event_service as events
 
 dynamic_events_bp = Blueprint("dynamic_events", __name__)
+
+@dynamic_events_bp.get("/api/invasao_reino/status")
+def invasion_schedule_status():
+    """Publica o estado e o próximo horário da invasão diária da Capital."""
+    try:
+        fuso = ZoneInfo("America/Sao_Paulo") if ZoneInfo else None
+    except Exception:
+        fuso = None
+    if fuso is None:
+        fuso = timezone(timedelta(hours=-3))
+    agora = datetime.now(fuso)
+    horarios = (8, 14, 19, 23)
+    proximos = [
+        agora.replace(hour=hora, minute=0, second=0, microsecond=0)
+        for hora in horarios
+    ]
+    proximo_inicio = next((data for data in proximos if data > agora), None)
+    if proximo_inicio is None:
+        amanha = agora + timedelta(days=1)
+        proximo_inicio = amanha.replace(hour=horarios[0], minute=0, second=0, microsecond=0)
+
+    invasao = current_app.config.get("SISTEMA_INVASAO_MAPA")
+    preparando = bool(getattr(invasao, "preparacao_ativa", False))
+    ativa = bool(getattr(invasao, "evento_ativo", False))
+    restante = max(0, int(getattr(invasao, "tempo_final_evento", 0) - time.time())) if (preparando or ativa) else 0
+    return jsonify(
+        success=True,
+        state="active" if ativa else "preparing" if preparando else "scheduled",
+        wave=int(getattr(invasao, "onda_atual", 0) or 0) if ativa else 0,
+        remaining_seconds=restante,
+        next_at=proximo_inicio.isoformat(),
+        schedule=[f"{hora:02d}:00" for hora in horarios],
+        timezone="America/Sao_Paulo",
+    )
 
 
 def _sincronizar_evento_no_mapa(*, force=True):
