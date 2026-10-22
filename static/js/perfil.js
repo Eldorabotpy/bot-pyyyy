@@ -228,6 +228,51 @@ function normalizarProfissaoPerfil(valor) {
         .replace(/[\u0300-\u036f]/g, "");
 }
 
+function instalarAbasProfissoesPerfil() {
+    if (window.__eldoraAbasProfissoesInstaladas) return;
+    window.__eldoraAbasProfissoesInstaladas = true;
+
+    document.addEventListener('click', event => {
+        const tab = event.target?.closest?.('.perfil-v2-prof-tab');
+        const section = tab?.closest('.perfil-v2-profissoes');
+        if (!tab || !section) return;
+
+        const index = tab.dataset.profIndex;
+        section.querySelectorAll('.perfil-v2-prof-tab').forEach(button => {
+            const selected = button === tab;
+            button.classList.toggle('selecionada', selected);
+            button.setAttribute('aria-selected', String(selected));
+            button.tabIndex = selected ? 0 : -1;
+        });
+
+        section.querySelectorAll('.perfil-v2-prof-detalhe').forEach(panel => {
+            const selected = panel.dataset.profIndex === index;
+            panel.hidden = !selected;
+            panel.classList.remove('is-entering');
+            if (selected) {
+                void panel.offsetWidth;
+                panel.classList.add('is-entering');
+            }
+        });
+    });
+
+    document.addEventListener('keydown', event => {
+        const tab = event.target?.closest?.('.perfil-v2-prof-tab');
+        if (!tab || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+        const tabs = Array.from(tab.closest('[role="tablist"]')?.querySelectorAll('.perfil-v2-prof-tab') || []);
+        const current = tabs.indexOf(tab);
+        if (current < 0 || !tabs.length) return;
+        event.preventDefault();
+        const next = event.key === 'Home' ? 0
+            : event.key === 'End' ? tabs.length - 1
+            : (current + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
+        tabs[next].focus();
+        tabs[next].click();
+    });
+}
+
+instalarAbasProfissoesPerfil();
+
 function getNivelProfissaoPerfil(profKey) {
     const p = window.perfilDadosGlobais || {};
     const key = normalizarProfissaoPerfil(profKey);
@@ -547,119 +592,110 @@ async function carregarMeuPerfil() {
         const percentMP = Math.min(100, Math.max(0, (Number(p.mp_atual) / Math.max(1, Number(p.mp_max))) * 100));
 
         // ==========================================
-        // 🌟 NOVO: MULTI-PROFISSÕES (LISTA COM SCROLL E BÔNUS)
+        // PROFISSÕES: SELEÇÃO POR ÍCONE E PAINEL DE STATUS
         // ==========================================
         let htmlProfissao = '';
 
-        // Junta a profissão atual com as aprendidas (caso o backend não tenha sincronizado 100%)
-        let profsAprendidas = p.learned_professions || {};
+        // Junta a profissão atual às profissões aprendidas sem alterar os dados do personagem.
+        const profsAprendidas = { ...(p.learned_professions || {}) };
         if (p.profession && (p.profession.key || p.profession.type)) {
-            let pKey = p.profession.key || p.profession.type;
+            const pKey = p.profession.key || p.profession.type;
             if (!profsAprendidas[pKey]) profsAprendidas[pKey] = p.profession;
         }
 
         const listaProfs = Object.values(profsAprendidas);
 
         if (listaProfs.length > 0) {
-            // Cartões responsivos de profissão; os dados e cálculos permanecem os mesmos.
+            listaProfs.sort((a, b) => (Number(b.level) || 1) - (Number(a.level) || 1));
+            const paineisProfissoes = [];
             htmlProfissao = `<section class="perfil-v2-profissoes" aria-label="Profissões do personagem">
                 <header class="perfil-v2-prof-cabecalho"><h3>Profissões</h3><span>${listaProfs.length} ${listaProfs.length === 1 ? 'ofício' : 'ofícios'}</span></header>
-                <div class="perfil-v2-profissoes-lista">`;
+                <p class="perfil-v2-prof-instrucao">Toque em uma profissão para consultar seus status.</p>
+                <div class="perfil-v2-profissoes-lista" role="tablist" aria-label="Selecionar profissão">`;
 
-            // Ordena pelo maior nível
-            listaProfs.sort((a, b) => (b.level || 1) - (a.level || 1));
-
-            listaProfs.forEach(profInfo => {
-                let profNivel = profInfo.level || 1;
-                let profXp = profInfo.xp || 0;
-
-                let xpNecessarioProf = 40 + (25 * (profNivel - 1)) + (8 * Math.pow(profNivel - 1, 2));
-                let percentProfXP = Math.min((profXp / xpNecessarioProf) * 100, 100);
-
-                let nomeProf = profInfo.display_name || profInfo.nome || profInfo.type || "Aprendiz";
-
-                let keyword = "";
-                let imgGenerica = "martelo_ferreiro";
+            listaProfs.forEach((profInfo, index) => {
+                const profNivel = Math.max(1, Number(profInfo.level) || 1);
+                const profXp = Math.max(0, Number(profInfo.xp) || 0);
+                const xpNecessarioProf = 40 + (25 * (profNivel - 1)) + (8 * Math.pow(profNivel - 1, 2));
+                const percentProfXP = Math.min((profXp / Math.max(1, xpNecessarioProf)) * 100, 100);
+                const nomeProf = profInfo.display_name || profInfo.nome || profInfo.type || 'Aprendiz';
+                let keyword = '';
+                let imgGenerica = 'martelo_ferreiro';
                 let isCrafting = false;
+                const profStr = String(profInfo.key || profInfo.type || '').toLowerCase();
 
-                const profStr = (profInfo.key || profInfo.type || "").toLowerCase();
+                // Profissões de coleta
+                if (profStr.includes('lenhador')) { keyword = 'machado'; imgGenerica = 'machado'; }
+                else if (profStr.includes('minerador')) { keyword = 'picareta'; imgGenerica = 'picareta'; }
+                else if (profStr.includes('colhedor')) { keyword = 'foice'; imgGenerica = 'foice'; }
+                else if (profStr.includes('esfolador')) { keyword = 'faca'; imgGenerica = 'faca'; }
+                else if (profStr.includes('alquimista')) { keyword = 'frasco'; imgGenerica = 'frasco'; }
+                // Profissões de produção
+                else if (profStr.includes('ferreiro')) { keyword = 'martelo_ferreiro'; imgGenerica = 'martelo_ferreiro'; isCrafting = true; }
+                else if (profStr.includes('armeiro')) { keyword = 'martelo_armeiro'; imgGenerica = 'martelo_armeiro'; isCrafting = true; }
+                else if (profStr.includes('alfaiate')) { keyword = 'alfaiate'; imgGenerica = 'kit_alfaiate'; isCrafting = true; }
+                else if (profStr.includes('joalheiro')) { keyword = 'joalheiro'; imgGenerica = 'kit_joalheiro'; isCrafting = true; }
+                else if (profStr.includes('curtidor')) { keyword = 'curtidor'; imgGenerica = 'kit_curtidor'; isCrafting = true; }
 
-                // 🌿 PROFISSÕES DE COLETA
-                if (profStr.includes('lenhador')) { keyword = "machado"; imgGenerica = "machado"; }
-                else if (profStr.includes('minerador')) { keyword = "picareta"; imgGenerica = "picareta"; }
-                else if (profStr.includes('colhedor')) { keyword = "foice"; imgGenerica = "foice"; }
-                else if (profStr.includes('esfolador')) { keyword = "faca"; imgGenerica = "faca"; }
-                else if (profStr.includes('alquimista')) { keyword = "frasco"; imgGenerica = "frasco"; }
+                const bonusTexto = isCrafting
+                    ? `Tempo de forja: -${(profNivel * 0.5).toFixed(1)}%`
+                    : `Drop fixo: +${Math.floor(profNivel / 10)} | Chance dupla: ${(profNivel * 0.5).toFixed(1)}%`;
 
-                // 🔨 PROFISSÕES DE PRODUÇÃO
-                else if (profStr.includes('ferreiro')) { keyword = "martelo_ferreiro"; imgGenerica = "martelo_ferreiro"; isCrafting = true; }
-                else if (profStr.includes('armeiro')) { keyword = "martelo_armeiro"; imgGenerica = "martelo_armeiro"; isCrafting = true; }
-                else if (profStr.includes('alfaiate')) { keyword = "alfaiate"; imgGenerica = "kit_alfaiate"; isCrafting = true; }
-                else if (profStr.includes('joalheiro')) { keyword = "joalheiro"; imgGenerica = "kit_joalheiro"; isCrafting = true; }
-                else if (profStr.includes('curtidor')) { keyword = "curtidor"; imgGenerica = "kit_curtidor"; isCrafting = true; }
+                const inventario = Array.isArray(p.inventario) ? p.inventario : [];
+                const ferramentaUser = keyword
+                    ? inventario.find(item => String(item?.base_id || '').toLowerCase().includes(keyword))
+                    : null;
+                let corBordaT = '#475569';
+                let corFundoT = '#0f172a';
+                let glowT = 'rgba(0,0,0,0.5)';
+                let tierTxt = 'T1';
 
-                // 🔥 CÁLCULO DOS BÔNUS 🔥
-                let bonusTexto = "";
-                if (isCrafting) {
-                    bonusTexto = `Tempo de forja: -${(profNivel * 0.5).toFixed(1)}%`;
-                } else {
-                    bonusTexto = `Drop fixo: +${Math.floor(profNivel / 10)} | Chance dupla: ${(profNivel * 0.5).toFixed(1)}%`;
-                }
-
-                let imgFerramentaHtml = '';
-
-                // CORES PADRÃO (Tier 1)
-                let corBordaT = "#475569";
-                let corFundoT = "#0f172a";
-                let glowT = "rgba(0,0,0,0.5)";
-                let tierTxt = "T1";
-
-                if (keyword) {
-                    const inventario = Array.isArray(p.inventario) ? p.inventario : [];
-                    const ferramentaUser = inventario.find(i => i.base_id && i.base_id.toLowerCase().includes(keyword));
-                    if (ferramentaUser) {
-                        const idItem = ferramentaUser.base_id.toLowerCase();
-
-                        if (idItem.includes('ferro') || idItem.includes('ceramica') || idItem.includes('_t2')) {
-                            corBordaT = "#22c55e"; corFundoT = "rgba(34, 197, 94, 0.1)"; glowT = "rgba(34, 197, 94, 0.4)"; tierTxt = "T2";
-                        }
-                        else if (idItem.includes('aco') || idItem.includes('cristal') || idItem.includes('_t3')) {
-                            corBordaT = "#3b82f6"; corFundoT = "rgba(59, 130, 246, 0.1)"; glowT = "rgba(59, 130, 246, 0.4)"; tierTxt = "T3";
-                        }
-                        else if (idItem.includes('mithril') || idItem.includes('obsidiana') || idItem.includes('runico') || idItem.includes('_t4')) {
-                            corBordaT = "#a855f7"; corFundoT = "rgba(168, 85, 247, 0.1)"; glowT = "rgba(168, 85, 247, 0.4)"; tierTxt = "T4";
-                        }
-                        else if (idItem.includes('adamantio') || idItem.includes('vorpal') || idItem.includes('vazio') || idItem.includes('druidica') || idItem.includes('_t5')) {
-                            corBordaT = "#eab308"; corFundoT = "rgba(234, 179, 8, 0.1)"; glowT = "rgba(234, 179, 8, 0.4)"; tierTxt = "T5";
-                        }
+                if (ferramentaUser) {
+                    const idItem = String(ferramentaUser.base_id || '').toLowerCase();
+                    if (idItem.includes('ferro') || idItem.includes('ceramica') || idItem.includes('_t2')) {
+                        corBordaT = '#22c55e'; corFundoT = 'rgba(34, 197, 94, 0.1)'; glowT = 'rgba(34, 197, 94, 0.4)'; tierTxt = 'T2';
+                    } else if (idItem.includes('aco') || idItem.includes('cristal') || idItem.includes('_t3')) {
+                        corBordaT = '#3b82f6'; corFundoT = 'rgba(59, 130, 246, 0.1)'; glowT = 'rgba(59, 130, 246, 0.4)'; tierTxt = 'T3';
+                    } else if (idItem.includes('mithril') || idItem.includes('obsidiana') || idItem.includes('runico') || idItem.includes('_t4')) {
+                        corBordaT = '#a855f7'; corFundoT = 'rgba(168, 85, 247, 0.1)'; glowT = 'rgba(168, 85, 247, 0.4)'; tierTxt = 'T4';
+                    } else if (idItem.includes('adamantio') || idItem.includes('vorpal') || idItem.includes('vazio') || idItem.includes('druidica') || idItem.includes('_t5')) {
+                        corBordaT = '#eab308'; corFundoT = 'rgba(234, 179, 8, 0.1)'; glowT = 'rgba(234, 179, 8, 0.4)'; tierTxt = 'T5';
                     }
                 }
 
-                // Cada profissão usa a arte genérica correspondente hospedada no GitHub,
-                // mesmo antes de o personagem obter uma ferramenta.
                 const imgPath = `https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/itens/equipamentos/${imgGenerica}.png`;
-                imgFerramentaHtml = `<img src="${imgPath}" alt="Ferramenta de ${nomeProf}" loading="lazy" decoding="async" class="perfil-v2-prof-ferramenta">`;
+                const statusFerramenta = ferramentaUser ? `No inventário · ${tierTxt}` : 'Não encontrada no inventário';
+                const ariaId = `perfil-prof-tab-${index}`;
+                const painelId = `perfil-prof-detalhe-${index}`;
+                const barraXP = Math.min(profXp, xpNecessarioProf);
 
                 htmlProfissao += `
-                <article class="perfil-v2-prof-card" style="--prof-cor:${corBordaT}; --prof-fundo:${corFundoT}; --prof-glow:${glowT};">
-                    <div class="perfil-v2-prof-topo">
-                        <div class="perfil-v2-prof-identidade">
-                            <span class="perfil-v2-prof-icone">
-                                ${imgFerramentaHtml}
-                                <span class="perfil-v2-prof-tier">${tierTxt}</span>
-                            </span>
-                            <span class="perfil-v2-prof-nome-nivel"><strong>${nomeProf}</strong><small>Nível ${profNivel}</small></span>
+                    <button id="${ariaId}" class="perfil-v2-prof-tab${index === 0 ? ' selecionada' : ''}" type="button" role="tab"
+                        aria-selected="${index === 0 ? 'true' : 'false'}" aria-controls="${painelId}" tabindex="${index === 0 ? '0' : '-1'}"
+                        aria-label="${nomeProf}, nível ${profNivel}" data-prof-index="${index}" title="${nomeProf} — nível ${profNivel}">
+                        <span class="perfil-v2-prof-tab-icone"><img src="${imgPath}" alt="" loading="lazy" decoding="async"><small>Nv ${profNivel}</small></span>
+                        <span class="perfil-v2-prof-tab-nome">${nomeProf}</span>
+                    </button>`;
+
+                paineisProfissoes.push(`
+                    <section id="${painelId}" class="perfil-v2-prof-detalhe${index === 0 ? ' is-entering' : ''}" role="tabpanel" tabindex="0"
+                        aria-labelledby="${ariaId}" data-prof-index="${index}"${index === 0 ? '' : ' hidden'}>
+                        <div class="perfil-v2-prof-detalhe-topo">
+                            <span class="perfil-v2-prof-detalhe-icone" style="--prof-cor:${corBordaT}; --prof-fundo:${corFundoT}; --prof-glow:${glowT};"><img src="${imgPath}" alt="" loading="lazy" decoding="async"></span>
+                            <div class="perfil-v2-prof-detalhe-titulo"><small>${isCrafting ? 'OFÍCIO DE PRODUÇÃO' : 'OFÍCIO DE COLETA'}</small><h4>${nomeProf}</h4></div>
+                            <span class="perfil-v2-prof-nivel">Nível ${profNivel}</span>
                         </div>
-                        <span class="perfil-v2-prof-xp">${profXp.toLocaleString('pt-BR')} <small>/ ${xpNecessarioProf.toLocaleString('pt-BR')} XP</small></span>
-                    </div>
-                    <div class="perfil-v2-prof-trilho"><i style="width:${percentProfXP}%;"></i></div>
-                    <div class="perfil-v2-prof-bonus">${bonusTexto}</div>
-                </article>`;
+                        <div class="perfil-v2-prof-xp-heading"><span>Experiência</span><strong>${profXp.toLocaleString('pt-BR')} <small>/ ${xpNecessarioProf.toLocaleString('pt-BR')} XP</small></strong></div>
+                        <div class="perfil-v2-prof-trilho" role="progressbar" aria-label="Progresso de experiência de ${nomeProf}" aria-valuemin="0" aria-valuemax="${xpNecessarioProf}" aria-valuenow="${barraXP}"><i style="width:${percentProfXP}%;"></i></div>
+                        <div class="perfil-v2-prof-status">
+                            <div><span>Bônus atual</span><strong>${bonusTexto}</strong></div>
+                            <div><span>Ferramenta</span><strong>${statusFerramenta}</strong></div>
+                        </div>
+                    </section>`);
             });
 
-            htmlProfissao += `</div></section>`;
+            htmlProfissao += `</div>${paineisProfissoes.join('')}</section>`;
         } else {
-            // 👇 SE NÃO TIVER PROFISSÃO, MOSTRA ISTO 👇
             htmlProfissao = `
             <section class="perfil-v2-profissoes perfil-v2-profissoes-vazio" aria-label="Profissões do personagem">
                 <header class="perfil-v2-prof-cabecalho"><h3>Profissões</h3><span>0 ofícios</span></header>
