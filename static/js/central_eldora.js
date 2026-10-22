@@ -165,16 +165,41 @@
                 const estado = evento.state === "active" ? "active" : "scheduled";
                 const dataReferencia = estado === "active" ? evento.ends_at : evento.starts_at;
                 const prefixoData = estado === "active" ? "Termina" : "Começa";
-                const icone = estado === "active" ? "🔥" : "📅";
+                const chaveEvento = `${evento.event_key || evento.id || ""} ${evento.title || ""}`
+                    .normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+                const invasaoSombria = chaveEvento.includes("invasao sombria");
+                const fendaDimensional = chaveEvento.includes("fenda dimensional");
+                const invasaoReino = chaveEvento.includes("invasao do reino") || chaveEvento.includes("invasao reino");
+                const varianteSombria = estado === "scheduled" ? "invasao_sombria_programada" : "invasao_sombria";
+                const icone = invasaoSombria
+                    ? `<img src="/static/images/eventos/${varianteSombria}_icone.png" alt="" loading="lazy" decoding="async">`
+                    : fendaDimensional
+                        ? '<img src="/static/images/eventos/fenda_dimensional_icone.png" alt="" loading="lazy" decoding="async">'
+                        : invasaoReino
+                            ? '<img src="/static/images/eventos/invasao_reino_icone.png" alt="" loading="lazy" decoding="async">'
+                            : (estado === "active" ? "🔥" : "📅");
+                const bannerExterno = typeof evento.banner === "string" && /^https:\/\//i.test(evento.banner)
+                    ? escaparHtmlEvento(evento.banner)
+                    : "";
+                const banner = invasaoSombria
+                    ? `/static/images/eventos/${varianteSombria}_banner.webp`
+                    : fendaDimensional
+                        ? "/static/images/eventos/fenda_dimensional_banner.webp"
+                        : invasaoReino
+                            ? "/static/images/eventos/invasao_reino_banner.webp"
+                            : bannerExterno;
                 return `
                     <article class="central-card central-evento-card">
-                        <div class="central-card-icone" aria-hidden="true">${icone}</div>
-                        <div class="central-evento-card-conteudo">
-                            <h4>${escaparHtmlEvento(evento.title || "Evento do Reino")}</h4>
-                            <p>${escaparHtmlEvento(evento.description || "Um novo acontecimento movimenta Eldora.")}</p>
-                            <span class="central-evento-status" data-state="${estado}">${rotulosEstado[estado]} · ${prefixoData} ${dataEventoCentral(dataReferencia)}</span>
+                        <div class="central-evento-arte" aria-hidden="true">${banner ? `<img src="${banner}" alt="" loading="lazy" decoding="async">` : ""}</div>
+                        <div class="central-evento-detalhes">
+                            <div class="central-card-icone" aria-hidden="true">${icone}</div>
+                            <div class="central-evento-card-conteudo">
+                                <h4>${escaparHtmlEvento(evento.title || "Evento do Reino")}</h4>
+                                <p>${escaparHtmlEvento(evento.description || "Um novo acontecimento movimenta Eldora.")}</p>
+                                <span class="central-evento-status" data-state="${estado}">${rotulosEstado[estado]} · ${prefixoData} ${dataEventoCentral(dataReferencia)}</span>
+                            </div>
+                            <button type="button" class="central-evento-acao" data-evento-id="${id}">Ver detalhes</button>
                         </div>
-                        <button type="button" class="central-evento-acao" data-evento-id="${id}">Ver detalhes</button>
                     </article>`;
             }).join("");
 
@@ -200,21 +225,23 @@
             const estadoFenda = estadosFenda[fendaAtiva?.status] || "Fenda ativa";
             const cardDimensional = `
                 <article class="central-card central-evento-card central-evento-dimensional">
-                    <div class="central-card-icone" aria-hidden="true">🌌</div>
-                    <div class="central-evento-card-conteudo">
-                        <h4>Fenda Dimensional</h4>
-                        <p>${fendaAtiva
-                            ? `${estadoFenda} em ${escaparHtmlEvento(mapaFenda)}.`
-                            : "Abates de mobs nos mapas permitidos alimentam o surgimento de uma nova Fenda."}</p>
-                        ${fendaAtiva
-                            ? `<span class="central-evento-status" data-state="active">Em andamento · ${escaparHtmlEvento(mapaFenda)}</span>`
-                            : progressoDisponivel
-                                ? `<div class="central-evento-progresso"><div class="central-evento-progresso-label"><span>Abates coletivos</span><b>${abates.toLocaleString("pt-BR")} / ${limiteAbates.toLocaleString("pt-BR")}</b></div><div class="central-evento-progresso-barra" role="progressbar" aria-label="Progresso dos abates para a Fenda Dimensional" aria-valuemin="0" aria-valuemax="${limiteAbates}" aria-valuenow="${abates}"><i style="width:${progressoAbates}%"></i></div></div>`
-                                : `<span class="central-evento-status">Progresso indisponível · tente atualizar</span>`}
+                    <div class="central-evento-arte" aria-hidden="true"><img src="/static/images/eventos/fenda_dimensional_banner.webp" alt="" loading="lazy" decoding="async"></div>
+                    <div class="central-evento-detalhes">
+                        <div class="central-card-icone" aria-hidden="true"><img src="/static/images/eventos/fenda_dimensional_icone.png" alt="" loading="lazy" decoding="async"></div>
+                        <div class="central-evento-card-conteudo">
+                            <h4>Fenda Dimensional</h4>
+                            <p>${fendaAtiva
+                                ? `${estadoFenda} em ${escaparHtmlEvento(mapaFenda)}.`
+                                : "Abates de mobs nos mapas permitidos alimentam o surgimento de uma nova Fenda."}</p>
+                            ${fendaAtiva
+                                ? `<span class="central-evento-status" data-state="active">Em andamento · ${escaparHtmlEvento(mapaFenda)}</span>`
+                                : progressoDisponivel
+                                    ? `<div class="central-evento-progresso"><div class="central-evento-progresso-label"><span>Abates coletivos</span><b>${abates.toLocaleString("pt-BR")} / ${limiteAbates.toLocaleString("pt-BR")}</b></div><div class="central-evento-progresso-barra" role="progressbar" aria-label="Progresso dos abates para a Fenda Dimensional" aria-valuemin="0" aria-valuemax="${limiteAbates}" aria-valuenow="${abates}"><i style="width:${progressoAbates}%"></i></div></div>`
+                                    : `<span class="central-evento-status">Progresso indisponível · tente atualizar</span>`}
+                        </div>
+                        ${fendaAtiva ? '<button type="button" class="central-evento-acao" data-abrir-fenda-dimensional>Ver Fenda</button>' : ""}
                     </div>
-                    ${fendaAtiva ? '<button type="button" class="central-evento-acao" data-abrir-fenda-dimensional>Ver Fenda</button>' : ""}
                 </article>`;
-
             const segundosInvasao = Math.max(0, Number(statusInvasaoReino?.remaining_seconds || 0));
             const duracaoInvasao = segundosInvasao >= 3600
                 ? `${Math.floor(segundosInvasao / 3600)}h ${Math.floor((segundosInvasao % 3600) / 60)}min`
@@ -226,14 +253,18 @@
                     : `Próxima invasão · ${statusInvasaoReino?.next_at ? dataEventoCentral(statusInvasaoReino.next_at) : "horário a confirmar"}`;
             const cardInvasaoReino = `
                 <article class="central-card central-evento-card">
-                    <div class="central-card-icone" aria-hidden="true">🔥</div>
-                    <div class="central-evento-card-conteudo">
-                        <h4>Invasão do Reino</h4>
-                        <p>Defenda a Capital de Eldora contra as ondas de criaturas invasoras.</p>
-                        <span class="central-evento-status" data-state="${statusInvasaoReino?.state === "active" || statusInvasaoReino?.state === "preparing" ? "active" : "scheduled"}">${escaparHtmlEvento(estadoInvasao)}</span>
-                        <span class="central-evento-status">Diariamente · 08h, 14h, 19h e 23h · horário de Brasília</span>
+                    <div class="central-evento-arte" aria-hidden="true"><img src="/static/images/eventos/invasao_reino_banner.webp" alt="" loading="lazy" decoding="async"></div>
+                    <div class="central-evento-detalhes">
+                        <div class="central-card-icone" aria-hidden="true"><img src="/static/images/eventos/invasao_reino_icone.png" alt="" loading="lazy" decoding="async"></div>
+                        <div class="central-evento-card-conteudo">
+                            <h4>Invasão do Reino</h4>
+                            <p>Defenda a Capital de Eldora contra as ondas de criaturas invasoras.</p>
+                            <span class="central-evento-status" data-state="${statusInvasaoReino?.state === "active" || statusInvasaoReino?.state === "preparing" ? "active" : "scheduled"}">${escaparHtmlEvento(estadoInvasao)}</span>
+                            <span class="central-evento-status">Diariamente · 08h, 14h, 19h e 23h · horário de Brasília</span>
+                        </div>
                     </div>
                 </article>`;
+
 
 
             lista.innerHTML = cardInvasaoReino + cardDimensional + (cards || '<p class="central-eventos-mensagem">Nenhum outro evento está programado no momento. Volte em breve, aventureiro.</p>')
