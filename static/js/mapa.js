@@ -115,6 +115,9 @@ class MapaScene extends Phaser.Scene {
         this.isMoving = false;
         this.travadoNoPortal = true; // O jogador nasce ignorando portais
         this.graficosProntos = false;
+        this.carregamentoMapaFinalizado = false;
+        this.mobsMapaInicialPronto = false;
+        this.carregamentosMobsIniciais = [];
         this.skinBaseAtual = null;
         this.direcaoParadaEspecial = 'down';
         this.inicioParadoEspecial = null;
@@ -2030,15 +2033,20 @@ class MapaScene extends Phaser.Scene {
                 this.interativo = new MapaInterativo(this);
             }
 
-            // Inicialização do Multiplayer (Não apagar)
+            // Registra as escutas de mobs antes de entrar na região. O servidor
+            // responde à entrada com a lista inicial assim que o multiplayer conecta.
             if (typeof socket !== 'undefined' && socket) {
+                if (typeof window.atualizarCarregamento === 'function') {
+                    window.atualizarCarregamento(99, 'Sincronizando as criaturas do mapa...');
+                }
                 if (typeof MotorDeInvasao !== 'undefined') this.motorInvasao = new MotorDeInvasao(this, socket);
-                if (typeof MotorMultiplayer !== 'undefined') this.motorMultiplayer = new MotorMultiplayer(this, socket);
-                
                 if (typeof MotorCacada !== 'undefined') {
                     this.motorCacada = new MotorCacada(this, socket);
                 }
-
+                if (typeof MotorMultiplayer !== 'undefined') this.motorMultiplayer = new MotorMultiplayer(this, socket);
+            } else {
+                // Sem Socket.IO não há snapshot remoto a aguardar.
+                this.mobsMapaInicialPronto = true;
             }
 
             // O portal é conteúdo do mapa/evento, então sua vida não depende
@@ -3038,6 +3046,48 @@ class MapaScene extends Phaser.Scene {
         });
     }
 
+    registrarCarregamentoMobInicial(promessa) {
+        if (!this.mobsMapaInicialPronto && promessa && typeof promessa.then === 'function') {
+            this.carregamentosMobsIniciais.push(promessa);
+        }
+    }
+
+    concluirCarregamentoMobsMapa(total, falhas = 0) {
+        if (this.mobsMapaInicialPronto) return;
+
+        if (falhas > 0) {
+            if (typeof window.atualizarCarregamento === 'function') {
+                window.atualizarCarregamento(
+                    99,
+                    `Falha ao baixar ${falhas} imagem(ns) de mob. Atualize a página para tentar novamente.`
+                );
+            }
+            return;
+        }
+
+        this.mobsMapaInicialPronto = true;
+        this.carregamentosMobsIniciais = [];
+
+        if (typeof window.atualizarCarregamento === 'function') {
+            window.atualizarCarregamento(99, `Criaturas do mapa prontas: ${total}.`);
+        }
+
+        this.tentarFinalizarCarregamentoMapa();
+    }
+
+    tentarFinalizarCarregamentoMapa() {
+        if (
+            this.carregamentoMapaFinalizado ||
+            !this.graficosProntos ||
+            !this.mobsMapaInicialPronto
+        ) return;
+
+        this.carregamentoMapaFinalizado = true;
+        if (typeof window.finalizarCarregamento === 'function') {
+            window.finalizarCarregamento();
+        }
+    }
+
     update(time) {
 
         // ==========================================
@@ -3052,14 +3102,7 @@ class MapaScene extends Phaser.Scene {
 
             this.graficosProntos = true;
 
-            if (
-                typeof window.finalizarCarregamento
-                === 'function'
-            ) {
-
-                window.finalizarCarregamento();
-
-            }
+            this.tentarFinalizarCarregamentoMapa();
 
             this.cameras.main.fadeIn(
                 800,
