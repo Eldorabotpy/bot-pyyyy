@@ -1,6 +1,6 @@
 # Jornadas dos companheiros
 
-Capítulo atual: 1, configurado por RELEASED_PET_CHAPTER em modules/companions.py. O Códice mostra a jornada completa, mesmo quando a família ou a próxima forma ainda está bloqueada.
+Capítulo atual: 1, configurado por RELEASED_PET_CHAPTER em modules/companions.py. O Códice mostra a jornada completa, mesmo quando a família ou a próxima forma ainda está bloqueada. Slime Verde está liberado pontualmente por forma; Rei Slime, Lobo Alfa, Lobisomem e todas as formas do Morcego continuam bloqueados.
 
 ## Jornadas
 
@@ -22,7 +22,7 @@ O ovo de cada família exige 50 abates registrados no Bestiário. Abates de onda
 
 No Códice, a jornada detalhada identifica a forma atual, a próxima evolução e as formas futuras. Também mostra capítulo e requisitos de cada transição: nível 10, vínculo 50 e 25 essências na primeira; nível 25, vínculo 300 e 100 essências na final, com escolha de especialização.
 
-Não há liberação automática por data. Publicar e conferir a arte antes de aumentar RELEASED_PET_CHAPTER. O bloqueio é validado no servidor antes de consumir essências.
+Não há liberação automática por data. Para liberar uma forma isolada, use RELEASED_PET_FORM_OVERRIDES; para abrir um capítulo inteiro, confira suas artes e aumente RELEASED_PET_CHAPTER. A liberação atual é Pequeno Slime → Slime Verde. O bloqueio é validado no servidor antes de consumir essências.
 
 ## Arquivos de arte por forma
 

@@ -13,6 +13,7 @@ Entrada: Bestiário > Companheiros ou perfil > Equipamentos > Companheiro.
 - Caçar um membro das três famílias com pet equipado concede 1 essência daquela família, registrada na aba Companheiros.
 - Nível máximo 25. Cada nível exige 50 × nível atual XP.
 - Primeira evolução: nível 10, 50 vitórias de vínculo e 25 essências da família. Segunda evolução do Slime, Lobo e Morcego: nível 25, 300 vitórias e 100 essências. A especialização escolhida na forma final é definitiva nesta versão.
+- Liberação atual: Pequeno Slime → Slime Verde. Rei Slime e as evoluções de Lobo e Morcego continuam bloqueados.
 - Jornadas: Pequeno Slime → Slime Verde → Rei Slime; Lobo Magro → Lobo Alfa → Lobisomem; Morcego das Minas → Morcego de Mana → Morcego Gigante. As especializações finais são Slime: Guardião/Defesa ou Vital/HP; Lobo: Veloz/Iniciativa ou Guardião/Defesa; Morcego: Arcano/Mana ou Veloz/Iniciativa.
 - Bônus fixo: 1 + nível//5 + 2×estágio. HP/Mana multiplicam o valor por 3. Bônus é aplicado em get_player_total_stats, não grava atributos permanentes.
 - No mapa, o pet equipado segue o trajeto a 32px do personagem, usa metade do tamanho do herói e muda a textura ao evoluir. Quando existe folha 192×256, o Phaser toca as animações por espécie e direção a 4 quadros/s, com acompanhamento suavizado; sem folha, usa imagem estática e, sem imagem, o ícone da família. O cartão de estoque mostra a imagem da incubadora. O fluxo de carregamento e os arquivos de arte pendentes estão em docs/roteiro-pets.md.

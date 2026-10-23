@@ -17,8 +17,9 @@ PREMIUM_HUNT_GOALS = (100, 500, 1500)
 FORMS = ["Filhote", "Adulto", "Ancestral"]
 
 
-# As jornadas ficam visíveis no Códice; o servidor libera cada forma por capítulo.
+# As jornadas ficam visíveis no Códice; liberações pontuais não abrem o capítulo inteiro.
 RELEASED_PET_CHAPTER = 1
+RELEASED_PET_FORM_OVERRIDES = {('slime', 'slime_verde')}
 ASSET_ROOT = 'https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/'
 PET_JOURNEYS = {
     'slime': [('Pequeno Slime', 'pequeno_slime', 1), ('Slime Verde', 'slime_verde', 2), ('Rei Slime', 'rei_slime', 4)],
@@ -59,7 +60,7 @@ def journey(family):
             'name': name,
             'species': species,
             'chapter': chapter,
-            'released': chapter <= RELEASED_PET_CHAPTER,
+            'released': chapter <= RELEASED_PET_CHAPTER or (family, species) in RELEASED_PET_FORM_OVERRIDES,
             'image': f'{ASSET_ROOT}{image_path}' if image_path else None,
             'sheet': f'{ASSET_ROOT}{sheet_path}' if sheet_path else None,
         })
