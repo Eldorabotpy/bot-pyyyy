@@ -99,3 +99,43 @@
   .rune-card>div { flex:1 1 calc(100% - 54px); }
   .rune-card>button { width:100%; }
 }
+
+/* Árvore de evolução de runas */
+.rune-forge-row { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px; border:1px solid var(--rune-border); border-radius:10px; background:var(--rune-raised); }
+.rune-forge-row b { display:block; font-size:13px; }
+.rune-forge-row small { margin-top:3px; }
+.rune-forge-row button,.rune-node .rune-evolve { border-color:var(--rune-gold); background:var(--rune-gold); color:#1c2119; }
+.rune-family-list { display:flex; flex-wrap:wrap; gap:7px; margin:12px 0 16px; }
+.rune-workshop .rune-family { min-height:38px; padding:7px 11px; font-size:11px; }
+.rune-family-list .rune-family.active { border-color:var(--rune-gold); background:var(--rune-gold); color:#1c2119; }
+.rune-tree-wrap { margin:0; }
+.rune-tree-scroll-hint { display:none; }
+.rune-tree { display:grid; grid-template-columns:minmax(0,1fr) 24px minmax(0,1fr) 24px minmax(0,1fr); gap:6px; align-items:stretch; }
+.rune-node { min-width:0; padding:11px; border:1px solid var(--rune-border); border-radius:12px; background:var(--rune-raised); }
+.rune-node[data-tier="1"] { border-top:2px solid #7b8f7f; }
+.rune-node[data-tier="2"] { border-top:2px solid #9c82c2; }
+.rune-node[data-tier="3"] { border-top:2px solid var(--rune-gold); }
+.rune-node.owned { box-shadow:inset 0 0 0 1px #c9a45c22; }
+.rune-node-heading { display:flex; align-items:center; justify-content:space-between; gap:5px; min-height:20px; }
+.rune-node-heading small { font-size:9px; letter-spacing:.4px; }
+.rune-node-heading>span { flex:none; padding:3px 6px; border:1px solid var(--rune-border); border-radius:99px; color:var(--rune-gold); font-size:10px; }
+.rune-node-icon { display:grid; width:52px; height:52px; margin:10px auto 6px; place-items:center; border:1px solid var(--rune-border); border-radius:12px; background:var(--rune-panel); }
+.rune-node-icon img { width:40px; height:40px; object-fit:contain; }
+.rune-node h3 { min-height:36px; margin:7px 0 4px; font-size:12px; line-height:1.35; text-align:center; }
+.rune-node-desc { min-height:34px; margin:0; color:var(--rune-muted); font-size:11px; line-height:1.5; text-align:center; }
+.rune-node-owned { margin:9px 0; color:var(--rune-gold); font-size:10px; text-align:center; }
+.rune-node:not(.owned) .rune-node-owned { color:var(--rune-muted); }
+.rune-node-recipe { min-height:90px; padding:9px 0 5px; border-top:1px solid var(--rune-border); font-size:10px; line-height:1.5; }
+.rune-node-recipe b,.rune-node-recipe span,.rune-node-recipe small { display:block; }
+.rune-node-recipe b { min-height:30px; color:var(--rune-gold); }
+.rune-node-recipe span { color:var(--rune-text); }
+.rune-node-recipe small { margin-top:2px; }
+.rune-node .rune-evolve { width:100%; min-height:40px; margin:4px 0 0; padding:7px 5px; font-size:10px; }
+.rune-node .rune-secondary { width:100%; min-height:36px; margin-top:6px; padding:6px 5px; background:transparent; color:var(--rune-muted); font-size:10px; }
+.rune-node-max { min-height:90px; margin:0; padding-top:14px; border-top:1px solid var(--rune-border); color:var(--rune-muted); font-size:11px; line-height:1.5; text-align:center; }
+.rune-connector { display:grid; place-items:center; color:var(--rune-gold); font-size:30px; font-weight:700; }
+@media (max-width:520px) {
+  .rune-tree-wrap { overflow-x:auto; margin-right:-12px; padding:0 12px 8px 0; scrollbar-width:thin; scrollbar-color:var(--rune-gold) var(--rune-panel); }
+  .rune-tree-scroll-hint { display:block; margin:0 0 7px; color:var(--rune-gold); font-size:10px; }
+  .rune-tree { width:max-content; grid-template-columns:200px 24px 200px 24px 200px; }
+}

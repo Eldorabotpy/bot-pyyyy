@@ -57,17 +57,30 @@
  }
  function evolutionPage(){
   const families=[...new Map(state.runas.map(r=>[r.family,r.family_name])).entries()];
+  if(!families.length)return '<p class="rune-notice">Nenhuma família de runas está disponível.</p>';
+  if(!families.some(([id])=>id===family))family=families[0][0];
   const runes=state.runas.filter(r=>r.family===family).sort((a,b)=>a.tier-b.tier);
-  return `<button data-action="forjar" ${state.materiais.fragmento_runa_ancestral<7?'disabled':''}>Forjar runa menor aleatória · 7 fragmentos</button><label class="rune-label">Família<select id="rune-family">${families.map(([id,name])=>`<option value="${id}" ${id===family?'selected':''}>${esc(name)}</option>`).join('')}</select></label>
-  <p class="rune-notice">3 runas iguais + materiais tentam criar 1 runa do próximo nível. A chance depende do tier; se falhar, ouro e materiais são consumidos, mas as 3 runas são preservadas.</p><div class="rune-tree">${runes.map(r=>{
-   const cost=state.custos_evolucao[r.tier];
-   return `<article class="rune-tier">${icon(r)}<div><small>NÍVEL ${r.tier} · ${r.qtd} na mochila</small><h3>${esc(r.name)}</h3><p>${esc(r.desc)}</p></div>${r.next_id?`<p class="rune-cost">3 × ${esc(r.name)} + ${costText(cost)}</p><p class="rune-notice">Chance de sucesso: ${state.chance_evolucao[r.tier]}%. Se falhar, ouro e materiais são consumidos, mas as 3 runas são preservadas.</p><button data-action="evoluir" data-rune="${r.id}" ${r.qtd<3||!canPay(cost)?'disabled':''}>Evoluir para ${esc(runeById(r.next_id).name)}</button>`:'<p class="rune-notice">Evolução máxima desta família.</p>'}${r.qtd?`<button class="rune-secondary" data-action="dissolver" data-rune="${r.id}">Dissolver 1 → ${state.po_por_nivel[r.tier]} pó rúnico</button>`:''}</article>`;
-  }).join('<div class="rune-branch" aria-hidden="true">↓</div>')}</div>`;
+  const familyButtons=families.map(([id,name])=>`<button class="rune-family ${id===family?'active':''}" data-family="${esc(id)}" aria-pressed="${id===family}">${esc(name)}</button>`).join('');
+  const nodes=runes.map((r,index)=>{
+   const cost=state.custos_evolucao[r.tier]||{};
+   const next=r.next_id?runeById(r.next_id):null;
+   const stepName={1:'Menor',2:'Maior',3:'Ancestral'}[r.tier]||`Nível ${r.tier}`;
+   return `${index?'<span class="rune-connector" aria-hidden="true">›</span>':''}<article class="rune-node ${r.qtd>0?'owned':''}" data-tier="${r.tier}">
+    <div class="rune-node-heading"><small>NÍVEL ${r.tier} · ${esc(stepName)}</small><span>${r.qtd>0?`× ${r.qtd}`:'—'}</span></div>
+    <div class="rune-node-icon">${icon(r)}</div><h3>${esc(r.name)}</h3><p class="rune-node-desc">${esc(r.desc)}</p>
+    <p class="rune-node-owned">${r.qtd>0?`${r.qtd} na mochila`:'Ainda não obtida'}</p>
+    ${next?`<div class="rune-node-recipe"><b>Próxima: ${esc(next.name)}</b><span>3 × ${esc(r.name)}</span><small>${esc(costText(cost))} · ${state.chance_evolucao[r.tier]}% de chance</small></div><button class="rune-evolve" data-action="evoluir" data-rune="${esc(r.id)}" ${r.qtd<3||!canPay(cost)?'disabled':''}>Evoluir runa</button>`:'<p class="rune-node-max">Nível máximo desta família</p>'}
+    ${r.qtd?`<button class="rune-secondary" data-action="dissolver" data-rune="${esc(r.id)}">Dissolver 1 · ${state.po_por_nivel[r.tier]} pó</button>`:''}
+   </article>`;
+  }).join('');
+  return `<div class="rune-forge-row"><div><b>Forjar uma runa</b><small>Runa menor aleatória · 7 fragmentos</small></div><button data-action="forjar" ${state.materiais.fragmento_runa_ancestral<7?'disabled':''}>Forjar</button></div>
+  <p class="rune-notice">Escolha uma família e acompanhe a evolução da runa do nível menor ao ancestral. Evoluir consome 3 runas iguais, ouro e materiais; se falhar, as runas são preservadas.</p>
+  <div class="rune-family-list" role="group" aria-label="Famílias de runas">${familyButtons}</div>
+  <div class="rune-tree-wrap"><p class="rune-tree-scroll-hint">Deslize para acompanhar os níveis →</p><div class="rune-tree" aria-label="Árvore de evolução de ${esc(families.find(([id])=>id===family)?.[1]||'runas')}">${nodes}</div></div>`;
  }
  function render(){
   dialog.innerHTML=header()+`<section class="rune-content">${page==='equipar'?gearPage():evolutionPage()}</section><footer id="rune-status" role="status">Selecione um espaço ou explore a evolução das famílias.</footer>`;
   dialog.querySelector('#rune-gear')?.addEventListener('change',e=>{selectedItem=e.target.value;selectedSlot=0;render();});
-  dialog.querySelector('#rune-family')?.addEventListener('change',e=>{family=e.target.value;render();});
  }
  async function operate(action,rid){
   if(busy)return;busy=true;
@@ -101,6 +114,7 @@
   dialog.addEventListener('click',e=>{
    const btn=e.target.closest('button');if(!btn||busy)return;
    if(btn.dataset.page){page=btn.dataset.page;render();}
+   else if(btn.dataset.family){family=btn.dataset.family;render();[...dialog.querySelectorAll('[data-family]')].find(option=>option.dataset.family===family)?.focus();}
    else if(btn.dataset.slot!==undefined){selectedSlot=Number(btn.dataset.slot);render();}
    else if(btn.dataset.action==='fechar')close();
    else if(btn.dataset.action)inFlight=operate(btn.dataset.action,btn.dataset.rune);
