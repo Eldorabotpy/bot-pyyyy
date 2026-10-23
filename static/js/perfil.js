@@ -1452,11 +1452,12 @@ window.filtrarMochila = function(filtro) {
     const linkBaseNuvem = window.CATALOGO_SISTEMA ? "https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/" : "/static/assets/";
     const coresRaridade = {
         comum: '#94a3b8', common: '#94a3b8',
-        incomum: '#22c55e', uncommon: '#22c55e',
+        incomum: '#22c55e', uncommon: '#22c55e', bom: '#22c55e', good: '#22c55e',
         raro: '#3b82f6', rare: '#3b82f6',
         epico: '#a855f7', epic: '#a855f7',
         lendario: '#eab308', legendary: '#eab308',
-        mitico: '#ef4444', mythic: '#ef4444',
+        mitico: '#06b6d4', mythic: '#06b6d4',
+        unico: '#ef4444', unique: '#ef4444',
         divino: '#f0d48e', divine: '#f0d48e'
     };
 
@@ -1464,8 +1465,11 @@ window.filtrarMochila = function(filtro) {
         // Envia o item inteiro para a bússola decidir
 
 
-        const raridade = String(item.raridade || 'comum').trim().toLowerCase()
-            .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        const raridade = String(
+            item.raridade ?? item.rarity ?? item.base?.raridade ?? item.base?.rarity ??
+            item.item_data?.raridade ?? item.item_data?.rarity ?? 'comum'
+        ).trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+            .replace(/[^a-z0-9_-]/g, '');
         const corBorda = coresRaridade[raridade] || '#334155';
 
         const slotHtml = `

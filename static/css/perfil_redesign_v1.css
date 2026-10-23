@@ -268,9 +268,9 @@
     min-width: 0;
     border: 1px solid var(--rarity-border, rgba(228, 194, 118, .3)) !important;
     border-radius: 14px !important;
-    background: radial-gradient(circle at 50% 35%, rgba(166, 191, 184, .16), transparent 60%),
-        linear-gradient(145deg, rgba(28, 43, 51, .99), rgba(10, 18, 24, .99)) !important;
-    box-shadow: inset 0 1px rgba(255, 255, 255, .1), inset 0 -12px 18px rgba(0, 0, 0, .22), 0 5px 12px rgba(0, 0, 0, .3) !important;
+    background: radial-gradient(circle at 50% 32%, color-mix(in srgb, var(--rarity-border) 34%, transparent), transparent 68%),
+        linear-gradient(145deg, color-mix(in srgb, var(--rarity-border) 21%, #1c2b33), color-mix(in srgb, var(--rarity-border) 10%, #0a1218)) !important;
+    box-shadow: inset 0 1px rgba(255, 255, 255, .1), inset 0 -12px 18px rgba(0, 0, 0, .22), 0 0 13px color-mix(in srgb, var(--rarity-border) 24%, transparent), 0 5px 12px rgba(0, 0, 0, .3) !important;
     transition: transform .16s ease, box-shadow .16s ease, filter .16s ease !important;
     -webkit-tap-highlight-color: transparent;
 }
