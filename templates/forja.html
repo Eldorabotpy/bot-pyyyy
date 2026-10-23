@@ -1327,77 +1327,246 @@
 </style>
 
 <style>
-/* Tokens Eldora aplicados somente à interface da forja. */
+/* Identidade da bancada e hierarquia das abas. */
 #forja-container {
     --forja-panel: #0b1b20;
     --forja-raised: #12252b;
     --forja-interactive: #183139;
     --forja-border: rgba(211, 190, 132, .22);
     --forja-gold: #c9a45c;
+    --forja-gold-light: #e4c47a;
     --forja-text: #f4ead2;
     --forja-muted: #b8c4c2;
     color: var(--forja-text);
     font-family: Arial, sans-serif;
 }
-#forja-container .forja-modern-wrapper { border-color:var(--forja-gold); background:var(--forja-panel); color:var(--forja-text); box-shadow:0 24px 80px #000a; }
-#forja-container .forja-top-bar { background:var(--forja-raised); border-bottom:1px solid var(--forja-border); }
-#forja-container .forja-title { color:var(--forja-text); }
-#forja-container .forja-subtitle { color:var(--forja-muted); }
-#forja-container .forja-nav-tabs { background:var(--forja-raised); }
-#forja-container .aba-forja-btn { min-height:44px; border-color:var(--forja-border); background:var(--forja-interactive); color:var(--forja-text); }
-#forja-container .aba-forja-btn.active { border-color:var(--forja-gold); background:var(--forja-gold); color:#1b211b; }
-#forja-container .forja-search { color:var(--forja-muted); }
-#forja-container input { border-color:var(--forja-border); background:var(--forja-panel); color:var(--forja-text); }
-#forja-container :focus-visible { outline-color:var(--forja-gold); }
-#forja-container .recipe-card { border-color:var(--forja-border); background:var(--forja-raised); color:var(--forja-text); }
-#forja-container .recipe-card.active { border-color:var(--forja-gold); box-shadow:inset 3px 0 var(--forja-gold); background:var(--forja-interactive); }
-#forja-container .forja-details-view { background:var(--forja-panel); color:var(--forja-text); }
-#forja-container .forja-back { color:var(--forja-gold); }
-#forja-container .item-header-display { border-color:var(--forja-border); background:var(--forja-raised); }
-#forja-container .mat-pill { border-color:var(--forja-border); background:var(--forja-raised); color:var(--forja-text); }
-#forja-container .btn-forge-action:not(:disabled) { border-color:var(--forja-gold); background:var(--forja-gold) !important; color:#1b211b; }
-@media(max-width:768px) {
-    #forja-container .forja-sidebar,
-    #forja-container .forja-sidebar.forja-sidebar-compacta { border-right-color:var(--forja-border); }
+#forja-container .forja-modern-wrapper {
+    border-color: var(--forja-gold);
+    border-radius: 16px;
+    background: var(--forja-panel);
+    color: var(--forja-text);
+    box-shadow: 0 24px 80px #000a, inset 0 1px 0 rgba(255,255,255,.035);
+}
+#forja-container .forja-top-bar {
+    background: linear-gradient(110deg, #152a30, #102128 70%, #14242b);
+    border-bottom: 1px solid var(--forja-border);
+}
+#forja-container .forja-title { color: var(--forja-text); }
+#forja-container .forja-subtitle { color: var(--forja-muted); }
+#forja-container .forja-close {
+    width: 44px;
+    height: 44px;
+    border: 1px solid var(--forja-border);
+    border-radius: 12px;
+    background: var(--forja-interactive);
+    color: var(--forja-text);
+    font-size: 22px;
+    transition: border-color .16s ease, background .16s ease, transform .16s ease;
+}
+#forja-container .forja-close:hover {
+    border-color: var(--forja-gold);
+    background: #244047;
 }
 #forja-container .forja-nav-tabs {
-    display:grid;
-    grid-template-columns:minmax(0,1fr) auto;
-    gap:10px;
-    overflow:visible;
-    white-space:normal;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px;
+    padding: 8px 12px;
+    overflow: visible;
+    white-space: normal;
+    border-bottom: 1px solid var(--forja-border);
+    background: var(--forja-raised);
 }
-#forja-container .forja-tab-group { display:flex; min-width:0; align-items:center; gap:7px; }
-#forja-container .forja-tab-label { flex:none; color:var(--forja-muted); font-size:9px; font-weight:800; letter-spacing:.7px; }
-#forja-container .forja-tab-options { display:flex; min-width:0; gap:5px; }
-#forja-container .forja-tab-options .aba-forja-btn { min-width:0; min-height:44px; padding:8px 10px; }
-#forja-container .forja-tab-options .forja-action-runas { border-color:var(--forja-gold); color:var(--forja-gold); }
-#forja-container .forja-classes-tabs { display:flex; min-height:46px; align-items:center; gap:8px; padding:6px 14px; border-bottom:1px solid var(--forja-border); background:var(--forja-panel); }
-#forja-container .forja-classes-tabs[hidden] { display:none !important; }
-#forja-container .forja-class-tab-label { flex:none; color:var(--forja-muted); font-size:9px; font-weight:800; letter-spacing:.7px; }
-#forja-container .forja-class-tab-options { display:flex; min-width:0; gap:6px; overflow-x:auto; scrollbar-width:thin; scrollbar-color:#52606a transparent; padding:2px; touch-action:pan-x; }
-#forja-container .forja-class-tab { flex:none; min-height:38px; padding:7px 11px; border:1px solid var(--forja-border); border-radius:999px; background:var(--forja-interactive); color:var(--forja-text); font-size:11px; font-weight:700; white-space:nowrap; cursor:pointer; }
-#forja-container .forja-class-tab:hover { border-color:var(--forja-gold); }
-#forja-container .forja-class-tab.active { border-color:var(--forja-gold); background:var(--forja-gold); color:#1b211b; }
-#forja-container .forja-class-tab:focus-visible { outline:2px solid var(--forja-gold); outline-offset:2px; }
-#forja-container .recipe-copy { display:flex; flex:1; min-width:0; flex-direction:column; gap:4px; }
-#forja-container .recipe-name { flex:none; width:100%; }
-#forja-container .recipe-class-label { max-width:100%; overflow:hidden; color:var(--forja-gold); font-size:9px; font-weight:800; letter-spacing:.2px; text-overflow:ellipsis; white-space:nowrap; }
-#forja-container #classe-receita-forja { border-color:var(--forja-gold); color:var(--forja-gold); font-weight:800; }
-#forja-container #classe-receita-forja[hidden] { display:none; }
-#forja-container .recipe-card:focus-visible { outline:2px solid var(--forja-gold); outline-offset:2px; }
-#forja-container .recipe-scroll-list { padding-bottom:76px; scroll-padding-bottom:76px; }
-@media(max-width:768px) {
-    #forja-container .forja-nav-tabs { grid-template-columns:minmax(0,1fr); gap:5px; padding:6px 8px; }
-    #forja-container .forja-tab-group { display:grid; grid-template-columns:58px minmax(0,1fr); gap:5px; }
-    #forja-container .forja-tab-label { font-size:8px; letter-spacing:.35px; }
-    #forja-container .forja-tab-options { display:grid; grid-auto-flow:column; grid-auto-columns:minmax(0,1fr); gap:4px; }
-    #forja-container .forja-tab-options .aba-forja-btn { width:100%; min-height:42px; padding:5px 3px; font-size:9px; }
-    #forja-container .forja-classes-tabs { min-height:44px; gap:6px; padding:5px 8px; }
-    #forja-container .forja-class-tab-label { font-size:8px; letter-spacing:.35px; }
-    #forja-container .forja-class-tab-options { gap:5px; }
-    #forja-container .forja-class-tab { min-height:40px; padding:7px 10px; font-size:10px; }
-    #forja-container .recipe-copy { gap:3px; }
-    #forja-container .recipe-class-label { font-size:8px; }
+#forja-container .forja-tab-group {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 8px;
 }
-</style>
+#forja-container .forja-tab-label {
+    flex: 0 0 58px;
+    color: var(--forja-muted);
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: .65px;
+}
+#forja-container .forja-tab-options {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 6px;
+}
+#forja-container .forja-tab-options .aba-forja-btn {
+    min-width: 0;
+    min-height: 44px;
+    padding: 8px 11px;
+    border: 1px solid var(--forja-border);
+    border-radius: 10px;
+    background: var(--forja-interactive);
+    color: var(--forja-text);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: .15px;
+    white-space: nowrap;
+    touch-action: manipulation;
+    transition: border-color .16s ease, background .16s ease, color .16s ease, transform .16s ease;
+}
+#forja-container .aba-forja-btn:hover { border-color: rgba(228,196,122,.75); }
+#forja-container .aba-forja-btn:active { transform: translateY(1px); }
+#forja-container .aba-forja-btn.active {
+    border-color: var(--forja-gold-light);
+    background: linear-gradient(135deg, #dfbf73, #bd934c);
+    color: #172328;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.24), 0 3px 8px rgba(0,0,0,.2);
+}
+#forja-container .forja-tab-options .forja-action-runas {
+    border-color: rgba(169,139,213,.45);
+    background: linear-gradient(145deg, #2b2340, #1d2635);
+    color: #e3d2ff;
+}
+#forja-container .forja-tab-options .forja-action-runas:hover { border-color: #b99be6; }
+#forja-container .forja-classes-tabs {
+    display: flex;
+    min-height: 48px;
+    align-items: center;
+    gap: 9px;
+    padding: 6px 12px;
+    border-bottom: 1px solid var(--forja-border);
+    background: #0e2026;
+}
+#forja-container .forja-classes-tabs[hidden] { display: none !important; }
+#forja-container .forja-class-tab-label {
+    flex: 0 0 auto;
+    color: var(--forja-muted);
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: .65px;
+    white-space: nowrap;
+}
+#forja-container .forja-class-tab-label::after { content: '  ↔'; color: var(--forja-gold); }
+#forja-container .forja-class-tab-options {
+    display: flex;
+    flex: 1 1 auto;
+    min-width: 0;
+    gap: 6px;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x proximity;
+    scrollbar-width: thin;
+    scrollbar-color: var(--forja-gold) transparent;
+    padding: 3px 3px 5px;
+    touch-action: pan-x;
+    -webkit-overflow-scrolling: touch;
+}
+#forja-container .forja-class-tab-options::-webkit-scrollbar { height: 3px; }
+#forja-container .forja-class-tab-options::-webkit-scrollbar-track { background: transparent; }
+#forja-container .forja-class-tab-options::-webkit-scrollbar-thumb { border-radius: 99px; background: var(--forja-gold); }
+#forja-container .forja-class-tab {
+    flex: 0 0 auto;
+    min-height: 40px;
+    padding: 8px 12px;
+    border: 1px solid var(--forja-border);
+    border-radius: 999px;
+    background: var(--forja-interactive);
+    color: var(--forja-text);
+    font-size: 11px;
+    font-weight: 750;
+    white-space: nowrap;
+    scroll-snap-align: start;
+    cursor: pointer;
+    transition: border-color .16s ease, background .16s ease, color .16s ease, transform .16s ease;
+}
+#forja-container .forja-class-tab:hover { border-color: rgba(228,196,122,.75); }
+#forja-container .forja-class-tab:active { transform: translateY(1px); }
+#forja-container .forja-class-tab.active {
+    border-color: var(--forja-gold-light);
+    background: linear-gradient(135deg, #dfbf73, #bd934c);
+    color: #172328;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.24), 0 3px 8px rgba(0,0,0,.18);
+}
+#forja-container .forja-class-tab:focus-visible,
+#forja-container .aba-forja-btn:focus-visible,
+#forja-container .recipe-card:focus-visible {
+    outline: 2px solid var(--forja-gold-light);
+    outline-offset: 2px;
+}
+#forja-container .forja-search { color: var(--forja-muted); }
+#forja-container input {
+    border-color: var(--forja-border);
+    border-radius: 10px;
+    background: #0b1b20;
+    color: var(--forja-text);
+}
+#forja-container .forja-search input { min-height: 44px; padding: 9px 12px; font-size: 16px; }
+#forja-container :focus-visible { outline-color: var(--forja-gold-light); }
+#forja-container .recipe-card {
+    border-color: var(--forja-border);
+    background: linear-gradient(115deg, #14282e, #102128);
+    color: var(--forja-text);
+}
+#forja-container .recipe-card:hover { border-color: rgba(228,196,122,.65); }
+#forja-container .recipe-card.active {
+    border-color: var(--forja-gold);
+    background: linear-gradient(110deg, #1d3438, #14282e);
+    box-shadow: inset 3px 0 var(--forja-gold), 0 4px 12px rgba(0,0,0,.18);
+}
+#forja-container .card-icon { border: 1px solid rgba(211,190,132,.16); background: #0a171c; }
+#forja-container .recipe-name { color: var(--forja-text); font-size: 13px; }
+#forja-container .recipe-class-label { color: var(--forja-gold-light); font-size: 10px; font-weight: 750; }
+#forja-container .forja-details-view { background: var(--forja-panel); color: var(--forja-text); }
+#forja-container .forja-back { color: var(--forja-gold-light); }
+#forja-container .item-header-display { border-color: var(--forja-border); background: var(--forja-raised); }
+#forja-container .mat-pill { border-color: var(--forja-border); background: var(--forja-raised); color: var(--forja-text); }
+#forja-container .btn-forge-action:not(:disabled) {
+    border-color: var(--forja-gold);
+    background: linear-gradient(135deg, #dfbf73, #bd934c) !important;
+    color: #172328;
+    text-shadow: none;
+}
+@media (max-width: 768px) {
+    #forja-container .forja-sidebar,
+    #forja-container .forja-sidebar.forja-sidebar-compacta { border-right-color: var(--forja-border); }
+    #forja-container .forja-nav-tabs {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 4px;
+        padding: 6px 8px;
+    }
+    #forja-container .forja-tab-group {
+        display: grid;
+        grid-template-columns: 56px minmax(0, 1fr);
+        gap: 5px;
+    }
+    #forja-container .forja-tab-label { flex: none; align-self: center; font-size: 9px; letter-spacing: .35px; }
+    #forja-container .forja-tab-options { gap: 5px; }
+    #forja-container .forja-tab-options .aba-forja-btn {
+        flex: 1 1 0;
+        min-height: 42px;
+        padding: 6px 5px;
+        font-size: 10px;
+    }
+    #forja-container .forja-classes-tabs { min-height: 46px; gap: 7px; padding: 5px 8px; }
+    #forja-container .forja-class-tab-options { gap: 5px; }
+    #forja-container .forja-class-tab { min-height: 40px; padding: 7px 11px; font-size: 10px; }
+    #forja-container .forja-search { font-size: 11px; }
+    #forja-container .forja-search input { min-height: 42px; }
+    #forja-container .forja-sidebar.forja-sidebar-compacta { border-right-color: var(--forja-border); }
+}
+@media (max-width: 420px) {
+    #forja-container { padding: 4px; }
+    #forja-container .forja-modern-wrapper { max-height: calc(100dvh - 8px); height: calc(100dvh - 8px); border-radius: 13px; }
+    #forja-container .forja-top-bar { padding: 6px 9px; }
+    #forja-container .forja-title { font-size: 13px; letter-spacing: .6px; }
+    #forja-container .forja-subtitle { font-size: 10px; }
+    #forja-container .forja-close { width: 40px; height: 40px; }
+    #forja-container .forja-tab-label { flex-basis: 52px; font-size: 8px; }
+    #forja-container .forja-tab-options { gap: 4px; }
+    #forja-container .forja-tab-options .aba-forja-btn { min-height: 40px; padding: 5px 3px; font-size: 9px; }
+    #forja-container .forja-class-tab-label { font-size: 9px; }
+    #forja-container .forja-class-tab { min-height: 38px; padding: 6px 10px; }
+}
+@media (prefers-reduced-motion: reduce) {
+    #forja-container .aba-forja-btn,
+    #forja-container .forja-class-tab,
+    #forja-container .forja-close { transition: none; }
+    #forja-container .forja-class-tab-options { scroll-behavior: auto; }
+}</style>
