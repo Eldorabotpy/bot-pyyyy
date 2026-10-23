@@ -4,38 +4,38 @@
 
 /* 💬 BOTÃO DO CHAT NO MAPA */
 .btn-social-mapa {
-    position: fixed; 
+    position: fixed;
     top: 125px; /* Fica logo abaixo do Passe de Batalha (que está no 80px) */
-    right: 8px; 
+    right: 8px;
     width: 45px; /* Um pouco maior para a imagem ficar nítida */
     height: 45px;
-    background: rgba(15, 23, 42, 0); 
-    border: 2px solid #3498db00; 
+    background: rgba(15, 23, 42, 0);
+    border: 2px solid #3498db00;
     border-radius: 50%;
-    cursor: pointer; 
-    display: flex; 
-    justify-content: center; 
+    cursor: pointer;
+    display: flex;
+    justify-content: center;
     align-items: center;
-    box-shadow: 0 0 6px rgba(252, 39, 99, 0); 
-    z-index: 1000; 
+    box-shadow: 0 0 6px rgba(252, 39, 99, 0);
+    z-index: 1000;
     transition: transform 0.2s, background 0.2s;
     padding: 6px; /* Espaço para a imagem não tocar nas bordas */
 }
 
 .btn-social-mapa img {
-    width: 100%; 
-    height: 100%; 
-    object-fit: contain; 
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
     filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.8));
 }
 
-.btn-social-mapa:hover { 
-    transform: scale(1.10); 
-    background: rgba(1, 10, 15, 0); 
+.btn-social-mapa:hover {
+    transform: scale(1.10);
+    background: rgba(1, 10, 15, 0);
 }
 
 /* ==========================================
-   🛡️ TEMA: TAVERNA RPG MODERNA 
+   🛡️ TEMA: TAVERNA RPG MODERNA
    ========================================== */
 
 /* 1. O Fundo Escuro do Modal (Substituindo a social-container antiga) */
@@ -46,7 +46,7 @@
     width: 100% !important;
     height: 100% !important;
     z-index: 99999 !important; /* 👈 Agora sim ele vai esmagar o z-index 10 do Passe */
-    background: rgba(0, 0, 0, 0.85) !important; 
+    background: rgba(0, 0, 0, 0.85) !important;
     backdrop-filter: none !important;
     display: flex;
     justify-content: center;
@@ -56,19 +56,19 @@
 /* 2. O Quadro Principal da Taverna */
 #hub-social > div, .social-container {
     position: relative !important; /* 👈 Mantém o quadro na camada certa */
-    z-index: 100000 !important; 
+    z-index: 100000 !important;
     background: #121214 !important; /* Zinco escuro */
     border: 1px solid #27272a !important;
     border-top: 3px solid #ca8a04 !important; /* Borda dourada */
     border-radius: 6px !important;
     box-shadow: 0 25px 50px rgba(0,0,0,0.95) !important;
-    
+
     width: 95% !important;
-    max-width: 360px !important; 
+    max-width: 360px !important;
     height: 80vh !important;
     max-height: 550px !important;
-    
-    padding: 0 !important; 
+
+    padding: 0 !important;
     display: flex !important;
     flex-direction: column !important;
     overflow: hidden !important;
@@ -83,24 +83,24 @@
     display: flex; justify-content: space-between; align-items: center;
 }
 
-.btn-fechar-social { 
-    background: transparent; border: none; color: #ef4444; 
-    font-weight: bold; cursor: pointer; font-size: 1.2em; 
+.btn-fechar-social {
+    background: transparent; border: none; color: #ef4444;
+    font-weight: bold; cursor: pointer; font-size: 1.2em;
 }
 
 /* 4. Abas Superiores Minimalistas */
 .social-abas { display: flex; background: #18181b !important; }
-.aba-soc { 
-    flex: 1; padding: 12px 5px !important; background: transparent; border: none !important; 
-    color: #71717a !important; font-family: 'Cinzel', serif; cursor: pointer; 
+.aba-soc {
+    flex: 1; padding: 12px 5px !important; background: transparent; border: none !important;
+    color: #71717a !important; font-family: 'Cinzel', serif; cursor: pointer;
     border-bottom: 2px solid transparent !important; transition: 0.2s;
-    font-weight: bold !important; font-size: 0.8em !important; 
+    font-weight: bold !important; font-size: 0.8em !important;
     letter-spacing: 1px !important; text-transform: uppercase !important;
 }
-.aba-soc.active { 
-    color: #facc15 !important; 
-    border-bottom: 2px solid #facc15 !important; 
-    background: #27272a !important; 
+.aba-soc.active {
+    color: #facc15 !important;
+    border-bottom: 2px solid #facc15 !important;
+    background: #27272a !important;
 }
 
 /* 5. O Fundo do Chat */
@@ -159,18 +159,18 @@
     top: 50% !important;        /* Empurra 50% pro meio verticalmente */
     left: 50% !important;       /* Empurra 50% pro meio horizontalmente */
     transform: translate(-50%, -50%) !important; /* Centraliza perfeitamente no próprio eixo */
-    
-    background: rgba(15, 23, 42, 0.95); 
+
+    background: rgba(15, 23, 42, 0.95);
     border: 1px solid #ca8a04; /* Bordinha dourada para combinar com a nova Taverna */
-    border-radius: 8px; 
-    padding: 10px; 
+    border-radius: 8px;
+    padding: 10px;
     box-shadow: 0 10px 25px rgba(0,0,0,0.9); /* Sombra mais forte para destacar no meio */
     z-index: 2000;
     display: flex; flex-direction: column; gap: 5px; min-width: 150px;
 }
 
 .menu-flutuante button {
-    background: transparent; border: none; color: white; text-align: left; 
+    background: transparent; border: none; color: white; text-align: left;
     padding: 8px; cursor: pointer; border-radius: 4px; transition: 0.2s;
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     font-weight: bold;
@@ -305,27 +305,27 @@
     left: 50%;
     transform: translateX(-50%);
     z-index: 99999999;
-    
+
     /* Padrão visual puxado direto do #hub-social */
-    background: #121214; 
+    background: #121214;
     border: 1px solid #27272a;
-    border-top: 3px solid #ca8a04; 
+    border-top: 3px solid #ca8a04;
     border-radius: 6px;
     box-shadow: 0 15px 35px rgba(0,0,0,0.9);
-    
+
     color: #e4e4e7;
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     font-size: 0.95em;
     font-weight: bold;
     padding: 12px 24px;
-    
+
     display: flex;
     align-items: center;
     gap: 12px;
     white-space: nowrap;
-    
+
     /* Animação com um "quique" suave no final */
-    transition: top 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
+    transition: top 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
 #eldora-toast .toast-icon {
@@ -335,7 +335,7 @@
 
 /* Quando o JS adiciona esta classe, a notificação desce! */
 #eldora-toast.mostrar {
-    top: 25px; 
+    top: 25px;
 }
 /* Taverna compacta: largura, abas e compositor ajustados para mobile. */
 #hub-social {
@@ -653,6 +653,195 @@
 }
 
 #hub-social .grade-expressoes-chat > button {
+.emoji-btn {
+    background: #18181b !important;
+    border: 1px solid #3f3f46 !important;
+    border-radius: 10px !important;
+    height: 45px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 1.5em;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
+}
+
+.emoji-btn.ativo:hover {
+    border-color: #facc15 !important;
+    background: #27272a !important;
+    transform: scale(1.25);
+}
+
+.emoji-btn.bloqueado {
+    background: #09090b !important;
+    border-color: #1c1917 !important;
+    color: #3f3f46 !important;
+    font-size: 1.2em;
+    cursor: not-allowed;
+}
+
+.emoji-icon-frame {
+    display: block;
+    width: 40px;
+    height: 40px;
+    overflow: hidden;
+    flex: 0 0 40px;
+}
+
+.emoji-icon-frame img {
+    display: block;
+    width: 160px;
+    max-width: none;
+    height: 40px;
+    object-fit: contain;
+}
+
+/* Garante que o botão principal pulse quando o mouse passa */
+#btn-expressoes:hover {
+    background: rgba(202, 139, 4, 0);
+    border-color: #ca8b0400;
+}
+
+/* ==========================================
+   Tamanho Customizado do Botão de Expressões
+   ========================================== */
+#btn-expressoes {
+    width: 44px !important;
+    height: 44px !important;
+    padding: 0 !important;
+    overflow: visible !important;
+}
+
+/* Ícone do botão de expressões */
+#btn-expressoes img {
+    width: 54px !important;
+    height: 54px !important;
+    object-fit: contain;
+    transform: none;
+    transition: transform 0.2s ease;
+}
+
+#btn-expressoes:hover img {
+    transform: scale(1.06);
+}
+
+@keyframes atalhosMapaRespiram {
+    0%, 100% {
+        transform: translateY(0) scale(1);
+        filter: drop-shadow(0 2px 3px rgba(0, 0, 0, .35));
+    }
+    50% {
+        transform: translateY(-2px) scale(1.06);
+        filter: drop-shadow(0 3px 7px rgba(255, 208, 82, .58));
+    }
+}
+
+.btn-passe-mapa img,
+.btn-social-mapa img,
+#btn-abrir-menu img,
+#img-pergaminho-quest {
+    transform-origin: center;
+    animation: atalhosMapaRespiram 2.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .btn-passe-mapa img,
+    .btn-social-mapa img,
+    #btn-abrir-menu img,
+    #img-pergaminho-quest {
+        animation: none;
+    }
+}
+
+/* ========================================== */
+/* 🔔 NOTIFICAÇÕES TOAST (MUNDO DE ELDORA)    */
+/* ========================================== */
+#eldora-toast {
+    position: fixed;
+    top: -100px; /* Começa escondido no topo */
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 99999999;
+
+    /* Padrão visual puxado direto do #hub-social */
+    background: #121214;
+    border: 1px solid #27272a;
+    border-top: 3px solid #ca8a04;
+    border-radius: 6px;
+    box-shadow: 0 15px 35px rgba(0,0,0,0.9);
+
+    color: #e4e4e7;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-size: 0.95em;
+    font-weight: bold;
+    padding: 12px 24px;
+
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    white-space: nowrap;
+
+    /* Animação com um "quique" suave no final */
+    transition: top 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+#eldora-toast .toast-icon {
+    font-size: 1.4em;
+    filter: drop-shadow(0 2px 2px rgba(0,0,0,0.8));
+}
+
+/* Quando o JS adiciona esta classe, a notificação desce! */
+#eldora-toast.mostrar {
+    top: 25px;
+}
+/* Taverna compacta: largura, abas e compositor ajustados para mobile. */
+#hub-social {
+    box-sizing: border-box;
+    padding: 14px !important;
+    background: rgba(3, 8, 16, .72) !important;
+    backdrop-filter: blur(4px) !important;
+}
+
+#hub-social > .social-container {
+    box-sizing: border-box;
+    width: min(360px, calc(100vw - 32px)) !important;
+    max-width: 360px !important;
+    height: min(72dvh, 520px) !important;
+    max-height: calc(100dvh - 28px) !important;
+    min-height: 0 !important;
+    border: 1px solid rgba(223, 190, 116, .38) !important;
+    border-top: 2px solid #d8b45f !important;
+    border-radius: 16px !important;
+    background:
+        radial-gradient(ellipse at 50% 0, rgba(214, 174, 91, .1), transparent 48%),
+        linear-gradient(155deg, #1b273a 0%, #111a28 58%, #0d1420 100%) !important;
+    box-shadow: 0 20px 55px rgba(0, 0, 0, .62),
+        inset 0 0 0 1px rgba(255, 255, 255, .035) !important;
+}
+
+#hub-social > .social-container > .social-header {
+    box-sizing: border-box;
+    flex: 0 0 54px;
+    height: 54px !important;
+    min-height: 54px !important;
+    max-height: 54px !important;
+    gap: 8px;
+    padding: 7px 12px !important;
+    background: linear-gradient(100deg, rgba(31, 43, 58, .98), rgba(20, 29, 42, .98)) !important;
+    border-bottom: 1px solid rgba(224, 190, 112, .16) !important;
+}
+
+#hub-social .social-header h2 {
+    overflow: hidden;
+    font-size: 16px !important;
+    line-height: 1.2;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#hub-social .btn-fechar-social {
+    position: relative;
     display: grid;
     place-items: center;
     min-width: 0;
@@ -686,6 +875,254 @@
 #hub-social .grade-expressoes-chat [data-expressao="risada"] { --emoji-cor-rgb: 251, 146, 60; }
 #hub-social .grade-expressoes-chat [data-expressao="sono"] { --emoji-cor-rgb: 129, 140, 248; }
 #hub-social .grade-expressoes-chat [data-expressao="raiva"] { --emoji-cor-rgb: 239, 68, 68; }
+    padding: 9px 2px !important;
+    color: #9caabd !important;
+    font-size: 10px !important;
+    letter-spacing: .45px !important;
+    background: transparent !important;
+    border: 1px solid transparent !important;
+    border-bottom: 2px solid transparent !important;
+    border-radius: 8px 8px 2px 2px;
+    white-space: nowrap;
+}
+
+#hub-social .aba-soc.active {
+    color: #f3d486 !important;
+    background: linear-gradient(180deg, rgba(218, 177, 91, .14), rgba(218, 177, 91, .035)) !important;
+    border-color: rgba(218, 177, 91, .16) !important;
+    border-bottom-color: #e4c26f !important;
+}
+
+#hub-social #conteudo-social.social-content {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+    height: auto !important;
+    overflow: hidden;
+    padding: 0 !important;
+    background: linear-gradient(180deg, #111a27, #0d1420) !important;
+}
+
+#hub-social .aviso-central-eldora:not([hidden]) {
+    display: grid;
+    flex: 0 0 auto;
+    grid-template-columns: 34px minmax(0, 1fr);
+    gap: 8px 10px;
+    margin: 9px 10px 0;
+    padding: 10px;
+    color: #e9dfc9;
+    background: linear-gradient(135deg, rgba(105, 76, 28, .32), rgba(24, 35, 49, .96));
+    border: 1px solid rgba(218, 177, 91, .48);
+    border-radius: 11px;
+    box-shadow: inset 0 1px rgba(255, 255, 255, .04);
+}
+
+#hub-social .aviso-central-icone {
+    display: grid;
+    width: 32px;
+    height: 32px;
+    place-items: center;
+    background: rgba(218, 177, 91, .12);
+    border: 1px solid rgba(218, 177, 91, .3);
+    border-radius: 9px;
+}
+
+#hub-social .aviso-central-texto { min-width: 0; }
+#hub-social .aviso-central-texto strong { color: #f3d486; font-size: 12px; }
+#hub-social .aviso-central-texto p { margin: 3px 0 0; color: #b8c3d2; font-size: 11px; line-height: 1.4; }
+
+#hub-social #aviso-central-abrir {
+    grid-column: 2;
+    justify-self: start;
+    padding: 6px 10px;
+    color: #f6e3b2;
+    font-size: 11px;
+    font-weight: 700;
+    background: #3a2c16;
+    border: 1px solid rgba(218, 177, 91, .56);
+    border-radius: 7px;
+    cursor: pointer;
+}
+
+#btn-chat-mapa { position: fixed; }
+#btn-chat-mapa .badge-central-eldora {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    display: grid;
+    width: 20px;
+    height: 20px;
+    place-items: center;
+    background: #ef4444;
+    border: 2px solid #101827;
+    border-radius: 50%;
+    box-shadow: 0 0 9px rgba(239, 68, 68, .8);
+    color: #fff;
+    font: 900 13px/1 Arial, sans-serif;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, .75);
+    animation: pulso-badge-central 1.8s ease-in-out infinite;
+}
+
+@keyframes pulso-badge-central {
+    50% { box-shadow: 0 0 13px rgba(239, 68, 68, .95); transform: scale(1.08); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #btn-chat-mapa .badge-central-eldora { animation: none; }
+}
+
+#hub-social #chat-box.chat-historico {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: auto !important;
+    padding: 12px 11px !important;
+    overflow-y: auto;
+    background:
+        radial-gradient(ellipse at 50% 0, rgba(77, 102, 127, .09), transparent 55%),
+        #0d1420 !important;
+}
+
+#hub-social #chat-box > p {
+    margin: 14px 4px;
+    color: #b8a87f !important;
+    font-size: 10px !important;
+    letter-spacing: .55px;
+    line-height: 1.5;
+}
+
+#hub-social .chat-input-area {
+    flex: 0 0 auto;
+    gap: 7px;
+    padding: 8px 10px calc(8px + env(safe-area-inset-bottom, 0px)) !important;
+    background: #141e2b !important;
+    border-top: 1px solid rgba(224, 190, 112, .15) !important;
+}
+
+#hub-social #input-chat {
+    min-width: 0;
+    padding: 9px 11px !important;
+    color: #edf0f2 !important;
+    font-size: 14px;
+    background: #0b1420 !important;
+    border: 1px solid #354256 !important;
+    border-radius: 10px !important;
+}
+
+#hub-social #input-chat:focus {
+    border-color: #c9a75e !important;
+    outline: 2px solid rgba(201, 167, 94, .16);
+}
+
+#hub-social .chat-input-area button {
+    flex: 0 0 auto;
+    min-height: 36px;
+    padding: 0 11px !important;
+    font-size: 10px !important;
+    background: linear-gradient(180deg, #d9b967, #9d7839) !important;
+    border: 1px solid #e4c879 !important;
+    border-radius: 9px !important;
+    box-shadow: inset 0 1px rgba(255, 255, 255, .28), 0 3px 8px rgba(0, 0, 0, .2) !important;
+}
+
+@media (max-width: 480px) {
+    #hub-social > .social-container {
+        width: min(330px, calc(100vw - 28px)) !important;
+        height: min(72dvh, 480px) !important;
+    }
+}
+
+@media (max-width: 340px) {
+    #hub-social {
+        padding: 10px !important;
+    }
+
+    #hub-social > .social-container {
+        width: calc(100vw - 20px) !important;
+    }
+
+    #hub-social .social-abas {
+        gap: 2px;
+        padding-right: 5px;
+        padding-left: 5px;
+    }
+
+    #hub-social .aba-soc {
+        font-size: 9px !important;
+        letter-spacing: .2px !important;
+    }
+}
+
+/* Expressões animadas para inserir no chat da Taverna. */
+#hub-social .chat-input-area {
+    position: relative;
+}
+
+#hub-social .chat-input-area > .btn-expressoes-chat {
+    flex: 0 0 38px;
+    width: 38px;
+    min-width: 38px;
+    min-height: 36px;
+    padding: 0 !important;
+    color: #f3d58e !important;
+    font-size: 21px !important;
+    line-height: 1;
+    text-transform: none !important;
+    text-shadow: none !important;
+    background: #0b1420 !important;
+    border: 1px solid #665334 !important;
+    border-radius: 9px !important;
+    box-shadow: inset 0 1px rgba(255, 255, 255, .05) !important;
+}
+
+#hub-social .chat-input-area > .btn-expressoes-chat:hover {
+    border-color: #d2ad61 !important;
+    background: #182334 !important;
+}
+
+#hub-social .painel-expressoes-chat[hidden] {
+    display: none !important;
+}
+
+#hub-social .painel-expressoes-chat {
+    position: absolute;
+    z-index: 10020;
+    left: 10px;
+    bottom: calc(100% + 9px);
+    width: 204px;
+    padding: 10px;
+    border: 1px solid rgba(210, 173, 97, .55);
+    border-radius: 12px;
+    background: linear-gradient(160deg, #182538, #0b1420 75%);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, .55), inset 0 1px rgba(255, 255, 255, .06);
+}
+
+#hub-social .painel-expressoes-titulo {
+    margin: 0 0 8px;
+    color: #e9d6a5;
+    font: 700 11px/1.2 'Cinzel', serif;
+    letter-spacing: .6px;
+}
+
+#hub-social .grade-expressoes-chat {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+}
+
+#hub-social .grade-expressoes-chat > button {
+    display: grid;
+    place-items: center;
+    min-width: 0;
+    min-height: 42px;
+    padding: 4px !important;
+    background: rgba(8, 17, 29, .85) !important;
+    border: 1px solid #34445a !important;
+    border-radius: 8px !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+    cursor: pointer;
+}
 
 #hub-social .grade-expressoes-chat > button:hover,
 #hub-social .grade-expressoes-chat > button:focus-visible {

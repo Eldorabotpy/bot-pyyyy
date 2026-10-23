@@ -22,6 +22,17 @@ FAMILIES = {
     "sabio": ("Sábio", "xp_multiplier", [3, 6, 9], "XP em caçadas", "%", "#afcfdb"),
 }
 
+RUNE_NAME_PREFIXES = {
+    "crueldade": "da Crueldade",
+    "precisao": "da Precisão",
+    "vampiro": "do Vampiro",
+    "rocha": "da Rocha",
+    "mente": "da Mente",
+    "eco": "do Eco",
+    "midas": "de Midas",
+    "sabio": "do Sábio",
+}
+
 def complete_catalog(runes):
     for family, (name, stat, values, label, unit, color) in FAMILIES.items():
         for tier, suffix in enumerate(("menor", "maior", "ancestral"), 1):

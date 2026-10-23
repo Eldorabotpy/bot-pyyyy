@@ -223,7 +223,7 @@ class PerfilVisual {
 
         let classeBusca = '.card-opcao';
         if (tipo === 'banner') classeBusca = '.card-opcao-banner';
-        
+
         const prefixo = tipo === 'avatar' ? 'av-' : (tipo === 'skin' ? 'sk-' : 'bn-');
         
         document.querySelectorAll(classeBusca).forEach(el => {

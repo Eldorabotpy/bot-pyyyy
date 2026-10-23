@@ -9,6 +9,9 @@ class MotorDeInvasao {
         this.monstrosNaTela = {};
         this.monstrosAguardandoTextura = new Map();
         this.texturasInvasaoCarregando = new Map();
+        this.statusFrentesInvasao = null;
+        this.avisoPreparacaoInvasao = null;
+        this.timerAvisoPreparacaoInvasao = null;
 
         // 👇 CONECTANDO O NOVO ARQUIVO DE HUD 👇
         this.hud = new HudInvasao();
@@ -16,6 +19,7 @@ class MotorDeInvasao {
         this.iniciarEscutas();
         this.iniciarAtaqueDosMinions();
     }
+
     estaNaCapital() {
         const regiao =
             (this.scene?.regiaoAtual ||
@@ -27,8 +31,105 @@ class MotorDeInvasao {
         return regiao.includes("capital");
     }
 
+    estaNaTelaDoMapa() {
+        return Boolean(document.querySelector("#aba-reino.active #game-container"));
+    }
+
+    observarTelaDoMapa() {
+        const abaMapa = document.getElementById("aba-reino");
+        if (!abaMapa || typeof MutationObserver === "undefined") return;
+
+        this.observadorTelaMapa?.disconnect();
+        this.observadorTelaMapa = new MutationObserver(() => {
+            if (this.statusFrentesInvasao) {
+                this.atualizarPainelFrentesInvasao(this.statusFrentesInvasao);
+            } else {
+                this.esconderPainelFrentesInvasao();
+            }
+            this.renderizarAvisoPreparacaoInvasao();
+        });
+        this.observadorTelaMapa.observe(abaMapa, {
+            attributes: true,
+            attributeFilter: ["class"]
+        });
+
+        this.scene?.events?.once?.("shutdown", () => {
+            this.observadorTelaMapa?.disconnect();
+            this.esconderAvisoPreparacaoInvasao();
+        });
+    }
+
     esconderPainelFrentesInvasao() {
         const painel = document.getElementById("painel-frentes-invasao");
+        if (painel) painel.style.display = "none";
+    }
+
+    mostrarAvisoPreparacaoInvasao(segundos) {
+        const restante = Number(segundos);
+        if (!Number.isFinite(restante) || restante <= 0) {
+            this.esconderAvisoPreparacaoInvasao();
+            return;
+        }
+
+        this.avisoPreparacaoInvasao = {
+            expiraEm: Date.now() + restante * 1000
+        };
+        this.renderizarAvisoPreparacaoInvasao();
+
+        if (this.timerAvisoPreparacaoInvasao) {
+            clearInterval(this.timerAvisoPreparacaoInvasao);
+        }
+        this.timerAvisoPreparacaoInvasao = setInterval(
+            () => this.renderizarAvisoPreparacaoInvasao(),
+            1000
+        );
+    }
+
+    renderizarAvisoPreparacaoInvasao() {
+        if (!this.avisoPreparacaoInvasao) return;
+
+        const painelId = "aviso-preparacao-invasao";
+        let painel = document.getElementById(painelId);
+        if (!painel) {
+            painel = document.createElement("div");
+            painel.id = painelId;
+            painel.style.cssText = `
+                position:fixed; top:78px; left:50%; transform:translateX(-50%);
+                z-index:90; width:min(88vw,300px); box-sizing:border-box;
+                padding:8px 12px; border:1px solid #ca8a04; border-radius:9px;
+                background:rgba(2,6,23,.94); color:#f4ead2;
+                font:600 12px Arial,sans-serif; text-align:center;
+                box-shadow:0 3px 10px rgba(0,0,0,.48); pointer-events:none;
+            `;
+            painel.innerHTML = '<div style="color:#facc15;font-weight:900;letter-spacing:.04em">🛡️ A INVASÃO SE APROXIMA</div><div style="margin-top:4px;color:#cbd5e1">Começa em <span id="aviso-invasao-contagem" style="color:#facc15;font-variant-numeric:tabular-nums">10:00</span></div>';
+            document.body.appendChild(painel);
+        }
+
+        const restante = Math.ceil((this.avisoPreparacaoInvasao.expiraEm - Date.now()) / 1000);
+        if (restante <= 0) {
+            this.esconderAvisoPreparacaoInvasao();
+            return;
+        }
+
+        if (!this.estaNaCapital() || !this.estaNaTelaDoMapa()) {
+            painel.style.display = "none";
+            return;
+        }
+
+        const minutos = String(Math.floor(restante / 60)).padStart(2, "0");
+        const segundos = String(restante % 60).padStart(2, "0");
+        const contador = painel.querySelector("#aviso-invasao-contagem");
+        if (contador) contador.textContent = `${minutos}:${segundos}`;
+        painel.style.display = "block";
+    }
+
+    esconderAvisoPreparacaoInvasao() {
+        this.avisoPreparacaoInvasao = null;
+        if (this.timerAvisoPreparacaoInvasao) {
+            clearInterval(this.timerAvisoPreparacaoInvasao);
+            this.timerAvisoPreparacaoInvasao = null;
+        }
+        const painel = document.getElementById("aviso-preparacao-invasao");
         if (painel) painel.style.display = "none";
     }
 
@@ -59,7 +160,11 @@ class MotorDeInvasao {
     }
 
     atualizarPainelFrentesInvasao(dados) {
-        if (!dados || !dados.ativo || !this.estaNaCapital()) {
+        this.statusFrentesInvasao = dados && typeof dados === "object"
+            ? { ...dados }
+            : null;
+
+        if (!dados || !dados.ativo || !this.estaNaCapital() || !this.estaNaTelaDoMapa()) {
             this.esconderPainelFrentesInvasao();
             return;
         }
@@ -200,6 +305,8 @@ class MotorDeInvasao {
         painel.style.display = "block";
     }
     iniciarEscutas() {
+        this.observarTelaDoMapa();
+
         // Isso vai escutar TODOS os eventos que o servidor enviar
         this.socket.on('spawnMonstroInvasao', (dados) => {
             // Se o Python esquecer a região, assumimos que é a Capital!
@@ -233,11 +340,13 @@ class MotorDeInvasao {
         });
         
         this.socket.on('statusInvasaoFrentes', (dados) => {
+            if (dados?.ativo) this.esconderAvisoPreparacaoInvasao();
             this.atualizarPainelFrentesInvasao(dados);
         });
 
         this.socket.on('eventoEncerrado', (dados = {}) => {
             this.ultimoEncerramentoInvasao = dados || {};
+            this.esconderAvisoPreparacaoInvasao();
 
             const resultado = String(
                 dados.resultado || ""
@@ -314,21 +423,32 @@ class MotorDeInvasao {
         // 📺 AVISA O HUD PARA LIGAR OU DESLIGAR A TELA (AGORA SOLTO)
         // ========================================================
         this.socket.on('alertaInvasao', (dados) => {
+            dados = dados && typeof dados === "object" ? dados : {};
+            const mensagem = String(dados.mensagem || "");
+            const msg = mensagem.toUpperCase();
+
             if (!this.estaNaCapital()) {
                 if (this.hud && typeof this.hud.esconder === "function") {
                     this.hud.esconder();
                 }
+                this.esconderAvisoPreparacaoInvasao();
                 this.esconderPainelFrentesInvasao();
                 return;
             }
 
             if (dados.tempo_restante) {
-                let ondaAtual = dados.onda || (dados.mensagem.includes('10 MINUTOS') ? 0 : 1);
+                let ondaAtual = dados.onda || (msg.includes('10 MINUTOS') ? 0 : 1);
                 this.hud.mostrar(ondaAtual, dados.tempo_restante);
             }
 
-            let msg = String(dados.mensagem || "").toUpperCase();
             let resultado = String(dados.resultado || "").toLowerCase();
+            const avisoDePreparacao = msg.includes("INVASÃO COMEÇARÁ") || msg.includes("INVASAO COMECARA");
+
+            if (avisoDePreparacao) {
+                this.mostrarAvisoPreparacaoInvasao(dados.tempo_restante);
+            } else if (dados.resultado || msg.includes("ONDA") || msg.includes("COMEÇOU")) {
+                this.esconderAvisoPreparacaoInvasao();
+            }
 
             const ehDerrota =
                 resultado === "derrota" ||
@@ -371,7 +491,13 @@ class MotorDeInvasao {
         this.socket.on('statusInvasaoAtual', (dados) => {
             if (dados.ativo && this.estaNaCapital()) {
                 this.hud.mostrar(dados.onda, dados.tempo_restante);
+                if (Number(dados.onda) === 0) {
+                    this.mostrarAvisoPreparacaoInvasao(dados.tempo_restante);
+                } else {
+                    this.esconderAvisoPreparacaoInvasao();
+                }
             } else {
+                this.esconderAvisoPreparacaoInvasao();
                 if (this.hud && typeof this.hud.esconder === "function") {
                     this.hud.esconder();
                 }

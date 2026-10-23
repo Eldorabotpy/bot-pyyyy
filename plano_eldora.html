@@ -43,7 +43,10 @@ const phases=[
  {id:"pets-chapters",status:"pending",title:"Preparar artes e revisar regras dos próximos capítulos de pets",note:"Capítulos reservados dependem de regras e artes; liberar cada capítulo somente depois de validar missões e assets.",source:"docs/roteiro-pets.md"},
  {id:"asset-audit",status:"validate",title:"Atualizar auditoria de imagens e corrigir os caminhos prioritários",note:"Auditoria de 30/09/2026 encontrou 102 caminhos principais ausentes e 232 ícones individuais; 37 casos tinham alternativa. Rechecar, priorizar e decidir reutilização.",source:"docs/auditoria-imagens/LEIA-ME.md"}
  ]},
- {id:"release",number:"03 · Preparar lançamento",title:"Preparar backup e publicação",desc:"Fechar a operação das mudanças que a documentação diz ainda não terem sido publicadas.",tasks:[
+ {id:"central-improvements",number:"03 · Melhorar",title:"Aprimorar a Central e a comunicação do reino",desc:"Melhorias combinadas para destacar novidades e orientar os jogadores.",tasks:[
+ {id:"tavern-central-news",status:"done",title:"Avisar na Taverna sobre novidades ainda não vistas na Central",note:"Implementado por personagem: o indicador e o aviso aparecem enquanto houver novidades não lidas; abrir a novidade registra a leitura no servidor e leva à aba correspondente. Novidades futuras são cadastradas em modules/central_eldora_news.py.",source:"modules/central_eldora_news.py"}
+ ]},
+ {id:"release",number:"04 · Preparar lançamento",title:"Preparar backup e publicação",desc:"Fechar a operação das mudanças que a documentação diz ainda não terem sido publicadas.",tasks:[
  {id:"backup",status:"pending",title:"Confirmar backup de users e companions",note:"A rotina de backup precisa preservar contas, recibos, estoque, incubação e ciclos Premium.",source:"docs/companheiros.md"},
  {id:"deploy",status:"pending",title:"Planejar publicação conjunta do backend, templates e scripts",note:"A entrega de companheiros está documentada como não aplicada em produção; registrar versão, reinício e reversão.",source:"docs/companheiros.md"},
  {id:"security-review",status:"pending",title:"Fazer revisão de segurança além da identidade da conta",note:"A auditoria existente declara que não cobre todas as regras de jogo. Revisar propriedade dos dados, ações de Socket.IO, pagamentos e fluxo de recuperação.",source:"docs/login-google-telegram.md"}

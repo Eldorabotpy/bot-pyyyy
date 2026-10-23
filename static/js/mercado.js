@@ -206,12 +206,21 @@ function mercadoCaminhosImagemItem(item) {
     if (!id) return ["/static/assets/box.png"];
 
     const pasta = mercadoObterPastaItem(item);
+    const somenteFerramentas = pasta === "ferramentas";
     const caminhos = [];
 
     const iconUrl = typeof item?.icon_url === "string" ? item.icon_url.trim() : "";
-    if (/^(https?:\/\/|\/static\/)/i.test(iconUrl)) caminhos.push(iconUrl);
-    if (/^runa_(crueldade|precisao|vampiro|rocha|mente|eco|midas|sabio)_(menor|maior|ancestral)$/.test(id)) {
+    if (/^(https?:\/\/|\/static\/)/i.test(iconUrl)
+        && (!somenteFerramentas || /(?:^|\/)ferramentas\//i.test(iconUrl.replace(/\\/g, '/')))) caminhos.push(iconUrl);
+    if (!somenteFerramentas && /^runa_(crueldade|precisao|vampiro|rocha|mente|eco|midas|sabio)_(menor|maior|ancestral)$/.test(id)) {
         caminhos.push(`https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/runas/${id}.png`);
+    }
+
+    if (somenteFerramentas) {
+        caminhos.push(`${base}itens/ferramentas/${id}.png`);
+        caminhos.push(`${base}itens/ferramentas/work_${id}.png`);
+        caminhos.push("/static/assets/box.png");
+        return [...new Set(caminhos)];
     }
 
     if (pasta === "equipamentos") {
@@ -615,7 +624,7 @@ function renderizarPreviewItemVendaMercado(item) {
 
     if (stats && Object.keys(stats).length > 0) {
         for (const [key, raw] of Object.entries(stats)) {
-            const chaveNormalizada = String(key).trim().toLowerCase().replace(/[\\s_-]/g, "");
+            const chaveNormalizada = String(key).trim().toLowerCase().replace(/[\s_-]/g, "");
             if (chaveNormalizada === "dmg" || chaveNormalizada === "damage") continue;
 
             let valor = raw;
@@ -881,12 +890,21 @@ function mercadoCaminhosImagem(item) {
     if (!id) return ["/static/assets/box.png"];
 
     const pasta = mercadoPastaItem(item);
+    const somenteFerramentas = pasta === "ferramentas";
     const caminhos = [];
 
     const iconUrl = typeof item?.icon_url === "string" ? item.icon_url.trim() : "";
-    if (/^(https?:\/\/|\/static\/)/i.test(iconUrl)) caminhos.push(iconUrl);
-    if (/^runa_(crueldade|precisao|vampiro|rocha|mente|eco|midas|sabio)_(menor|maior|ancestral)$/.test(id)) {
+    if (/^(https?:\/\/|\/static\/)/i.test(iconUrl)
+        && (!somenteFerramentas || /(?:^|\/)ferramentas\//i.test(iconUrl.replace(/\\/g, '/')))) caminhos.push(iconUrl);
+    if (!somenteFerramentas && /^runa_(crueldade|precisao|vampiro|rocha|mente|eco|midas|sabio)_(menor|maior|ancestral)$/.test(id)) {
         caminhos.push(`https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/runas/${id}.png`);
+    }
+
+    if (somenteFerramentas) {
+        caminhos.push(`${base}itens/ferramentas/${id}.png`);
+        caminhos.push(`${base}itens/ferramentas/work_${id}.png`);
+        caminhos.push("/static/assets/box.png");
+        return [...new Set(caminhos)];
     }
 
     if (pasta === "equipamentos") {
@@ -935,7 +953,7 @@ function mercadoStatsHtml(stats) {
     let html = "";
 
     for (const [key, raw] of Object.entries(stats)) {
-        const chaveNormalizada = String(key).trim().toLowerCase().replace(/[\\s_-]/g, "");
+        const chaveNormalizada = String(key).trim().toLowerCase().replace(/[\s_-]/g, "");
         if (chaveNormalizada === "dmg" || chaveNormalizada === "damage") continue;
 
         let valor = raw;

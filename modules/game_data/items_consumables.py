@@ -21,13 +21,13 @@ CONSUMABLES_DATA = {
 
     # --- POÇÕES & ALIMENTOS ---
     "frasco_com_agua": {
-        "display_name": "Frasco com Água", "emoji": "💧", 
+        "display_name": "Frasco com Água", "emoji": "💧",
         "type": "reagent",
         "description": "A base para a maioria das poções.",
         "stackable": True
     },
     "pocao_cura_leve": {
-        "display_name": "Poção de Cura P", "emoji": "❤️", 
+        "display_name": "Poção de Cura P", "emoji": "❤️",
         "type": "consumivel",
         "category": "consumivel", "description": "Uma pequena e simples poção de cura 100 HP.",
         "stackable": True,
@@ -50,20 +50,20 @@ CONSUMABLES_DATA = {
         "price": 300
     },
     "pocao_cura_grande": {
-        "display_name": "Poção de Cura G", "emoji": "❤️", 
+        "display_name": "Poção de Cura G", "emoji": "❤️",
         "type": "consumivel",
         "category": "consumivel", "description": "Uma grande poção de cura 1000 HP.",
-        "stackable": True, 
+        "stackable": True,
         "effects": {"heal": 1000},
         "price": 1000
     },
     "pocao_mana_leve": {
-        "display_name": "Poção de Mana Pequena", "emoji": "💧", 
+        "display_name": "Poção de Mana Pequena", "emoji": "💧",
         "type": "consumivel",
         "category": "consumivel", "description": "Uma pequena e simples poção de Mana 100 MP.",
         "stackable": True,
         "effects": {"mana": 100},
-        "price": 100  
+        "price": 100
     },
     "pocao_mana_media": {
         "display_name": "Poção de Mana M",
@@ -81,7 +81,7 @@ CONSUMABLES_DATA = {
         "price": 300
     },
     "pocao_mana_grande": {
-        "display_name": "Poção de Mana G", "emoji": "💧", 
+        "display_name": "Poção de Mana G", "emoji": "💧",
         "type": "consumivel",
         "category": "consumivel", "description": "Uma grande poção de mana 1000 MP.",
         "stackable": True,
@@ -123,9 +123,9 @@ CONSUMABLES_DATA = {
     },
 
     "fragmento_bravura": {
-        "display_name": "Fragmento de Bravura", "emoji": "🏅", 
-        "type": "especial", "category": "evento", 
-        "description": "Obtido ao defender o reino.", 
+        "display_name": "Fragmento de Bravura", "emoji": "🏅",
+        "type": "especial", "category": "evento",
+        "description": "Obtido ao defender o reino.",
         "stackable": True,
         "tradable": False # 🔴 BLOQUEADO
     },
@@ -256,12 +256,12 @@ CONSUMABLES_DATA = {
         "tradable": False
     },
     "gems": {
-        "display_name": "Diamante", "emoji": "💎", 
-        "type": "currency", "stackable": True, 
+        "display_name": "Diamante", "emoji": "💎",
+        "type": "currency", "stackable": True,
         "description": "Moeda premium.",
         "tradable": False # 🔴 BLOQUEADO (Segurança extra)
     },
-    
+
     # --- EVENTO DE NATAL ---
     "presente_perdido": {
         "display_name": "Presente Perdido",
@@ -271,7 +271,7 @@ CONSUMABLES_DATA = {
         "stackable": True,
         "category": "evento"
     },
-    
+
     "presente_dourado": {
         "display_name": "Presente Dourado",
         "emoji": "🎁🌟",

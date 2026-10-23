@@ -523,17 +523,28 @@ function calcularPreviewDesmonteLocal(item) {
 }
 
 function getPastasPossiveisItemForja(item) {
-    const tipo = String(item?.tipo || item?.type || "").toLowerCase();
-    const baseId = String(item?.base_id || item?.id || "").toLowerCase();
-    const nome = String(item?.nome || "").toLowerCase();
+    const normalizar = valor => String(valor || "").trim().toLowerCase()
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const tipo = normalizar(item?.tipo || item?.type || item?.categoria || item?.category);
+    const slot = normalizar(item?.slot || item?.slot_profissao);
+    const toolType = normalizar(item?.tool_type);
+    const profession = normalizar(item?.profession || item?.profession_req);
+    const baseId = normalizar(item?.base_id || item?.id || "");
+    const nome = normalizar(item?.nome || item?.display_name || "");
+    const tiposFerramenta = new Set(["tool", "ferramenta", "lenhador", "minerador", "colhedor", "esfolador", "ferreiro", "armeiro", "alfaiate", "joalheiro", "curtidor"]);
+    const tiposEquipamento = new Set(["weapon", "armor", "equipment", "equipamento", "equipamentos", "arma", "armadura", "helmet", "boots", "ring", "necklace", "earring"]);
+    const ferramentaDeclarada = tiposFerramenta.has(tipo) || tiposFerramenta.has(slot) || tiposFerramenta.has(toolType);
+    const equipamentoDeclarado = tiposEquipamento.has(tipo) || tiposEquipamento.has(slot) || baseId.startsWith("work_");
+    // Receitas do armeiro/alfaiate entregam equipamentos, mesmo quando o nome
+    // contém "machado", "faca" ou outro termo que também identifica ferramenta.
+    const receitaDeEquipamento = ["armeiro", "alfaiate"].includes(profession);
 
-    const isFerramenta =
-        tipo.includes("tool") ||
-        tipo.includes("ferramenta") ||
-        tipo.includes("lenhador") ||
-        tipo.includes("minerador") ||
-        tipo.includes("colhedor") ||
-        tipo.includes("esfolador") ||
+    if (receitaDeEquipamento || equipamentoDeclarado) {
+        return ["equipamentos"];
+    }
+
+    const isFerramenta = ferramentaDeclarada || (
+        baseId.includes("ferramenta") ||
         baseId.includes("martelo") ||
         baseId.includes("faca") ||
         baseId.includes("machado") ||
@@ -543,10 +554,11 @@ function getPastasPossiveisItemForja(item) {
         nome.includes("faca") ||
         nome.includes("machado") ||
         nome.includes("picareta") ||
-        nome.includes("foice");
+        nome.includes("foice")
+    );
 
     if (isFerramenta) {
-        return ["ferramentas", "equipamentos", "materiais"];
+        return ["ferramentas"];
     }
 
     return ["equipamentos", "ferramentas", "materiais"];
@@ -554,14 +566,19 @@ function getPastasPossiveisItemForja(item) {
 
 function caminhosCadastradosForja(item, ids) {
     const caminhos = [];
+    const somenteFerramentas = getPastasPossiveisItemForja(item)[0] === "ferramentas";
     for (const campo of ['image_url', 'icon_url', 'imagem', 'image', 'icon']) {
         const valor = item?.[campo];
         if (typeof valor !== 'string') continue;
+        if (somenteFerramentas && !/(?:^|\/)ferramentas\//i.test(valor.replace(/\\/g, '/'))) continue;
         if (/^https?:\/\//i.test(valor) || valor.startsWith('/static/')) caminhos.push(valor);
         else if (/\.(png|webp|jpg|jpeg)$/i.test(valor) && valor.includes('/')) caminhos.push(GITHUB_BASE_ITENS + valor.replace(/^assets\/itens\//, ''));
     }
     for (const id of ids) {
-        for (const path of window.FORJA_IMAGENS?.[id] || []) caminhos.push(GITHUB_BASE_ITENS + path);
+        for (const path of window.FORJA_IMAGENS?.[id] || []) {
+            if (somenteFerramentas && !/(?:^|\/)ferramentas\//i.test(String(path).replace(/\\/g, '/'))) continue;
+            caminhos.push(GITHUB_BASE_ITENS + path);
+        }
     }
     return caminhos;
 }

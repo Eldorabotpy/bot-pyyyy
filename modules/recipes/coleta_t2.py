@@ -3,7 +3,7 @@
 from __future__ import annotations
 from typing import Dict, Any
 
-# TIER 2: RECEITAS 
+# TIER 2: RECEITAS
 # ============================================================================
 
 RECIPES: Dict[str, Dict[str, Any]] = {

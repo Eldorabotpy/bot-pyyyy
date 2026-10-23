@@ -86,6 +86,10 @@ class GerenciadorInvasao:
         self.onda_em_transicao = False
         self.contador_invocacoes = 0
         self.recompensas_raid_entregues = set()
+        self.cooldowns_ataque = {}
+        self.timer_preparacao = None
+        self.lock_ataques = threading.Lock()
+        self.lock_frentes = threading.RLock()
 
     def _jogadores_por_frente_estimado(self):
         total_jogadores = int(getattr(self, "jogadores_ativos", 1) or 1)
@@ -167,8 +171,10 @@ class GerenciadorInvasao:
         ids = []
 
         if isinstance(jogadores_online, dict):
-            for _, info in jogadores_online.items():
+            for _, info in list(jogadores_online.items()):
                 if isinstance(info, dict):
+                    if info.get("regiao") != "capital_eldora":
+                        continue
                     char_id = info.get("char_id") or info.get("player_id") or info.get("id")
                     if char_id:
                         ids.append(str(char_id))
@@ -178,6 +184,8 @@ class GerenciadorInvasao:
         elif isinstance(jogadores_online, list):
             for info in jogadores_online:
                 if isinstance(info, dict):
+                    if info.get("regiao") and info.get("regiao") != "capital_eldora":
+                        continue
                     char_id = info.get("char_id") or info.get("player_id") or info.get("id")
                     if char_id:
                         ids.append(str(char_id))
@@ -241,7 +249,7 @@ class GerenciadorInvasao:
         )
 
 
-    def _emitir_status_frentes(self):
+    def _emitir_status_frentes(self, destinatario=None):
         frentes_payload = []
 
         for frente in getattr(self, "frentes_ativas", []) or []:
@@ -261,7 +269,7 @@ class GerenciadorInvasao:
                 "status": status
             })
 
-        self.socketio.emit("statusInvasaoFrentes", {
+        dados_status = {
             "ativo": bool(self.evento_ativo),
             "onda": int(getattr(self, "onda_atual", 1) or 1),
             "total_frentes": len(frentes_payload),
@@ -269,13 +277,19 @@ class GerenciadorInvasao:
             "perdidas": len(getattr(self, "frentes_perdidas", set())),
             "em_raid": len(getattr(self, "frentes_em_raid", set())),
             "frentes": frentes_payload
-        })
+        }
+
+        if destinatario:
+            self.socketio.emit("statusInvasaoFrentes", dados_status, to=destinatario)
+        else:
+            self.socketio.emit("statusInvasaoFrentes", dados_status)
 
     def agendar_invasao(self, jogadores_online):
-        if self.evento_ativo or self.preparacao_ativa: return
+        if self.evento_ativo or self.preparacao_ativa:
+            return False
         
         self.preparacao_ativa = True
-        duracao_prep = 600 # 10 minutos
+        duracao_prep = 600
         self.tempo_final_evento = time.time() + duracao_prep
         
         # Enviamos o tempo final para o JS se sincronizar
@@ -284,7 +298,14 @@ class GerenciadorInvasao:
             "tempo_restante": duracao_prep 
         })
         
-        threading.Timer(duracao_prep, self.iniciar_invasao, args=[jogadores_online]).start()
+        self.timer_preparacao = threading.Timer(
+            duracao_prep,
+            self.iniciar_invasao,
+            args=[jogadores_online]
+        )
+        self.timer_preparacao.daemon = True
+        self.timer_preparacao.start()
+        return True
         
     def iniciar_invasao(self, jogadores_online):
         if self.evento_ativo:
@@ -292,6 +313,7 @@ class GerenciadorInvasao:
 
         self.evento_ativo = True
         self.preparacao_ativa = False
+        self.timer_preparacao = None
         self.onda_atual = 1
         self.registro_dano = {}
         self.eliminados = []
@@ -299,6 +321,7 @@ class GerenciadorInvasao:
         self.participantes_invasao = set()
         self.monstros_vivos = {}
         self.contador_invocacoes = 0
+        self.cooldowns_ataque.clear()
 
         self._preparar_escalonamento_invasao(jogadores_online)
 
@@ -685,6 +708,24 @@ class GerenciadorInvasao:
         if novo_hp <= 0:
             self.jogador_morreu(player_id, player_nome, db_collection)
 
+    def registrar_cooldown_ataque(self, player_id, intervalo=0.65):
+        agora = time.monotonic()
+        player_id = str(player_id)
+        with self.lock_ataques:
+            ultimo_ataque = self.cooldowns_ataque.get(player_id, 0)
+            if agora - ultimo_ataque < intervalo:
+                return False
+
+            self.cooldowns_ataque[player_id] = agora
+            if len(self.cooldowns_ataque) > 500:
+                limite = agora - 60
+                self.cooldowns_ataque = {
+                    pid: timestamp
+                    for pid, timestamp in self.cooldowns_ataque.items()
+                    if timestamp >= limite
+                }
+            return True
+
     def processar_ataque(self, monstro_id, player_id, player_nome, db_collection, dicionario_sids_online=None):
         from bson.objectid import ObjectId
         import random
@@ -738,22 +779,29 @@ class GerenciadorInvasao:
 
         lider_id = str(lider_id)
 
-        if boss_id not in self.monstros_vivos:
-            return
+        with self.lock_frentes:
+            if not self.evento_ativo or boss_id not in self.monstros_vivos:
+                return
 
-        boss_ref = self.monstros_vivos.get(boss_id, {})
-        frente_id = boss_ref.get("frente_id") or "central"
-        frente_nome = boss_ref.get("frente_nome") or "Frente Central"
+            boss_ref = self.monstros_vivos.get(boss_id, {})
+            frente_id = boss_ref.get("frente_id") or "central"
+            frente_nome = boss_ref.get("frente_nome") or "Frente Central"
 
-        if frente_id in getattr(self, "frentes_em_raid", set()):
-            return
+            if (
+                frente_id in self.frentes_em_raid
+                or frente_id in self.frentes_concluidas
+                or frente_id in self.frentes_perdidas
+            ):
+                return
 
-        if frente_id in getattr(self, "frentes_concluidas", set()):
-            return
-
-        self.frentes_em_raid.add(frente_id)
+            self.frentes_em_raid.add(frente_id)
         self._emitir_status_frentes()
-        grupo_do_jogador = obter_grupo_do_jogador(lider_id)
+        try:
+            grupo_do_jogador = obter_grupo_do_jogador(lider_id)
+        except Exception:
+            self.frentes_em_raid.discard(frente_id)
+            self._emitir_status_frentes()
+            raise
         membros_ids = grupo_do_jogador.get('membros', []) if grupo_do_jogador else [lider_id]
         membros_ids = [str(m) for m in membros_ids if m]
         if lider_id not in membros_ids:
@@ -767,8 +815,12 @@ class GerenciadorInvasao:
             info_online = None
 
             if dicionario_sids_online:
-                for sid, info in dicionario_sids_online.items():
-                    if str(info.get('char_id')) == str(membro_id):
+                for sid, info in list(dicionario_sids_online.items()):
+                    if (
+                        isinstance(info, dict)
+                        and str(info.get('char_id')) == str(membro_id)
+                        and info.get("regiao") == "capital_eldora"
+                    ):
                         sid_do_jogador = sid
                         info_online = info
                         break
@@ -776,8 +828,10 @@ class GerenciadorInvasao:
             if not sid_do_jogador:
                 continue
 
-            if info_online and info_online.get("em_combate"):
+            if not info_online or info_online.get("em_combate"):
+                continue
 
+            if membro_id in self.eliminados:
                 continue
 
             try:
@@ -789,8 +843,14 @@ class GerenciadorInvasao:
 
                 continue
 
-            stats = get_combat_stats_sync(dados_db)
-            dados_db = aplicar_combat_stats_no_player(dados_db, stats)
+            try:
+                stats = get_combat_stats_sync(dados_db)
+                hp_atual = int(dados_db.get("current_hp", stats.get("max_hp", 100)) or 0)
+                if hp_atual <= 0:
+                    continue
+                dados_db = aplicar_combat_stats_no_player(dados_db, stats)
+            except Exception:
+                continue
 
             # ✅ SKIN DO PARTICIPANTE DA RAID:
             # A raid precisa receber a skin real de cada membro,
@@ -840,10 +900,9 @@ class GerenciadorInvasao:
             jogadores_na_raid.append(dados_db)
 
         if not jogadores_na_raid:
-
+            self.frentes_em_raid.discard(frente_id)
+            self._emitir_status_frentes()
             return
-        self.frentes_em_raid.discard(frente_id)
-        self._emitir_status_frentes()
         
         if boss_ref.get("frente_id"):
             monstros_na_raid = [m for m in self.monstros_vivos.values() if m.get("frente_id") == frente_id]
@@ -851,27 +910,32 @@ class GerenciadorInvasao:
             monstros_na_raid = [boss_ref] + [m for mid, m in self.monstros_vivos.items() if mid != boss_id and not m.get('is_boss')]
 
         if not monstros_na_raid:
+            self.frentes_em_raid.discard(frente_id)
+            self._emitir_status_frentes()
             return
-        self.frentes_em_raid.discard(frente_id)
-        self._emitir_status_frentes()
 
         raid_id = f"raid_invasao_{frente_id}_{int(time.time())}"
         ids_para_remover = [m.get("id") for m in monstros_na_raid if m.get("id")]
 
-        raid_state = criar_sala_raid(
-            raid_id,
-            jogadores_na_raid,
-            monstros_na_raid,
-            self.socketio,
-            metadata={
-                "tipo_evento": "invasao_reino",
-                "frente_id": frente_id,
-                "frente_nome": frente_nome,
-                "onda": int(getattr(self, "onda_atual", 1) or 1),
-                "boss_id": boss_id,
-                "membros_ids": [str(j.get("id")) for j in jogadores_na_raid]
-            }
-        )
+        try:
+            raid_state = criar_sala_raid(
+                raid_id,
+                jogadores_na_raid,
+                monstros_na_raid,
+                self.socketio,
+                metadata={
+                    "tipo_evento": "invasao_reino",
+                    "frente_id": frente_id,
+                    "frente_nome": frente_nome,
+                    "onda": int(getattr(self, "onda_atual", 1) or 1),
+                    "boss_id": boss_id,
+                    "membros_ids": [str(j.get("id")) for j in jogadores_na_raid]
+                }
+            )
+        except Exception:
+            self.frentes_em_raid.discard(frente_id)
+            self._emitir_status_frentes()
+            raise
 
         if dicionario_sids_online:
             for jogador in jogadores_na_raid:
@@ -1588,13 +1652,16 @@ class GerenciadorInvasao:
         if resultado == "vitoria":
             self._entregar_recompensa_raid_invasao(raid_state, pacote_resultado)
 
-        # 2. Libera a frente que estava em raid
-        self.frentes_em_raid.discard(frente_id)
+        # 2. Atualiza atomicamente o estado da frente após a raid.
+        with self.lock_frentes:
+            self.frentes_em_raid.discard(frente_id)
+            if resultado == "vitoria":
+                self.frentes_concluidas.add(frente_id)
+            else:
+                self.frentes_perdidas.add(frente_id)
 
         # 3. Marca resultado da frente
         if resultado == "vitoria":
-            self.frentes_concluidas.add(frente_id)
-
             self.socketio.emit("alertaInvasao", {
                 "mensagem": f"🛡️ {frente_nome} foi defendida pelos heróis!",
                 "frente_id": frente_id,
@@ -1602,8 +1669,6 @@ class GerenciadorInvasao:
             })
 
         else:
-            self.frentes_perdidas.add(frente_id)
-
             # ✅ DERROTA NA RAID:
             # Todos os jogadores que participaram dessa frente ficam eliminados
             # da invasão atual. Eles não podem ir para outro portão/frente.

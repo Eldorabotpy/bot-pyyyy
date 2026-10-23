@@ -6,6 +6,11 @@
     let countdownTimer = null;
 
     function esc(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+    function isShadowInvasion(event){
+        const key=String(event?.event_key||'').toLowerCase();
+        const title=String(event?.title||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+        return key.startsWith('invasao-sombria-')||title.includes('invasao sombria');
+    }
     function charId(){return String(window.eldoraCharacterId||'');}
     async function getJson(url, options){
         const response = await fetch(url, {credentials:'same-origin',...options});
@@ -38,7 +43,10 @@
           <div class="eventos-progress-label"><span>Progresso coletivo</span><b>${Number(ev.global_points||0).toLocaleString('pt-BR')} / ${Number(ev.global_goal||0).toLocaleString('pt-BR')}</b></div><div class="eventos-progress" aria-label="Progresso coletivo"><i style="width:${pct}%"></i></div>
           <nav class="eventos-tabs"><button class="${activeTab==='overview'?'active':''}" data-tab="overview">Visão geral</button><button class="${activeTab==='missions'?'active':''}" data-tab="missions">Missões</button><button class="${activeTab==='rewards'?'active':''}" data-tab="rewards">Recompensas</button><button class="${activeTab==='ranking'?'active':''}" data-tab="ranking">Ranking</button></nav>
           <div class="eventos-panel" id="eventos-panel"></div>`;
-        if(ev.banner && /^https:\/\//i.test(ev.banner)) $('eventos-conteudo').querySelector('.eventos-hero').style.backgroundImage=`linear-gradient(100deg,#130d20ee,#2b1639aa),url("${ev.banner.replace(/["\\\\\n\r]/g,'')}")`;
+        const bannerEvento=isShadowInvasion(ev)
+            ? (ev.state==='scheduled' ? '/static/images/eventos/invasao_sombria_programada_banner.png' : '/static/images/eventos/invasao_sombria_banner.png')
+            : (ev.banner && /^https:\/\//i.test(ev.banner) ? ev.banner.replace(/["\\\n\r]/g,'') : null);
+        if(bannerEvento) $('eventos-conteudo').querySelector('.eventos-hero').style.backgroundImage=`linear-gradient(100deg,#130d20ee,#2b1639aa),url("${bannerEvento}")`;
         clearInterval(countdownTimer);
         countdownTimer=setInterval(()=>{const timer=$('eventos-conteudo')?.querySelector('[data-event-end]');if(timer)timer.textContent=dateRemaining(timer.dataset.eventEnd);},60000);
         $('eventos-conteudo').querySelectorAll('[data-tab]').forEach(button=>button.addEventListener('click',()=>{activeTab=button.dataset.tab;if(activeTab==='ranking')rankingPage=1;renderEvent().catch(showError);}));

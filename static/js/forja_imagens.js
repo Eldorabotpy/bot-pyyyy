@@ -74,41 +74,43 @@ window.FORJA_IMAGENS = {
     "consumiveis/sigilo_de_protecao.png"
   ],
   "craft_martelo_armeiro_t1": [
-    "equipamentos/craft_martelo_armeiro_t1.png"
+    "ferramentas/craft_martelo_armeiro_t1.png"
   ],
   "faca": [
-    "equipamentos/faca.png"
+    "ferramentas/faca.png"
   ],
   "foice": [
-    "equipamentos/foice.png"
+    "ferramentas/foice.png"
   ],
   "frasco": [
-    "equipamentos/frasco.png"
+    "ferramentas/frasco.png"
   ],
   "frasco_vidro": [
-    "equipamentos/frasco_vidro.png",
     "ferramentas/frasco_vidro.png"
   ],
   "kit_alfaiate": [
-    "equipamentos/kit_alfaiate.png"
+    "ferramentas/kit_alfaiate.png"
   ],
   "kit_curtidor": [
-    "equipamentos/kit_curtidor.png"
+    "ferramentas/kit_curtidor.png"
   ],
   "kit_joalheiro": [
-    "equipamentos/kit_joalheiro.png"
+    "ferramentas/kit_joalheiro.png"
+  ],
+  "luvas_aventureiro_guilda": [
+    "equipamentos/work_luvas_aventureiro_guilda.png"
   ],
   "machado": [
-    "equipamentos/machado.png"
+    "ferramentas/machado.png"
   ],
   "martelo_armeiro": [
-    "equipamentos/martelo_armeiro.png"
+    "ferramentas/martelo_armeiro.png"
   ],
   "martelo_ferreiro": [
-    "equipamentos/martelo_ferreiro.png"
+    "ferramentas/martelo_ferreiro.png"
   ],
   "picareta": [
-    "equipamentos/picareta.png"
+    "ferramentas/picareta.png"
   ],
   "work_adaga_sombra_assassino": [
     "equipamentos/work_adaga_sombra_assassino.png"
@@ -387,10 +389,10 @@ window.FORJA_IMAGENS = {
     "equipamentos/work_colete_viajante_bardo.png"
   ],
   "work_couraça_sombra_assassino": [
-    "equipamentos/work_couraça_sombra_assassino.png"
+    "equipamentos/work_couraca_sombra_assassino.png"
   ],
   "work_couraça_sorrateira_assassino": [
-    "equipamentos/work_couraça_sorrateira_assassino.png"
+    "equipamentos/work_couraca_sorrateira_assassino.png"
   ],
   "work_do_damasco_samurai": [
     "equipamentos/work_do_damasco_samurai.png"
@@ -427,6 +429,9 @@ window.FORJA_IMAGENS = {
   ],
   "work_gi_mestre_monge": [
     "equipamentos/work_gi_mestre_monge.png"
+  ],
+  "work_guild_aventureiro_luvas": [
+    "equipamentos/work_luvas_aventureiro_guilda.png"
   ],
   "work_haidate_damasco_samurai": [
     "equipamentos/work_haidate_damasco_samurai.png"

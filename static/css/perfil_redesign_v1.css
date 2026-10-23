@@ -356,3 +356,93 @@
     #aba-perfil button,
     #aba-perfil .eldora-item-slot { transition: none !important; }
 }
+
+/* Busca e filtros da mochila: a faixa pode rolar sem comprimir os nomes no celular. */
+#aba-perfil .eldora-inventory-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    margin: 0 0 9px;
+}
+
+#aba-perfil .eldora-inventory-search {
+    display: flex;
+    min-width: 0;
+    min-height: 39px;
+    flex: 1 1 auto;
+    align-items: center;
+    gap: 8px;
+    padding: 0 10px;
+    border: 1px solid rgba(139, 159, 186, .25);
+    border-radius: 10px;
+    background: rgba(8, 17, 28, .82);
+    color: #d8bd7d;
+}
+
+#aba-perfil .eldora-inventory-search > span { font-size: 20px; line-height: 1; }
+#aba-perfil .eldora-inventory-search input {
+    width: 100%;
+    min-width: 0;
+    padding: 8px 0;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: #f2ead8;
+    font: 11px/1.2 "Segoe UI", Arial, sans-serif;
+}
+#aba-perfil .eldora-inventory-search input::placeholder { color: #8492a5; }
+#aba-perfil .eldora-inventory-count {
+    flex: 0 0 auto;
+    color: #9eacbd;
+    font-size: 9px;
+    white-space: nowrap;
+}
+
+#aba-perfil .eldora-inventory-filters {
+    display: flex !important;
+    align-items: center;
+    gap: 6px !important;
+    padding: 1px 0 7px !important;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(228, 194, 118, .4) transparent;
+    -webkit-overflow-scrolling: touch;
+}
+
+#aba-perfil .eldora-inventory-filter {
+    display: inline-flex !important;
+    flex: 0 0 auto !important;
+    min-width: 0;
+    min-height: 36px;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    padding: 6px 9px !important;
+    font-size: 10px !important;
+    white-space: nowrap;
+}
+
+#aba-perfil .eldora-inventory-filter > span:first-child { font-size: 12px; }
+#aba-perfil .eldora-inventory-filter small {
+    display: inline-grid;
+    min-width: 16px;
+    height: 16px;
+    place-items: center;
+    padding: 0 3px;
+    border-radius: 999px;
+    background: rgba(5, 12, 20, .35);
+    color: inherit;
+    font-size: 8px;
+    line-height: 1;
+}
+
+#aba-perfil .eldora-inventory-empty {
+    grid-column: 1 / -1;
+    padding: 20px 12px;
+    border: 1px dashed rgba(139, 159, 186, .28);
+    border-radius: 11px;
+    color: #a7b3c2;
+    font-size: 11px;
+    text-align: center;
+}

@@ -4,7 +4,11 @@ import random
 import time
 import math
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
+try:
+    from zoneinfo import ZoneInfo
+except ImportError:
+    ZoneInfo = None
 from threading import Thread, Lock
 from uuid import uuid4
 from flask import Flask, render_template, jsonify, request, session
@@ -2246,35 +2250,70 @@ def curar_jogador_catedral(data):
 
 @socketio.on('sofrerDanoInvasao')
 def handle_sofrer_dano_invasao(dados):
+    dados = dados if isinstance(dados, dict) else {}
     player = _authenticated_socket_player(dados.get('player_id'))
-    if player:
+    online = jogadores_online.get(request.sid) or {}
+    if player and online.get("regiao") == "capital_eldora":
         sistema_invasao_mapa.jogador_levou_dano_minion(player['char_id'], player.get('nome', 'Herói'), users_collection)
 
 @socketio.on('atacarMonstroInvasao')
 def handle_atacar_monstro(dados):
+    dados = dados if isinstance(dados, dict) else {}
     player = _authenticated_socket_player(dados.get('player_id'))
     if not player:
         return
     player_id = player['char_id']
     player_nome = player.get('nome', 'Herói')
-    monstro_id = dados.get('monstro_id')
+    online = jogadores_online.get(request.sid) or {}
+
+    if not sistema_invasao_mapa.evento_ativo:
+        emit('erroGeral', {'mensagem': "A invasão não está ativa."}, to=request.sid)
+        return
+
+    if online.get("regiao") != "capital_eldora":
+        emit('erroGeral', {'mensagem': "Você precisa estar na Capital para defender o reino."}, to=request.sid)
+        return
+
+    if str(player_id) in sistema_invasao_mapa.eliminados:
+        emit('erroGeral', {'mensagem': "Você foi eliminado desta invasão."}, to=request.sid)
+        return
+
+    monstro_id = str(dados.get('monstro_id') or '')
     
     # 1. Verifica se a invasão está ativa e se o monstro existe
     monstro = sistema_invasao_mapa.monstros_vivos.get(monstro_id)
     if not monstro:
         emit('erroGeral', {'mensagem': "A criatura já foi derrotada ou fugiu!"}, to=request.sid)
         return
+
+    try:
+        jogador_x = float(online.get("x"))
+        jogador_y = float(online.get("y"))
+        distancia = math.hypot(jogador_x - float(monstro.get("x")), jogador_y - float(monstro.get("y")))
+    except (TypeError, ValueError):
+        distancia = float("inf")
+
+    if not math.isfinite(distancia) or distancia >= 70:
+        emit('erroGeral', {'mensagem': "Aproxime-se da criatura para atacar."}, to=request.sid)
+        return
+
+    if not sistema_invasao_mapa.registrar_cooldown_ataque(player_id):
+        return
         
     # 2. Chama o sistema de Invasão (e não o battle_manager)
     # Passamos o 'users_collection' para ler os status
     # Passamos o 'jogadores_online' para puxar as conexões do Grupo
-    sistema_invasao_mapa.processar_ataque(
-        monstro_id, 
-        player_id, 
-        player_nome, 
-        users_collection, 
-        jogadores_online
-    )
+    try:
+        sistema_invasao_mapa.processar_ataque(
+            monstro_id,
+            player_id,
+            player_nome,
+            users_collection,
+            jogadores_online
+        )
+    except Exception:
+        app.logger.exception("Falha ao processar ataque na invasão")
+        emit('erroGeral', {'mensagem': "Não foi possível iniciar esse combate agora."}, to=request.sid)
 
 @socketio.on('checarStatusInvasao')
 def handle_check_status():
@@ -2282,6 +2321,10 @@ def handle_check_status():
         restante = int(sistema_invasao_mapa.tempo_final_evento - time.time())
         if restante > 0:
             emit('statusInvasaoAtual', {"ativo": True, "onda": sistema_invasao_mapa.onda_atual if sistema_invasao_mapa.evento_ativo else 0, "tempo_restante": restante})
+    if sistema_invasao_mapa.evento_ativo:
+        sistema_invasao_mapa._emitir_status_frentes(destinatario=request.sid)
+    else:
+        emit('statusInvasaoFrentes', {"ativo": False, "frentes": []}, to=request.sid)
 
 @socketio.on('usarPocaoMapa')
 def handle_usar_pocao(data):
@@ -2330,8 +2373,10 @@ def handle_usar_pocao(data):
         
 @socketio.on('jogadorSofreuDanoFatalInvasao')
 def handle_morte_jogador(data):
+    data = data if isinstance(data, dict) else {}
     player = _authenticated_socket_player(data.get('player_id'))
-    if not player:
+    online = jogadores_online.get(request.sid) or {}
+    if not player or online.get("regiao") != "capital_eldora":
         return
     sistema_invasao_mapa.jogador_morreu(
         player['char_id'], player.get('nome', 'Herói'), users_collection
@@ -2339,14 +2384,18 @@ def handle_morte_jogador(data):
 
 @socketio.on('jogadorLevouDanoMinion')
 def handle_dano_minion(data):
+    data = data if isinstance(data, dict) else {}
     player = _authenticated_socket_player(data.get('player_id'))
-    if player:
+    online = jogadores_online.get(request.sid) or {}
+    if player and online.get("regiao") == "capital_eldora":
         sistema_invasao_mapa.jogador_levou_dano_minion(player['char_id'], player.get('nome', 'Herói'), users_collection)
         
 @socketio.on('jogadorLevouDanoBoss')
 def handle_dano_boss(data):
+    data = data if isinstance(data, dict) else {}
     player = _authenticated_socket_player(data.get('player_id'))
-    if player:
+    online = jogadores_online.get(request.sid) or {}
+    if player and online.get("regiao") == "capital_eldora":
         sistema_invasao_mapa.jogador_levou_dano_boss(player['char_id'], player.get('nome', 'Herói'), users_collection)
 
 @socketio.on('enviarConviteDuelo')
@@ -3429,22 +3478,32 @@ def loop_agendamento_invasao():
     """Fica em segundo plano checando o relógio para rodar a invasão sozinho"""
     print("⏰ Cronômetro de Invasões ativado! Monitorando os horários do Reino...")
     
-    # Lista dos horários exatos em que a invasão deve começar (Formato HH:MM)
-    HORARIOS_ALVO = ["08:00", "14:00", "19:00", "23:00"]
+    # A invasão começa 10 minutos depois do aviso, no fuso oficial do jogo.
+    HORARIOS_INICIO = ["08:00", "14:00", "19:00", "23:00"]
+    HORARIOS_AVISO = ["07:50", "13:50", "18:50", "22:50"]
+    try:
+        fuso_jogo = ZoneInfo("America/Sao_Paulo") if ZoneInfo else None
+    except Exception:
+        fuso_jogo = None
+    if fuso_jogo is None:
+        # São Paulo usa UTC-3; fallback para ambientes sem base IANA instalada.
+        fuso_jogo = timezone(timedelta(hours=-3))
     
     while True:
         try:
-            agora = datetime.now()
+            agora = datetime.now(fuso_jogo)
             hora_minuto_atual = agora.strftime("%H:%M")
             
-            # Se o relógio bater com um dos horários da lista, solta os monstros!
-            if hora_minuto_atual in HORARIOS_ALVO:
-                print(f"⚔️ CRON: Horário de Invasão atingido ({hora_minuto_atual})! Iniciando evento...")
+            if hora_minuto_atual in HORARIOS_AVISO:
+                horario_inicio = HORARIOS_INICIO[HORARIOS_AVISO.index(hora_minuto_atual)]
+                print(
+                    f"⚔️ CRON: Aviso da invasão enviado às {hora_minuto_atual}; "
+                    f"início previsto para {horario_inicio} (horário de São Paulo)."
+                )
                 
-                # Dispara a invasão passando a lista global de quem está online
-                sistema_invasao_mapa.iniciar_invasao(jogadores_online)
+                sistema_invasao_mapa.agendar_invasao(jogadores_online)
                 
-                # Dorme por 61 segundos para evitar que o loop rode duas vezes no mesmo minuto
+                # Evita processar novamente o mesmo minuto do aviso.
                 time.sleep(61)
                 
         except Exception as e:

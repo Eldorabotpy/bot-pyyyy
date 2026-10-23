@@ -323,13 +323,53 @@ ITEM_DATABASE = {
     "botas_real_cacador":      {"slot": "botas",    "nome_exibicao": "Botas do Caçador Real", "set_id": "set_heranca_real", "class_req": ["cacador", "patrulheiro", "franco_atirador", "mestre_da_selva"],"image_url": "https://github.com/sua-imagem-da-mascara.png"},
     "luvas_real_cacador":      {"slot": "luvas",    "nome_exibicao": "Luvas do Caçador Real", "set_id": "set_heranca_real", "class_req": ["cacador", "patrulheiro", "franco_atirador", "mestre_da_selva"],"image_url": "https://github.com/sua-imagem-da-mascara.png"},
 
-    # --- CURANDEIRO ---
+    # --- CURANDEIRO — CONJUNTOS T1/T2 ---
+    "cajado_esperanca_curandeiro": {"slot": "arma", "nome_exibicao": "Cajado da Esperança", "class_req": ["curandeiro", "clerigo", "druida", "sacerdote"]},
+    "capuz_linho_curandeiro": {"slot": "elmo", "nome_exibicao": "Capuz de Linho da Vigília", "class_req": ["curandeiro", "clerigo", "druida", "sacerdote"]},
+    "veste_linho_curandeiro": {"slot": "armadura", "nome_exibicao": "Veste de Linho da Vigília", "class_req": ["curandeiro", "clerigo", "druida", "sacerdote"]},
+    "calcas_linho_curandeiro": {"slot": "calca", "nome_exibicao": "Calças de Linho da Vigília", "class_req": ["curandeiro", "clerigo", "druida", "sacerdote"]},
+    "botas_linho_curandeiro": {"slot": "botas", "nome_exibicao": "Botas de Linho da Vigília", "class_req": ["curandeiro", "clerigo", "druida", "sacerdote"]},
+    "luvas_linho_curandeiro": {"slot": "luvas", "nome_exibicao": "Luvas de Linho da Vigília", "class_req": ["curandeiro", "clerigo", "druida", "sacerdote"]},
+    "anel_esperanca_curandeiro": {"slot": "anel", "nome_exibicao": "Anel da Esperança", "class_req": ["curandeiro", "clerigo", "druida", "sacerdote"]},
+    "colar_esperanca_curandeiro": {"slot": "colar", "nome_exibicao": "Colar da Esperança", "class_req": ["curandeiro", "clerigo", "druida", "sacerdote"]},
+    "brinco_esperanca_curandeiro": {"slot": "brinco", "nome_exibicao": "Brinco da Esperança", "class_req": ["curandeiro", "clerigo", "druida", "sacerdote"]},
+    "cajado_aurora_curandeiro": {"slot": "arma", "nome_exibicao": "Cajado da Aurora", "class_req": ["curandeiro", "clerigo", "druida", "sacerdote"]},
+    "capuz_veludo_curandeiro": {"slot": "elmo", "nome_exibicao": "Capuz de Veludo da Aurora", "class_req": ["curandeiro", "clerigo", "druida", "sacerdote"]},
+    "manto_veludo_curandeiro": {"slot": "armadura", "nome_exibicao": "Manto de Veludo da Aurora", "class_req": ["curandeiro", "clerigo", "druida", "sacerdote"]},
+    "calcas_veludo_curandeiro": {"slot": "calca", "nome_exibicao": "Calças de Veludo da Aurora", "class_req": ["curandeiro", "clerigo", "druida", "sacerdote"]},
+    "botas_veludo_curandeiro": {"slot": "botas", "nome_exibicao": "Botas de Veludo da Aurora", "class_req": ["curandeiro", "clerigo", "druida", "sacerdote"]},
+    "luvas_veludo_curandeiro": {"slot": "luvas", "nome_exibicao": "Luvas de Veludo da Aurora", "class_req": ["curandeiro", "clerigo", "druida", "sacerdote"]},
+    "anel_aurora_curandeiro": {"slot": "anel", "nome_exibicao": "Anel Rúnico da Aurora", "class_req": ["curandeiro", "clerigo", "druida", "sacerdote"]},
+    "colar_aurora_curandeiro": {"slot": "colar", "nome_exibicao": "Colar Rúnico da Aurora", "class_req": ["curandeiro", "clerigo", "druida", "sacerdote"]},
+    "brinco_aurora_curandeiro": {"slot": "brinco", "nome_exibicao": "Brinco Rúnico da Aurora", "class_req": ["curandeiro", "clerigo", "druida", "sacerdote"]},
+
+    # --- CURANDEIRO — T3 REAL ---
     "arma_real_curandeiro":    {"slot": "arma",     "nome_exibicao": "Cajado do Milagre Real", "set_id": "set_heranca_real", "class_req": ["curandeiro", "clerigo", "druida", "sacerdote"],"image_url": "https://github.com/sua-imagem-da-mascara.png"},
     "elmo_real_curandeiro":    {"slot": "elmo",     "nome_exibicao": "Capuz do Milagre Real", "set_id": "set_heranca_real", "class_req": ["curandeiro", "clerigo", "druida", "sacerdote"],"image_url": "https://github.com/sua-imagem-da-mascara.png"},
     "armadura_real_curandeiro":{"slot": "armadura", "nome_exibicao": "Veste do Milagre Real", "set_id": "set_heranca_real", "class_req": ["curandeiro", "clerigo", "druida", "sacerdote"],"image_url": "https://github.com/sua-imagem-da-mascara.png"},
     "calca_real_curandeiro":   {"slot": "calca",    "nome_exibicao": "Calças do Milagre Real", "set_id": "set_heranca_real", "class_req": ["curandeiro", "clerigo", "druida", "sacerdote"],"image_url": "https://github.com/sua-imagem-da-mascara.png"},
     "botas_real_curandeiro":   {"slot": "botas",    "nome_exibicao": "Sandálias do Milagre Real", "set_id": "set_heranca_real", "class_req": ["curandeiro", "clerigo", "druida", "sacerdote"],"image_url": "https://github.com/sua-imagem-da-mascara.png"},
     "luvas_real_curandeiro":   {"slot": "luvas",    "nome_exibicao": "Luvas do Milagre Real", "set_id": "set_heranca_real", "class_req": ["curandeiro", "clerigo", "druida", "sacerdote"],"image_url": "https://github.com/sua-imagem-da-mascara.png"},
+
+    # --- NECROMANTE — VIGÍLIA DAS ALMAS (T1) E VÉU ESPECTRAL (T2) ---
+    "cajado_vigilia_necromante": {"slot": "arma", "nome_exibicao": "Cajado da Vigília", "class_req": ["necromante"]},
+    "capuz_vigilia_necromante": {"slot": "elmo", "nome_exibicao": "Capuz da Vigília", "class_req": ["necromante"]},
+    "veste_vigilia_necromante": {"slot": "armadura", "nome_exibicao": "Veste da Vigília", "class_req": ["necromante"]},
+    "calcas_vigilia_necromante": {"slot": "calca", "nome_exibicao": "Calças da Vigília", "class_req": ["necromante"]},
+    "botas_vigilia_necromante": {"slot": "botas", "nome_exibicao": "Botas da Vigília", "class_req": ["necromante"]},
+    "luvas_vigilia_necromante": {"slot": "luvas", "nome_exibicao": "Luvas da Vigília", "class_req": ["necromante"]},
+    "anel_vigilia_necromante": {"slot": "anel", "nome_exibicao": "Anel da Vigília", "class_req": ["necromante"]},
+    "colar_vigilia_necromante": {"slot": "colar", "nome_exibicao": "Colar da Vigília", "class_req": ["necromante"]},
+    "brinco_vigilia_necromante": {"slot": "brinco", "nome_exibicao": "Brinco da Vigília", "class_req": ["necromante"]},
+    "cajado_veu_espectral_necromante": {"slot": "arma", "nome_exibicao": "Cajado do Véu Espectral", "class_req": ["necromante"]},
+    "capuz_veu_espectral_necromante": {"slot": "elmo", "nome_exibicao": "Capuz do Véu Espectral", "class_req": ["necromante"]},
+    "manto_veu_espectral_necromante": {"slot": "armadura", "nome_exibicao": "Manto do Véu Espectral", "class_req": ["necromante"]},
+    "calcas_veu_espectral_necromante": {"slot": "calca", "nome_exibicao": "Calças do Véu Espectral", "class_req": ["necromante"]},
+    "botas_veu_espectral_necromante": {"slot": "botas", "nome_exibicao": "Botas do Véu Espectral", "class_req": ["necromante"]},
+    "luvas_veu_espectral_necromante": {"slot": "luvas", "nome_exibicao": "Luvas do Véu Espectral", "class_req": ["necromante"]},
+    "anel_veu_espectral_necromante": {"slot": "anel", "nome_exibicao": "Anel do Véu Espectral", "class_req": ["necromante"]},
+    "colar_veu_espectral_necromante": {"slot": "colar", "nome_exibicao": "Colar do Véu Espectral", "class_req": ["necromante"]},
+    "brinco_veu_espectral_necromante": {"slot": "brinco", "nome_exibicao": "Brinco do Véu Espectral", "class_req": ["necromante"]},
 }
 
 def get_item_info(base_id: str) -> dict:

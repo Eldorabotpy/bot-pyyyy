@@ -4,14 +4,28 @@
 // ==========================================
 // BÚSSOLA DE PASTAS DE ITENS
 // ==========================================
+function itemEUmaFerramenta(dado) {
+    const tiposFerramenta = new Set(['tool', 'ferramenta', 'lenhador', 'minerador', 'colhedor', 'esfolador', 'ferreiro', 'armeiro', 'alfaiate', 'joalheiro', 'curtidor', 'alquimista', 'fundidor']);
+    if (typeof dado !== 'object' || !dado) return tiposFerramenta.has(String(dado || '').trim().toLowerCase());
+
+    const normalizar = valor => String(valor || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const tipo = normalizar(dado.tipo || dado.type || dado.categoria || dado.category);
+    const slot = normalizar(dado.slot || dado.slot_profissao);
+    const tipoFerramenta = normalizar(dado.tool_type);
+    return tiposFerramenta.has(tipo) || tiposFerramenta.has(slot) || slot.startsWith('tool_') || tiposFerramenta.has(tipoFerramenta);
+}
+
+function caminhoPertencePastaFerramentas(caminho) {
+    return /(?:^|\/)ferramentas\//i.test(String(caminho || '').replace(/\\/g, '/'));
+}
+
 window.obterPastaItem = function(dado) {
     // Pega o tipo seja lá como ele vier (se mandarem o objeto inteiro ou só o texto)
     let tipo = typeof dado === 'object' ? (dado.tipo || dado.type || "") : (dado || "");
     const t = tipo.toLowerCase();
 
     // 1. Ferramentas de Profissão
-    const tiposFerramenta = ['tool', 'ferramenta', 'lenhador', 'minerador', 'colhedor', 'esfolador', 'ferreiro', 'armeiro', 'alfaiate', 'joalheiro', 'curtidor'];
-    if (tiposFerramenta.includes(t)) return 'ferramentas';
+    if (itemEUmaFerramenta(dado)) return 'ferramentas';
 
     // 2. Equipamentos (Armas e Armaduras)
     const tiposEquipamento = ['weapon', 'armor', 'helmet', 'boots', 'bota', 'ring', 'necklace', 'earring', 'equipamento', 'arma', 'armadura', 'elmo', 'anel', 'colar', 'brinco'];
@@ -24,6 +38,62 @@ window.obterPastaItem = function(dado) {
     // Fallback absoluto
     return 'materiais';
 };
+
+const FILTROS_MOCHILA = [
+    { id: 'todos', nome: 'Todos', icone: '🎒' },
+    { id: 'consumiveis', nome: 'Consumíveis', icone: '🧪' },
+    { id: 'combate', nome: 'Combate', icone: '⚔️' },
+    { id: 'profissao', nome: 'Profissão', icone: '🛠️' },
+    { id: 'materiais', nome: 'Materiais', icone: '📦' },
+    { id: 'essencias', nome: 'Essências', icone: '✨' },
+    { id: 'runas', nome: 'Runas', icone: '🔮' },
+    { id: 'livros', nome: 'Livros', icone: '📘' },
+    { id: 'outros', nome: 'Outros', icone: '🗝️' }
+];
+
+function normalizarCategoriaMochila(valor) {
+    return String(valor || '').trim().toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
+function classificarItemMochila(item) {
+    const tipo = normalizarCategoriaMochila(item?.tipo || item?.type);
+    const categoria = normalizarCategoriaMochila(item?.categoria || item?.category);
+    const slot = normalizarCategoriaMochila(item?.slot || item?.slot_profissao);
+    const id = normalizarCategoriaMochila(item?.base_id || item?.item_id || item?.id);
+    const toolType = normalizarCategoriaMochila(item?.tool_type || item?.slot_profissao);
+
+    // Ferramentas de coleta e produção ficam separadas dos equipamentos de combate.
+    const slotsProfissao = new Set(['tool', 'ferramenta', 'lenhador', 'minerador', 'colhedor', 'esfolador', 'ferreiro', 'armeiro', 'alfaiate', 'joalheiro', 'curtidor', 'alquimista', 'fundidor']);
+    if (tipo === 'tool' || tipo === 'ferramenta' || slot === 'tool' || slot.startsWith('tool_') || slotsProfissao.has(slot) || toolType) return 'profissao';
+
+    if (tipo === 'skill_book' || id.startsWith('tomo_')) return 'livros';
+    if (['essencia', 'essencias', 'essence'].includes(tipo) || categoria === 'essencia' || id.startsWith('essencia_')) return 'essencias';
+    if (['runa', 'rune'].includes(tipo) || categoria === 'runas' || categoria === 'socketable' || id.startsWith('runa_')) return 'runas';
+
+    const slotsCombate = new Set([
+        'arma', 'weapon', 'armadura', 'armor', 'elmo', 'helmet', 'capacete', 'chapeu',
+        'calca', 'calcas', 'botas', 'bota', 'luvas', 'luva', 'anel', 'ring', 'colar',
+        'necklace', 'brinco', 'earring', 'acessorio', 'escudo', 'capa', 'peitoral',
+        'capuz', 'tunica', 'manto', 'adaga', 'espada', 'arco', 'cajado'
+    ]);
+    const tiposCombate = new Set([
+        'equipment', 'equipment_base', 'equipamento', 'equipamentos', 'weapon', 'armor', 'helmet',
+        'boots', 'ring', 'necklace', 'earring', 'arma', 'armadura', 'elmo', 'bota', 'botas',
+        'anel', 'colar', 'brinco', 'acessorio'
+    ]);
+    const categoriasCombate = new Set(['arma', 'armadura', 'acessorio', 'equipamento']);
+    if (slotsCombate.has(slot) || tiposCombate.has(tipo) || categoriasCombate.has(categoria)) return 'combate';
+
+    if (['skill_book', 'livro', 'book'].includes(tipo)) return 'livros';
+    if (['consumable', 'consumivel', 'potion', 'pocao', 'scroll', 'pergaminho', 'chest', 'box', 'event_ticket'].includes(tipo) || categoria === 'consumivel') return 'consumiveis';
+    if (tipo === 'especial' && item?.on_use && Object.keys(item.on_use).length) return 'consumiveis';
+
+    if (tipo.startsWith('material') || ['material', 'coletavel', 'cacada', 'reagente', 'alquimia', 'mineral', 'madeira', 'couro', 'fibra', 'runas'].includes(categoria)
+        || ['reagent', 'resource', 'sucata', 'fragmento_divino', 'divino'].includes(tipo)) return 'materiais';
+
+    return 'outros';
+}
 
 window.getCaminhosImagemItemEldora = function(item) {
     const linkBaseNuvem = "https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/";
@@ -46,11 +116,21 @@ window.getCaminhosImagemItemEldora = function(item) {
     if (/^runa_(crueldade|precisao|vampiro|rocha|mente|eco|midas|sabio)_(menor|maior|ancestral)$/.test(runeId)) {
         caminhos.push(`${linkBaseNuvem}runas/${runeId}.png`);
     }
-    if (typeof item?.icon_url === 'string' && /^(https?:\/\/|\/static\/)/.test(item.icon_url)) {
+    const ehFerramenta = pasta === 'ferramentas';
+    if (typeof item?.icon_url === 'string' && /^(https?:\/\/|\/static\/)/.test(item.icon_url)
+        && (!ehFerramenta || caminhoPertencePastaFerramentas(item.icon_url))) {
         caminhos.push(item.icon_url);
     }
     for (const caminho of (window.FORJA_IMAGENS?.[idReal] || [])) {
+        if (ehFerramenta && !caminhoPertencePastaFerramentas(caminho)) continue;
         caminhos.push(`${linkBaseNuvem}itens/${caminho}`);
+    }
+
+    if (ehFerramenta) {
+        caminhos.push(`${linkBaseNuvem}itens/ferramentas/${idReal}.png`);
+        caminhos.push(`${linkBaseNuvem}itens/ferramentas/work_${idReal}.png`);
+        caminhos.push("/static/assets/box.png");
+        return [...new Set(caminhos)];
     }
 
 
@@ -103,10 +183,14 @@ window.getCaminhosImagemPerfilEldora = function(item) {
 
     const idSemWork = bruto.replace(/^work_/i, "");
     const ids = [...new Set([bruto, idSemWork, "work_" + idSemWork].filter(Boolean))];
+    const tipo = String(item?.tipo || item?.type || item?.categoria || item?.category || "")
+        .trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const ferramenta = itemEUmaFerramenta(item);
     const caminhos = [];
     const urlIcone = typeof item?.icon_url === "string" ? item.icon_url.trim() : "";
     const iconePlaceholder = /(?:seuusuario|seurepositorio|example\.com|placeholder)/i.test(urlIcone);
-    if (!iconePlaceholder && /^(https?:\/\/|\/static\/)/i.test(urlIcone)) caminhos.push(urlIcone);
+    if (!iconePlaceholder && /^(https?:\/\/|\/static\/)/i.test(urlIcone)
+        && (!ferramenta || caminhoPertencePastaFerramentas(urlIcone))) caminhos.push(urlIcone);
 
     const runeId = String(item?.base_id || item?.item_id || item?.uid || item?.id || "").trim();
     if (/^runa_(crueldade|precisao|vampiro|rocha|mente|eco|midas|sabio)_(menor|maior|ancestral)$/.test(runeId)) {
@@ -118,14 +202,13 @@ window.getCaminhosImagemPerfilEldora = function(item) {
         const cadastrados = window.FORJA_IMAGENS?.[id];
         if (!Array.isArray(cadastrados)) continue;
         for (const caminho of cadastrados) {
+            if (ferramenta && !caminhoPertencePastaFerramentas(caminho)) continue;
             if (typeof caminho === "string" && caminho) {
                 caminhos.push(base + caminho.replace(/^\/?(?:assets\/)?itens\//, "") + "?v=" + cacheVersion);
             }
         }
     }
 
-    const tipo = String(item?.tipo || item?.type || item?.categoria || item?.category || "")
-        .trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     const tiposEquipamento = new Set([
         "weapon", "armor", "helmet", "boots", "bota", "botas", "ring", "necklace", "earring",
         "equipamento", "arma", "armadura", "elmo", "anel", "colar", "brinco", "calca", "calcas",
@@ -134,10 +217,9 @@ window.getCaminhosImagemPerfilEldora = function(item) {
     ]);
     const idPareceEquipamento = /^(?:work_)?(?:espada|adaga|arco|cajado|machado|peitoral|armadura|calca|calcas|bota|botas|luva|luvas|anel|colar|brinco|capuz|chapeu|elmo|capacete|tunica|manto|escudo|capa)(?:_|$)/i.test(bruto);
     const temMapaEquipamento = ids.some(id => (window.FORJA_IMAGENS?.[id] || []).some(path => /^equipamentos\//i.test(path)));
-    const equipamento = tiposEquipamento.has(tipo) || tipo === "equipamentos" || idPareceEquipamento || temMapaEquipamento;
-    const tiposFerramenta = new Set(["tool", "ferramenta", "lenhador", "minerador", "colhedor", "esfolador", "ferreiro", "armeiro", "alfaiate", "joalheiro", "curtidor"]);
+    const equipamento = !ferramenta && (tiposEquipamento.has(tipo) || tipo === "equipamentos" || idPareceEquipamento || temMapaEquipamento);
     const tiposUsaveis = new Set(["potion", "pocao", "consumable", "consumivel", "scroll", "pergaminho", "chest", "box", "reagent", "especial", "event_ticket"]);
-    const pastas = equipamento ? ["equipamentos"] : tiposFerramenta.has(tipo) ? ["ferramentas", "equipamentos"] : tiposUsaveis.has(tipo) ? ["consumiveis", "materiais"] : ["materiais"];
+    const pastas = ferramenta ? ["ferramentas"] : equipamento ? ["equipamentos"] : tiposUsaveis.has(tipo) ? ["consumiveis", "materiais"] : ["materiais"];
 
     for (const pasta of pastas) {
         for (const id of ids) caminhos.push(base + pasta + "/" + id + ".png?v=" + cacheVersion);
@@ -668,7 +750,7 @@ async function carregarMeuPerfil() {
                     }
                 }
 
-                const imgPath = `https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/itens/equipamentos/${imgGenerica}.png`;
+                const imgPath = `https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/itens/ferramentas/${imgGenerica}.png`;
                 const statusFerramenta = ferramentaUser ? `No inventário · ${tierTxt}` : 'Não encontrada no inventário';
                 const ariaId = `perfil-prof-tab-${index}`;
                 const painelId = `perfil-prof-detalhe-${index}`;
@@ -707,6 +789,7 @@ async function carregarMeuPerfil() {
                 <div class="perfil-v2-prof-vazio"><strong>Nenhum ofício aprendido</strong><span>Encontre um Mestre de Guilda para aprender uma profissão.</span></div>
             </section>`;
         }
+        // ==========================================
         // ==========================================
         // 3. O TRADUTOR DO GITHUB E CORPO COMPLETO
         // ==========================================
@@ -950,15 +1033,28 @@ async function carregarMeuPerfil() {
                 ${htmlFerramentas}
             </div>`;
 
-        // --- Inventário ---
+        // --- Mochila: categorias construídas a partir dos metadados reais de cada item ---
+        const itensInventario = Array.isArray(p.inventario) ? p.inventario : [];
+        const contagensMochila = Object.fromEntries(FILTROS_MOCHILA.map(filtro => [
+            filtro.id,
+            filtro.id === 'todos' ? itensInventario.length : itensInventario.filter(item => classificarItemMochila(item) === filtro.id).length
+        ]));
         let htmlInv = `
-            <div class="eldora-inventory-filters eldora-profile-style-494596d6" >
-                <button class="eldora-inventory-filter active eldora-profile-style-2cadcdff" onclick="filtrarMochila('todos')" id="btn-filtro-todos" >Todos</button>
-                <button class="eldora-inventory-filter eldora-profile-style-9b604a42" onclick="filtrarMochila('equips')" id="btn-filtro-equips" >Equips</button>
-                <button class="eldora-inventory-filter eldora-profile-style-9b604a42" onclick="filtrarMochila('materiais')" id="btn-filtro-materiais" >Materiais</button>
-                <button class="eldora-inventory-filter eldora-profile-style-9b604a42" onclick="filtrarMochila('usaveis')" id="btn-filtro-usaveis" >Usáveis</button>
+            <div class="eldora-inventory-toolbar">
+                <label class="eldora-inventory-search" for="busca-mochila">
+                    <span aria-hidden="true">⌕</span>
+                    <input id="busca-mochila" type="search" placeholder="Buscar item pelo nome…" autocomplete="off" aria-label="Buscar item na mochila">
+                </label>
+                <span id="contagem-itens-mochila" class="eldora-inventory-count" aria-live="polite">${itensInventario.length} ${itensInventario.length === 1 ? 'item' : 'itens'}</span>
             </div>
-            <div id="grid-mochila" class="eldora-inventory-grid eldora-profile-style-5bf71092" ></div>
+            <div id="filtros-mochila" class="eldora-inventory-filters eldora-profile-style-494596d6" role="group" aria-label="Categorias da mochila">
+                ${FILTROS_MOCHILA.map(filtro => `
+                    <button type="button" class="eldora-inventory-filter${filtro.id === 'todos' ? ' is-active' : ''}" onclick="filtrarMochila('${filtro.id}')" id="btn-filtro-${filtro.id}" aria-pressed="${filtro.id === 'todos'}">
+                        <span aria-hidden="true">${filtro.icone}</span><span>${filtro.nome}</span><small>${contagensMochila[filtro.id]}</small>
+                    </button>
+                `).join('')}
+            </div>
+            <div id="grid-mochila" class="eldora-inventory-grid eldora-profile-style-5bf71092" aria-live="polite"></div>
         `;
 
         // ==========================================
@@ -1033,6 +1129,15 @@ async function carregarMeuPerfil() {
         `;
         const heroProfile = conteudo.querySelector(".eldora-profile-hero");
         if (heroProfile) heroProfile.style.setProperty("--eldora-profile-banner", bannerImgCss);
+
+        const buscaMochila = document.getElementById('busca-mochila');
+        if (buscaMochila) {
+            buscaMochila.value = window.perfilBuscaMochilaAtual || '';
+            buscaMochila.addEventListener('input', () => {
+                window.perfilBuscaMochilaAtual = buscaMochila.value;
+                filtrarMochila(window.perfilFiltroMochilaAtual || 'todos');
+            });
+        }
 
         setTimeout(() => {
             document.querySelectorAll("[data-equip-img]").forEach(img => {
@@ -1297,8 +1402,10 @@ window.equiparSkillPerfil = async function(skillId, slotNum) {
 // FILTRO E RENDERIZAÇÃO DA MOCHILA (CORRIGIDO)
 // ==========================================
 window.filtrarMochila = function(filtro) {
-    window.perfilFiltroMochilaAtual = filtro || 'todos';
-    filtro = window.perfilFiltroMochilaAtual;
+    const aliases = { equips: 'combate', usaveis: 'consumiveis' };
+    filtro = aliases[filtro] || filtro;
+    if (!FILTROS_MOCHILA.some(categoria => categoria.id === filtro)) filtro = 'todos';
+    window.perfilFiltroMochilaAtual = filtro;
 
     if (!window.perfilDadosGlobais || !window.perfilDadosGlobais.inventario) return;
 
@@ -1306,41 +1413,32 @@ window.filtrarMochila = function(filtro) {
     const grid = document.getElementById('grid-mochila');
     if (!grid) return;
 
-    // Atualiza o visual dos botões de filtro
-    ['todos', 'equips', 'materiais', 'usaveis'].forEach(f => {
-        const btn = document.getElementById(`btn-filtro-${f}`);
-        if (btn) {
-            btn.classList.toggle('is-active', f === filtro);
-        }
+    // Mantém os filtros separados por uso e inclui tudo o que não tinha aba dedicada.
+    const filtros = document.querySelectorAll('#filtros-mochila .eldora-inventory-filter');
+    filtros.forEach(botao => {
+        const ativo = botao.id === `btn-filtro-${filtro}`;
+        botao.classList.toggle('is-active', ativo);
+        botao.setAttribute('aria-pressed', String(ativo));
     });
 
-    // 🛡️ Filtro Robusto (lendo a propriedade padronizada que criamos)
-    let filtrados = inv;
+    const busca = normalizarCategoriaMochila(window.perfilBuscaMochilaAtual);
+    let filtrados = inv.filter(item => {
+        const correspondeCategoria = filtro === 'todos' || classificarItemMochila(item) === filtro;
+        if (!correspondeCategoria) return false;
+        if (!busca) return true;
+        const texto = normalizarCategoriaMochila([
+            item.nome, item.display_name, item.base_id, item.item_id, item.id, item.tipo, item.categoria
+        ].filter(Boolean).join(' '));
+        return texto.includes(busca);
+    });
 
-    if (filtro === 'equips') {
-        filtrados = inv.filter(i => [
-            'equipamento', 'weapon', 'armor', 'helmet', 'boots', 'bota', 'ring', 'anel', 'necklace', 'colar', 'earring', 'brinco',
-            'tool', 'ferramenta', 'arma', 'armadura', 'elmo', 'lenhador', 'minerador', 'colhedor', 'esfolador',
-            'ferreiro', 'armeiro', 'alfaiate', 'joalheiro', 'curtidor'
-        ].includes((i.tipo || i.type || '').toLowerCase()));
-
-    } else if (filtro === 'materiais') {
-        filtrados = inv.filter(i => {
-            const t = (i.tipo || i.type || '').toLowerCase();
-            // Tudo o que é material ou o que não se encaixou em nada
-            return ['material', 'material_bruto', 'material_refinado', 'material_runico', 'divino'].includes(t) || t === '' || t === 'materiais';
-        });
-
-    } else if (filtro === 'usaveis') {
-        filtrados = inv.filter(i => [
-            'potion', 'pocao', 'consumable', 'consumivel', 'scroll', 'pergaminho', 'chest', 'box', 'especial'
-        ].includes((i.tipo || i.type || '').toLowerCase()));
-    }
+    const contagem = document.getElementById('contagem-itens-mochila');
+    if (contagem) contagem.textContent = `${filtrados.length} ${filtrados.length === 1 ? 'item' : 'itens'}`;
 
     grid.innerHTML = '';
 
     if (filtrados.length === 0) {
-        grid.innerHTML = `<div class="eldora-profile-style-21776fc0">Mochila vazia nesta categoria.</div>`;
+        grid.innerHTML = `<div class="eldora-inventory-empty">${busca ? 'Nenhum item encontrado. Tente outro nome ou categoria.' : 'Mochila vazia nesta categoria.'}</div>`;
         return;
     }
 

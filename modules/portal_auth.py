@@ -110,7 +110,7 @@ def require_csrf():
 
 
 def _jogador_selecionado():
-    """Obtém o personagem ativo da sessão validada do portal."""
+    """Retorna o personagem ativo validando conta e propriedade no servidor."""
     character_id = str(session.get('portal_character') or '')
     if not ObjectId.is_valid(character_id):
         raise PlayerSessionError('Selecione um personagem antes de continuar.', 401)
@@ -153,6 +153,7 @@ def marcar_novidade_central_eldora_lida():
         return jsonify(erro=str(exc)), exc.status_code
     except ValueError as exc:
         return jsonify(erro=str(exc)), 403
+
 
 def limit_attempts():
     from modules.player.core import db

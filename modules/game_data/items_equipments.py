@@ -1283,6 +1283,136 @@ EQUIPMENTS_DATA = {
         "class_req": ["samurai"]
     },
     # ============================================================
+    # 🩹 CURANDEIRO — CONJUNTOS DA ESPERANÇA (T1) E DA AURORA (T2)
+    # ============================================================
+    "cajado_esperanca_curandeiro": {
+        "display_name": "Cajado da Esperança", "emoji": "🪄",
+        "slot": "arma", "type": "equipamento", "category": "arma",
+        "description": "Cajado simples para canalizar a fé do Curandeiro.",
+        "stackable": False, "icon_url": "",
+        "class_req": ["curandeiro", "clerigo", "druida", "sacerdote"]
+    },
+    "capuz_linho_curandeiro": {
+        "display_name": "Capuz de Linho da Vigília", "emoji": "🧢",
+        "slot": "elmo", "type": "equipamento", "category": "armadura",
+        "description": "Capuz leve para longas jornadas de cuidado e proteção.",
+        "stackable": False, "icon_url": "",
+        "class_req": ["curandeiro", "clerigo", "druida", "sacerdote"]
+    },
+    "veste_linho_curandeiro": {
+        "display_name": "Veste de Linho da Vigília", "emoji": "🥼",
+        "slot": "armadura", "type": "equipamento", "category": "armadura",
+        "description": "Veste confortável usada por curandeiros iniciantes.",
+        "stackable": False, "icon_url": "",
+        "class_req": ["curandeiro", "clerigo", "druida", "sacerdote"]
+    },
+    "calcas_linho_curandeiro": {
+        "display_name": "Calças de Linho da Vigília", "emoji": "👖",
+        "slot": "calca", "type": "equipamento", "category": "armadura",
+        "description": "Calças de tecido leve, reforçadas para a estrada.",
+        "stackable": False, "icon_url": "",
+        "class_req": ["curandeiro", "clerigo", "druida", "sacerdote"]
+    },
+    "botas_linho_curandeiro": {
+        "display_name": "Botas de Linho da Vigília", "emoji": "🥾",
+        "slot": "botas", "type": "equipamento", "category": "armadura",
+        "description": "Botas leves para acompanhar grupos em viagem.",
+        "stackable": False, "icon_url": "",
+        "class_req": ["curandeiro", "clerigo", "druida", "sacerdote"]
+    },
+    "luvas_linho_curandeiro": {
+        "display_name": "Luvas de Linho da Vigília", "emoji": "🧤",
+        "slot": "luvas", "type": "equipamento", "category": "armadura",
+        "description": "Luvas simples para mãos firmes durante a cura.",
+        "stackable": False, "icon_url": "",
+        "class_req": ["curandeiro", "clerigo", "druida", "sacerdote"]
+    },
+    "anel_esperanca_curandeiro": {
+        "display_name": "Anel da Esperança", "emoji": "💍",
+        "slot": "anel", "type": "equipamento", "category": "acessorio",
+        "description": "Anel de prata com uma gema bruta em seu centro.",
+        "stackable": False, "icon_url": "",
+        "class_req": ["curandeiro", "clerigo", "druida", "sacerdote"]
+    },
+    "colar_esperanca_curandeiro": {
+        "display_name": "Colar da Esperança", "emoji": "📿",
+        "slot": "colar", "type": "equipamento", "category": "acessorio",
+        "description": "Colar de prata que simboliza o voto de amparo.",
+        "stackable": False, "icon_url": "",
+        "class_req": ["curandeiro", "clerigo", "druida", "sacerdote"]
+    },
+    "brinco_esperanca_curandeiro": {
+        "display_name": "Brinco da Esperança", "emoji": "🧿",
+        "slot": "brinco", "type": "equipamento", "category": "acessorio",
+        "description": "Pequena gema para manter o foco durante as curas.",
+        "stackable": False, "icon_url": "",
+        "class_req": ["curandeiro", "clerigo", "druida", "sacerdote"]
+    },
+    "cajado_aurora_curandeiro": {
+        "display_name": "Cajado da Aurora", "emoji": "🪄",
+        "slot": "arma", "type": "equipamento", "category": "arma",
+        "description": "Cajado de madeira rara que canaliza poder sagrado.",
+        "stackable": False, "icon_url": "",
+        "class_req": ["curandeiro", "clerigo", "druida", "sacerdote"]
+    },
+    "capuz_veludo_curandeiro": {
+        "display_name": "Capuz de Veludo da Aurora", "emoji": "🧢",
+        "slot": "elmo", "type": "equipamento", "category": "armadura",
+        "description": "Capuz de veludo rúnico para canalizar a fé com clareza.",
+        "stackable": False, "icon_url": "",
+        "class_req": ["curandeiro", "clerigo", "druida", "sacerdote"]
+    },
+    "manto_veludo_curandeiro": {
+        "display_name": "Manto de Veludo da Aurora", "emoji": "🥼",
+        "slot": "armadura", "type": "equipamento", "category": "armadura",
+        "description": "Manto rúnico reforçado para os protetores do grupo.",
+        "stackable": False, "icon_url": "",
+        "class_req": ["curandeiro", "clerigo", "druida", "sacerdote"]
+    },
+    "calcas_veludo_curandeiro": {
+        "display_name": "Calças de Veludo da Aurora", "emoji": "👖",
+        "slot": "calca", "type": "equipamento", "category": "armadura",
+        "description": "Calças de veludo rúnico, resistentes e flexíveis.",
+        "stackable": False, "icon_url": "",
+        "class_req": ["curandeiro", "clerigo", "druida", "sacerdote"]
+    },
+    "botas_veludo_curandeiro": {
+        "display_name": "Botas de Veludo da Aurora", "emoji": "🥾",
+        "slot": "botas", "type": "equipamento", "category": "armadura",
+        "description": "Botas reforçadas com fio de prata para longas jornadas.",
+        "stackable": False, "icon_url": "",
+        "class_req": ["curandeiro", "clerigo", "druida", "sacerdote"]
+    },
+    "luvas_veludo_curandeiro": {
+        "display_name": "Luvas de Veludo da Aurora", "emoji": "🧤",
+        "slot": "luvas", "type": "equipamento", "category": "armadura",
+        "description": "Luvas macias para canalizar magia com precisão.",
+        "stackable": False, "icon_url": "",
+        "class_req": ["curandeiro", "clerigo", "druida", "sacerdote"]
+    },
+    "anel_aurora_curandeiro": {
+        "display_name": "Anel Rúnico da Aurora", "emoji": "💍",
+        "slot": "anel", "type": "equipamento", "category": "acessorio",
+        "description": "Anel de prata que guarda a luz de uma gema polida.",
+        "stackable": False, "icon_url": "",
+        "class_req": ["curandeiro", "clerigo", "druida", "sacerdote"]
+    },
+    "colar_aurora_curandeiro": {
+        "display_name": "Colar Rúnico da Aurora", "emoji": "📿",
+        "slot": "colar", "type": "equipamento", "category": "acessorio",
+        "description": "Colar rúnico de prata e gemas para amparar aliados.",
+        "stackable": False, "icon_url": "",
+        "class_req": ["curandeiro", "clerigo", "druida", "sacerdote"]
+    },
+    "brinco_aurora_curandeiro": {
+        "display_name": "Brinco Rúnico da Aurora", "emoji": "🧿",
+        "slot": "brinco", "type": "equipamento", "category": "acessorio",
+        "description": "Brinco rúnico para manter a concentração nas batalhas.",
+        "stackable": False, "icon_url": "",
+        "class_req": ["curandeiro", "clerigo", "druida", "sacerdote"]
+    },
+
+    # ============================================================
     # 🏅 CONJUNTO DO AVENTUREIRO — GUILDA DOS AVENTUREIROS
     # ============================================================
 
@@ -1376,4 +1506,69 @@ EQUIPMENTS_DATA = {
     "anel_vigilia_necromante": {"display_name": "Anel da Vigília", "emoji": "💍", "slot": "anel", "type": "equipamento", "category": "acessorio", "description": "Anel de prata que ancora um fragmento de energia espiritual.", "stackable": False, "icon_url": "", "class_req": ["necromante"]},
     "colar_vigilia_necromante": {"display_name": "Colar da Vigília", "emoji": "📿", "slot": "colar", "type": "equipamento", "category": "acessorio", "description": "Amuleto simples para manter o vínculo sob controle.", "stackable": False, "icon_url": "", "class_req": ["necromante"]},
     "brinco_vigilia_necromante": {"display_name": "Brinco da Vigília", "emoji": "🧿", "slot": "brinco", "type": "equipamento", "category": "acessorio", "description": "Pequena gema que retém um eco das catacumbas.", "stackable": False, "icon_url": "", "class_req": ["necromante"]},
+
+    # -- NECROMANTE T2: VÉU ESPECTRAL --
+    "cajado_veu_espectral_necromante": {
+        "display_name": "Cajado do Véu Espectral", "emoji": "🪄",
+        "slot": "arma", "type": "arma", "category": "arma",
+        "description": "Cajado raro que conduz ecos entre o mundo dos vivos e o dos mortos.",
+        "stackable": False, "media_key": "item_cajado_veu_espectral_necromante", "icon_url": "",
+        "class_req": ["necromante"],
+    },
+    "capuz_veu_espectral_necromante": {
+        "display_name": "Capuz do Véu Espectral", "emoji": "🧢",
+        "slot": "elmo", "type": "equipamento", "category": "armadura",
+        "description": "Capuz de veludo rúnico que abafa os sussurros das almas.",
+        "stackable": False, "media_key": "item_capuz_veu_espectral_necromante", "icon_url": "",
+        "class_req": ["necromante"],
+    },
+    "manto_veu_espectral_necromante": {
+        "display_name": "Manto do Véu Espectral", "emoji": "🥼",
+        "slot": "armadura", "type": "equipamento", "category": "armadura",
+        "description": "Manto de veludo rúnico reforçado com fios de prata e ectoplasma.",
+        "stackable": False, "media_key": "item_manto_veu_espectral_necromante", "icon_url": "",
+        "class_req": ["necromante"],
+    },
+    "calcas_veu_espectral_necromante": {
+        "display_name": "Calças do Véu Espectral", "emoji": "👖",
+        "slot": "calca", "type": "equipamento", "category": "armadura",
+        "description": "Calças leves envoltas por um véu de energia espectral.",
+        "stackable": False, "media_key": "item_calcas_veu_espectral_necromante", "icon_url": "",
+        "class_req": ["necromante"],
+    },
+    "botas_veu_espectral_necromante": {
+        "display_name": "Botas do Véu Espectral", "emoji": "🥾",
+        "slot": "botas", "type": "equipamento", "category": "armadura",
+        "description": "Botas macias que cruzam criptas sem despertar seus guardiões.",
+        "stackable": False, "media_key": "item_botas_veu_espectral_necromante", "icon_url": "",
+        "class_req": ["necromante"],
+    },
+    "luvas_veu_espectral_necromante": {
+        "display_name": "Luvas do Véu Espectral", "emoji": "🧤",
+        "slot": "luvas", "type": "equipamento", "category": "armadura",
+        "description": "Luvas bordadas com runas que seguram a energia dos espíritos.",
+        "stackable": False, "media_key": "item_luvas_veu_espectral_necromante", "icon_url": "",
+        "class_req": ["necromante"],
+    },
+    "anel_veu_espectral_necromante": {
+        "display_name": "Anel do Véu Espectral", "emoji": "💍",
+        "slot": "anel", "type": "equipamento", "category": "acessorio",
+        "description": "Anel de prata polida que prende um eco espiritual.",
+        "stackable": False, "media_key": "item_anel_veu_espectral_necromante", "icon_url": "",
+        "class_req": ["necromante"],
+    },
+    "colar_veu_espectral_necromante": {
+        "display_name": "Colar do Véu Espectral", "emoji": "📿",
+        "slot": "colar", "type": "equipamento", "category": "acessorio",
+        "description": "Colar rúnico que mantém as almas sob controle.",
+        "stackable": False, "media_key": "item_colar_veu_espectral_necromante", "icon_url": "",
+        "class_req": ["necromante"],
+    },
+    "brinco_veu_espectral_necromante": {
+        "display_name": "Brinco do Véu Espectral", "emoji": "🧿",
+        "slot": "brinco", "type": "equipamento", "category": "acessorio",
+        "description": "Gema encantada com um sussurro vindo do outro lado.",
+        "stackable": False, "media_key": "item_brinco_veu_espectral_necromante", "icon_url": "",
+        "class_req": ["necromante"],
+    },
 }
