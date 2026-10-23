@@ -260,6 +260,26 @@
     padding-top:8px;
     border-top:1px solid #344356;
 }
+#modal-bestiario .pet-roadmap-list{display:grid;gap:7px;margin-top:6px}
+#modal-bestiario .pet-roadmap-step{
+    align-items:flex-start;
+    padding:8px;
+    border:1px solid #ffffff0c;
+    border-radius:10px;
+    background:#0c142066;
+}
+#modal-bestiario .pet-roadmap-step.is-current{border-color:#b99752;background:#d4b46512}
+#modal-bestiario .pet-roadmap-step.is-next{border-color:#557a71;background:#41736516}
+#modal-bestiario .pet-roadmap-step.is-future{opacity:.78}
+#modal-bestiario .pet-roadmap-copy{flex:1;min-width:0;padding-top:2px}
+#modal-bestiario .pet-roadmap-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+#modal-bestiario .pet-roadmap-heading strong{font-size:12px;overflow-wrap:anywhere}
+#modal-bestiario .pet-roadmap-heading span{flex:0 0 auto;padding:2px 6px;border-radius:999px;background:#ffffff0b;color:#c5d1df;font-size:9px;line-height:1.4}
+#modal-bestiario .pet-roadmap-step.is-current .pet-roadmap-heading span{background:#d4b46522;color:#f0d698}
+#modal-bestiario .pet-roadmap-step.is-next .pet-roadmap-heading span{background:#4173652b;color:#b7ddcf}
+#modal-bestiario .pet-roadmap-meta,#modal-bestiario .pet-roadmap-requirement{display:block;margin-top:3px;font-size:10px!important;letter-spacing:0!important}
+#modal-bestiario .pet-roadmap-meta{color:#9eafc3!important}
+#modal-bestiario .pet-roadmap-requirement{color:#d0d8e3!important}
 #modal-bestiario .companheiros-panel summary{
     min-height:40px;
     padding:8px 0;
@@ -268,7 +288,6 @@
     line-height:1.5;
     cursor:pointer;
 }
-#modal-bestiario .pet-roadmap .pet-step{padding:7px 9px;border-radius:9px;background:#0c142066}
 #modal-bestiario .premium-pet-missions{
     margin:0;
     padding:12px 14px;

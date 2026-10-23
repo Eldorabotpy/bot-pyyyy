@@ -20,7 +20,25 @@ Capítulo atual: 1, configurado por RELEASED_PET_CHAPTER em modules/companions.p
 
 O ovo de cada família exige 50 abates registrados no Bestiário. Abates de ondas de invasão não contam. A forma final recebe uma especialização. A mudança mantém nível, XP e vínculo; o estágio e o bônus avançam.
 
+No Códice, a jornada detalhada identifica a forma atual, a próxima evolução e as formas futuras. Também mostra capítulo e requisitos de cada transição: nível 10, vínculo 50 e 25 essências na primeira; nível 25, vínculo 300 e 100 essências na final, com escolha de especialização.
+
 Não há liberação automática por data. Publicar e conferir a arte antes de aumentar RELEASED_PET_CHAPTER. O bloqueio é validado no servidor antes de consumir essências.
+
+## Arquivos de arte por forma
+
+Os caminhos são relativos a `assets/` no repositório de imagens. Cada forma precisa de uma imagem estática para o Códice e de uma folha própria para andar no mapa.
+
+| Família | Forma | Imagem estática | Folha animada |
+| --- | --- | --- | --- |
+| Slime | Pequeno Slime | `mob/combate/pradaria/pequeno_slime.png` | `mob/pet/pequeno_slime.png` |
+| Slime | Slime Verde | `mob/combate/pradaria/slime_verde.png` | `mob/pet/slime_verde.png` |
+| Slime | Rei Slime | `mob/combate/pradaria/rei_slime.png` | `mob/pet/rei_slime.png` |
+| Lobo | Lobo Magro | `mob/combate/floresta/lobo_magro.png` | `mob/pet/lobo_magro.png` |
+| Lobo | Lobo Alfa | `mob/combate/floresta/lobo_alfa.png` | `mob/pet/lobo_alfa.png` |
+| Lobo | Lobisomem | `mob/combate/campos_linho/lobisomem_campones.png` | `mob/pet/lobisomem_campones.png` |
+| Morcego | Morcego das Minas | `mob/combate/mina_ferro/morcego_das_minas.png` | `mob/pet/morcego_das_minas.png` |
+| Morcego | Morcego de Mana | `mob/combate/dungeon_01/morcego_mana.png` | `mob/pet/morcego_mana.png` |
+| Morcego | Morcego Gigante | `mob/combate/dungeon_01/morcego_gigante.png` | `mob/pet/morcego_gigante.png` |
 
 ## Mudança de forma e animação no mapa
 

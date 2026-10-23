@@ -7,7 +7,23 @@
         return `<button type="button" data-action="${escape(action)}" data-family="${escape(family)}" data-specialty="${escape(specialty)}" ${disabled||busy?'disabled':''}>${escape(saving?'Salvando…':label)}</button>`;
     };
     const art = (url, name, cls='mission-art', fallback='🐾') => '<span class="pet-art-frame">'+(url?'<img class="'+escape(cls)+'" src="'+escape(url)+'" alt="'+escape(name)+'" width="64" height="64" loading="lazy" onerror="this.hidden=true;this.nextElementSibling.hidden=false">':'')+'<span class="pet-art-fallback" '+(url?'hidden':'')+' aria-hidden="true">'+escape(fallback)+'</span></span>';
-    const roadmap = family => family.journey.length<2?'':`<details class="pet-roadmap" data-panel="${escape(family.journey[0].species)}"><summary>Ver jornada de evolução</summary>${family.journey.map(step=>`<div class="pet-step">${art(step.image,step.name,'mission-art',family.icon)}<div><strong>${escape(step.name)}</strong><small>Capítulo ${step.chapter} · ${step.released?'Disponível':'Em breve'}</small></div></div>`).join('')}</details>`;
+    const roadmap = (family,currentStage=null) => {
+        const steps=family.journey||[];
+        if(steps.length<2)return '';
+        return `<details class="pet-roadmap" data-panel="${escape(steps[0].species)}"><summary>Ver jornada de evolução · ${steps.length} formas</summary><div class="pet-roadmap-list">${steps.map((step,index)=>{
+            const isCurrent=currentStage===index;
+            const isNext=Number.isInteger(currentStage)&&index===currentStage+1;
+            const isComplete=Number.isInteger(currentStage)&&index<currentStage;
+            const role=isCurrent?'Forma atual':isNext?'Próxima evolução':isComplete?'Concluída':index===0?'Forma inicial':'Forma futura';
+            const roleClass=isCurrent?'is-current':isNext?'is-next':isComplete?'is-complete':'is-future';
+            const requirement=index===0
+                ?'Nasce ao chocar o ovo.'
+                :index===1
+                    ?'Nível 10 · vínculo 50 · 25 essências.'
+                    :'Nível 25 · vínculo 300 · 100 essências'+(Object.keys(family.specialties||{}).length?' · especialização final.':'.');
+            return `<div class="pet-step pet-roadmap-step ${roleClass}">${art(step.image,step.name,'mission-art',family.icon)}<div class="pet-roadmap-copy"><div class="pet-roadmap-heading"><strong>${escape(step.name)}</strong><span>${role}</span></div><small class="pet-roadmap-meta">Capítulo ${step.chapter} · ${step.released?'Liberada':'Ainda bloqueada'}</small><small class="pet-roadmap-requirement">${requirement}</small></div></div>`;
+        }).join('')}</div></details>`;
+    };
     const date = value => {
         const parsed=new Date(value);
         return Number.isNaN(parsed.getTime())?'Data indisponível':parsed.toLocaleDateString('pt-BR');
@@ -117,7 +133,7 @@
                             <p class="pet-map-change">Ao evoluir, a aparência do companheiro também muda no mapa.</p>
                             ${finalEvolution&&Object.keys(family.specialties||{}).length?Object.entries(family.specialties).map(([id,option])=>button('Evoluir: '+option[0],'evolve',key,!ready,id)).join(''):button('Evoluir','evolve',key,!ready)}
                         </section>`:maxStage===0?'<p class="pet-final">Forma única · o bônus cresce com o nível</p>':'<p class="pet-final">Evolução final concluída</p>'}
-                        ${roadmap(family)}
+                        ${roadmap(family,pet.stage)}
                     </article>`;
                 }).join('')}
             </section>
