@@ -821,11 +821,50 @@ function aplicarImagemMaterialForja(imgEl, matId) {
 
     imgEl.src = caminhos[0];
 }
+function getCategoriaReceitaForja(id, receita = {}) {
+    const normalizar = valor => String(valor || "")
+        .trim()
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "");
+
+    const idReceita = normalizar(id);
+    const idResultado = normalizar(
+        receita.result_base_id ||
+        receita.result_id ||
+        receita.output_id ||
+        receita.item_id
+    );
+    const tipoResultado = normalizar(
+        receita.result_type ||
+        receita.output_type ||
+        receita.item_type ||
+        receita.type
+    );
+
+    if (receita.unlock_id || idReceita.startsWith("work_guild_")) {
+        return "guilda";
+    }
+
+    if (["tool", "ferramenta", "ferramentas"].includes(tipoResultado)) {
+        return "ferramentas";
+    }
+
+    const idsDeFerramentas = /^(ferramentas_|ferramenta_|martelo_(ferreiro|armeiro)_t[1-5]$|machado_(pedra|ferro|aco|mithril|adamantio)$|picareta_(pedra|ferro|aco|mithril|adamantio)$|foice_(pedra|ferro|aco|mithril|druidica)$|faca_(pedra|ferro|aco|obsidiana|vorpal)$|frasco_(vidro|ceramica)$|extrator_cristal$|coletor_runico$|cubo_vazio$)/;
+
+    if (idsDeFerramentas.test(idResultado) || idsDeFerramentas.test(idReceita)) {
+        return "ferramentas";
+    }
+
+    return "receitas";
+}
+
 const ForjaEngine = {
     receitas: {},
     unlocksGuilda: new Set(),
     profSelecionada: null,
     classeSelecionada: "todas",
+    categoriaSelecionada: "receitas",
     receitaSelecionada: null,
     itemDesmontarSelecionado: null,
     itemMelhorarSelecionado: null,
@@ -963,8 +1002,17 @@ const ForjaEngine = {
         return filtradas;
     },
 
-    getReceitasDaAbaAtual() {
+    getReceitasDaCategoriaAtual() {
         const receitas = this.getReceitasDaProfissaoAtual();
+        return Object.fromEntries(
+            Object.entries(receitas).filter(([id, receita]) =>
+                getCategoriaReceitaForja(id, receita) === this.categoriaSelecionada
+            )
+        );
+    },
+
+    getReceitasDaAbaAtual() {
+        const receitas = this.getReceitasDaCategoriaAtual();
         return filtrarReceitasPorClasseForja(receitas, this.classeSelecionada);
     },
 
@@ -1061,6 +1109,7 @@ const ForjaEngine = {
 
     mudarAba(prof) {
         this.profSelecionada = prof.toLowerCase();
+        this.categoriaSelecionada = "receitas";
         this.classeSelecionada = "todas";
         const abasClasses = document.querySelector('#abas-classes-forja .forja-class-tab-options');
         if (abasClasses) abasClasses.scrollLeft = 0;
@@ -1260,12 +1309,25 @@ const ForjaUI = {
 
         const profs = ForjaEngine.getProfissoesJogador();
         const oficios = profs.filter(prof => !['melhorar', 'desmontar'].includes(prof));
+        const iconesOficio = {
+            alfaiate: "✂️",
+            armeiro: "🛡️",
+            ferreiro: "⚒️",
+            joalheiro: "💎"
+        };
         const botoesOficio = criarGrupo('OFÍCIOS', 'forja-tab-professions');
         oficios.forEach(prof => {
             const btn = document.createElement('button');
             btn.type = 'button';
             btn.className = `aba-forja-btn ${ForjaEngine.profSelecionada === prof ? 'active' : ''}`;
-            btn.innerText = prof.toUpperCase();
+            const icone = document.createElement('span');
+            icone.className = 'forja-profession-icon';
+            icone.setAttribute('aria-hidden', 'true');
+            icone.textContent = iconesOficio[prof] || '✦';
+            const nome = document.createElement('span');
+            nome.textContent = prof.toUpperCase();
+            btn.append(icone, nome);
+            btn.setAttribute('aria-label', prof[0].toUpperCase() + prof.slice(1));
             btn.setAttribute('aria-pressed', String(ForjaEngine.profSelecionada === prof));
             btn.onclick = () => ForjaEngine.mudarAba(prof);
             botoesOficio.appendChild(btn);
@@ -1292,8 +1354,95 @@ const ForjaUI = {
         runasBtn.setAttribute('aria-label', 'Abrir oficina de runas');
         runasBtn.onclick = () => window.abrirOficinaRunas();
         botoesAcao.appendChild(runasBtn);
+        this.desenharAbasCategoria();
         this.desenharAbasClasse();
         this.ativarScrollAbas(container);
+    },
+
+    desenharAbasCategoria() {
+        const container = document.getElementById('abas-categorias-forja');
+        if (!container) return;
+
+        const scrollAnterior = container.querySelector('.forja-category-options')?.scrollLeft || 0;
+        const receitas = ForjaEngine.getReceitasDaProfissaoAtual();
+        const definicoes = [
+            { id: 'receitas', label: 'Receitas', icone: '⚒️' },
+            { id: 'ferramentas', label: 'Ferramentas de Ofício', icone: '🧰' },
+            { id: 'guilda', label: 'Conjunto da Guilda', icone: '🛡️' }
+        ];
+        const contagens = Object.fromEntries(definicoes.map(categoria => [categoria.id, 0]));
+
+        Object.entries(receitas).forEach(([id, receita]) => {
+            const categoria = getCategoriaReceitaForja(id, receita);
+            contagens[categoria] = (contagens[categoria] || 0) + 1;
+        });
+
+        const disponiveis = definicoes.filter(categoria => contagens[categoria.id] > 0);
+        if (!disponiveis.length) {
+            container.hidden = true;
+            container.innerHTML = '';
+            return;
+        }
+
+        if (!disponiveis.some(categoria => categoria.id === ForjaEngine.categoriaSelecionada)) {
+            ForjaEngine.categoriaSelecionada = disponiveis[0].id;
+        }
+
+        container.hidden = false;
+        container.innerHTML = '';
+
+        const label = document.createElement('span');
+        label.className = 'forja-category-label';
+        label.textContent = 'BANCADA';
+
+        const options = document.createElement('div');
+        options.className = 'forja-category-options';
+        options.setAttribute('role', 'group');
+        options.setAttribute('aria-label', 'Categorias de projetos da forja');
+
+        disponiveis.forEach(categoria => {
+            const ativo = ForjaEngine.categoriaSelecionada === categoria.id;
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = `forja-category-tab forja-category-${categoria.id}${ativo ? ' active' : ''}`;
+            btn.setAttribute('aria-pressed', String(ativo));
+            btn.setAttribute('aria-label', `${categoria.label}: ${contagens[categoria.id]} projetos`);
+
+            const icone = document.createElement('span');
+            icone.className = 'forja-category-icon';
+            icone.setAttribute('aria-hidden', 'true');
+            icone.textContent = categoria.icone;
+
+            const nome = document.createElement('span');
+            nome.className = 'forja-category-name';
+            nome.textContent = categoria.label;
+
+            const contagem = document.createElement('span');
+            contagem.className = 'forja-category-count';
+            contagem.textContent = contagens[categoria.id];
+
+            btn.append(icone, nome, contagem);
+            btn.onclick = () => {
+                if (ForjaEngine.categoriaSelecionada === categoria.id) return;
+
+                const busca = document.getElementById('forja-busca');
+                const termoBusca = busca?.value || '';
+                ForjaEngine.categoriaSelecionada = categoria.id;
+                ForjaEngine.classeSelecionada = 'todas';
+                ForjaEngine.receitaSelecionada = null;
+                this.renderizarTudo();
+
+                if (busca) {
+                    busca.value = termoBusca;
+                    window.filtrarProjetosForja(termoBusca);
+                }
+            };
+            options.appendChild(btn);
+        });
+
+        container.append(label, options);
+        options.scrollLeft = scrollAnterior;
+        this.ativarScrollAbas(options);
     },
 
     desenharAbasClasse() {
@@ -1301,7 +1450,7 @@ const ForjaUI = {
         if (!container) return;
         const scrollAnterior = container.querySelector('.forja-class-tab-options')?.scrollLeft || 0;
 
-        const receitas = ForjaEngine.getReceitasDaProfissaoAtual();
+        const receitas = ForjaEngine.getReceitasDaCategoriaAtual();
         if (Object.keys(receitas).length === 0) {
             container.hidden = true;
             container.innerHTML = '';
@@ -1455,7 +1604,10 @@ const ForjaUI = {
 
                 <span class="recipe-copy">
                     <span class="recipe-name"></span>
-                    <span class="recipe-class-label"></span>
+                    <span class="recipe-meta">
+                        <span class="recipe-class-label"></span>
+                        <span class="recipe-kind-label" hidden></span>
+                    </span>
                 </span>
 
                 ${
@@ -1482,8 +1634,19 @@ const ForjaUI = {
                 }
             `;
 
+            const categoriaReceita = getCategoriaReceitaForja(id, r);
+            card.dataset.recipeCategory = categoriaReceita;
             card.querySelector('.recipe-name').textContent = r.display_name || id;
             card.querySelector('.recipe-class-label').textContent = formatarClassesReceitaForja(r);
+
+            const seloCategoria = card.querySelector('.recipe-kind-label');
+            if (categoriaReceita === 'ferramentas') {
+                seloCategoria.textContent = 'FERRAMENTA';
+                seloCategoria.hidden = false;
+            } else if (categoriaReceita === 'guilda') {
+                seloCategoria.textContent = 'GUILDA';
+                seloCategoria.hidden = false;
+            }
 
             card.onclick = () => {
 

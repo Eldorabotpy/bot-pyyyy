@@ -29,6 +29,7 @@
         <div id="abas-profissoes-forja" class="forja-nav-tabs">
             </div>
 
+        <div id="abas-categorias-forja" class="forja-category-tabs" hidden></div>
         <div id="abas-classes-forja" class="forja-classes-tabs" hidden></div>
 
         <div class="forja-main-content">
@@ -1563,6 +1564,144 @@
     #forja-container .forja-tab-options .aba-forja-btn { min-height: 40px; padding: 5px 3px; font-size: 9px; }
     #forja-container .forja-class-tab-label { font-size: 9px; }
     #forja-container .forja-class-tab { min-height: 38px; padding: 6px 10px; }
+}
+#forja-container .forja-tab-options .aba-forja-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 46px;
+    padding-inline: 12px;
+    border-radius: 12px;
+    background: linear-gradient(145deg, #19323a, #14272e);
+    box-shadow: inset 0 1px rgba(255,255,255,.04);
+}
+#forja-container .forja-profession-icon { font-size: 15px; line-height: 1; }
+#forja-container .forja-tab-options .aba-forja-btn.active {
+    background: linear-gradient(145deg, #efd18b, #c99c4e);
+    color: #1d2929;
+    box-shadow: inset 0 1px rgba(255,255,255,.42), 0 3px 10px rgba(201,156,78,.18);
+}
+#forja-container .forja-tab-options .forja-action-runas {
+    background: linear-gradient(145deg, #302748, #211e35);
+    color: #e4d8ff;
+}
+#forja-container .forja-category-tabs {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    min-height: 58px;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--forja-border);
+    background: linear-gradient(100deg, #0e2026, #12242a);
+}
+#forja-container .forja-category-tabs[hidden] { display: none !important; }
+#forja-container .forja-category-label {
+    flex: 0 0 auto;
+    color: var(--forja-muted);
+    font-size: 9px;
+    font-weight: 900;
+    letter-spacing: 1px;
+}
+#forja-container .forja-category-options {
+    display: flex;
+    flex: 1 1 auto;
+    min-width: 0;
+    gap: 7px;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
+    scrollbar-color: var(--forja-gold) transparent;
+    padding: 3px 3px 5px;
+    touch-action: pan-x;
+    -webkit-overflow-scrolling: touch;
+}
+#forja-container .forja-category-options::-webkit-scrollbar { height: 3px; }
+#forja-container .forja-category-options::-webkit-scrollbar-thumb { border-radius: 99px; background: var(--forja-gold); }
+#forja-container .forja-category-tab {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 7px;
+    min-height: 44px;
+    padding: 7px 11px;
+    border: 1px solid rgba(211,190,132,.22);
+    border-radius: 12px;
+    background: linear-gradient(145deg, #192e34, #12252b);
+    color: var(--forja-text);
+    font: 800 10px/1.2 Arial, sans-serif;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: border-color .16s ease, background .16s ease, transform .16s ease, box-shadow .16s ease;
+}
+#forja-container .forja-category-tab:hover { border-color: rgba(228,196,122,.78); }
+#forja-container .forja-category-tab:active { transform: translateY(1px); }
+#forja-container .forja-category-tab.active {
+    border-color: var(--forja-gold-light);
+    background: linear-gradient(145deg, #e5c477, #bd914a);
+    color: #172328;
+    box-shadow: inset 0 1px rgba(255,255,255,.38), 0 4px 12px rgba(0,0,0,.2);
+}
+#forja-container .forja-category-guilda.active {
+    border-color: #d4b5f2;
+    background: linear-gradient(145deg, #75589a, #4d3d71);
+    color: #fff3d0;
+}
+#forja-container .forja-category-icon { font-size: 15px; line-height: 1; }
+#forja-container .forja-category-count {
+    display: inline-flex;
+    min-width: 21px;
+    min-height: 21px;
+    align-items: center;
+    justify-content: center;
+    padding: 0 5px;
+    border-radius: 999px;
+    background: rgba(0,0,0,.2);
+    color: inherit;
+    font-size: 9px;
+    font-weight: 900;
+}
+#forja-container .forja-category-tab.active .forja-category-count { background: rgba(24,34,35,.16); }
+#forja-container .forja-category-tab:focus-visible { outline: 2px solid var(--forja-gold-light); outline-offset: 2px; }
+#forja-container .recipe-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+#forja-container .recipe-class-label { color: #bbd0cf; }
+#forja-container .recipe-kind-label {
+    display: inline-flex;
+    align-items: center;
+    min-height: 17px;
+    padding: 1px 6px;
+    border: 1px solid rgba(211,190,132,.25);
+    border-radius: 99px;
+    color: var(--forja-gold-light);
+    font-size: 8px;
+    font-weight: 900;
+    letter-spacing: .55px;
+}
+#forja-container .recipe-kind-label[hidden] { display: none !important; }
+#forja-container .recipe-card[data-recipe-category="guilda"] {
+    border-color: rgba(169,139,213,.45);
+    background: linear-gradient(110deg, #211e30, #15262c);
+}
+#forja-container .recipe-card[data-recipe-category="guilda"].active {
+    border-color: #c4a0e8;
+    box-shadow: inset 3px 0 #b99be6, 0 4px 12px rgba(0,0,0,.2);
+}
+@media (max-width: 768px) {
+    #forja-container .forja-category-tabs { min-height: 52px; gap: 7px; padding: 6px 8px; }
+    #forja-container .forja-category-label { font-size: 8px; letter-spacing: .7px; }
+    #forja-container .forja-category-options { gap: 5px; }
+    #forja-container .forja-category-tab { min-height: 42px; padding: 6px 9px; font-size: 9px; }
+    #forja-container .forja-category-icon { font-size: 14px; }
+    #forja-container .forja-category-count { min-width: 19px; min-height: 19px; }
+    #forja-container .forja-tab-options .aba-forja-btn { min-height: 42px; padding-inline: 7px; }
+    #forja-container .forja-profession-icon { font-size: 13px; }
+}
+@media (max-width: 420px) {
+    #forja-container .forja-category-label { display: none; }
+    #forja-container .forja-category-options { gap: 5px; }
+    #forja-container .forja-category-tab { min-height: 40px; padding: 6px 8px; font-size: 9px; }
+    #forja-container .forja-category-icon { font-size: 13px; }
+    #forja-container .forja-tab-options .aba-forja-btn { padding-inline: 5px; font-size: 9px; }
 }
 @media (prefers-reduced-motion: reduce) {
     #forja-container .aba-forja-btn,
