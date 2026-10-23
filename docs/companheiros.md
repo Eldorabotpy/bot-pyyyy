@@ -3,8 +3,8 @@
 Entrada: Bestiário > Companheiros ou perfil > Equipamentos > Companheiro.
 
 - Conquista de 10 abates concede 1 incubadora de uso único, uma única vez por personagem.
-- 50 abates acumulados no Bestiário de uma família concedem um ovo único. Progresso anterior conta; ondas de invasão não contam.
-- Famílias: Slime (Defesa), Lobo (Iniciativa), Morcego (Mana máxima).
+- 50 abates acumulados no Bestiário de Slimes, Lobos ou Morcegos concedem o ovo da família. Progresso anterior conta; ondas de invasão não contam.
+- Companheiros: Slime (Defesa), Lobo (Iniciativa) e Morcego (Mana máxima). Slimes elementais continuam como monstros, sem ovos próprios.
 - Uma incubação por vez; iniciar consome 1 incubadora do estoque de Companheiros. 96.000 pixels = 3.000 blocos de 32px. Cerca de 11 minutos de caminhada contínua a 150px/s; valores iniciais sujeitos a balanceamento.
 - Contador usa posições recebidas pelo socket do personagem. Saltos, intervalos longos, coordenadas inválidas e trocas de região não concedem progresso. Limite de velocidade validado pelo servidor; colisões continuam a cargo do mapa Phaser. Isto não é um motor de movimento totalmente autoritativo e não impede um cliente adulterado de fabricar deslocamentos lentos.
 - Checkpoint de caminhada a cada segundo e ao sair/trocar de mapa. Reinício abrupto pode perder até um segundo ainda não consolidado, mas preserva ovo e progresso salvo.
@@ -12,11 +12,10 @@ Entrada: Bestiário > Companheiros ou perfil > Equipamentos > Companheiro.
 - Um pet ativo: ganha 10 XP e 1 vínculo por abate válido de caça, solo ou como aliado elegível na divisão de recompensas. Sem retirar XP do jogador; poção de XP não multiplica XP do pet. Pets guardados não evoluem.
 - Caçar um membro das três famílias com pet equipado concede 1 essência daquela família, registrada na aba Companheiros.
 - Nível máximo 25. Cada nível exige 50 × nível atual XP.
-- Adulto: nível 10, 50 vitórias de vínculo e 25 essências da família.
-- Ancestral: nível 25, 300 vitórias e 100 essências. Especialização escolhida no botão de evolução é definitiva nesta versão.
-- Slime: Guardião/Defesa ou Vital/HP. Lobo: Veloz/Iniciativa ou Guardião/Defesa. Morcego: Arcano/Mana ou Veloz/Iniciativa.
+- Primeira evolução: nível 10, 50 vitórias de vínculo e 25 essências da família. Segunda evolução do Slime, Lobo e Morcego: nível 25, 300 vitórias e 100 essências. A especialização escolhida na forma final é definitiva nesta versão.
+- Jornadas: Pequeno Slime → Slime Verde → Rei Slime; Lobo Magro → Lobo Alfa → Lobisomem; Morcego das Minas → Morcego de Mana → Morcego Gigante. As especializações finais são Slime: Guardião/Defesa ou Vital/HP; Lobo: Veloz/Iniciativa ou Guardião/Defesa; Morcego: Arcano/Mana ou Veloz/Iniciativa.
 - Bônus fixo: 1 + nível//5 + 2×estágio. HP/Mana multiplicam o valor por 3. Bônus é aplicado em get_player_total_stats, não grava atributos permanentes.
-- No mapa, o pet equipado usa a imagem da criatura do Bestiário (Slime Verde, Lobo Magro ou Morcego das Minas), com ícone como fallback. Cabe em metade do tamanho do personagem: 24px para herói de 48px, preservando proporção. Segue o trajeto com distância de 32px e reposiciona após teleporte. Imagens ainda não têm animações próprias; visível no mapa do dono nesta versão. O cartão de estoque mostra a imagem da incubadora.
+- No mapa, o pet equipado segue o trajeto a 32px do personagem, usa metade do tamanho do herói e muda a textura ao evoluir. Quando existe folha 192×256, o Phaser toca as animações por espécie e direção a 4 quadros/s, com acompanhamento suavizado; sem folha, usa imagem estática e, sem imagem, o ícone da família. O cartão de estoque mostra a imagem da incubadora. O fluxo de carregamento e os arquivos de arte pendentes estão em docs/roteiro-pets.md.
 
 ## Persistência e publicação
 

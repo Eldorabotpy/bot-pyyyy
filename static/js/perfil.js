@@ -1033,8 +1033,8 @@ async function carregarMeuPerfil() {
                     <div class="eldora-equipment-slots eldora-profile-style-d9b56f37" >${htmlSlots}</div>
                 </div>
 
-                <button class="eldora-companion-button eldora-profile-style-ca6eb74e" type="button" onclick="window.abrirCodiceHunter().then(() => window.abrirCompanheiros())" >
-                    🐾 Companheiro<br><span class="eldora-profile-style-e18a3df1">${p.companion ? `${p.companion.icon} ${p.companion.name} · ${p.companion.form} · Nv. ${p.companion.level}` : 'Nenhum equipado · Abrir Bestiário'}</span>
+                <button class="eldora-companion-button eldora-profile-style-ca6eb74e" type="button" onclick="window.abrirCompanheiros()" >
+                    🐾 Companheiro<br><span class="eldora-profile-style-e18a3df1">${p.companion ? `${p.companion.icon} ${p.companion.name} · ${p.companion.form} · Nv. ${p.companion.level}` : 'Nenhum equipado · Abrir Companheiros'}</span>
                 </button>
                 ${htmlFerramentas}
             </div>`;

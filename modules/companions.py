@@ -7,38 +7,70 @@ from datetime import datetime, timedelta, timezone
 from bson import ObjectId
 
 FAMILIES = {
-    "slime": {"name": "Slime", "icon": "🟢", "stat": "defense", "label": "Defesa", "specialties": {"guardiao": ["Guardião", "defense"], "vital": ["Vital", "max_hp"]}},
-    "lobo": {"name": "Lobo", "icon": "🐺", "stat": "initiative", "label": "Iniciativa", "specialties": {"veloz": ["Veloz", "initiative"], "guardiao": ["Guardião", "defense"]}},
-    "morcego": {"name": "Morcego", "icon": "🦇", "stat": "max_mana", "label": "Mana máxima", "specialties": {"arcano": ["Arcano", "max_mana"], "veloz": ["Veloz", "initiative"]}},
+    "slime": {"name": "Slime", "icon": "🟢", "stat": "defense", "label": "Defesa", "claim_label": "Abates de Slimes", "specialties": {"guardiao": ["Guardião", "defense"], "vital": ["Vital", "max_hp"]}},
+    "lobo": {"name": "Lobo", "icon": "🐺", "stat": "initiative", "label": "Iniciativa", "claim_label": "Abates de Lobos", "specialties": {"veloz": ["Veloz", "initiative"], "guardiao": ["Guardião", "defense"]}},
+    "morcego": {"name": "Morcego", "icon": "🦇", "stat": "max_mana", "label": "Mana máxima", "claim_label": "Abates de Morcegos", "specialties": {"arcano": ["Arcano", "max_mana"], "veloz": ["Veloz", "initiative"]}},
 }
+ESSENCE_FAMILIES = ("slime", "lobo", "morcego")
 HATCH_DISTANCE = 96000  # 3000 blocos de 32px; cerca de 11min de caminhada a 150px/s.
 PREMIUM_HUNT_GOALS = (100, 500, 1500)
 FORMS = ["Filhote", "Adulto", "Ancestral"]
 
 
-# Aumentar somente quando as missões e artes do próximo capítulo estiverem prontas.
+# As jornadas ficam visíveis no Códice; o servidor libera cada forma por capítulo.
 RELEASED_PET_CHAPTER = 1
 ASSET_ROOT = 'https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/'
 PET_JOURNEYS = {
-    'slime': [('Pequeno Slime', 'pequeno_slime', 'pradaria', 1), ('Slime Verde', 'slime_verde', 'pradaria', 2), ('Rei Slime', 'rei_slime', 'pradaria', 4)],
-    'lobo': [('Lobo Magro', 'lobo_magro', 'floresta', 1), ('Lobo Alfa', 'lobo_alfa', 'floresta', 2), ('Lobisomem', 'lobisomem_campones', 'campos_linho', 4)],
-    'morcego': [('Morcego das Minas', 'morcego_das_minas', 'mina_ferro', 5)],
+    'slime': [('Pequeno Slime', 'pequeno_slime', 1), ('Slime Verde', 'slime_verde', 2), ('Rei Slime', 'rei_slime', 4)],
+    'lobo': [('Lobo Magro', 'lobo_magro', 1), ('Lobo Alfa', 'lobo_alfa', 2), ('Lobisomem', 'lobisomem_campones', 4)],
+    'morcego': [('Morcego das Minas', 'morcego_das_minas', 5), ('Morcego de Mana', 'morcego_mana', 5), ('Morcego Gigante', 'morcego_gigante', 5)],
+}
+# Caminhos explícitos: os que faltam serão publicados com as novas artes.
+PET_IMAGES = {
+    'pequeno_slime': 'mob/combate/pradaria/pequeno_slime.png',
+    'slime_verde': 'mob/combate/pradaria/slime_verde.png',
+    'rei_slime': 'mob/combate/pradaria/rei_slime.png',
+    'lobo_magro': 'mob/combate/floresta/lobo_magro.png',
+    'lobo_alfa': 'mob/combate/floresta/lobo_alfa.png',
+    'lobisomem_campones': 'mob/combate/campos_linho/lobisomem_campones.png',
+    'morcego_das_minas': 'mob/combate/mina_ferro/morcego_das_minas.png',
+    'morcego_mana': 'mob/combate/dungeon_01/morcego_mana.png',
+    'morcego_gigante': 'mob/combate/dungeon_01/morcego_gigante.png',
+}
+PET_SHEETS = {
+    'pequeno_slime': 'mob/pet/pequeno_slime.png',
+    'slime_verde': 'mob/pet/slime_verde.png',
+    'rei_slime': 'mob/pet/rei_slime.png',
+    'lobo_magro': 'mob/pet/lobo_magro.png',
+    'lobo_alfa': 'mob/pet/lobo_alfa.png',
+    'lobisomem_campones': 'mob/pet/lobisomem_campones.png',
+    'morcego_das_minas': 'mob/pet/morcego_das_minas.png',
+    'morcego_mana': 'mob/pet/morcego_mana.png',
+    'morcego_gigante': 'mob/pet/morcego_gigante.png',
 }
 
 
 def journey(family):
-    return [{'name': name, 'species': species, 'chapter': chapter,
-             'released': chapter <= RELEASED_PET_CHAPTER,
-             'image': f'{ASSET_ROOT}mob/combate/{region}/{species}.png',
-             'sheet': f'{ASSET_ROOT}mob/pet/{species}.png'}
-            for name, species, region, chapter in PET_JOURNEYS[family]]
+    result = []
+    for name, species, chapter in PET_JOURNEYS[family]:
+        image_path = PET_IMAGES.get(species)
+        sheet_path = PET_SHEETS.get(species)
+        result.append({
+            'name': name,
+            'species': species,
+            'chapter': chapter,
+            'released': chapter <= RELEASED_PET_CHAPTER,
+            'image': f'{ASSET_ROOT}{image_path}' if image_path else None,
+            'sheet': f'{ASSET_ROOT}{sheet_path}' if sheet_path else None,
+        })
+    return result
 
 
 def family_of(monster_id):
     key = str(monster_id or "")
     if key.startswith(('ond', 'onda')):
         return None
-    return next((f for f in FAMILIES if f in key), None)
+    return next((f for f in ESSENCE_FAMILIES if f in key), None)
 
 
 def initial():
@@ -88,11 +120,11 @@ def mutate(user_id, change):
 
 
 def knowledge(player):
-    counts = {f: 0 for f in FAMILIES}
-    for mid, qty in (player.get('bestiario') or {}).items():
-        f = family_of(mid)
-        if f:
-            counts[f] += max(0, int(qty))
+    counts = {family: 0 for family in FAMILIES}
+    for monster_id, quantity in (player.get('bestiario') or {}).items():
+        family = family_of(monster_id)
+        if family:
+            counts[family] += max(0, int(quantity))
     return counts
 
 
@@ -113,7 +145,8 @@ def bonus(state):
     lvl = level(pet)[0]
     stage = pet.get('stage', 0)
     stat = FAMILIES[key]['stat']
-    if stage == 2:
+    max_stage = len(PET_JOURNEYS[key]) - 1
+    if stage == max_stage and FAMILIES[key]['specialties']:
         stat = FAMILIES[key]['specialties'].get(pet.get('specialty'), ['', stat])[1]
     amount = 1 + lvl // 5 + stage * 2
     return {stat: amount * (3 if stat in ('max_hp', 'max_mana') else 1)}
@@ -171,7 +204,13 @@ def premium_view(player, state, now=None):
 def view(player, state):
     result = normalize(state)
     result.pop('_id', None)
-    result['families'] = {key: {**value, 'journey': journey(key), 'available': journey(key)[0]['released']} for key, value in FAMILIES.items()}
+    family_views = {}
+    for key, value in FAMILIES.items():
+        steps = journey(key)
+        family_views[key] = {**value, 'journey': steps, 'available': steps[0]['released'], 'max_stage': len(steps) - 1}
+    result['families'] = family_views
+    if result.get('active') not in FAMILIES:
+        result['active'] = None
     result['chapter'] = RELEASED_PET_CHAPTER
     result['knowledge'] = knowledge(player)
     result['incubator_progress'] = sum(max(0, int(n)) for n in (player.get('bestiario') or {}).values())
@@ -179,6 +218,8 @@ def view(player, state):
     result['hatch_distance'] = HATCH_DISTANCE
     result['bonus'] = bonus(state)
     for key, pet in result['pets'].items():
+        if key not in FAMILIES:
+            continue
         pet['level'], pet['level_xp'], pet['next_xp'] = level(pet)
         steps = journey(key)
         step = steps[min(pet.get('stage', 0), len(steps)-1)]
@@ -251,19 +292,23 @@ def action(player, state, action, family=None, specialty=None):
         return 'Companheiro equipado!'
     if action == 'evolve':
         stage = pet['stage']
-        if stage >= 2:
-            raise ValueError('Esse companheiro já alcançou a forma final.')
         steps = journey(family)
-        if stage + 1 >= len(steps) or not steps[stage + 1]['released']:
+        max_stage = len(steps) - 1
+        if stage >= max_stage:
+            raise ValueError('Esse companheiro já alcançou a forma final.')
+        next_stage = stage + 1
+        if not steps[next_stage]['released']:
             raise ValueError('Esta evolução ainda não foi liberada. Seu progresso está salvo.')
         req_level, req_bond, cost = (10, 50, 25) if stage == 0 else (25, 300, 100)
         if level(pet)[0] < req_level or pet['bond'] < req_bond or state['essences'].get(family, 0) < cost:
             raise ValueError('Complete o nível, o vínculo e as essências da evolução.')
-        if stage == 1 and specialty not in FAMILIES[family]['specialties']:
+        final_evolution = next_stage == max_stage
+        specialties = FAMILIES[family]['specialties']
+        if final_evolution and specialties and specialty not in specialties:
             raise ValueError('Escolha a especialização final.')
         state['essences'][family] -= cost
-        pet['stage'] += 1
-        pet['specialty'] = specialty if stage == 1 else None
+        pet['stage'] = next_stage
+        pet['specialty'] = specialty if final_evolution and specialties else None
         return 'Evolução concluída!'
     raise ValueError('Ação inválida.')
 
@@ -276,7 +321,8 @@ def record_victory(user_id, monster_id):
         return
     def reward(s):
         advance_premium(s, cycle)
-        pet = s['pets'].get(s.get('active'))
+        active = s.get('active')
+        pet = s['pets'].get(active) if active in FAMILIES else None
         if pet:
             pet['xp'] = min(15000, pet['xp'] + 10)
             pet['bond'] += 1
@@ -318,8 +364,13 @@ def profile_slot(user_id):
     pet = state.get('pets', {}).get(key)
     if not pet or key not in FAMILIES:
         return None
+    if pet.get('journey_version') == 1:
+        steps = journey(key)
+        current_form = steps[min(pet['stage'], len(steps) - 1)]['name']
+    else:
+        current_form = FORMS[pet['stage']]
     return {'name': FAMILIES[key]['name'], 'icon': FAMILIES[key]['icon'],
-            'level': level(pet)[0], 'form': FORMS[pet['stage']]}
+            'level': level(pet)[0], 'form': current_form}
 
 
 def flush_movement(online):

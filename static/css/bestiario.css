@@ -32,3 +32,39 @@
 #modal-bestiario .codice-detail-header { background: #142032; }
 
 #modal-bestiario .codice-mastery{width:85%;height:5px;accent-color:#d9b865;flex-shrink:0;margin:2px 0}
+
+/* Ajustes do Códice: leitura móvel, abas completas e estados acessíveis. */
+#modal-bestiario{padding:max(8px,env(safe-area-inset-top)) max(8px,env(safe-area-inset-right)) max(8px,env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left))}
+#container-livro{width:min(100%,620px);height:min(88dvh,760px);max-height:calc(100dvh - 16px)}
+#modal-bestiario .codice-header{gap:12px}
+#modal-bestiario .codice-header h2{margin:0;font-size:19px}
+#modal-bestiario .codice-tabs{gap:8px;padding:12px 14px 8px}
+#modal-bestiario .codice-tabs button{min-width:0;min-height:46px;transition:background-color .16s ease,border-color .16s ease,color .16s ease}
+#modal-bestiario .codice-tabs button:hover{border-color:#a88c51;color:#f0d698}
+#codice-regioes{scroll-snap-type:x proximity;scroll-padding-inline:14px;scrollbar-width:thin;scrollbar-color:#8f7a4c transparent}
+#codice-regioes::-webkit-scrollbar{height:4px}
+#codice-regioes::-webkit-scrollbar-track{background:transparent}
+#codice-regioes::-webkit-scrollbar-thumb{border-radius:4px;background:#8f7a4c}
+#codice-regioes::-webkit-scrollbar-button{display:none}
+#codice-regioes button{scroll-snap-align:start}
+#codice-regioes button:focus-visible,#grid-monstros button:focus-visible,#grid-monstros summary:focus-visible{outline:2px solid #e9c97f;outline-offset:2px}
+#modal-bestiario .codice-region-title{padding:4px 0 12px}
+#modal-bestiario .codice-region-title h3{margin:0;font-size:18px}
+#modal-bestiario .codice-state{grid-column:1/-1;place-self:center;max-width:320px;padding:24px;text-align:center;color:#d5e0eb}
+#modal-bestiario .codice-state p{margin:0 0 14px;color:#d5e0eb}
+#modal-bestiario .codice-state button{padding:8px 14px;border:1px solid #b99752;border-radius:9px;background:#283444;color:#f1d99f}
+#modal-bestiario .codice-spinner,.pet-spinner{display:inline-block;width:18px;height:18px;border:2px solid #b8c5d74d;border-top-color:#e0c578;border-radius:50%;animation:codice-spin .8s linear infinite}
+#modal-bestiario .codice-spinner{margin-right:9px;vertical-align:middle}
+@keyframes codice-spin{to{transform:rotate(360deg)}}
+
+@media(max-width:420px){
+    #container-livro{height:min(88dvh,760px);border-radius:16px}
+    #modal-bestiario .codice-header{padding:13px}
+    #modal-bestiario .codice-header h2{font-size:18px}
+    #modal-bestiario .codice-tabs{padding-inline:12px}
+    #codice-regioes{padding-inline:12px}
+}
+@media(prefers-reduced-motion:reduce){
+    #modal-bestiario .codice-tabs button{transition:none}
+    #modal-bestiario .codice-spinner,.pet-spinner{animation:none}
+}
