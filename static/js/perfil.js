@@ -177,7 +177,8 @@ window.aplicarImagemItemEldora = function(imgEl, item) {
 // Resolve as artes da mochila apenas nesta tela, usando os nomes reais do catálogo público.
 window.getCaminhosImagemPerfilEldora = function(item) {
     const base = "https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/itens/";
-    const cacheVersion = "1122";
+    const baseRunas = "https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/runas/";
+    const cacheVersion = "20261023-8";
     const bruto = String(item?.base_id || item?.item_id || item?.uid || item?.id || "").trim();
     if (!bruto) return [];
 
@@ -193,8 +194,13 @@ window.getCaminhosImagemPerfilEldora = function(item) {
         && (!ferramenta || caminhoPertencePastaFerramentas(urlIcone))) caminhos.push(urlIcone);
 
     const runeId = String(item?.base_id || item?.item_id || item?.uid || item?.id || "").trim();
-    if (/^runa_(crueldade|precisao|vampiro|rocha|mente|eco|midas|sabio)_(menor|maior|ancestral)$/.test(runeId)) {
-        caminhos.unshift(base + "runas/" + runeId + ".png", "/static/assets/runas/" + runeId.split("_")[1] + ".svg?v=2");
+    const runeMatch = runeId.match(/^runa_(crueldade|precisao|vampiro|rocha|mente|eco|midas|sabio)_(menor|maior|ancestral)$/);
+    if (runeMatch) {
+        const imagemRuna = `${baseRunas}${runeId}.png?v=${cacheVersion}`;
+        const fallbackFamilia = `/static/assets/runas/${runeMatch[1]}.svg?v=3`;
+        // Runas ficam em assets/runas (fora de assets/itens). Tenta a arte
+        // específica do nível antes do símbolo genérico da família.
+        return [...new Set([imagemRuna, ...caminhos, fallbackFamilia])];
     }
 
     // Os itens de forja têm chaves "work_*" no índice, embora o base_id não tenha esse prefixo.
