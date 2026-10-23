@@ -1,6 +1,19 @@
 // /static/js/forja.js
 
 const GITHUB_BASE_ITENS = "https://raw.githubusercontent.com/Eldorabotpy/static-img/refs/heads/main/assets/itens/";
+const VERSAO_CACHE_IMAGENS_FORJA = "20261023-6";
+
+function urlImagemGitHubForja(caminho) {
+    const relativo = String(caminho || "")
+        .replace(/\\/g, "/")
+        .replace(/^\/+/, "")
+        .replace(/^assets\/itens\//i, "");
+    if (!relativo) return "/static/assets/box.png";
+
+    const url = `${GITHUB_BASE_ITENS}${relativo}`;
+    const separador = url.includes("?") ? "&" : "?";
+    return `${url}${separador}v=${VERSAO_CACHE_IMAGENS_FORJA}`;
+}
 
 function descobrirPastaForja(receita, idReceita) {
     let outputId = idReceita; 
@@ -121,6 +134,110 @@ function normalizarProfissaoForja(valor) {
         .toLowerCase()
         .normalize("NFD")
         .replace(/[\u0300-\u036f]/g, "");
+}
+
+const CLASSES_FORJA_ORDEM = [
+    "aventureiro",
+    "guerreiro",
+    "berserker",
+    "cacador",
+    "mago",
+    "bardo",
+    "assassino",
+    "samurai",
+    "monge",
+    "curandeiro",
+    "necromante"
+];
+
+const NOMES_CLASSES_FORJA = {
+    aventureiro: "Aventureiro",
+    guerreiro: "Guerreiro",
+    berserker: "Berserker",
+    cacador: "Caçador",
+    mago: "Mago",
+    bardo: "Bardo",
+    assassino: "Assassino",
+    samurai: "Samurai",
+    monge: "Monge",
+    curandeiro: "Curandeiro",
+    necromante: "Necromante"
+};
+
+const ALIASES_CLASSES_FORJA = {
+    aprendiz: "aventureiro",
+    cavaleiro: "guerreiro",
+    gladiador: "guerreiro",
+    templario: "guerreiro",
+    guardiao_divino: "guerreiro",
+    barbaro: "berserker",
+    juggernaut: "berserker",
+    ira_primordial: "berserker",
+    patrulheiro: "cacador",
+    franco_atirador: "cacador",
+    olho_de_aguia: "cacador",
+    feiticeiro: "mago",
+    elementalista: "mago",
+    arquimago: "mago",
+    menestrel: "bardo",
+    encantador: "bardo",
+    maestro: "bardo",
+    ladrao_de_sombras: "assassino",
+    ninja: "assassino",
+    mestre_das_laminas: "assassino",
+    kensei: "samurai",
+    ronin: "samurai",
+    shogun: "samurai",
+    guardiao_do_templo: "monge",
+    punho_elemental: "monge",
+    ascendente: "monge",
+    clerigo: "curandeiro",
+    druida: "curandeiro",
+    sacerdote: "curandeiro"
+};
+
+function getClassesReceitaForja(receita) {
+    const requisito = receita?.class_req ?? receita?.required_class ?? receita?.classe_req ?? receita?.classe;
+    const valores = Array.isArray(requisito)
+        ? requisito
+        : (typeof requisito === "string" ? requisito.split(/[;,]/) : []);
+
+    return [...new Set(valores
+        .map(valor => normalizarProfissaoForja(valor).replace(/\s+/g, "_"))
+        .filter(valor => valor && !["geral", "livre", "all", "todas"].includes(valor))
+        .map(valor => ALIASES_CLASSES_FORJA[valor] || valor))];
+}
+
+function getNomeClasseForja(classeKey) {
+    const chave = normalizarProfissaoForja(classeKey).replace(/\s+/g, "_");
+    if (NOMES_CLASSES_FORJA[chave]) return NOMES_CLASSES_FORJA[chave];
+
+    return chave
+        .replace(/_/g, " ")
+        .replace(/\b\w/g, letra => letra.toUpperCase());
+}
+
+function formatarClassesReceitaForja(receita) {
+    const classes = getClassesReceitaForja(receita);
+    if (!classes.length) return "Geral";
+
+    const ordem = new Map(CLASSES_FORJA_ORDEM.map((classe, index) => [classe, index]));
+    return classes
+        .sort((a, b) => (ordem.get(a) ?? 999) - (ordem.get(b) ?? 999) || a.localeCompare(b))
+        .map(getNomeClasseForja)
+        .join(" / ");
+}
+
+function filtrarReceitasPorClasseForja(receitas, classeSelecionada) {
+    const selecionada = classeSelecionada || "todas";
+    if (selecionada === "todas") return receitas;
+
+    return Object.fromEntries(Object.entries(receitas).filter(([, receita]) => {
+        const classes = getClassesReceitaForja(receita);
+        return selecionada === "geral"
+            ? classes.length === 0
+            : classes.includes(selecionada);
+    }));
 }
 
 function getProfissaoReceitaForja(receita, fallback = "ferreiro") {
@@ -567,27 +684,33 @@ function getPastasPossiveisItemForja(item) {
 function caminhosCadastradosForja(item, ids) {
     const caminhos = [];
     const somenteFerramentas = getPastasPossiveisItemForja(item)[0] === "ferramentas";
+
+    // O índice explícito é a fonte oficial da arte. Não deixe uma classificação
+    // ambígua (ex.: machado feito pelo Armeiro) descartar o caminho cadastrado.
+    for (const id of ids) {
+        for (const path of window.FORJA_IMAGENS?.[id] || []) {
+            caminhos.push(urlImagemGitHubForja(path));
+        }
+    }
+
     for (const campo of ['image_url', 'icon_url', 'imagem', 'image', 'icon']) {
         const valor = item?.[campo];
         if (typeof valor !== 'string') continue;
         if (somenteFerramentas && !/(?:^|\/)ferramentas\//i.test(valor.replace(/\\/g, '/'))) continue;
         if (/^https?:\/\//i.test(valor) || valor.startsWith('/static/')) caminhos.push(valor);
-        else if (/\.(png|webp|jpg|jpeg)$/i.test(valor) && valor.includes('/')) caminhos.push(GITHUB_BASE_ITENS + valor.replace(/^assets\/itens\//, ''));
-    }
-    for (const id of ids) {
-        for (const path of window.FORJA_IMAGENS?.[id] || []) {
-            if (somenteFerramentas && !/(?:^|\/)ferramentas\//i.test(String(path).replace(/\\/g, '/'))) continue;
-            caminhos.push(GITHUB_BASE_ITENS + path);
-        }
+        else if (/\.(png|webp|jpg|jpeg)$/i.test(valor) && valor.includes('/')) caminhos.push(urlImagemGitHubForja(valor));
     }
     return caminhos;
 }
 
 function getCaminhosImagemItemForja(item) {
     const baseId = item?.base_id || item?.id || "";
-    const idsPossiveis = [];
-
-    if (baseId) idsPossiveis.push(baseId);
+    const idsPossiveis = [...new Set([
+        item?.recipe_id,
+        item?.recipeId,
+        item?.id,
+        baseId
+    ].map(id => String(id || "").trim()).filter(Boolean))];
 
     const receitaInfo = buscarReceitaDoItemForja(baseId);
     if (receitaInfo?.recipeId) {
@@ -600,7 +723,7 @@ function getCaminhosImagemItemForja(item) {
     for (const pasta of pastas) {
         for (const id of idsPossiveis) {
             if (!id) continue;
-            caminhos.push(`${GITHUB_BASE_ITENS}${pasta}/${id}.png`);
+            caminhos.push(urlImagemGitHubForja(`${pasta}/${id}.png`));
         }
     }
 
@@ -664,7 +787,7 @@ function getCaminhosImagemMaterialForja(matId) {
     const caminhos = caminhosCadastradosForja(null, [matId]);
 
     pastas.forEach(pasta => {
-        caminhos.push(`${GITHUB_BASE_ITENS}${pasta}/${matId}.png`);
+        caminhos.push(urlImagemGitHubForja(`${pasta}/${matId}.png`));
     });
 
     caminhos.push("/static/assets/box.png");
@@ -702,6 +825,7 @@ const ForjaEngine = {
     receitas: {},
     unlocksGuilda: new Set(),
     profSelecionada: null,
+    classeSelecionada: "todas",
     receitaSelecionada: null,
     itemDesmontarSelecionado: null,
     itemMelhorarSelecionado: null,
@@ -822,7 +946,7 @@ const ForjaEngine = {
         return profs;
     },
 
-    getReceitasDaAbaAtual() {
+    getReceitasDaProfissaoAtual() {
         if (this.profSelecionada === 'desmontar') return {};
         if (this.profSelecionada === 'melhorar') return {};
     
@@ -837,6 +961,11 @@ const ForjaEngine = {
             if (profMatch) filtradas[id] = receita;
         }
         return filtradas;
+    },
+
+    getReceitasDaAbaAtual() {
+        const receitas = this.getReceitasDaProfissaoAtual();
+        return filtrarReceitasPorClasseForja(receitas, this.classeSelecionada);
     },
 
     getItensParaDesmontar() {
@@ -932,6 +1061,9 @@ const ForjaEngine = {
 
     mudarAba(prof) {
         this.profSelecionada = prof.toLowerCase();
+        this.classeSelecionada = "todas";
+        const abasClasses = document.querySelector('#abas-classes-forja .forja-class-tab-options');
+        if (abasClasses) abasClasses.scrollLeft = 0;
         this.receitaSelecionada = null;
         this.itemDesmontarSelecionado = null;
         this.itemMelhorarSelecionado = null;
@@ -1160,7 +1292,79 @@ const ForjaUI = {
         runasBtn.setAttribute('aria-label', 'Abrir oficina de runas');
         runasBtn.onclick = () => window.abrirOficinaRunas();
         botoesAcao.appendChild(runasBtn);
+        this.desenharAbasClasse();
         this.ativarScrollAbas(container);
+    },
+
+    desenharAbasClasse() {
+        const container = document.getElementById('abas-classes-forja');
+        if (!container) return;
+        const scrollAnterior = container.querySelector('.forja-class-tab-options')?.scrollLeft || 0;
+
+        const receitas = ForjaEngine.getReceitasDaProfissaoAtual();
+        if (Object.keys(receitas).length === 0) {
+            container.hidden = true;
+            container.innerHTML = '';
+            return;
+        }
+
+        const contagens = new Map();
+        Object.values(receitas).forEach(receita => {
+            const classes = getClassesReceitaForja(receita);
+            if (!classes.length) {
+                contagens.set('geral', (contagens.get('geral') || 0) + 1);
+                return;
+            }
+            classes.forEach(classe => contagens.set(classe, (contagens.get(classe) || 0) + 1));
+        });
+
+        const ordem = new Map(CLASSES_FORJA_ORDEM.map((classe, index) => [classe, index]));
+        const classes = [...contagens.keys()].filter(classe => classe !== 'geral')
+            .sort((a, b) => (ordem.get(a) ?? 999) - (ordem.get(b) ?? 999) || a.localeCompare(b));
+        const filtros = [
+            { key: 'todas', label: 'Todas', count: Object.keys(receitas).length },
+            ...classes.map(key => ({ key, label: getNomeClasseForja(key), count: contagens.get(key) })),
+            ...(contagens.has('geral') ? [{ key: 'geral', label: 'Geral', count: contagens.get('geral') }] : [])
+        ];
+
+        container.hidden = false;
+        container.innerHTML = '';
+        const label = document.createElement('span');
+        label.className = 'forja-class-tab-label';
+        label.textContent = 'CLASSE';
+        label.id = 'forja-class-tab-label';
+
+        const options = document.createElement('div');
+        options.className = 'forja-class-tab-options';
+        options.setAttribute('role', 'group');
+        options.setAttribute('aria-labelledby', label.id);
+        options.setAttribute('aria-label', 'Filtros de classe; deslize horizontalmente para ver todas as opções.');
+
+        filtros.forEach(filtro => {
+            const btn = document.createElement('button');
+            const ativo = ForjaEngine.classeSelecionada === filtro.key;
+            btn.type = 'button';
+            btn.className = `forja-class-tab ${ativo ? 'active' : ''}`;
+            btn.setAttribute('aria-pressed', String(ativo));
+            btn.textContent = `${filtro.label} · ${filtro.count}`;
+            btn.onclick = () => {
+                if (ForjaEngine.classeSelecionada === filtro.key) return;
+                const busca = document.getElementById('forja-busca');
+                const termoBusca = busca?.value || '';
+                ForjaEngine.classeSelecionada = filtro.key;
+                ForjaEngine.receitaSelecionada = null;
+                this.renderizarTudo();
+                if (busca) {
+                    busca.value = termoBusca;
+                    window.filtrarProjetosForja(termoBusca);
+                }
+            };
+            options.appendChild(btn);
+        });
+
+        container.append(label, options);
+        options.scrollLeft = scrollAnterior;
+        this.ativarScrollAbas(options);
     },
     
     ativarScrollAbas(container) {
@@ -1230,9 +1434,6 @@ const ForjaUI = {
         Object.keys(receitas).forEach(id => {
             const r = receitas[id];
             const info = descobrirPastaForja(r, id);
-            const imgPath1 = `${GITHUB_BASE_ITENS}${info.pasta}/${info.outputId}.png`; 
-            const imgPath2 = `${GITHUB_BASE_ITENS}${info.pasta}/${info.idReceita}.png`; 
-
             const bloqueadaGuilda =
                 Boolean(r.unlock_id) &&
                 !ForjaEngine.receitaGuildaEstaDesbloqueada(r);
@@ -1250,21 +1451,11 @@ const ForjaUI = {
             }
 
             card.innerHTML = `
-                <img
-                    src="${imgPath1}"
-                    class="card-icon"
-                    onerror="
-                        if(this.getAttribute('data-tried') !== 'true') {
-                            this.setAttribute('data-tried', 'true');
-                            this.src='${imgPath2}';
-                        } else {
-                            this.onerror=null; this.src='/static/assets/box.png';
-                        }
-                    "
-                >
+                <img src="/static/assets/box.png" class="card-icon" alt="">
 
-                <span class="recipe-name">
-                    ${r.display_name}
+                <span class="recipe-copy">
+                    <span class="recipe-name"></span>
+                    <span class="recipe-class-label"></span>
                 </span>
 
                 ${
@@ -1291,6 +1482,9 @@ const ForjaUI = {
                 }
             `;
 
+            card.querySelector('.recipe-name').textContent = r.display_name || id;
+            card.querySelector('.recipe-class-label').textContent = formatarClassesReceitaForja(r);
+
             card.onclick = () => {
 
                 document.querySelectorAll('#lista-receitas .recipe-card').forEach(el => {
@@ -1302,7 +1496,6 @@ const ForjaUI = {
                 ForjaEngine.receitaSelecionada = id;
                 this.atualizarDetalhesDaReceita(id, r);
             };
-            aplicarImagemItemForja(card.querySelector('img'), {...r, base_id: info.outputId});
             card.tabIndex = 0;
             card.setAttribute('role', 'button');
             card.setAttribute('aria-pressed', String(ForjaEngine.receitaSelecionada === id));
@@ -1310,6 +1503,12 @@ const ForjaUI = {
                 if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); card.click(); }
             };
             lista.appendChild(card);
+            aplicarImagemItemForja(card.querySelector('img'), {
+                ...r,
+                id,
+                recipe_id: id,
+                base_id: info.outputId
+            });
         });
     },
     desenharListaMelhorar() {
@@ -1370,6 +1569,8 @@ const ForjaUI = {
 
     atualizarDetalhesMelhorar(item, corRaridade) {
         document.getElementById("forja-container").classList.add("forja-detalhando");
+        const badgeClasse = document.getElementById('classe-receita-forja');
+        if (badgeClasse) badgeClasse.hidden = true;
         const sidebar = document.querySelector('.forja-sidebar');
         const detailsView = document.querySelector('.forja-details-view');
 
@@ -1560,6 +1761,12 @@ const ForjaUI = {
         document.getElementById('detalhe-receita').style.display = 'flex';
         document.getElementById('label-materiais').innerText = "Materiais Necessários";
 
+        const badgeClasse = document.getElementById('classe-receita-forja');
+        if (badgeClasse) {
+            badgeClasse.textContent = `Classe: ${formatarClassesReceitaForja(receita)}`;
+            badgeClasse.hidden = false;
+        }
+
         const profKey = (ForjaEngine.profSelecionada || 'ferreiro').toLowerCase();
         const learned = window.perfilDadosGlobais.learned_professions || {};
         let profData = learned[profKey] || {};
@@ -1664,6 +1871,8 @@ const ForjaUI = {
         
         document.getElementById('detalhe-vazio').style.display = 'none';
         document.getElementById('detalhe-receita').style.display = 'flex';
+        const badgeClasse = document.getElementById('classe-receita-forja');
+        if (badgeClasse) badgeClasse.hidden = true;
         
         document.getElementById('nome-item-resultado').innerText = item.nome;
         document.getElementById('nome-item-resultado').style.color = corRaridade;

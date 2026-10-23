@@ -103,6 +103,12 @@ window.FORJA_IMAGENS = {
   "machado": [
     "ferramentas/machado.png"
   ],
+  "machado_aco_berserker": [
+    "equipamentos/work_machado_aco_berserker.png"
+  ],
+  "machado_rustico_berserker": [
+    "equipamentos/work_machado_rustico_berserker.png"
+  ],
   "martelo_armeiro": [
     "ferramentas/martelo_armeiro.png"
   ],

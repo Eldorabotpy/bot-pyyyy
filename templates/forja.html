@@ -29,6 +29,8 @@
         <div id="abas-profissoes-forja" class="forja-nav-tabs">
             </div>
 
+        <div id="abas-classes-forja" class="forja-classes-tabs" hidden></div>
+
         <div class="forja-main-content">
             <div class="forja-sidebar">
                 <label class="forja-search">Buscar projeto ou equipamento<input id="forja-busca" type="search" placeholder="Buscar…" oninput="filtrarProjetosForja(this.value)"></label>
@@ -58,6 +60,7 @@
                         <div class="recipe-tags">
                             <span>Nível <b id="nvl-req">1</b></span>
                             <span>⏳ <b id="tempo-forja">0</b>s</span>
+                            <span id="classe-receita-forja" hidden></span>
                         </div>
                     </div>
 
@@ -1369,6 +1372,19 @@
 #forja-container .forja-tab-options { display:flex; min-width:0; gap:5px; }
 #forja-container .forja-tab-options .aba-forja-btn { min-width:0; min-height:44px; padding:8px 10px; }
 #forja-container .forja-tab-options .forja-action-runas { border-color:var(--forja-gold); color:var(--forja-gold); }
+#forja-container .forja-classes-tabs { display:flex; min-height:46px; align-items:center; gap:8px; padding:6px 14px; border-bottom:1px solid var(--forja-border); background:var(--forja-panel); }
+#forja-container .forja-classes-tabs[hidden] { display:none !important; }
+#forja-container .forja-class-tab-label { flex:none; color:var(--forja-muted); font-size:9px; font-weight:800; letter-spacing:.7px; }
+#forja-container .forja-class-tab-options { display:flex; min-width:0; gap:6px; overflow-x:auto; scrollbar-width:thin; scrollbar-color:#52606a transparent; padding:2px; touch-action:pan-x; }
+#forja-container .forja-class-tab { flex:none; min-height:38px; padding:7px 11px; border:1px solid var(--forja-border); border-radius:999px; background:var(--forja-interactive); color:var(--forja-text); font-size:11px; font-weight:700; white-space:nowrap; cursor:pointer; }
+#forja-container .forja-class-tab:hover { border-color:var(--forja-gold); }
+#forja-container .forja-class-tab.active { border-color:var(--forja-gold); background:var(--forja-gold); color:#1b211b; }
+#forja-container .forja-class-tab:focus-visible { outline:2px solid var(--forja-gold); outline-offset:2px; }
+#forja-container .recipe-copy { display:flex; flex:1; min-width:0; flex-direction:column; gap:4px; }
+#forja-container .recipe-name { flex:none; width:100%; }
+#forja-container .recipe-class-label { max-width:100%; overflow:hidden; color:var(--forja-gold); font-size:9px; font-weight:800; letter-spacing:.2px; text-overflow:ellipsis; white-space:nowrap; }
+#forja-container #classe-receita-forja { border-color:var(--forja-gold); color:var(--forja-gold); font-weight:800; }
+#forja-container #classe-receita-forja[hidden] { display:none; }
 #forja-container .recipe-card:focus-visible { outline:2px solid var(--forja-gold); outline-offset:2px; }
 #forja-container .recipe-scroll-list { padding-bottom:76px; scroll-padding-bottom:76px; }
 @media(max-width:768px) {
@@ -1377,5 +1393,11 @@
     #forja-container .forja-tab-label { font-size:8px; letter-spacing:.35px; }
     #forja-container .forja-tab-options { display:grid; grid-auto-flow:column; grid-auto-columns:minmax(0,1fr); gap:4px; }
     #forja-container .forja-tab-options .aba-forja-btn { width:100%; min-height:42px; padding:5px 3px; font-size:9px; }
+    #forja-container .forja-classes-tabs { min-height:44px; gap:6px; padding:5px 8px; }
+    #forja-container .forja-class-tab-label { font-size:8px; letter-spacing:.35px; }
+    #forja-container .forja-class-tab-options { gap:5px; }
+    #forja-container .forja-class-tab { min-height:40px; padding:7px 10px; font-size:10px; }
+    #forja-container .recipe-copy { gap:3px; }
+    #forja-container .recipe-class-label { font-size:8px; }
 }
 </style>
