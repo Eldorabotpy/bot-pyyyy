@@ -1233,3 +1233,47 @@ background-size: cover;
 #side-menu :focus-visible {
     outline-color: var(--eldora-menu-gold);
 }
+
+/* Mobile: painel lateral encostado à borda externa da tela. */
+@media (max-width: 600px) and (orientation: portrait) {
+    #menu-overlay {
+        background: rgba(3, 8, 14, .46);
+        backdrop-filter: blur(2px) saturate(.8);
+        -webkit-backdrop-filter: blur(2px) saturate(.8);
+    }
+
+    #side-menu.eldora-menu {
+        inset: 0 0 0 auto;
+        width: min(320px, calc(100vw - 32px));
+        max-width: 320px;
+        height: 100dvh;
+        max-height: 100dvh;
+        border: 1px solid rgba(224, 188, 102, .72);
+        border-right: 0;
+        border-radius: 22px 0 0 22px;
+        transform: translateX(110%);
+        box-shadow: -18px 0 54px rgba(0, 0, 0, .62), inset 1px 0 rgba(255, 247, 221, .06);
+    }
+
+    #side-menu.eldora-menu.aberto {
+        transform: translateX(0);
+    }
+}
+
+/* Em paisagem, a gaveta também acompanha toda a altura disponível. */
+@media (max-width: 600px) and (orientation: landscape) and (max-height: 520px) {
+    #side-menu.eldora-menu {
+        inset: 0 0 0 auto;
+        width: min(320px, calc(100vw - 24px));
+        height: 100dvh;
+        max-height: 100dvh;
+        border: 1px solid rgba(224, 188, 102, .72);
+        border-right: 0;
+        border-radius: 18px 0 0 18px;
+        transform: translateX(110%);
+    }
+
+    #side-menu.eldora-menu.aberto {
+        transform: translateX(0);
+    }
+}
