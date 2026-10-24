@@ -223,7 +223,9 @@ window.getCaminhosImagemPerfilEldora = function(item) {
     ]);
     const idPareceEquipamento = /^(?:work_)?(?:espada|adaga|arco|cajado|machado|peitoral|armadura|calca|calcas|bota|botas|luva|luvas|anel|colar|brinco|capuz|chapeu|elmo|capacete|tunica|manto|escudo|capa)(?:_|$)/i.test(bruto);
     const temMapaEquipamento = ids.some(id => (window.FORJA_IMAGENS?.[id] || []).some(path => /^equipamentos\//i.test(path)));
-    const equipamento = !ferramenta && (tiposEquipamento.has(tipo) || tipo === "equipamentos" || idPareceEquipamento || temMapaEquipamento);
+    const equipamento = !ferramenta && (
+        tiposEquipamento.has(tipo) || tipo === "equipamentos" || temMapaEquipamento || (!tipo && idPareceEquipamento)
+    );
     const tiposUsaveis = new Set(["potion", "pocao", "consumable", "consumivel", "scroll", "pergaminho", "chest", "box", "reagent", "especial", "event_ticket"]);
     const pastas = ferramenta ? ["ferramentas"] : equipamento ? ["equipamentos"] : tiposUsaveis.has(tipo) ? ["consumiveis", "materiais"] : ["materiais"];
 
