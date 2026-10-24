@@ -198,13 +198,6 @@ def apply_item_effects(player_data: dict, effects: dict) -> list[str]:
                 current_skills[skill_id] = {"rarity": "comum", "progress": 0}
                 messages.append(f"✨ Aprendeu: {skill_info['display_name']}!")
 
-    if "grant_skin" in effects:
-        skin_id = effects["grant_skin"]
-        unlocked = player_data.setdefault("unlocked_skins", [])
-        if skin_id not in unlocked:
-            unlocked.append(skin_id)
-            messages.append("👘 Skin desbloqueada!")
-
     if "heal" in effects:
         amount = effects["heal"]
         max_hp = _ival(player_data.get("max_hp", 100))

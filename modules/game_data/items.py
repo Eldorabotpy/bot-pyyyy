@@ -154,36 +154,6 @@ def _generate_auto_items():
     except ImportError: pass
     except Exception as e: logger.error(f"Auto-Items Skill Error: {e}")
 
-    # --- AUTOMATIZAÇÃO DE CAIXAS DE SKIN ---
-    try:
-        from modules.game_data.skins import SKIN_CATALOG
-        for skin_id, info in SKIN_CATALOG.items():
-            caixa_id = f"caixa_{skin_id}"
-            skin_name = info.get('display_name', skin_id)
-            item_def = {
-                "display_name": f"Cx. Skin: {skin_name}",
-                "emoji": "👘", 
-                "type": "consumable",
-                "category": "aprendizado",
-                "description": f"Desbloqueia a aparência: {skin_name}.",
-                "stackable": True, 
-                
-                # 🔴 ALTERADO: Impede venda no mercado
-                "tradable": False, 
-                
-                "market_currency": "gems",
-                "price": 200,
-                "on_use": {"effect": "grant_skin", "skin_id": skin_id}
-            }
-            if caixa_id not in ITEMS_DATA:
-                ITEMS_DATA[caixa_id] = item_def
-                generated += 1
-            if skin_id not in ITEMS_DATA:
-                ITEMS_DATA[skin_id] = item_def.copy()
-                ITEMS_DATA[skin_id]["display_name"] = f"Skin: {skin_name} (Item)"
-    except ImportError: pass
-    except Exception as e: logger.error(f"Auto-Items Skin Error: {e}")
-        
     print(f">>> ITEMS: {generated} itens automáticos gerados.")
 
 _generate_auto_items()

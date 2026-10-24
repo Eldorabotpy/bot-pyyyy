@@ -16,6 +16,11 @@ try:
 except ImportError:
     EVOLUTION_ITEMS_DATA = {} 
 
+try:
+    from modules.game_data.skins import SKIN_CATALOG
+except ImportError:
+    SKIN_CATALOG = {}
+
 MONGO_CONN_STR = os.getenv("MONGO_CONNECTION_STRING")
 log = logging.getLogger(__name__)
 
@@ -44,7 +49,8 @@ MAX_GEM_PRICE = 9_999_999
 
 MIN_GEM_EVO_PRICE = 10     # Preço mínimo para Itens de Evolução
 MIN_GEM_SKILL_PRICE = 50   # Preço mínimo para Skills (Tomos)
-MIN_GEM_SKIN_PRICE = 50    # Preço mínimo para Skins (Caixas)
+SKIN_ITEM_IDS = set(SKIN_CATALOG)
+SKIN_BOX_ITEM_IDS = {f"caixa_{skin_id}" for skin_id in SKIN_CATALOG}
 
 class GemMarketError(Exception): ...
 class ListingNotFound(GemMarketError): ...
@@ -70,8 +76,17 @@ def _validate_item_payload(item_payload: dict):
     t = item_payload.get("type")
     base_id = item_payload.get("base_id")
 
+    base_id_text = str(base_id or "")
+    if (
+        t == "skin"
+        or base_id_text in SKIN_ITEM_IDS
+        or base_id_text in SKIN_BOX_ITEM_IDS
+        or base_id_text.startswith(("caixa_", "skin_"))
+    ):
+        raise InvalidListing("Caixas e itens de desbloqueio de skin não são mais negociados neste mercado.")
+
     # Lista expandida de tipos permitidos para evitar erro 'item_stack'
-    allowed_types = ("skill", "skin", "evo_item", "item_stack", "misc", "consumable")
+    allowed_types = ("skill", "evo_item", "item_stack", "misc", "consumable")
     
     is_evolution = base_id in EVOLUTION_ITEMS_DATA
     
@@ -111,13 +126,6 @@ def create_listing(
         # Opcional: Forçar qty=1 para skills se desejar
         # item_payload["qty"] = 1 
         item_payload["type"] = "skill"
-
-    # 3. Regra para Skins (Caixas)
-    elif item_type == "skin" or "caixa_" in str(base_id) or "skin_" in str(base_id):
-        if unit_price < MIN_GEM_SKIN_PRICE:
-            raise InvalidListing(f"⚠️ Preço muito baixo! Mínimo para Skins: {MIN_GEM_SKIN_PRICE} Gemas.")
-        item_payload["qty"] = 1 # Skins geralmente são vendidas 1 por 1
-        item_payload["type"] = "skin"
 
     # -----------------------------------------------------------
 
