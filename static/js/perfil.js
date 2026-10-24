@@ -1409,6 +1409,59 @@ window.equiparSkillPerfil = async function(skillId, slotNum) {
 // ==========================================
 // FILTRO E RENDERIZAÇÃO DA MOCHILA (CORRIGIDO)
 // ==========================================
+window.carregarMaisItensMochila = function() {
+    const estado = window.__perfilMochilaRender;
+    const grid = document.getElementById('grid-mochila');
+    if (!estado || !grid || estado.indice >= estado.itens.length) return;
+
+    grid.querySelector('#btn-carregar-mais-mochila')?.remove();
+
+    const lote = estado.itens.slice(estado.indice, estado.indice + estado.tamanhoLote);
+    estado.indice += lote.length;
+
+    const html = lote.map(item => {
+        const raridade = String(
+            item.raridade ?? item.rarity ?? item.base?.raridade ?? item.base?.rarity ??
+            item.item_data?.raridade ?? item.item_data?.rarity ?? 'comum'
+        ).trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+            .replace(/[^a-z0-9_-]/g, '');
+        const corBorda = estado.coresRaridade[raridade] || '#334155';
+
+        return `
+            <div class="eldora-item-slot" onclick="abrirModalItem('${item.id}', 'mochila')"
+                 style="--rarity-border:${corBorda}">
+                <img data-item-img="${item.id}" src="/static/assets/box.png" loading="lazy" decoding="async" onerror="this.hidden=true; if(this.nextElementSibling){this.nextElementSibling.classList.add('eldora-image-fallback','is-visible')}" class="eldora-profile-style-c8590c2b">
+                <span class="eldora-profile-style-e6b19889">${item.emoji || '📦'}</span>
+                <div class="eldora-item-quantity eldora-profile-style-6a5a7d0d">x${item.qtd || item.quantidade || 1}</div>
+                ${window.renderRuneSockets?.(item) || ''}
+                ${item.refino > 0 ? `<div class="eldora-item-refinement eldora-profile-style-7acfd725">+${item.refino}</div>` : ''}
+            </div>
+        `;
+    }).join('');
+
+    grid.insertAdjacentHTML('beforeend', html);
+
+    const idsDoLote = new Map(lote.map(item => [String(item.id), item]));
+    grid.querySelectorAll('img[data-item-img]:not([data-perfil-imagem-pronta])').forEach(img => {
+        const item = idsDoLote.get(img.dataset.itemImg);
+        if (!item) return;
+        img.dataset.perfilImagemPronta = 'true';
+        window.aplicarImagemPerfilEldora(img, item);
+    });
+
+    if (estado.indice < estado.itens.length) {
+        const restantes = estado.itens.length - estado.indice;
+        const botao = document.createElement('button');
+        botao.id = 'btn-carregar-mais-mochila';
+        botao.type = 'button';
+        botao.textContent = `Carregar mais ${Math.min(estado.tamanhoLote, restantes)} · ${restantes} restantes`;
+        botao.setAttribute('aria-label', `Carregar mais itens da mochila. ${restantes} restantes.`);
+        botao.style.cssText = 'grid-column:1/-1;width:100%;min-height:44px;margin:8px 0;padding:10px 14px;border:1px solid rgba(201,164,92,.55);border-radius:10px;background:linear-gradient(180deg,#26344a,#152033);color:#f4ead2;font-weight:800;cursor:pointer;';
+        botao.addEventListener('click', window.carregarMaisItensMochila);
+        grid.appendChild(botao);
+    }
+};
+
 window.filtrarMochila = function(filtro) {
     const aliases = { equips: 'combate', usaveis: 'consumiveis' };
     filtro = aliases[filtro] || filtro;
@@ -1443,15 +1496,14 @@ window.filtrarMochila = function(filtro) {
     const contagem = document.getElementById('contagem-itens-mochila');
     if (contagem) contagem.textContent = `${filtrados.length} ${filtrados.length === 1 ? 'item' : 'itens'}`;
 
-    grid.innerHTML = '';
+    grid.replaceChildren();
 
     if (filtrados.length === 0) {
         grid.innerHTML = `<div class="eldora-inventory-empty">${busca ? 'Nenhum item encontrado. Tente outro nome ou categoria.' : 'Mochila vazia nesta categoria.'}</div>`;
+        window.__perfilMochilaRender = null;
         return;
     }
 
-    // Pega o caminho base do GitHub
-    const linkBaseNuvem = window.CATALOGO_SISTEMA ? "https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/" : "/static/assets/";
     const coresRaridade = {
         comum: '#94a3b8', common: '#94a3b8',
         incomum: '#22c55e', uncommon: '#22c55e', bom: '#22c55e', good: '#22c55e',
@@ -1463,36 +1515,13 @@ window.filtrarMochila = function(filtro) {
         divino: '#f0d48e', divine: '#f0d48e'
     };
 
-    filtrados.forEach(item => {
-        // Envia o item inteiro para a bússola decidir
-
-
-        const raridade = String(
-            item.raridade ?? item.rarity ?? item.base?.raridade ?? item.base?.rarity ??
-            item.item_data?.raridade ?? item.item_data?.rarity ?? 'comum'
-        ).trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-            .replace(/[^a-z0-9_-]/g, '');
-        const corBorda = coresRaridade[raridade] || '#334155';
-
-        const slotHtml = `
-            <div class="eldora-item-slot" onclick="abrirModalItem('${item.id}', 'mochila')"
-                 style="--rarity-border:${corBorda}">
-
-                <img data-item-img="${item.id}" src="/static/assets/box.png" onerror="this.hidden=true; if(this.nextElementSibling){this.nextElementSibling.classList.add('eldora-image-fallback','is-visible')}" class="eldora-profile-style-c8590c2b">
-                <span class="eldora-profile-style-e6b19889">${item.emoji || '📦'}</span>
-
-                <div class="eldora-item-quantity eldora-profile-style-6a5a7d0d" >
-                    x${item.qtd || item.quantidade || 1}
-                </div>
-
-                ${window.renderRuneSockets?.(item) || ''}
-                ${item.refino > 0 ? `<div class="eldora-item-refinement eldora-profile-style-7acfd725" >+${item.refino}</div>` : ''}
-            </div>
-        `;
-        grid.innerHTML += slotHtml;
-        const imgEl = grid.querySelector(`img[data-item-img="${item.id}"]`);
-        window.aplicarImagemPerfilEldora(imgEl, item);
-    });
+    window.__perfilMochilaRender = {
+        itens: filtrados,
+        indice: 0,
+        tamanhoLote: 60,
+        coresRaridade
+    };
+    window.carregarMaisItensMochila();
 };
 
 // ==========================================
