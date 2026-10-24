@@ -1429,7 +1429,7 @@ EQUIPMENTS_DATA = {
         "stackable": False,
         "tradable": False,
         "media_key": "item_botas_aventureiro_guilda",
-        "icon_url": "",
+        "icon_url": "https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/itens/equipamentos/work_guild_aventureiro_botas.png",
     },
 
     "luvas_aventureiro_guilda": {
@@ -1445,7 +1445,7 @@ EQUIPMENTS_DATA = {
         "stackable": False,
         "tradable": False,
         "media_key": "item_luvas_aventureiro_guilda",
-        "icon_url": "",
+        "icon_url": "https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/itens/equipamentos/work_luvas_aventureiro_guilda.png",
     },
 
     "calcas_aventureiro_guilda": {
@@ -1461,7 +1461,7 @@ EQUIPMENTS_DATA = {
         "stackable": False,
         "tradable": False,
         "media_key": "item_calcas_aventureiro_guilda",
-        "icon_url": "",
+        "icon_url": "https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/itens/equipamentos/work_guild_aventureiro_calcas.png",
     },
 
     "couraca_aventureiro_guilda": {
@@ -1477,7 +1477,7 @@ EQUIPMENTS_DATA = {
         "stackable": False,
         "tradable": False,
         "media_key": "item_couraca_aventureiro_guilda",
-        "icon_url": "",
+        "icon_url": "https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/itens/equipamentos/work_guild_aventureiro_couraca.png",
     },
 
     "elmo_aventureiro_guilda": {
@@ -1493,7 +1493,7 @@ EQUIPMENTS_DATA = {
         "stackable": False,
         "tradable": False,
         "media_key": "item_elmo_aventureiro_guilda",
-        "icon_url": "",
+        "icon_url": "https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/itens/equipamentos/work_guild_aventureiro_elmo.png",
     },
 
     # -- NECROMANTE T1: VIGÍLIA DAS ALMAS --

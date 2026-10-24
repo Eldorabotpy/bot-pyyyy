@@ -1,4 +1,4 @@
-// Índice dos arquivos de Eldorabotpy/static-img, verificado em 2026-09-27.
+// Índice dos arquivos de Eldorabotpy/static-img, verificado em 2026-10-24.
 window.FORJA_IMAGENS = {
   "pocao_xp_boost": ["consumiveis/elixir_xp_dobrado_10m.png"],
   "pocao_xp_boost_g": ["consumiveis/elixir_xp_dobrado_30m.png"],
@@ -99,6 +99,18 @@ window.FORJA_IMAGENS = {
   ],
   "luvas_aventureiro_guilda": [
     "equipamentos/work_luvas_aventureiro_guilda.png"
+  ],
+  "botas_aventureiro_guilda": [
+    "equipamentos/work_guild_aventureiro_botas.png"
+  ],
+  "calcas_aventureiro_guilda": [
+    "equipamentos/work_guild_aventureiro_calcas.png"
+  ],
+  "couraca_aventureiro_guilda": [
+    "equipamentos/work_guild_aventureiro_couraca.png"
+  ],
+  "elmo_aventureiro_guilda": [
+    "equipamentos/work_guild_aventureiro_elmo.png"
   ],
   "machado": [
     "ferramentas/machado.png"
@@ -438,6 +450,18 @@ window.FORJA_IMAGENS = {
   ],
   "work_guild_aventureiro_luvas": [
     "equipamentos/work_luvas_aventureiro_guilda.png"
+  ],
+  "work_guild_aventureiro_botas": [
+    "equipamentos/work_guild_aventureiro_botas.png"
+  ],
+  "work_guild_aventureiro_calcas": [
+    "equipamentos/work_guild_aventureiro_calcas.png"
+  ],
+  "work_guild_aventureiro_couraca": [
+    "equipamentos/work_guild_aventureiro_couraca.png"
+  ],
+  "work_guild_aventureiro_elmo": [
+    "equipamentos/work_guild_aventureiro_elmo.png"
   ],
   "work_haidate_damasco_samurai": [
     "equipamentos/work_haidate_damasco_samurai.png"

@@ -261,6 +261,175 @@ def api_equipar_skill():
         import traceback
         print(f"Erro Crítico em /api/equipar_skill: {traceback.format_exc()}")
         return jsonify({"sucesso": False, "erro": str(e)}), 500
+
+
+@character_bp.route('/api/personagem/aprender_habilidade', methods=['POST'])
+def api_aprender_habilidade_com_tomo():
+    """Aprende uma habilidade consumindo um tomo compatível da mochila."""
+    from copy import deepcopy
+    from modules.portal_auth import (
+        PlayerSessionError,
+        require_csrf,
+        require_player_identity,
+    )
+    from modules.game_data.items import ITEMS_DATA
+    from modules.game_data.skills import SKILL_DATA
+    from modules.game_data.class_evolution import can_player_use_skill
+
+    try:
+        require_csrf()
+        dados = request.get_json(silent=True) or {}
+        user_id = str(dados.get("user_id") or "")
+        item_uid = str(dados.get("item_id") or "").strip()
+        if not user_id or not item_uid:
+            return jsonify({"sucesso": False, "erro": "Selecione um tomo da mochila."}), 400
+
+        jogador = require_player_identity(user_id)
+        inventario_bruto = deepcopy(jogador.get("inventory")) if "inventory" in jogador else None
+        if inventario_bruto is not None and not isinstance(inventario_bruto, dict):
+            return jsonify({"sucesso": False, "erro": "O formato da mochila é inválido."}), 400
+        inventario_original = inventario_bruto if isinstance(inventario_bruto, dict) else {}
+
+        item_instancia = inventario_original.get(item_uid)
+        if item_instancia is None:
+            return jsonify({"sucesso": False, "erro": "Este tomo não está mais na mochila."}), 404
+
+        base_id = (
+            str(item_instancia.get("base_id") or item_uid)
+            if isinstance(item_instancia, dict)
+            else item_uid
+        )
+        info_item = ITEMS_DATA.get(base_id) or {}
+        skill_id = str((info_item.get("effects") or {}).get("learn_skill") or "")
+        skill_info = SKILL_DATA.get(skill_id)
+        if info_item.get("type") != "skill_book" or not skill_id or not skill_info:
+            return jsonify({"sucesso": False, "erro": "Este item não é um tomo de habilidade válido."}), 400
+
+        classes_permitidas = (
+            info_item.get("class_req")
+            or info_item.get("required_class")
+            or skill_info.get("allowed_classes")
+            or []
+        )
+        if isinstance(classes_permitidas, str):
+            classes_permitidas = [classes_permitidas]
+        classe_jogador = str(jogador.get("class") or jogador.get("class_key") or jogador.get("classe") or "aventureiro")
+        if not can_player_use_skill(classe_jogador, classes_permitidas):
+            return jsonify({
+                "sucesso": False,
+                "erro": "Seu personagem ainda não pode aprender essa habilidade.",
+            }), 403
+
+        def normalizar_skills(valor):
+            if isinstance(valor, dict):
+                return deepcopy(valor)
+            resultado = {}
+            if isinstance(valor, list):
+                for skill_existente in valor:
+                    if isinstance(skill_existente, dict):
+                        sid = skill_existente.get("skill_id") or skill_existente.get("id")
+                        if sid:
+                            resultado[str(sid)] = deepcopy(skill_existente)
+                    elif skill_existente:
+                        resultado[str(skill_existente)] = {
+                            "unlocked": True,
+                            "rarity": "comum",
+                            "level": 1,
+                        }
+            return resultado
+
+        skills_anteriores = jogador.get("skills")
+        skills_desbloqueadas_anteriores = jogador.get("skills_desbloqueadas")
+        skills_novas = normalizar_skills(skills_anteriores)
+        skills_desbloqueadas_novas = normalizar_skills(skills_desbloqueadas_anteriores)
+        if skill_id in skills_novas or skill_id in skills_desbloqueadas_novas:
+            nome_skill = skill_info.get("display_name") or skill_id
+            return jsonify({
+                "sucesso": False,
+                "erro": f"Você já conhece {nome_skill}.",
+            }), 409
+
+        inventario_novo = deepcopy(inventario_original)
+        entry = inventario_novo[item_uid]
+        if isinstance(entry, dict):
+            campo_quantidade = next(
+                (campo for campo in ("quantity", "qty", "qtd", "quantidade") if campo in entry),
+                "quantity",
+            )
+            try:
+                quantidade = int(entry.get(campo_quantidade, 1))
+            except (TypeError, ValueError):
+                quantidade = 0
+            if quantidade < 1:
+                return jsonify({"sucesso": False, "erro": "A quantidade deste tomo é inválida."}), 400
+            if quantidade == 1:
+                del inventario_novo[item_uid]
+            else:
+                entry[campo_quantidade] = quantidade - 1
+        else:
+            try:
+                quantidade = int(entry)
+            except (TypeError, ValueError):
+                quantidade = 0
+            if quantidade < 1:
+                return jsonify({"sucesso": False, "erro": "A quantidade deste tomo é inválida."}), 400
+            if quantidade == 1:
+                del inventario_novo[item_uid]
+            else:
+                inventario_novo[item_uid] = quantidade - 1
+
+        skills_novas[skill_id] = {
+            "unlocked": True,
+            "rarity": "comum",
+            "level": 1,
+            "progress": 0,
+        }
+        skills_desbloqueadas_novas[skill_id] = deepcopy(skills_novas[skill_id])
+
+        filtro = {"_id": jogador["_id"]}
+        filtro["inventory"] = inventario_bruto if "inventory" in jogador else {"$exists": False}
+        filtro["skills"] = skills_anteriores if "skills" in jogador else {"$exists": False}
+        filtro["skills_desbloqueadas"] = (
+            skills_desbloqueadas_anteriores
+            if "skills_desbloqueadas" in jogador else {"$exists": False}
+        )
+        filtro["class"] = jogador["class"] if "class" in jogador else {"$exists": False}
+        filtro["class_key"] = jogador["class_key"] if "class_key" in jogador else {"$exists": False}
+        filtro["classe"] = jogador["classe"] if "classe" in jogador else {"$exists": False}
+        atualizacao = users_collection.update_one(
+            filtro,
+            {"$set": {
+                "inventory": inventario_novo,
+                "skills": skills_novas,
+                "skills_desbloqueadas": skills_desbloqueadas_novas,
+            }},
+        )
+        if atualizacao.modified_count != 1:
+            return jsonify({
+                "sucesso": False,
+                "erro": "A mochila ou as habilidades mudaram. Atualize e tente novamente.",
+            }), 409
+
+        try:
+            from modules.player.core import clear_player_cache
+            asyncio.run(clear_player_cache(str(jogador["_id"])))
+        except Exception:
+            pass
+
+        nome_skill = skill_info.get("display_name") or skill_id
+        return jsonify({
+            "sucesso": True,
+            "skill_id": skill_id,
+            "msg": f"✨ Você aprendeu {nome_skill}! Agora equipe a habilidade no Grimório.",
+        })
+    except PlayerSessionError as exc:
+        return jsonify({"sucesso": False, "erro": str(exc)}), exc.status_code
+    except ValueError as exc:
+        return jsonify({"sucesso": False, "erro": str(exc)}), 403
+    except Exception:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"sucesso": False, "erro": "Não foi possível aprender a habilidade agora."}), 500
     
 @character_bp.route('/api/npc/missao/grimorio', methods=['POST'])
 def api_missao_grimorio():

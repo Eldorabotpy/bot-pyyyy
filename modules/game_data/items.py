@@ -1,5 +1,5 @@
 # modules/items.py
-# (VERSÃO CORRIGIDA: Tomos e Skins marcados como NÃO TROCÁVEIS)
+# Catálogo unificado: tomos são negociáveis por gemas; skins mantêm suas regras próprias.
 
 import logging
 
@@ -157,6 +157,19 @@ def _generate_auto_items():
     print(f">>> ITEMS: {generated} itens automáticos gerados.")
 
 _generate_auto_items()
+
+# Marcador interno usado apenas na configuração e seleção de recompensas por classe.
+# O fluxo de drop/evento sempre o troca por um tomo real antes de entregar ao jogador.
+ITEMS_DATA["tomo_habilidade_classe"] = {
+    "display_name": "Tomo de Habilidade da sua Classe",
+    "emoji": "📘",
+    "type": "event_skill_tome",
+    "category": "aprendizado",
+    "description": "Recompensa especial: ensina uma habilidade compatível com sua classe.",
+    "stackable": True,
+    "tradable": False,
+    "price": 0,
+}
 
 # ==============================================================================
 # 6. INDEXAÇÃO DO MERCADO

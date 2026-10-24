@@ -1791,11 +1791,38 @@ MERLIN_ITENS = ('pocao_cura_leve', 'pocao_cura_media', 'pocao_cura_grande',
                 'pedra_de_aprimoramento', 'pergaminho_de_reparo', 'nucleo_de_forja')
 
 
+def _merlin_itens_disponiveis(items_data):
+    tomos = [
+        item_id
+        for item_id, info in items_data.ITEMS_DATA.items()
+        if item_id.startswith("tomo_")
+        and info.get("type") == "skill_book"
+        and (info.get("effects") or {}).get("learn_skill")
+    ]
+    return tuple(dict.fromkeys((*MERLIN_ITENS, *tomos)))
+
+
+def _moeda_loja_merlin(info_item):
+    return "gemas" if info_item.get("type") == "skill_book" else "ouro"
+
+
 @webapp_bp.get('/api/loja/catalogo')
 def api_loja_catalogo():
+    from modules.game_data import items as items_data
+
     return jsonify({'itens': [
-        {'id': key, 'preco': int(items_data.ITEMS_DATA[key].get('price', items_data.ITEMS_DATA[key].get('preco', 9999999)))}
-        for key in MERLIN_ITENS if key in items_data.ITEMS_DATA
+        {
+            'id': key,
+            'nome': items_data.ITEMS_DATA[key].get('display_name', key.replace('_', ' ').title()),
+            'preco': int(items_data.ITEMS_DATA[key].get('price', items_data.ITEMS_DATA[key].get('preco', 9999999))),
+            'moeda': _moeda_loja_merlin(items_data.ITEMS_DATA[key]),
+            'tipo': items_data.ITEMS_DATA[key].get('type', ''),
+            'categoria': items_data.ITEMS_DATA[key].get('category', ''),
+            'descricao': items_data.ITEMS_DATA[key].get('description', ''),
+            'emoji': items_data.ITEMS_DATA[key].get('emoji', '📦'),
+        }
+        for key in _merlin_itens_disponiveis(items_data)
+        if key in items_data.ITEMS_DATA
     ]})
 
 
@@ -1804,12 +1831,14 @@ def api_loja_comprar():
     try:
         from modules.player.core import users_collection
         from modules.game_data import items as items_data  # 👈 Importa o catálogo de itens
-        from bson.objectid import ObjectId
+        from modules.portal_auth import PlayerSessionError, require_csrf, require_player_identity
         
-        data = request.json
+        require_csrf()
+        data = request.get_json(silent=True) or {}
         user_id = data.get("user_id")
         item_id = data.get("item_id")
-        if item_id not in MERLIN_ITENS:
+        itens_disponiveis = _merlin_itens_disponiveis(items_data)
+        if item_id not in itens_disponiveis:
             return jsonify({'erro': 'Este item não é vendido por Merlin.'}), 400
 
         # 1. Pega as informações reais do item no Backend
@@ -1821,25 +1850,28 @@ def api_loja_comprar():
             return jsonify({"erro": "Este item não existe na loja."}), 404
             
         # 2. Pega o preço real (Se não tiver preço, bota um valor absurdo para bloquear)
-        preco_real = int(info_item.get("price", info_item.get("preco", 9999999)))
-        preco_real *= quantidade
+        preco_unitario = int(info_item.get("price", info_item.get("preco", 9999999)))
+        if preco_unitario < 0:
+            return jsonify({"erro": "O preço deste item está inválido."}), 500
+        preco_real = preco_unitario * quantidade
+        moeda = _moeda_loja_merlin(info_item)
+        campo_saldo = "gems" if moeda == "gemas" else "gold"
 
-        # Suporte para ObjectId ou ID numérico do Telegram
-        busca_id = ObjectId(user_id) if len(str(user_id)) == 24 else int(user_id) if str(user_id).isdigit() else user_id
-        pdata = users_collection.find_one({"$or": [{"_id": busca_id}, {"telegram_id": busca_id}]})
+        pdata = require_player_identity(str(user_id))
 
-        if not pdata:
-            return jsonify({"erro": "Herói não encontrado no banco."}), 404
-
-        ouro_atual = int(pdata.get("gold", 0))
+        saldo_atual = int(pdata.get(campo_saldo, 0) or 0)
         
         # 3. Usa o preço REAL para a verificação
-        if ouro_atual < preco_real:
-            return jsonify({"erro": f"Ouro insuficiente! Custa {preco_real} moedas."}), 400
+        if saldo_atual < preco_real:
+            nome_moeda = "Gemas" if moeda == "gemas" else "Ouro"
+            return jsonify({"erro": f"{nome_moeda} insuficientes! Custa {preco_real} {nome_moeda.lower()}."}), 400
 
         # Atualização do Inventário
-        inventario_original = copy.deepcopy(pdata.get('inventory', {}))
-        inventario = pdata.get("inventory", {})
+        inventario_original = copy.deepcopy(pdata.get('inventory') or {})
+        if not isinstance(inventario_original, dict):
+            return jsonify({'erro': 'O formato da mochila é inválido. Atualize a página e tente novamente.'}), 409
+        inventario_condicao = copy.deepcopy(pdata.get('inventory')) if 'inventory' in pdata else {"$exists": False}
+        inventario = copy.deepcopy(inventario_original)
         if item_id in inventario:
             if isinstance(inventario[item_id], dict):
                 inventario[item_id]["quantity"] = inventario[item_id].get("quantity", 1) + quantidade
@@ -1849,14 +1881,26 @@ def api_loja_comprar():
             inventario[item_id] = {"base_id": item_id, "quantity": quantidade}
 
         # Salva o novo saldo e o inventário
+        novo_saldo = saldo_atual - preco_real
         resultado = users_collection.update_one(
-            {"_id": pdata["_id"], "gold": ouro_atual, "inventory": inventario_original},
-            {"$set": {"gold": ouro_atual - preco_real, "inventory": inventario}}
+            {"_id": pdata["_id"], campo_saldo: saldo_atual, "inventory": inventario_condicao},
+            {"$set": {campo_saldo: novo_saldo, "inventory": inventario}}
         )
 
         if resultado.modified_count != 1:
             return jsonify({'erro': 'Seu saldo ou mochila mudou. Atualize e tente novamente.'}), 409
-        return jsonify({"sucesso": True, "novo_ouro": ouro_atual - preco_real, 'quantidade': quantidade})
+        return jsonify({
+            "sucesso": True,
+            "moeda": moeda,
+            "novo_saldo": novo_saldo,
+            "novo_ouro": novo_saldo if campo_saldo == "gold" else None,
+            "novas_gemas": novo_saldo if campo_saldo == "gems" else None,
+            "quantidade": quantidade,
+        })
+    except PlayerSessionError as exc:
+        return jsonify({"erro": str(exc)}), exc.status_code
+    except ValueError as exc:
+        return jsonify({"erro": str(exc)}), 403
     except Exception as e:
         return jsonify({"erro": "Erro na transação: " + str(e)}), 500
     

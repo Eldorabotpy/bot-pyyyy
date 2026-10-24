@@ -106,7 +106,7 @@ def calculate_victory_rewards(player_data: dict, combat_details: dict) -> tuple[
     
     loot_table = combat_details.get('loot_table', [])
     luck = int(player_data.get('total_stats', {}).get('luck', 0))
-    looted_items = roll_loot(loot_table, luck_bonus=luck * 0.1)
+    looted_items = roll_loot(loot_table, luck_bonus=luck * 0.1, player_data=player_data)
     
     return xp_reward, gold_reward, looted_items
 
@@ -284,8 +284,17 @@ async def processar_recompensa_abate(matador_id, xp_base_combate, xp_base_passe,
                             player_manager.add_gold(pdata, ouro_dividido)
 
                         if itens_looteados:
-                            for item_id in itens_looteados:
-                                player_manager.add_item_to_inventory(pdata, item_id, 1)
+                            from modules.game_data.items import ITEMS_DATA
+                            from modules.skill_tome_rewards import resolve_class_skill_tome
+                            for item_index, item_id in enumerate(itens_looteados):
+                                item_aliado = item_id
+                                if (ITEMS_DATA.get(item_id) or {}).get("type") == "skill_book":
+                                    item_aliado = resolve_class_skill_tome(
+                                        pdata,
+                                        f"party:{matador_id}:{membro_id_str}:{item_index}",
+                                    )
+                                if item_aliado:
+                                    player_manager.add_item_to_inventory(pdata, item_aliado, 1)
 
                         await save_player_data(membro_oid, pdata)
                         

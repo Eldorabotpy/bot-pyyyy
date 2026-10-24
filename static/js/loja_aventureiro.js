@@ -1,4 +1,4 @@
-// Catálogo interno do Mercador (Loja a Ouro)
+// Itens fixos do Mercador; os tomos são carregados dinamicamente pelo catálogo do servidor.
 const CATALOGO_AVENTUREIRO = [
     { id: 'pocao_cura_leve', nome: 'Poção de Cura P', preco: 100, tipo: 'potion', desc: 'Recupera 100 de HP instantaneamente.' },
     { id: 'pocao_cura_media', nome: 'Poção de Cura M', preco: 300, tipo: 'potion', desc: 'Recupera 300 de HP instantaneamente.' },
@@ -17,7 +17,9 @@ let merlinComprando = false;
 let merlinCatalogo = [];
 const merlinEl = id => document.getElementById(id);
 const merlinNumero = valor => Number(valor).toLocaleString('pt-BR');
+const merlinNomeMoeda = item => item?.moeda === 'gemas' ? 'Gemas 💎' : 'Ouro';
 function merlinImagem(item) {
+    if (item?.tipo === 'skill_book') return '';
     const base = window.CATALOGO_SISTEMA ? 'https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/itens/' : '/static/assets/itens/';
     return `${base}${window.obterPastaItem ? window.obterPastaItem(item.tipo) : 'consumiveis'}/${item.id}.png`;
 }
@@ -34,22 +36,35 @@ window.abrirLojaAventureiro = async function() {
         const res = await fetch('/api/loja/catalogo');
         if (!res.ok) throw new Error();
         const dados = await res.json();
-        merlinCatalogo = CATALOGO_AVENTUREIRO.flatMap(item => {
-            const oficial = dados.itens.find(x => x.id === item.id);
-            return oficial ? [{...item, preco: oficial.preco}] : [];
+        const oficiais = new Map((dados.itens || []).map(item => [item.id, item]));
+        const fixos = CATALOGO_AVENTUREIRO.flatMap(item => {
+            const oficial = oficiais.get(item.id);
+            return oficial ? [{...item, ...oficial, desc: oficial.descricao || item.desc}] : [];
         });
+        const tomos = (dados.itens || [])
+            .filter(item => item.tipo === 'skill_book')
+            .map(item => ({...item, nome: item.nome, desc: item.descricao, emoji: item.emoji || '📘'}));
+        merlinCatalogo = [...fixos, ...tomos];
         lista.replaceChildren();
         merlinCatalogo.forEach(item => {
             const button = document.createElement('button');
             button.type = 'button'; button.className = 'loja-item-card';
             const img = document.createElement('img');
-            img.src = merlinImagem(item); img.alt = ''; img.className = 'loja-item-img';
-            img.onerror = () => { img.hidden = true; };
+            img.alt = ''; img.className = 'loja-item-img';
+            const emoji = document.createElement('span');
+            emoji.className = 'loja-item-emoji'; emoji.textContent = item.emoji || '📦'; emoji.hidden = true;
+            const imagem = merlinImagem(item);
+            if (imagem) {
+                img.src = imagem;
+                img.onerror = () => { img.hidden = true; emoji.hidden = false; };
+            } else {
+                img.hidden = true; emoji.hidden = false;
+            }
             const nome = document.createElement('span');
             nome.className = 'loja-item-nome'; nome.textContent = item.nome;
             const preco = document.createElement('span');
-            preco.className = 'loja-item-preco'; preco.textContent = `${merlinNumero(item.preco)} Ouro / un.`;
-            button.append(img, nome, preco);
+            preco.className = 'loja-item-preco'; preco.textContent = `${merlinNumero(item.preco)} ${merlinNomeMoeda(item)} / un.`;
+            button.append(img, emoji, nome, preco);
             button.onclick = () => selecionarItemMerlin(item.id);
             lista.append(button);
         });
@@ -68,10 +83,18 @@ window.selecionarItemMerlin = function(id) {
     if (!merlinSelecionado) return;
     merlinEl('lista-itens-aventureiro').hidden = true;
     merlinEl('merlin-compra').hidden = false;
-    merlinEl('merlin-imagem').src = merlinImagem(merlinSelecionado);
+    const imagem = merlinEl('merlin-imagem');
+    const emoji = merlinEl('merlin-emoji');
+    imagem.hidden = !merlinImagem(merlinSelecionado);
+    emoji.hidden = Boolean(merlinImagem(merlinSelecionado));
+    emoji.textContent = merlinSelecionado.emoji || '📦';
+    if (!imagem.hidden) {
+        imagem.onerror = () => { imagem.hidden = true; emoji.hidden = false; };
+        imagem.src = merlinImagem(merlinSelecionado);
+    }
     merlinEl('merlin-nome').textContent = merlinSelecionado.nome;
     merlinEl('merlin-descricao').textContent = merlinSelecionado.desc;
-    merlinEl('merlin-unitario').textContent = `${merlinNumero(merlinSelecionado.preco)} Ouro por unidade`;
+    merlinEl('merlin-unitario').textContent = `${merlinNumero(merlinSelecionado.preco)} ${merlinNomeMoeda(merlinSelecionado)} por unidade`;
     merlinEl('merlin-quantidade').value = 1;
     merlinEl('merlin-feedback').textContent = '';
     atualizarTotalMerlin();
@@ -84,7 +107,7 @@ window.voltarItensMerlin = function() {
 window.atualizarTotalMerlin = function() {
     const qtd = Number(merlinEl('merlin-quantidade').value);
     const valido = Number.isInteger(qtd) && qtd >= 1 && qtd <= 999;
-    merlinEl('merlin-total').textContent = valido && merlinSelecionado ? `${merlinNumero(qtd * merlinSelecionado.preco)} Ouro` : 'Quantidade inválida';
+    merlinEl('merlin-total').textContent = valido && merlinSelecionado ? `${merlinNumero(qtd * merlinSelecionado.preco)} ${merlinNomeMoeda(merlinSelecionado)}` : 'Quantidade inválida';
     merlinEl('merlin-confirmar').disabled = !valido || merlinComprando;
 };
 window.ajustarQuantidadeMerlin = function(delta) {
@@ -104,10 +127,13 @@ window.comprarItemAventureiro = async function() {
     merlinEl('merlin-controles').disabled = true;
     atualizarTotalMerlin();
     try {
-        const res = await fetch('/api/loja/comprar', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({user_id: userId, item_id: merlinSelecionado.id, quantidade})});
+        if (!window.portalSessionHeaders) throw new Error('A sessão expirou. Atualize a página e entre novamente.');
+        const headers = await window.portalSessionHeaders({'Content-Type': 'application/json'});
+        const res = await fetch('/api/loja/comprar', {method: 'POST', headers, body: JSON.stringify({user_id: userId, item_id: merlinSelecionado.id, quantidade})});
         const dados = await res.json();
         if (!res.ok || !dados.sucesso) throw new Error(dados.erro || 'Não foi possível comprar.');
-        merlinEl('merlin-feedback').textContent = `${quantidade} × ${merlinSelecionado.nome} enviados à mochila. Ouro restante: ${merlinNumero(dados.novo_ouro)}.`;
+        const saldoRestante = dados.moeda === 'gemas' ? dados.novas_gemas : dados.novo_ouro;
+        merlinEl('merlin-feedback').textContent = `${quantidade} × ${merlinSelecionado.nome} enviados à mochila. ${merlinNomeMoeda(merlinSelecionado)} restantes: ${merlinNumero(saldoRestante)}.`;
         if (typeof carregarMeuPerfil === 'function') carregarMeuPerfil();
     } catch (erro) {
         merlinEl('merlin-feedback').textContent = erro.message || 'Conexão interrompida. Confira a mochila antes de tentar novamente.';

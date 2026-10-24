@@ -90,6 +90,13 @@
     border: none; /* Borda da imagem removida */
     filter: drop-shadow(0 4px 6px rgba(0,0,0,0.8));
 }
+.loja-item-emoji {
+    width: 48px; height: 48px; display: inline-flex;
+    align-items: center; justify-content: center; font-size: 34px;
+    filter: drop-shadow(0 4px 6px rgba(0,0,0,0.65));
+}
+.loja-item-emoji[hidden] { display: none !important; }
+#merlin-compra .loja-item-emoji { width: 64px; height: 64px; font-size: 48px; }
 
 /* 👇 CORREÇÃO: Corte com os três pontinhos (...) para textos gigantes 👇 */
 .loja-item-nome { 

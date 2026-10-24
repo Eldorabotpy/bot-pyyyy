@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime, time as datetime_time, timedelta, timezone
 from hashlib import sha256
+from copy import deepcopy
 from zoneinfo import ZoneInfo
 
 from bson import ObjectId
@@ -23,7 +24,7 @@ DEFAULT_REWARDS = [
     {"gold": 200, "items": [{"item_id": "essencia_purificadora", "quantity": 1}]},
     {"gold": 350, "items": [{"item_id": "folha_sombria", "quantity": 5}]},
     {"gold": 500, "items": [{"item_id": "essencia_purificadora", "quantity": 3}]},
-    {"gold": 1000, "items": [{"item_id": "folha_sombria", "quantity": 10}]},
+    {"gold": 1000, "items": [{"item_id": "folha_sombria", "quantity": 10}, {"item_id": "tomo_habilidade_classe", "quantity": 1}]},
 ]
 DEFAULT_CORRUPTION = {
     "enabled": False,
@@ -394,10 +395,44 @@ def event_detail(event_id, character_id=None):
     if not doc:
         raise EventError("Evento não encontrado.")
     participant = PARTICIPANTS.find_one({"event_id": doc["_id"], "character_id": str(character_id)}) if character_id else None
+    player = None
+    if character_id:
+        try:
+            player = users_collection.find_one(
+                {"_id": ObjectId(str(character_id))},
+                {"class": 1, "class_key": 1, "classe": 1, "skills": 1, "skills_desbloqueadas": 1},
+            )
+        except Exception:
+            player = None
     safe = _public(doc)
+    rewards = _event_rewards_for_player(doc, player, character_id)
+    safe["rewards"] = rewards
     safe["personal"] = _public(participant) if participant else {"points": 0, "points_today": 0, "claimed_tiers": [], "collective_claimed": False}
-    safe["tiers_view"] = [{"tier": i + 1, "points": points, "reward": doc["rewards"][i], "state": "claimed" if participant and i in participant.get("claimed_tiers", []) else "available" if participant and participant.get("points", 0) >= points else "locked"} for i, points in enumerate(doc["tiers"])]
+    safe["tiers_view"] = [{"tier": i + 1, "points": points, "reward": rewards[i], "state": "claimed" if participant and i in participant.get("claimed_tiers", []) else "available" if participant and participant.get("points", 0) >= points else "locked"} for i, points in enumerate(doc["tiers"])]
     return safe
+
+
+def _event_rewards_for_player(event, player=None, character_id=None):
+    """Return invasion rewards with a class tome marker, personalized when possible."""
+    rewards = deepcopy(event.get("rewards") or [])
+    if str(event.get("event_key", "")).startswith("invasao-sombria-") and rewards:
+        last_items = rewards[-1].setdefault("items", [])
+        if not any(item.get("item_id") == "tomo_habilidade_classe" for item in last_items):
+            last_items.append({"item_id": "tomo_habilidade_classe", "quantity": 1})
+    if player:
+        from modules.skill_tome_rewards import CLASS_SKILL_TOME_MARKER, resolve_class_skill_tome
+        stable_character = str(character_id or player.get("_id") or "")
+        for index, reward in enumerate(rewards):
+            resolved_items = []
+            for item in reward.get("items", []):
+                if item.get("item_id") != CLASS_SKILL_TOME_MARKER:
+                    resolved_items.append(item)
+                    continue
+                tome_id = resolve_class_skill_tome(player, f"{event.get('_id')}:{stable_character}:tier:{index + 1}")
+                if tome_id:
+                    resolved_items.append({**item, "item_id": tome_id})
+            reward["items"] = resolved_items
+    return rewards
 
 
 def ranking(event_id, page=1, page_size=20):
@@ -514,13 +549,18 @@ def claim_reward(character_id, event_id, *, tier=None, collective=False):
             if index < 0 or index >= len(event["tiers"]):
                 raise EventError("Marco de recompensa inválido.")
             threshold = event["tiers"][index]
-            reward = event["rewards"][index]
+            player = users_collection.find_one({"_id": ObjectId(str(character_id))}, session=s)
+            if not player:
+                raise EventError("Personagem não encontrado.")
+            rewards = _event_rewards_for_player(event, player, character_id)
+            reward = rewards[index]
             updated = PARTICIPANTS.update_one({**pkey, "points": {"$gte": threshold}, "claimed_tiers": {"$ne": index}}, {"$addToSet": {"claimed_tiers": index}, "$set": {"updated_at": now}}, session=s)
         if updated.modified_count != 1:
             raise EventError("Recompensa ainda bloqueada ou já resgatada.")
-        player = users_collection.find_one({"_id": ObjectId(str(character_id))}, session=s)
-        if not player:
-            raise EventError("Personagem não encontrado.")
+        if collective:
+            player = users_collection.find_one({"_id": ObjectId(str(character_id))}, session=s)
+            if not player:
+                raise EventError("Personagem não encontrado.")
         _apply_reward(player, reward)
         users_collection.update_one({"_id": player["_id"]}, {"$set": {"inventory": player.get("inventory", {}), "gold": player.get("gold", 0)}}, session=s)
         outcome = {"success": True, "reward": reward, "gold": player.get("gold", 0)}

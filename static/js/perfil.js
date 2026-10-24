@@ -178,7 +178,7 @@ window.aplicarImagemItemEldora = function(imgEl, item) {
 window.getCaminhosImagemPerfilEldora = function(item) {
     const base = "https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/itens/";
     const baseRunas = "https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/runas/";
-    const cacheVersion = "20261023-8";
+    const cacheVersion = "20261024-1";
     const bruto = String(item?.base_id || item?.item_id || item?.uid || item?.id || "").trim();
     if (!bruto) return [];
 
@@ -1840,6 +1840,12 @@ window.abrirModalItem = function(idAlvo, origem) {
         if (['weapon', 'armor', 'helmet', 'boots', 'ring', 'necklace', 'earring', 'equipamento', 'tool', 'arma', 'armadura', 'lenhador', 'minerador', 'colhedor', 'esfolador', 'ferreiro', 'armeiro', 'alfaiate', 'joalheiro', 'curtidor'].includes(t)) {
             botoesHtml = `<button onclick="usarOuEquiparItem('${itemData.id}')" class="eldora-profile-style-7c693876">Equipar</button>`;
         }
+        else if (t === 'skill_book') {
+            botoesHtml = `
+                <div class="eldora-profile-style-3198545b">📘 Este tomo ensina uma habilidade compatível com sua classe. Depois, equipe-a no Grimório para usá-la em combate.</div>
+                <button onclick="aprenderHabilidadePeloTomo('${itemData.id}', this)" class="eldora-profile-style-873b2342">Aprender habilidade</button>
+            `;
+        }
         else if (itemData.on_use?.effect === 'xp_boost' || ['pocao_xp_boost', 'pocao_xp_boost_g', 'elixir_xp_dobrado_10m', 'elixir_xp_dobrado_30m'].includes(idReal)) {
             botoesHtml = `<button onclick="consumirItemDireto('${itemData.id}', '${idReal}')" class="eldora-profile-style-038e3ada">Usar · XP ×2</button>`;
         }
@@ -2146,6 +2152,50 @@ window.equiparPergaminhoReparoAtalho = async function(itemId) {
     } catch (e) {
         console.error("Erro ao equipar pergaminho no atalho:", e);
         if (window.alertaEldora) window.alertaEldora("Atalho de Reparo", "Falha ao equipar o pergaminho.", "erro");
+    }
+};
+
+window.aprenderHabilidadePeloTomo = async function(itemId, botao) {
+    const charId = localStorage.getItem("jogadorEldoraID");
+    if (!charId) {
+        window.avisoEldora("Entre novamente para aprender uma habilidade.");
+        return;
+    }
+    if (!window.portalSessionHeaders) {
+        window.avisoEldora("A sessão expirou. Atualize a página e tente novamente.");
+        return;
+    }
+
+    if (botao) {
+        botao.disabled = true;
+        botao.textContent = "Decifrando tomo…";
+    }
+
+    try {
+        const headers = await window.portalSessionHeaders({ 'Content-Type': 'application/json' });
+        const res = await fetch('/api/personagem/aprender_habilidade', {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ user_id: charId, item_id: itemId })
+        });
+        const data = await res.json();
+        if (!res.ok || !data.sucesso) {
+            throw new Error(data.erro || "Não foi possível aprender a habilidade.");
+        }
+
+        fecharModalItem();
+        if (typeof carregarMeuPerfil === 'function') await carregarMeuPerfil();
+        if (typeof window.carregarMenuMagias === 'function') await window.carregarMenuMagias();
+        if (window.alertaEldora) {
+            window.alertaEldora("Habilidade aprendida", data.msg || "A habilidade foi adicionada ao Grimório.", "sucesso");
+        }
+    } catch (erro) {
+        if (botao) {
+            botao.disabled = false;
+            botao.textContent = "Aprender habilidade";
+        }
+        if (window.alertaEldora) window.alertaEldora("Não foi possível aprender", erro.message, "erro");
+        else window.avisoEldora(erro.message);
     }
 };
 

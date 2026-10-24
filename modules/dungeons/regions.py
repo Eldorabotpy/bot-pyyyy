@@ -96,6 +96,7 @@ REGIONAL_DUNGEONS = {
                       
                     # A Tabela de Loot que me enviaste
                     "loot_table": [
+                        {"item_id": "tomo_habilidade_classe", "drop_chance": 5},
                         {"item_id": "emblema_guerreiro", "drop_chance": 8},
                         {"item_id": "essencia_guardia", "drop_chance": 8},
                         {"item_id": "essencia_furia", "drop_chance": 8},
@@ -231,6 +232,7 @@ REGIONAL_DUNGEONS = {
                     "xp_reward": 120,    
                     "gold_drop": 50,
                     "loot_table": [
+                        {"item_id": "tomo_habilidade_classe", "drop_chance": 5},
                         {"item_id": "emblema_guerreiro", "drop_chance": 5},
                         {"item_id": "essencia_guardia", "drop_chance": 5},
                         {"item_id": "essencia_furia", "drop_chance": 5},
@@ -369,6 +371,7 @@ REGIONAL_DUNGEONS = {
                       
                     # A Tabela de Loot que me enviaste
                     "loot_table": [
+                        {"item_id": "tomo_habilidade_classe", "drop_chance": 5},
                         {"item_id": "emblema_guerreiro", "drop_chance": 5},
                         {"item_id": "essencia_guardia", "drop_chance": 5},
                         {"item_id": "essencia_furia", "drop_chance": 5},
@@ -507,6 +510,7 @@ REGIONAL_DUNGEONS = {
                       
                     # A Tabela de Loot que me enviaste
                     "loot_table": [
+                        {"item_id": "tomo_habilidade_classe", "drop_chance": 5},
                         {"item_id": "emblema_guerreiro", "drop_chance": 5},
                         {"item_id": "essencia_guardia", "drop_chance": 5},
                         {"item_id": "essencia_furia", "drop_chance": 5},
@@ -618,6 +622,7 @@ REGIONAL_DUNGEONS = {
                     "xp_reward": 150,
                     "gold_drop": 800,
                     "loot_table": [
+                        {"item_id": "tomo_habilidade_classe", "drop_chance": 5},
                         {"item_id": "emblema_guerreiro", "drop_chance": 5},
                         {"item_id": "essencia_guardia", "drop_chance": 5},
                         {"item_id": "essencia_furia", "drop_chance": 5},

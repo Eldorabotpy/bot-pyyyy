@@ -151,6 +151,7 @@ def create_listing(*, seller_id, item_id, total_price, quantity=1, currency='our
         tipo_item = str(info.get('type', '')).strip().lower()
         somente_gemas = (
             base in EVOLUTION_ITEMS_DATA
+            or base.startswith('tomo_')
             or categoria_item in {'runas', 'runa', 'socketable', 'evolucao', 'evolução', 'aprendizado'}
             or tipo_item in {'rune', 'runa', 'skill_book'}
             or moeda_obrigatoria == 'gemas'
