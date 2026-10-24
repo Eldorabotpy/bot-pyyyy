@@ -17,7 +17,6 @@ from modules.player.inventory import add_item_to_inventory, add_gold
 from modules.player.stats import get_player_total_stats, check_and_apply_level_up
 from modules.auth_utils import get_current_player_id
 from modules import game_data
-from modules.combat import durability
 
 from handlers.utils import format_combat_message
 from handlers.profile_handler import _get_class_media
@@ -516,7 +515,6 @@ async def advance_after_victory(update, context, player_id, chat_id, combat_deta
     cur_stg = int(combat_details.get("dungeon_stage", 0))
     next_stg = cur_stg + 1
 
-    dummy_log = []
     active_cds = pdata.get("cooldowns", {})
 
     # --- VITÓRIA FINAL ---
@@ -527,8 +525,6 @@ async def advance_after_victory(update, context, player_id, chat_id, combat_deta
         bonus = _final_gold_for(dungeon, diff_cfg)
         if bonus > 0:
             add_gold(pdata, bonus)
-
-        durability.apply_end_of_battle_wear(pdata, {}, dummy_log)
 
         stats = await get_player_total_stats(pdata)
         pdata["current_hp"] = stats.get("max_hp", 50)
@@ -566,8 +562,6 @@ async def advance_after_victory(update, context, player_id, chat_id, combat_deta
         next_mob = floors[next_stg]
     except:
         return
-
-    durability.apply_end_of_battle_wear(pdata, {}, dummy_log)
 
     combat = _build_combat_details(next_mob, diff_cfg, reg_key, next_stg, active_cooldowns=active_cds)
 

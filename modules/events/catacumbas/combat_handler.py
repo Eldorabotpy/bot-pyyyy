@@ -27,6 +27,28 @@ from ui import ui_renderer
 
 logger = logging.getLogger(__name__)
 
+
+async def _aplicar_desgaste_combate_catacumba(session: dict, player_ids=None):
+    """Desgasta uma vez os itens dos participantes ao terminar o combate do andar."""
+    from modules.combat.durability import apply_combat_end_wear_once
+
+    floor_key = str(session.get("current_floor", 1))
+    floor_state = session.setdefault("_durability_wear_by_floor", {}).setdefault(floor_key, {})
+    ids = list(player_ids if player_ids is not None else (session.get("players") or {}).keys())
+
+    for player_id in ids:
+        player_id = str(player_id)
+        pdata = await player_manager.get_player_data(player_id)
+        if not pdata:
+            continue
+
+        result = apply_combat_end_wear_once(pdata, floor_state, player_id, amount=1)
+        if result.get("ja_aplicado"):
+            continue
+
+        await player_manager.save_player_data(player_id, pdata)
+        session.setdefault("turn_log", []).extend(result.get("mensagens", []))
+
 # ==============================================================================
 # 🎨 UTILITÁRIOS DE MÍDIA
 # ==============================================================================
@@ -310,6 +332,7 @@ async def combat_action_cb(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if boss["current_hp"] <= 0:
             session["floor_cleared"] = True
             session["turn_log"].append(f"💀 **{boss['name']} DERROTADO!**")
+            await _aplicar_desgaste_combate_catacumba(session)
         else:
             # Incrementa contador de turno do monstro
             session["monster_turn_counter"] = session.get("monster_turn_counter", 0) + 1
@@ -409,6 +432,7 @@ async def catacomb_use_skill_cb(update: Update, context: ContextTypes.DEFAULT_TY
     if boss["current_hp"] <= 0:
         active_raid["floor_cleared"] = True
         active_raid["turn_log"].append(f"💀 **{boss['name']}** foi derrotado!")
+        await _aplicar_desgaste_combate_catacumba(active_raid)
         if active_raid["current_floor"] >= active_raid["total_floors"]:
             await _handle_victory(update, context, active_raid, user_id)
             return
@@ -598,6 +622,14 @@ async def execute_boss_turn(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     if is_crit: msg += " (CRIT! 💥)"
     session["turn_log"].append(msg)
 
+    vivos_depois = []
+    for player_id in session.get("players", {}):
+        pdata = await player_manager.get_player_data(str(player_id))
+        if pdata and int(pdata.get("current_hp", 0) or 0) > 0:
+            vivos_depois.append(str(player_id))
+    if not vivos_depois:
+        await _aplicar_desgaste_combate_catacumba(session)
+
     # 4. Avança o turno após o ataque do boss
     await pass_turn(update, context, session)
 
@@ -682,6 +714,7 @@ async def leave_active_raid_cb(update: Update, context: ContextTypes.DEFAULT_TYP
     # Limpa Raids Ativas
     for code, session in list(raid_manager.ACTIVE_RAIDS.items()):
         if user_id in session.get("players", {}):
+            await _aplicar_desgaste_combate_catacumba(session, [user_id])
             del session["players"][user_id]
             raid_found = True
             if len(session["players"]) == 0:

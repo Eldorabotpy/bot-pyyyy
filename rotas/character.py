@@ -292,6 +292,7 @@ def acao_combate_migrada():
     import asyncio
     from flask import current_app
     from modules.player.stats import processar_turno_combate
+    from modules.combat.durability import apply_equipment_combat_wear
     from modules.game_data.monsters import MONSTERS_DATA
     from modules.combat.combat_engine import processar_acao_combate
     from modules.dungeon_event_service import (
@@ -336,6 +337,7 @@ def acao_combate_migrada():
             )
 
             mob_evento = None
+            combate_ativo = False
 
             if sistema_cacada:
 
@@ -359,16 +361,30 @@ def acao_combate_migrada():
                         )
                     )
 
-                    if (
-                        mob
-                        and
-                        is_dungeon_event_mob(
-                            mob
-                        )
-                    ):
+                    if not mob:
+                        continue
 
+                    if int(mob.get("hp_atual", mob.get("hp", 0)) or 0) > 0:
+                        combate_ativo = True
+
+                    if is_dungeon_event_mob(mob):
                         mob_evento = mob
+
+                    if combate_ativo and mob_evento:
                         break
+
+            durabilidade_resultado = {"alterados": [], "quebrados": [], "mensagens": []}
+            if combate_ativo:
+                jogador = users_collection.find_one({"_id": ObjectId(user_id)})
+                if jogador:
+                    durabilidade_resultado = apply_equipment_combat_wear(
+                        jogador,
+                        amount=1,
+                    )
+                    users_collection.update_one(
+                        {"_id": ObjectId(user_id)},
+                        {"$set": {"inventory": jogador.get("inventory", {})}},
+                    )
 
             # ==========================================
             # 🧹 LIMPA O ESTADO DO MÍMICO
@@ -416,7 +432,16 @@ def acao_combate_migrada():
                             "Fugiste da batalha!"
                     }
 
-                ]
+                ] + [
+                    {
+                        "autor": "sistema",
+                        "texto": msg,
+                        "dano": 0,
+                        "tipo": "durabilidade",
+                    }
+                    for msg in durabilidade_resultado.get("mensagens", [])
+                ],
+                "durabilidade": durabilidade_resultado,
 
             })
 

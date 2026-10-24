@@ -1181,169 +1181,6 @@ def _nome_buff_suporte(buff_def: dict) -> str:
         return f"{efeito} ({duracao} turnos)"
     return str(efeito)
 
-def _dur_tuple_combate(raw) -> tuple[int, int]:
-    cur, mx = 0, 0
-
-    if isinstance(raw, (list, tuple)) and len(raw) >= 2:
-        try:
-            cur = int(raw[0])
-            mx = int(raw[1])
-        except Exception:
-            cur, mx = 0, 0
-
-    elif isinstance(raw, dict):
-        try:
-            cur = int(raw.get("current", raw.get("cur", 0)))
-            mx = int(raw.get("max", raw.get("mx", 0)))
-        except Exception:
-            cur, mx = 0, 0
-
-    mx = max(0, mx)
-    cur = max(0, min(cur, mx)) if mx > 0 else max(0, cur)
-
-    return cur, mx
-
-
-def _set_dur_combate(item: dict, cur: int, mx: int) -> None:
-    item["durability"] = [int(max(0, min(cur, mx))), int(max(0, mx))]
-
-
-def _nome_item_combate(item: dict, uid: str = "") -> str:
-    if not isinstance(item, dict):
-        return str(uid or "Item")
-
-    if item.get("display_name"):
-        return str(item.get("display_name"))
-
-    if item.get("nome"):
-        return str(item.get("nome"))
-
-    base_id = item.get("base_id") or uid or "item"
-    return str(base_id).replace("_", " ").title()
-
-
-def _gastar_durabilidade_equipamentos_combate(
-    player_data: dict,
-    *,
-    gastar_arma: bool = False,
-    gastar_defesa: bool = False,
-    custo_arma: int = 1,
-    custo_defesa: int = 1,
-    chance_arma: float = 0.30,
-    chance_defesa: float = 0.30
-) -> dict:
-    """
-    Gasta durabilidade dos equipamentos de combate.
-
-    Regras:
-    - 30% de chance da arma gastar quando causa dano.
-    - 30% de chance de UMA peça defensiva gastar quando recebe dano.
-    - ferramentas de profissão em equipment_tools NÃO gastam em combate.
-    """
-    import random
-
-    inventory = player_data.get("inventory", {}) or {}
-    equipment = player_data.get("equipment", {}) or {}
-
-    if not isinstance(inventory, dict):
-        inventory = {}
-
-    if not isinstance(equipment, dict):
-        equipment = {}
-
-    alterados = []
-    quebrados = []
-
-    def gastar_slot(slot: str, custo: int):
-        uid = equipment.get(slot)
-
-        if not uid:
-            return
-
-        item = inventory.get(uid)
-
-        if not isinstance(item, dict):
-            return
-
-        cur, mx = _dur_tuple_combate(item.get("durability"))
-
-        # Item sem durabilidade não é afetado.
-        if mx <= 0:
-            return
-
-        # Já quebrado, não reduz mais.
-        if cur <= 0:
-            return
-
-        novo_cur = max(0, cur - int(max(1, custo)))
-        _set_dur_combate(item, novo_cur, mx)
-
-        inventory[uid] = item
-
-        alterados.append({
-            "slot": slot,
-            "uid": uid,
-            "nome": _nome_item_combate(item, uid),
-            "durability": item.get("durability")
-        })
-
-        if novo_cur <= 0:
-            quebrados.append({
-                "slot": slot,
-                "uid": uid,
-                "nome": _nome_item_combate(item, uid)
-            })
-
-    # 1. Arma: 30% de chance ao causar dano.
-    if gastar_arma and random.random() <= float(chance_arma):
-        gastar_slot("arma", custo_arma)
-
-    # 2. Defesa: 30% de chance de gastar UMA peça aleatória ao receber dano.
-    if gastar_defesa and random.random() <= float(chance_defesa):
-        slots_defesa = [
-            "elmo",
-            "armadura",
-            "calca",
-            "luvas",
-            "botas",
-            "colar",
-            "anel",
-            "brinco"
-        ]
-
-        slots_validos = []
-
-        for slot in slots_defesa:
-            uid = equipment.get(slot)
-            if not uid:
-                continue
-
-            item = inventory.get(uid)
-            if not isinstance(item, dict):
-                continue
-
-            cur, mx = _dur_tuple_combate(item.get("durability"))
-
-            if mx > 0 and cur > 0:
-                slots_validos.append(slot)
-
-        if slots_validos:
-            slot_sorteado = random.choice(slots_validos)
-            gastar_slot(slot_sorteado, custo_defesa)
-
-    player_data["inventory"] = inventory
-
-    mensagens = []
-
-    for item in quebrados:
-        mensagens.append(f"⚠️ {item['nome']} quebrou durante o combate.")
-
-    return {
-        "alterados": alterados,
-        "quebrados": quebrados,
-        "mensagens": mensagens
-    }
-
 async def processar_turno_combate(
     user_id,
     acao,
@@ -1523,7 +1360,6 @@ async def processar_turno_combate(
     for msg in msgs_cooldown:
         log_turno.append({"autor": "sistema", "texto": msg, "dano": 0, "tipo": "suporte"})
 
-    dano_heroi = 0
     acao_suporte_grupo = False
     player_mp_antes_acao = player_mp
 
@@ -1760,15 +1596,12 @@ async def processar_turno_combate(
             attacker_current_mp=player_mp,
         )
 
-        dano_heroi = int(resultado.get("total_damage", 0) or 0)
         player_mp = int(resultado.get("attacker_mp_left", player_mp))
 
-        hp_mob_antes = mob_hp
         player_hp, player_mp, mob_hp, logs_golpes = _aplicar_golpes_combate(
             resultado, player_stats, player_hp, player_mp, mob_hp
         )
         log_turno.extend(logs_golpes)
-        dano_heroi = hp_mob_antes - mob_hp
         mob_vivo["hp_atual"] = mob_hp
 
     # A legião é estado privado deste herói e deste encontro. Os esqueletos
@@ -2438,42 +2271,7 @@ async def processar_turno_combate(
             player["max_mana"] = max_mp_novo
 
     # =============================================================
-    # 6. GASTA DURABILIDADE DOS EQUIPAMENTOS DE COMBATE
-    # =============================================================
-
-    # A arma gasta quando o jogador realizou ataque/magia ofensiva e causou dano.
-    gastar_arma_combate = (
-        acao in ["atacar", "ataque", "normal", "basico", "magia"]
-        and not acao_suporte_grupo
-        and int(dano_heroi or 0) > 0
-    )
-
-    # Equipamentos defensivos gastam quando o monstro causou dano.
-    gastar_defesa_combate = int(dano_mob or 0) > 0
-
-    durabilidade_resultado = _gastar_durabilidade_equipamentos_combate(
-        player,
-        gastar_arma=gastar_arma_combate,
-        gastar_defesa=gastar_defesa_combate,
-        custo_arma=1,
-        custo_defesa=1,
-        chance_arma=0.30,
-        chance_defesa=0.30
-    )
-
-    for msg_dur in durabilidade_resultado.get("mensagens", []):
-        log_turno.append({
-            "autor": "sistema",
-            "texto": msg_dur,
-            "dano": 0,
-            "tipo": "durabilidade"
-        })
-
-    # Atualiza a referência do inventário, porque a função mexeu dentro de player.
-    inventory = player.get("inventory", inventory)
-
-    # =============================================================
-    # 7. SALVA JOGADOR
+    # 6. SALVA JOGADOR
     # =============================================================
     if player_hp > 0 and mob_hp > 0:
         hp_antes_regen, mp_antes_regen = player_hp, player_mp
@@ -2489,6 +2287,20 @@ async def processar_turno_combate(
 
     luta_encerrada = (mob_hp <= 0) or (is_derrota and not sala_grupo)
     cooldowns_finais = {} if luta_encerrada else player.get("cooldowns", {})
+
+    durabilidade_resultado = {"alterados": [], "quebrados": [], "mensagens": []}
+    if luta_encerrada and not sala_grupo:
+        from modules.combat.durability import apply_equipment_combat_wear
+
+        durabilidade_resultado = apply_equipment_combat_wear(player, amount=1)
+        for msg_dur in durabilidade_resultado.get("mensagens", []):
+            log_turno.append({
+                "autor": "sistema",
+                "texto": msg_dur,
+                "dano": 0,
+                "tipo": "durabilidade"
+            })
+        inventory = player.get("inventory", inventory)
 
     users_collection.update_one(
         {"_id": ObjectId(user_id)},
@@ -2543,6 +2355,49 @@ async def processar_turno_combate(
                     player_mp = mp_h
 
             estado_grupo = gcm.verificar_fim_combate(sala_id_real)
+
+            if estado_grupo in (gcm.ESTADO_VITORIA, gcm.ESTADO_DERROTA):
+                luta_encerrada = True
+
+                # O desgaste é por encontro: cada membro perde 1 ponto em cada
+                # item equipado apenas quando a sala inteira termina.
+                from modules.combat.durability import apply_combat_end_wear_once
+
+                for membro_id in sala_grupo.get("membros_ids", []):
+                    try:
+                        membro_oid = ObjectId(str(membro_id))
+                    except Exception:
+                        continue
+
+                    membro_atual = str(membro_id) == str(user_id)
+                    dados_membro = player if membro_atual else users_collection.find_one({"_id": membro_oid})
+                    if not dados_membro:
+                        continue
+
+                    desgaste_membro = apply_combat_end_wear_once(
+                        dados_membro,
+                        sala_grupo,
+                        str(membro_id),
+                        amount=1,
+                    )
+                    users_collection.update_one(
+                        {"_id": membro_oid},
+                        {"$set": {"inventory": dados_membro.get("inventory", {})}},
+                    )
+
+                    if membro_atual:
+                        durabilidade_resultado = desgaste_membro
+                        inventory = dados_membro.get("inventory", inventory)
+
+                    for msg_dur in desgaste_membro.get("mensagens", []):
+                        log_turno.append({
+                            "autor": "sistema",
+                            "texto": msg_dur,
+                            "dano": 0,
+                            "tipo": "durabilidade",
+                        })
+
+                cooldowns_finais = {}
 
             proximo_turno = None
             if estado_grupo == gcm.ESTADO_EM_ANDAMENTO and mob_hp > 0:

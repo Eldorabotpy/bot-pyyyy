@@ -2819,6 +2819,29 @@ def _registrar_resultado_coliseu(duelo, vencedor_sid):
     with resultado_coliseu_lock:
         if duelo.get("resultado_registrado"):
             return
+
+        # O equipamento perde durabilidade uma vez no encerramento do duelo,
+        # inclusive nas modalidades casual, ranqueada, evento e espelho.
+        if not duelo.get("desgaste_durabilidade_concluido"):
+            from modules.combat.durability import apply_combat_end_wear_once
+
+            for participante in (duelo.get("jogador_a"), duelo.get("jogador_b")):
+                if not participante or participante.get("espelho"):
+                    continue
+                player_db = participante.get("db") or {}
+                player_id = player_db.get("_id")
+                if player_id is None:
+                    continue
+
+                apply_combat_end_wear_once(player_db, duelo, str(player_id), amount=1)
+                users_collection.update_one(
+                    {"_id": player_id},
+                    {"$set": {"inventory": player_db.get("inventory", {})}},
+                )
+
+            duelo["desgaste_durabilidade_concluido"] = True
+            clear_all_player_cache()
+
         modo = duelo.get("modo", "casual")
         if modo not in ("ranqueado", "evento"):
             return
@@ -2871,10 +2894,8 @@ def _registrar_resultado_coliseu(duelo, vencedor_sid):
 
 
 def _encerrar_duelo_coliseu_ao_desconectar(sid):
-    """Trata desconexão em partida competitiva como desistência e libera o rival."""
+    """Encerra qualquer duelo ativo por desistência e libera o rival."""
     for duelo_id, duelo in list(duelos_ativos.items()):
-        if duelo.get("modo") not in ("ranqueado", "evento") and not duelo.get("espelho"):
-            continue
         participantes = [duelo["jogador_a"], duelo["jogador_b"]]
         perdedor = next((p for p in participantes if p["sid"] == sid), None)
         if not perdedor:
@@ -3455,6 +3476,28 @@ def handle_acao_raid(dados):
             emit('animarTurnoRaid', pacote, to=sid_destino)
 
     if pacote.get('raid_encerrada'):
+        if not raid.get("desgaste_durabilidade_concluido"):
+            from modules.combat.durability import apply_combat_end_wear_once
+
+            for jogador_id in (raid.get("jogadores") or {}):
+                try:
+                    jogador_oid = ObjectId(str(jogador_id))
+                except Exception:
+                    continue
+
+                player_db = users_collection.find_one({"_id": jogador_oid})
+                if not player_db:
+                    continue
+
+                apply_combat_end_wear_once(player_db, raid, str(jogador_id), amount=1)
+                users_collection.update_one(
+                    {"_id": jogador_oid},
+                    {"$set": {"inventory": player_db.get("inventory", {})}},
+                )
+
+            raid["desgaste_durabilidade_concluido"] = True
+            clear_all_player_cache()
+
         try:
             metadata = raid.get('metadata', {}) or {}
             if metadata.get('tipo_evento') == 'invasao_reino':

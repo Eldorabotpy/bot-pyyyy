@@ -91,6 +91,34 @@ def _object_id(
     )
 
 
+def _aplicar_desgaste_batalha_clan(batalha):
+    """Aplica uma vez 1 ponto em cada item dos combatentes da frente encerrada."""
+    if batalha.get("desgaste_durabilidade_concluido"):
+        return
+
+    from modules.combat.durability import apply_combat_end_wear_once
+    from modules.player.core import clear_all_player_cache
+
+    for combatente in batalha.get("combatentes", []) or []:
+        player_id = combatente.get("user_id")
+        player_oid = _object_id(player_id)
+        if not player_oid:
+            continue
+
+        player_db = users_collection.find_one({"_id": player_oid})
+        if not player_db:
+            continue
+
+        apply_combat_end_wear_once(player_db, batalha, str(player_oid), amount=1)
+        users_collection.update_one(
+            {"_id": player_oid},
+            {"$set": {"inventory": player_db.get("inventory", {})}},
+        )
+
+    batalha["desgaste_durabilidade_concluido"] = True
+    clear_all_player_cache()
+
+
 def _localizar_frente(
     guerra,
     numero_frente,
@@ -3158,6 +3186,8 @@ async def executar_ataque_basico(
 
     if batalha_finalizada:
 
+        _aplicar_desgaste_batalha_clan(batalha)
+
         resultado_guerra = (
             _consolidar_guerra_apos_finalizar_frente(
                 guerra["_id"]
@@ -4392,6 +4422,8 @@ async def executar_skill_ofensiva(
 
 
     if batalha_finalizada:
+
+        _aplicar_desgaste_batalha_clan(batalha)
 
         resultado_guerra = (
             _consolidar_guerra_apos_finalizar_frente(

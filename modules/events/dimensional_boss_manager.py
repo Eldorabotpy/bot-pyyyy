@@ -151,6 +151,32 @@ def _buscar_player(user_id: str) -> Optional[dict]:
 
     return None
 
+
+def _aplicar_desgaste_evento_dimensional(evento: Dict[str, Any], player_ids=None) -> None:
+    """Aplica uma vez o desgaste de fim de combate aos participantes da Fenda."""
+    from modules.combat.durability import apply_combat_end_wear_once
+    from modules.player.core import clear_all_player_cache
+
+    ids = list(player_ids if player_ids is not None else (evento.get("jogadores") or {}).keys())
+    for player_id in ids:
+        player_id = str(player_id)
+        player_db = _buscar_player(player_id)
+        if not player_db:
+            continue
+
+        result = apply_combat_end_wear_once(player_db, evento, player_id, amount=1)
+        if result.get("ja_aplicado"):
+            continue
+
+        users_collection.update_one(
+            {"_id": player_db["_id"]},
+            {"$set": {"inventory": player_db.get("inventory", {})}},
+        )
+        for message in result.get("mensagens", []):
+            _log_evento_dimensional(evento, message, "durabilidade")
+
+    clear_all_player_cache()
+
 def _resolver_user_id_no_evento(evento: Dict[str, Any], user_id: str) -> str:
     """
     Garante que, se vier telegram_id ou outro id, a gente tente resolver
@@ -263,6 +289,7 @@ def serializar_evento(evento: Optional[Dict[str, Any]] = None) -> Optional[Dict[
         return None
 
     saida = copy.deepcopy(evento)
+    saida.pop("_durability_wear_applied_players", None)
 
     jogadores_dict = saida.get("jogadores", {}) or {}
 
@@ -769,6 +796,9 @@ def sair_do_evento(user_id: str) -> Dict[str, Any]:
     jogadores = evento.setdefault("jogadores", {})
 
     if user_id in jogadores:
+        if evento.get("status") == "em_combate":
+            _aplicar_desgaste_evento_dimensional(evento, [user_id])
+
         nome = jogadores[user_id].get("nome", "Herói")
         del jogadores[user_id]
 
@@ -878,6 +908,9 @@ def executar_acao(user_id: str, alvo_id: str, tipo: str = "ataque_basico", skill
             "error": "Tipo de ação inválido."
         }
 
+    if evento.get("status") in ("vitoria", "derrota") or evento.get("finalizado"):
+        _aplicar_desgaste_evento_dimensional(evento)
+
     return {
         **resultado,
         "evento": serializar_evento(evento)
@@ -893,6 +926,9 @@ def encerrar_evento_debug() -> Dict[str, Any]:
         }
 
     evento_id = _evento_dimensional_ativo.get("evento_id")
+
+    if _evento_dimensional_ativo.get("status") == "em_combate":
+        _aplicar_desgaste_evento_dimensional(_evento_dimensional_ativo)
 
     _evento_dimensional_ativo["status"] = "cancelado"
     _evento_dimensional_ativo["finalizado"] = True
