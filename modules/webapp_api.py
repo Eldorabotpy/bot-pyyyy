@@ -1592,6 +1592,49 @@ def api_equipar_pocao():
         return jsonify({"sucesso": True})
     except Exception as e:
         return jsonify({"sucesso": False, "erro": str(e)}), 500
+
+@webapp_bp.route('/api/personagem/equipar_pergaminho_reparo', methods=['POST'])
+def api_equipar_pergaminho_reparo():
+    try:
+        from bson.objectid import ObjectId
+
+        data = request.get_json(silent=True) or {}
+        user_id = data.get("user_id")
+        item_id = str(data.get("item_id") or "")
+        ids_permitidos = {"pergaminho_de_reparo", "pergaminho_durabilidade"}
+        if not user_id or item_id not in ids_permitidos:
+            return jsonify({"sucesso": False, "erro": "Selecione um Pergaminho de Reparo da mochila."}), 400
+
+        busca_id = ObjectId(user_id) if len(str(user_id)) == 24 else int(user_id)
+        pdata = users_collection.find_one({"_id": busca_id})
+        if not pdata:
+            return jsonify({"sucesso": False, "erro": "Herói não encontrado."}), 404
+
+        inventario = pdata.get("inventory", {}) or {}
+        quantidade = 0
+        for uid, item in inventario.items():
+            base_id = item.get("base_id", uid) if isinstance(item, dict) else uid
+            if str(base_id) != item_id:
+                continue
+            bruto = item.get("quantity", item.get("qtd", item.get("quantidade", 1))) if isinstance(item, dict) else item
+            try:
+                quantidade += max(0, int(bruto or 0))
+            except (TypeError, ValueError):
+                continue
+
+        if quantidade <= 0:
+            return jsonify({"sucesso": False, "erro": "Esse pergaminho não está mais na mochila."}), 400
+
+        resultado = users_collection.update_one(
+            {"_id": busca_id},
+            {"$set": {"pergaminho_reparo_equipado": True}}
+        )
+        if resultado.matched_count != 1:
+            return jsonify({"sucesso": False, "erro": "Herói não encontrado."}), 404
+
+        return jsonify({"sucesso": True, "msg": "Pergaminho equipado no atalho rápido."})
+    except Exception as e:
+        return jsonify({"sucesso": False, "erro": str(e)}), 500
         
 @webapp_bp.route('/api/personagem/equipar_skin', methods=['POST'])
 def api_equipar_skin():
@@ -1892,6 +1935,34 @@ def api_usar_pocao_rapida():
         return jsonify({"sucesso": True, "cura": cura_valor, "cor": cor_hex})
         
     except Exception as e: return jsonify({"erro": str(e)}), 500
+
+
+@webapp_bp.route('/api/personagem/usar_pergaminho_reparo_rapido', methods=['POST'])
+def api_usar_pergaminho_reparo_rapido():
+    try:
+        from bson.objectid import ObjectId
+        from modules import player_manager, profession_engine
+
+        data = request.get_json(silent=True) or {}
+        user_id = data.get("user_id")
+        if not user_id:
+            return jsonify({"sucesso": False, "erro": "Identifique seu herói para usar o atalho."}), 400
+
+        busca_id = ObjectId(user_id) if len(str(user_id)) == 24 else int(user_id)
+        pdata = users_collection.find_one({"_id": busca_id})
+        if not pdata:
+            return jsonify({"sucesso": False, "erro": "Herói não encontrado."}), 404
+        if not pdata.get("pergaminho_reparo_equipado"):
+            return jsonify({"sucesso": False, "erro": "Equipe um Pergaminho de Reparo pela mochila primeiro."}), 400
+
+        resultado = _run_async(profession_engine.restore_all_equipped_durability(pdata))
+        if "error" in resultado:
+            return jsonify({"sucesso": False, "erro": resultado["error"]}), 400
+
+        _run_async(player_manager.save_player_data(str(busca_id), pdata))
+        return jsonify({"sucesso": True, "msg": resultado.get("message", "Equipamentos reparados com sucesso!")})
+    except Exception as e:
+        return jsonify({"sucesso": False, "erro": str(e)}), 500
 
 
 @webapp_bp.route('/api/personagem/usar_item', methods=['POST'])

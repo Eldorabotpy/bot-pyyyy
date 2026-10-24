@@ -190,6 +190,7 @@ def obter_personagem_info(personagem_id):
             "skills_equipadas": pdata.get("equipped_skills", {}),
             "pocao_equipada_hp": pdata.get("pocao_equipada_hp"),
             "pocao_equipada_mp": pdata.get("pocao_equipada_mp"),
+            "pergaminho_reparo_equipado": pdata.get("pergaminho_reparo_equipado", False),
             "profession": pdata.get("profession"),
             "learned_professions": pdata.get("learned_professions", {}),
             "equipment_tools": pdata.get("equipment_tools", {}),

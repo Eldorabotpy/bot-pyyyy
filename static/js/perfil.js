@@ -1820,6 +1820,9 @@ window.abrirModalItem = function(idAlvo, origem) {
                 <button onclick="equiparPocaoAtalho('${idReal}', 'mp')" class="eldora-profile-style-43efeeaf">Slot 💧</button>
             `;
         }
+        else if (['pergaminho_de_reparo', 'pergaminho_durabilidade'].includes(idReal)) {
+            botoesHtml = `<button onclick="equiparPergaminhoReparoAtalho('${idReal}')" class="eldora-profile-style-50b8d325">Equipar no atalho 📜</button>`;
+        }
         else if (idReal === 'carta_recomendacao') {
             botoesHtml = '<div class="eldora-profile-style-3198545b">📜 Apresente esta carta à recepcionista da Guilda dos Aventureiros. Ela será recolhida automaticamente no seu registro.</div>';
         }
@@ -2084,6 +2087,76 @@ window.equiparPocaoAtalho = async function(itemId, tipoPocao) {
         console.error(e);
     }
 }
+
+window.equiparPergaminhoReparoAtalho = async function(itemId) {
+    const charId = localStorage.getItem("jogadorEldoraID");
+    if (!charId) return;
+
+    try {
+        const res = await fetch('/api/personagem/equipar_pergaminho_reparo', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: charId, item_id: itemId })
+        });
+        const data = await res.json();
+
+        if (!res.ok || !data.sucesso) {
+            const mensagem = data.erro || "Não foi possível equipar o pergaminho.";
+            if (window.alertaEldora) window.alertaEldora("Atalho de Reparo", mensagem, "erro");
+            else window.avisoEldora(mensagem);
+            return;
+        }
+
+        if (typeof window.fecharModalItem === 'function') window.fecharModalItem();
+        if (typeof window.carregarMeuPerfil === 'function') window.carregarMeuPerfil();
+        if (typeof window.atualizarHudCircular === 'function') window.atualizarHudCircular();
+        if (typeof window.carregarDadosDoHUD === 'function') window.carregarDadosDoHUD();
+        if (window.alertaEldora) {
+            window.alertaEldora("Atalho de Reparo", "Pergaminho equipado no novo slot rápido.", "sucesso");
+        }
+    } catch (e) {
+        console.error("Erro ao equipar pergaminho no atalho:", e);
+        if (window.alertaEldora) window.alertaEldora("Atalho de Reparo", "Falha ao equipar o pergaminho.", "erro");
+    }
+};
+
+window.usarPergaminhoReparoRapido = async function() {
+    const charId = localStorage.getItem("jogadorEldoraID");
+    if (!charId || window.__usandoPergaminhoReparoRapido) return;
+
+    window.__usandoPergaminhoReparoRapido = true;
+    const slot = document.getElementById("hud-slot-pergaminho-reparo");
+    if (slot) slot.style.pointerEvents = "none";
+
+    try {
+        const res = await fetch('/api/personagem/usar_pergaminho_reparo_rapido', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: charId })
+        });
+        const data = await res.json();
+
+        if (!res.ok || !data.sucesso) {
+            const mensagem = data.erro || "Não foi possível usar o pergaminho.";
+            if (window.alertaEldora) window.alertaEldora("Atalho de Reparo", mensagem, "erro");
+            else window.avisoEldora(mensagem);
+            return;
+        }
+
+        if (typeof window.carregarMeuPerfil === 'function') window.carregarMeuPerfil();
+        if (typeof window.atualizarHudCircular === 'function') window.atualizarHudCircular();
+        if (typeof window.carregarDadosDoHUD === 'function') window.carregarDadosDoHUD();
+        if (window.alertaEldora) {
+            window.alertaEldora("Reparo Concluído!", data.msg || "Equipamentos reparados com sucesso!", "sucesso");
+        }
+    } catch (e) {
+        console.error("Erro ao usar pergaminho rápido:", e);
+        if (window.alertaEldora) window.alertaEldora("Atalho de Reparo", "Falha ao usar o pergaminho.", "erro");
+    } finally {
+        window.__usandoPergaminhoReparoRapido = false;
+        if (slot) slot.style.pointerEvents = "auto";
+    }
+};
 
 // ==========================================
 // SISTEMA DE GRIMÓRIO E SKILLS (perfil.js)

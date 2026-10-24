@@ -635,7 +635,7 @@ window.injetarMenuStatusFlutuante = function() {
                         style="
                             display:flex;
 
-                            gap:18px;
+                            gap:12px;
 
                             justify-content:
                                 center;
@@ -955,6 +955,47 @@ window.injetarMenuStatusFlutuante = function() {
                                 x0
                             </div>
 
+                        </div>
+
+                        <!-- PERGAMINHO DE REPARO -->
+                        <div
+                            id="hud-slot-pergaminho-reparo"
+                            role="button"
+                            tabindex="0"
+                            aria-label="Atalho do Pergaminho de Reparo"
+                            onclick="window.usarPergaminhoReparoRapido && window.usarPergaminhoReparoRapido()"
+                            onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click()}"
+                            title="Equipe um Pergaminho de Reparo pela mochila para usar aqui"
+                            class="hud-slot"
+                            style="
+                                position:relative;
+                                width:50px;
+                                height:50px;
+                                background:radial-gradient(circle at 50% 35%, rgba(161,98,7,.24), rgba(4,10,20,.96));
+                                border:2px solid #c9a45c;
+                                border-radius:11px;
+                                display:flex;
+                                justify-content:center;
+                                align-items:center;
+                                cursor:pointer;
+                                box-shadow:inset 0 0 14px rgba(201,164,92,.14), 0 5px 10px rgba(0,0,0,.45);
+                                transition:transform .1s, opacity .15s;
+                            "
+                            onmousedown="this.style.transform='scale(.92)'"
+                            onmouseup="this.style.transform='scale(1)'"
+                            onmouseleave="this.style.transform='scale(1)'"
+                        >
+                            <img
+                                id="hud-img-pergaminho-reparo"
+                                src=""
+                                alt=""
+                                style="display:none;max-width:80%;max-height:80%;filter:drop-shadow(0 3px 4px rgba(0,0,0,.9));"
+                            >
+                            <span style="display:inline;font-size:1.3em;">📜</span>
+                            <div
+                                id="hud-qtd-pergaminho-reparo"
+                                style="display:none;position:absolute;right:-7px;bottom:-7px;min-width:24px;height:19px;padding:0 4px;border-radius:999px;background:linear-gradient(180deg,#d6b86a,#8b691f);border:2px solid #07111f;color:#fff;font-size:9px;font-weight:900;line-height:15px;text-align:center;box-shadow:0 3px 7px rgba(0,0,0,.75);z-index:5;"
+                            >x0</div>
                         </div>
 
                     </div>
@@ -2009,6 +2050,41 @@ window.carregarDadosDoHUD = async function() {
             const qtdMp =
                 quantidadeItemInventario(mpId);
 
+            const idsPergaminhoReparo = new Set([
+                "pergaminho_de_reparo",
+                "pergaminho_durabilidade"
+            ]);
+            const itensPergaminhoReparo = [];
+            const adicionarPergaminho = (uid, item, fallbackId) => {
+                const baseId = item && typeof item === "object"
+                    ? (item.base_id || item.item_id || item.id || fallbackId || uid)
+                    : (fallbackId || uid);
+                if (!idsPergaminhoReparo.has(String(baseId))) return;
+
+                const quantidade = item && typeof item === "object"
+                    ? Number(item.quantity ?? item.qtd ?? item.quantidade ?? item.amount ?? 1) || 0
+                    : Number(item) || 0;
+                if (quantidade > 0) itensPergaminhoReparo.push({ uid: String(uid || baseId), quantidade });
+            };
+
+            if (Array.isArray(inventario)) {
+                inventario.forEach((item, index) => {
+                    const baseId = item?.base_id || item?.item_id || item?.id;
+                    const uid = item?.uid || item?.unique_id || item?.item_uid || baseId || String(index);
+                    adicionarPergaminho(uid, item, baseId);
+                });
+            } else if (inventario && typeof inventario === "object") {
+                Object.entries(inventario).forEach(([uid, item]) => adicionarPergaminho(uid, item, uid));
+            }
+
+            const qtdPergaminhoReparo = itensPergaminhoReparo.reduce(
+                (total, item) => total + item.quantidade,
+                0
+            );
+            const pergaminhoEquipado = Boolean(
+                dataPocao.pergaminho_reparo_equipado ?? p.pergaminho_reparo_equipado
+            );
+
             // ======================================================
             // 🌐 IMAGENS
             // ======================================================
@@ -2172,6 +2248,53 @@ window.carregarDadosDoHUD = async function() {
                         qtdMpEl.style.display =
                             "none";
                     }
+                }
+            }
+
+            // ======================================================
+            // 📜 PERGAMINHO DE REPARO DO ATALHO
+            // ======================================================
+            const slotReparo = document.getElementById("hud-slot-pergaminho-reparo");
+            const imgReparo = document.getElementById("hud-img-pergaminho-reparo");
+            const qtdReparoEl = document.getElementById("hud-qtd-pergaminho-reparo");
+            const fallbackReparo = imgReparo?.nextElementSibling;
+            const possuiPergaminho = qtdPergaminhoReparo > 0;
+
+            if (slotReparo) {
+                const instrucoes = !pergaminhoEquipado
+                    ? "Equipe um Pergaminho de Reparo pela mochila para usar aqui."
+                    : possuiPergaminho
+                        ? "Usar Pergaminho de Reparo: restaura a durabilidade dos equipamentos."
+                        : "O Pergaminho de Reparo equipado acabou.";
+                slotReparo.title = instrucoes;
+                slotReparo.setAttribute("aria-label", instrucoes);
+                slotReparo.style.opacity = pergaminhoEquipado && possuiPergaminho ? "1" : "0.62";
+                slotReparo.style.borderColor = pergaminhoEquipado ? "#c9a45c" : "#64748b";
+            }
+
+            if (imgReparo) {
+                if (possuiPergaminho) {
+                    imgReparo.onload = function() {
+                        this.style.display = "block";
+                        if (fallbackReparo) fallbackReparo.style.display = "none";
+                    };
+                    imgReparo.onerror = function() {
+                        this.style.display = "none";
+                        if (fallbackReparo) fallbackReparo.style.display = "inline";
+                    };
+                    imgReparo.src = `${linkBaseNuvem}pergaminho_de_reparo.png`;
+                } else {
+                    imgReparo.style.display = "none";
+                    if (fallbackReparo) fallbackReparo.style.display = "inline";
+                }
+            }
+
+            if (qtdReparoEl) {
+                if (possuiPergaminho) {
+                    qtdReparoEl.innerText = `x${qtdPergaminhoReparo}`;
+                    qtdReparoEl.style.display = "block";
+                } else {
+                    qtdReparoEl.style.display = "none";
                 }
             }
 
