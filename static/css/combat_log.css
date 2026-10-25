@@ -45,7 +45,10 @@
 .eldora-log-history-heading { flex:0 0 auto; min-height:18px; color:#d6c18e; font-size:11px; }
 .eldora-log-history-heading > span:first-child { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .eldora-log-history-heading [data-log-count],#combat-log-count { color:#9aaac0; font-weight:600; letter-spacing:0; text-transform:none; white-space:nowrap; }
-.eldora-log-history { display:flex; flex:0 0 auto; flex-direction:column; gap:3px; min-height:0; max-height:none; overflow:hidden !important; padding:0 1px 1px 0; overscroll-behavior:contain; }
+.eldora-log-history { display:flex; flex:1 1 auto; flex-direction:column; gap:3px; min-height:0; max-height:clamp(76px,18dvh,148px); overflow-y:auto !important; overflow-x:hidden; padding:0 3px 1px 0; touch-action:pan-y; -webkit-overflow-scrolling:touch; overscroll-behavior-y:contain; scrollbar-color:#687a96 #0a1220; scrollbar-width:thin; }
+.eldora-log-history::-webkit-scrollbar { width:5px; }
+.eldora-log-history::-webkit-scrollbar-track { background:#0a1220; border-radius:5px; }
+.eldora-log-history::-webkit-scrollbar-thumb { background:#687a96; border-radius:5px; }
 .eldora-log-history:focus-visible { outline:2px solid #c9a45c; outline-offset:2px; border-radius:5px; }
 .eldora-log-empty { padding:3px 2px; color:#a7b5c8; font:11px/1.35 'Segoe UI',Arial,sans-serif; }
 .eldora-log-entry { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:5px 8px; min-height:29px; padding:4px 6px; background:#0e1928; border:1px solid #ffffff12; border-radius:6px; animation:eldora-log-entry-in .22s ease-out both; }
@@ -58,18 +61,19 @@
 .eldora-log-entry[data-tone="support"] .eldora-log-entry-value { color:#78d49a; }
 .eldora-log-entry[data-tone="critical"] .eldora-log-entry-value { color:#ffd77d; }
 @keyframes eldora-log-entry-in { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
-#tela-combate-global .eldora-combat-log { flex:0 1 auto; max-height:none; }
+#tela-combate-global .eldora-combat-log { flex:0 1 auto; max-height:clamp(138px,30dvh,230px); }
 #tela-combate-global #combat-log-box { align-items:stretch !important; justify-content:flex-start !important; text-align:left !important; background:linear-gradient(145deg,#111c2d,#0a1220) !important; border:1px solid rgba(201,164,92,.32) !important; padding:9px !important; }
 #tela-combate-global #botoes-fim-batalha,#tela-pvp-global #pvp-botoes-fim-batalha,#tela-pve-global #pve-botoes-fim-batalha { flex:0 0 auto; padding-top:7px; border-top:1px solid #ffffff16; }
 .combat-action-panel .eldora-combat-log { flex:0 1 auto; max-height:none; }
 #tela-pvp-global .eldora-combat-log,#tela-pve-global .eldora-combat-log { max-height:min(34dvh,270px); }
 #tela-pvp-global .combat-action-panel,#tela-pve-global .combat-action-panel { max-height:52dvh; }
-#pvp-caixa-logs-scroll.eldora-combat-log,#pve-log-content.eldora-combat-log { min-height:0; max-height:none; overflow:hidden !important; }
-#pvp-caixa-logs-scroll .eldora-log-history,#pve-log-content .eldora-log-history { min-height:0; max-height:none; overflow:hidden !important; }
+#pvp-caixa-logs-scroll.eldora-combat-log,#pve-log-content.eldora-combat-log { min-height:0; max-height:min(34dvh,245px); overflow:hidden !important; }
+#pvp-caixa-logs-scroll .eldora-log-history,#pve-log-content .eldora-log-history { min-height:0; max-height:clamp(72px,19dvh,148px); overflow-y:auto !important; }
 #raid-log.eldora-combat-log,#dimensional-log.eldora-combat-log { flex:1 1 auto; min-height:110px; max-height:none; margin:8px; }
 @media(max-height:640px) {
     .eldora-combat-log { gap:4px; padding:6px; }
     .eldora-log-history-heading { min-height:16px; }
     .eldora-log-entry { min-height:27px; padding:3px 5px; }
+    .eldora-log-history { max-height:clamp(64px,18dvh,116px); }
 }
 @media(prefers-reduced-motion:reduce) { .eldora-log-entry { animation:none; } }
