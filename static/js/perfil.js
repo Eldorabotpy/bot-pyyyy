@@ -2283,6 +2283,26 @@ const escaparHtmlSkillUpgrade = valor => String(valor ?? '').replace(/[&<>"']/g,
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
 }[caractere]));
 const numeroSkillUpgrade = valor => Number(valor || 0).toLocaleString('pt-BR');
+const URL_BASE_IMAGENS_SKILL_UPGRADE = 'https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/';
+const CAMINHOS_IMAGENS_SKILL_UPGRADE = {
+    ouro: 'perfil/ouro.png',
+    pedra_de_aprimoramento: 'itens/consumiveis/pedra_de_aprimoramento.png',
+    cristal_mana_bruto: 'itens/materiais/cristal_mana_bruto.png',
+    essencia_purificadora: 'itens/materiais/essencia_purificadora.png',
+};
+const urlImagemCustoSkillUpgrade = itemId => {
+    const id = String(itemId || '');
+    const caminho = CAMINHOS_IMAGENS_SKILL_UPGRADE[id]
+        || (id.startsWith('tomo_') ? `itens/materiais/${encodeURIComponent(id)}.png` : '');
+    return caminho ? `${URL_BASE_IMAGENS_SKILL_UPGRADE}${caminho}` : '';
+};
+const htmlIconeCustoSkillUpgrade = (itemId, fallback) => {
+    const imagem = urlImagemCustoSkillUpgrade(itemId);
+    const textoFallback = escaparHtmlSkillUpgrade(fallback || '📦');
+    return imagem
+        ? `<img src="${escaparHtmlSkillUpgrade(imagem)}" data-skill-cost-image data-fallback="${textoFallback}" alt="" loading="lazy" decoding="async">`
+        : `<span class="eldora-skill-cost-fallback" aria-hidden="true">${textoFallback}</span>`;
+};
 
 window.abrirMenuAprimoramentoSkill = async function(skillId) {
     let modal = null;
@@ -2297,7 +2317,7 @@ window.abrirMenuAprimoramentoSkill = async function(skillId) {
         modal = garantirModalDetalhesSkill();
         modal.setAttribute('role', 'dialog');
         modal.setAttribute('aria-modal', 'true');
-        modal.setAttribute('aria-label', 'Fórmula de aprimoramento');
+        modal.setAttribute('aria-label', 'Custos para aprimorar a habilidade');
         modal.setAttribute('aria-busy', 'true');
         modal.innerHTML = `<div class="eldora-skill-upgrade-loading" role="status" aria-live="polite">Consultando materiais e fórmula…</div>`;
 
@@ -2318,30 +2338,44 @@ window.abrirMenuAprimoramentoSkill = async function(skillId) {
 
         const formula = data.formula || {};
         const ouro = formula.gold || {};
-        const bonusPorNivel = Number(formula.bonus_per_level_pct || 4);
-        const raridade = escaparHtmlSkillUpgrade(formula.rarity || 'comum');
-        const multiplicadorRaridade = Number(formula.rarity_multiplier || 1);
-        const ouroHtml = `<li class="eldora-skill-cost-row ${ouro.enough ? 'has-enough' : 'needs-more'}">
-            <span class="eldora-skill-cost-icon">🪙</span>
-            <span class="eldora-skill-cost-copy"><strong>Ouro</strong><small>Possui ${numeroSkillUpgrade(ouro.owned)} / ${numeroSkillUpgrade(ouro.required)}</small></span>
-            <b>${numeroSkillUpgrade(ouro.required)}</b>
-        </li>`;
-        const itensHtml = (formula.items || []).map(item => `<li class="eldora-skill-cost-row ${item.enough ? 'has-enough' : 'needs-more'}">
-            <span class="eldora-skill-cost-icon">${escaparHtmlSkillUpgrade(item.emoji || '📦')}</span>
-            <span class="eldora-skill-cost-copy"><strong>${escaparHtmlSkillUpgrade(item.name)}</strong><small>Possui ${numeroSkillUpgrade(item.owned)} / ${numeroSkillUpgrade(item.required)}</small></span>
-            <b>×${numeroSkillUpgrade(item.required)}</b>
-        </li>`).join('');
         const nivelAtual = Number(formula.current_level || 1);
         const maximo = nivelAtual >= Number(formula.max_level || 10);
+        const proximoNivel = formula.next_level ? Number(formula.next_level) : nivelAtual;
+        const ouroHtml = `<li class="eldora-skill-cost-row ${ouro.enough ? 'has-enough' : 'needs-more'}">
+            <span class="eldora-skill-cost-icon">${htmlIconeCustoSkillUpgrade('ouro', '🪙')}</span>
+            <span class="eldora-skill-cost-copy"><strong>Ouro</strong><small>Em mãos: ${numeroSkillUpgrade(ouro.owned)}</small></span>
+            <b><small>PRECISA</small>${numeroSkillUpgrade(ouro.required)}</b>
+        </li>`;
+        const itensHtml = (formula.items || []).map(item => `<li class="eldora-skill-cost-row ${item.enough ? 'has-enough' : 'needs-more'}">
+            <span class="eldora-skill-cost-icon">${htmlIconeCustoSkillUpgrade(item.id, item.emoji || '📦')}</span>
+            <span class="eldora-skill-cost-copy"><strong>${escaparHtmlSkillUpgrade(item.name)}</strong><small>Em mãos: ${numeroSkillUpgrade(item.owned)}</small></span>
+            <b><small>PRECISA</small>${numeroSkillUpgrade(item.required)}</b>
+        </li>`).join('');
         const progresso = formula.next_level
             ? `Nível ${nivelAtual} <span>→</span> ${formula.next_level}`
             : `Nível ${nivelAtual} · máximo`;
         const potencia = formula.next_level
             ? `Potência +${formula.current_power_pct || 0}% → +${formula.next_power_pct || 0}%`
             : `Potência +${formula.current_power_pct || 0}%`;
-        const regraFormula = `<p><strong>Ouro:</strong> 150 × nível atual × raridade (${raridade} ×${multiplicadorRaridade}).</p>
-            <p><strong>Multiplicadores:</strong> comum ×1 · incomum ×2 · rara ×5 · épica ×10 · lendária ×20.</p>
-            <p><strong>Materiais:</strong> 1 tomo da habilidade; Pedra = nível ÷ 2 arredondado para cima; Cristal = nível ÷ 3 arredondado para cima; Essência = 1, +1 a cada 4 níveis acima do primeiro.</p>`;
+        const faltasAprimoramento = [];
+        if (!ouro.enough && !maximo) {
+            faltasAprimoramento.push(`${numeroSkillUpgrade(Math.max(0, ouro.required - ouro.owned))} ouro`);
+        }
+        for (const item of formula.items || []) {
+            if (!item.enough) {
+                faltasAprimoramento.push(`${item.name} ×${numeroSkillUpgrade(Math.max(0, item.required - item.owned))}`);
+            }
+        }
+        const statusAprimoramento = maximo
+            ? 'Esta habilidade já está no nível máximo.'
+            : formula.can_upgrade
+                ? 'Você tem tudo que precisa para o próximo nível.'
+                : faltasAprimoramento.length
+                    ? `Faltam: ${faltasAprimoramento.join(', ')}.`
+                    : formula.reason || 'Confira os materiais necessários.';
+        const custosHtml = maximo
+            ? '<li class="eldora-skill-cost-empty">Não há outro nível para aprimorar.</li>'
+            : `${ouroHtml}${itensHtml || '<li class="eldora-skill-cost-empty">Materiais indisponíveis para esta habilidade.</li>'}`;
         const estadoBotao = formula.can_upgrade ? 'Confirmar aprimoramento' : (maximo ? 'Nível máximo' : 'Faltam materiais');
 
         modal.innerHTML = `<div class="eldora-skill-upgrade-heading">
@@ -2353,15 +2387,23 @@ window.abrirMenuAprimoramentoSkill = async function(skillId) {
                 <img src="${imagem}" onerror="this.onerror=null;this.src='${fallback}'" alt="" class="eldora-skill-upgrade-icon">
                 <div><strong>${progresso}</strong><span>${potencia}</span></div>
             </div>
-            <p class="eldora-skill-upgrade-explainer">Cada nível aumenta em ${bonusPorNivel}% a potência de dano, cura e recuperação de mana. Habilidades passivas também fortalecem seus bônus.</p>
-            <section class="eldora-skill-cost-panel" aria-label="Fórmula de aprimoramento">
-                <header><h4>Fórmula para este nível</h4><span>Confira o custo total antes de confirmar</span></header>
-                <p class="eldora-skill-formula-rules">${regraFormula}</p>
-                <ul>${ouroHtml}${itensHtml || '<li class="eldora-skill-cost-empty">Materiais indisponíveis para esta habilidade.</li>'}</ul>
+            <section class="eldora-skill-cost-panel" aria-label="Materiais necessários para o próximo nível">
+                <header><h4>Materiais do próximo nível</h4><span>Do nível ${nivelAtual} para o ${proximoNivel}</span></header>
+                <ul>${custosHtml}</ul>
             </section>
-            <p class="eldora-skill-upgrade-status ${formula.can_upgrade ? 'is-ready' : 'is-missing'}" role="status" aria-live="polite">${escaparHtmlSkillUpgrade(formula.reason || 'Confira os requisitos.')}</p>
+            <p class="eldora-skill-upgrade-status ${formula.can_upgrade ? 'is-ready' : 'is-missing'}" role="status" aria-live="polite">${escaparHtmlSkillUpgrade(statusAprimoramento)}</p>
             <button type="button" class="eldora-skill-action is-upgrade" data-skill-upgrade-confirm ${formula.can_upgrade ? '' : 'disabled'}>${estadoBotao}</button>`;
         modal.setAttribute('aria-busy', 'false');
+
+        modal.querySelectorAll('[data-skill-cost-image]').forEach(imagemItem => {
+            imagemItem.addEventListener('error', () => {
+                const fallbackItem = document.createElement('span');
+                fallbackItem.className = 'eldora-skill-cost-fallback';
+                fallbackItem.setAttribute('aria-hidden', 'true');
+                fallbackItem.textContent = imagemItem.dataset.fallback || '📦';
+                imagemItem.replaceWith(fallbackItem);
+            }, { once: true });
+        });
 
         modal.querySelector('[data-skill-upgrade-back]')?.addEventListener('click', () => {
             const equipadas = window._skillsEquipadasTemp || {};
@@ -2378,7 +2420,7 @@ window.abrirMenuAprimoramentoSkill = async function(skillId) {
         if (requestId !== window.__skillUpgradeFormulaRequestId || !modal.isConnected) return;
         modal.setAttribute('role', 'dialog');
         modal.setAttribute('aria-modal', 'true');
-        modal.setAttribute('aria-label', 'Fórmula de aprimoramento');
+        modal.setAttribute('aria-label', 'Custos para aprimorar a habilidade');
         modal.setAttribute('aria-busy', 'false');
         modal.innerHTML = `<div class="eldora-skill-upgrade-heading">
                 <button type="button" class="eldora-skill-upgrade-back" data-skill-upgrade-back>← Voltar</button>
