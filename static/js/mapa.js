@@ -2869,13 +2869,13 @@ class MapaScene extends Phaser.Scene {
         
         }
         else if (this.regiaoAtual === 'pedreira_granito') {
-            // Minas: Local do Bórin
-            spawnRecurso('pedra_1', 'pedra', '🪨 Rocha', 'item_pedra', 52, 7);
-            spawnRecurso('pedra_2', 'pedra', '🪨 Rocha', 'item_pedra', 45, 16);
-            spawnRecurso('veio_ferro_granito_1', 'minerio_de_ferro', '🪨 Veio de Ferro', 'item_ferro', 16, 9);
-            spawnRecurso('veio_ferro_granito_2', 'minerio_de_ferro', '🪨 Veio de Ferro', 'item_ferro', 18, 15);
-            spawnRecurso('veio_ferro_granito_3', 'minerio_de_ferro', '🪨 Veio de Ferro', 'item_ferro', 35, 10);
-            spawnRecurso('poca_sangue_1', 'sangue', '🩸 Poça Sombria', 'item_sangue', 32, 22);
+            // Pontos no centro das clareiras, afastados das paredes e colisões.
+            spawnRecurso('pedra_1', 'pedra', '🪨 Rocha', 'item_pedra', 54, 7);
+            spawnRecurso('pedra_2', 'pedra', '🪨 Rocha', 'item_pedra', 46, 14);
+            spawnRecurso('veio_ferro_granito_1', 'minerio_de_ferro', '🪨 Veio de Ferro', 'item_ferro', 18, 7);
+            spawnRecurso('veio_ferro_granito_2', 'minerio_de_ferro', '🪨 Veio de Ferro', 'item_ferro', 15, 20);
+            spawnRecurso('veio_ferro_granito_3', 'minerio_de_ferro', '🪨 Veio de Ferro', 'item_ferro', 33, 8);
+            spawnRecurso('poca_sangue_1', 'sangue', '🩸 Poça Sombria', 'item_sangue', 31, 19);
         
         }
         // Nota: capital_eldora não tem recursos para manter a cidade limpa.
