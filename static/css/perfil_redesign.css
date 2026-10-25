@@ -1198,7 +1198,7 @@
 .eldora-skill-cost-icon img { display: block; width: 36px; height: 36px; object-fit: contain; filter: drop-shadow(0 2px 4px rgba(0, 0, 0, .35)); }
 .eldora-skill-cost-fallback { font-size: 20px; line-height: 1; }
 .eldora-skill-cost-copy { display: grid; flex: 1; min-width: 0; gap: 3px; }
-.eldora-skill-cost-copy strong { overflow: hidden; color: #e7edf5; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.eldora-skill-cost-copy strong { color: #e7edf5; font-size: 12px; line-height: 1.25; overflow-wrap: anywhere; white-space: normal; }
 .eldora-skill-cost-copy small { color: #b6c3d2; font-size: 11px; }
 .eldora-skill-cost-row > b { display: grid; flex: 0 0 auto; justify-items: end; gap: 3px; color: inherit; font-size: 13px; }
 .eldora-skill-cost-row > b small { color: #aebdce; font-size: 8px; letter-spacing: .07em; }
