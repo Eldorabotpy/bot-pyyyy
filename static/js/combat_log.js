@@ -199,12 +199,22 @@
         sub.textContent = event.detail;
         copy.append(actor, message, sub);
         line.appendChild(copy);
+        const side = document.createElement("span");
+        side.className = "eldora-log-entry-side";
         if (event.value !== null && event.value !== undefined && event.value !== "") {
             const val = document.createElement("span");
             val.className = "eldora-log-entry-value";
             val.textContent = `${event.value}${event.unit ? ` ${event.unit}` : ""}`;
-            line.appendChild(val);
+            side.appendChild(val);
         }
+        const flag = String(event.flag || "").trim();
+        if (flag && !event.title.toLocaleLowerCase("pt-BR").includes(flag.toLocaleLowerCase("pt-BR"))) {
+            const badge = document.createElement("span");
+            badge.className = "eldora-log-entry-flag";
+            badge.textContent = flag;
+            side.appendChild(badge);
+        }
+        if (side.childElementCount) line.appendChild(side);
         state.feed.appendChild(line);
         const entries = state.feed.querySelectorAll(".eldora-log-entry");
         if (entries.length > 5) entries[0].remove();

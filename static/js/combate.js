@@ -1399,8 +1399,10 @@ function animarAcoesDaRodada(turnoInfo, tipoAcao, skillId, skillNome) {
             const tituloGolpe = Number(acao.golpe) > 0
                 ? `Golpe ${Number(acao.golpe)}/${totalGolpes}`
                 : alvoEsquivou ? "Alvo esquivou" : alvoDefendeu ? "Alvo defendeu" : ehFalha ? "Ação falhou" : ehCura ? "Suporte" : ehCritico ? "Ataque crítico" : tipoAcao === "magia" ? (skillNome || "Habilidade") : "Ataque";
-            const detalheGolpe = acao.mostrar_roubo_vida && Number(acao.roubo_vida) > 0
-                ? `${textoGolpe} Roubo de vida: ${Number(acao.roubo_vida)} HP.`
+            const mostrarRouboVida = acao.mostrar_roubo_vida && Number(acao.roubo_vida) > 0;
+            const rouboVida = mostrarRouboVida ? Number(acao.roubo_vida) : 0;
+            const detalheGolpe = mostrarRouboVida && !/\broubou\b|\broubo de vida\b/i.test(textoGolpe)
+                ? `${textoGolpe} Roubo de vida: ${rouboVida} HP.`
                 : textoGolpe;
             registrarEventoLogCombate({
                 actor: "Você",
@@ -1412,7 +1414,7 @@ function animarAcoesDaRodada(turnoInfo, tipoAcao, skillId, skillNome) {
                 critico: ehCritico,
                 golpe: acao.golpe,
                 total_hits: totalGolpes,
-                flag: acao.mostrar_roubo_vida && Number(acao.roubo_vida) > 0 ? `Roubo ${Number(acao.roubo_vida)} HP` : (ehCritico ? "Crítico" : "")
+                flag: mostrarRouboVida ? `Roubo ${rouboVida} HP` : (ehCritico ? "Crítico" : "")
             });
             if (ehCura) {
                 let ehMana = txtAcao.includes("MANA");

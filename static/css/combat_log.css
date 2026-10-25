@@ -51,13 +51,17 @@
 .eldora-log-empty { padding:3px 2px; color:#a7b5c8; font:11px/1.35 'Segoe UI',Arial,sans-serif; }
 .eldora-log-entry { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:5px 8px; min-height:29px; padding:4px 6px; background:#0e1928; border:1px solid #ffffff12; border-radius:6px; animation:eldora-log-entry-in .22s ease-out both; }
 .eldora-log-entry-copy { display:grid; grid-template-columns:auto minmax(0,1fr); column-gap:6px; row-gap:2px; align-items:baseline; min-width:0; }
+.eldora-log-entry-side { display:flex; grid-column:2; grid-row:1; flex-direction:column; align-items:flex-end; justify-content:center; gap:3px; max-width:92px; min-width:0; }
 .eldora-log-entry-actor { overflow:hidden; max-width:100px; color:#aab8ca; font:800 10px/1.2 'Segoe UI',Arial,sans-serif; letter-spacing:.02em; text-overflow:ellipsis; text-transform:uppercase; white-space:nowrap; }
 .eldora-log-entry-title { overflow:hidden; color:#e4eaf2; font:650 11px/1.25 'Segoe UI',Arial,sans-serif; text-overflow:ellipsis; white-space:nowrap; }
 .eldora-log-entry-detail { grid-column:1/-1; overflow:hidden; color:#b8c4d3; font:10px/1.25 'Segoe UI',Arial,sans-serif; text-overflow:ellipsis; white-space:nowrap; }
 .eldora-log-entry-value { color:#f0c878; font:800 10px/1.2 'Segoe UI',Arial,sans-serif; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.eldora-log-entry-flag { max-width:100%; overflow:hidden; padding:1px 4px; color:#f0d28b; background:#332919; border:1px solid #c9a45c55; border-radius:4px; font:800 9px/1.2 'Segoe UI',Arial,sans-serif; text-overflow:ellipsis; white-space:nowrap; }
 .eldora-log-entry[data-tone="enemy"] .eldora-log-entry-value { color:#ef8580; }
 .eldora-log-entry[data-tone="support"] .eldora-log-entry-value { color:#78d49a; }
 .eldora-log-entry[data-tone="critical"] .eldora-log-entry-value { color:#ffd77d; }
+.eldora-log-entry[data-tone="support"] .eldora-log-entry-flag { color:#a2e1b8; background:#15291f; border-color:#65cf7244; }
+.eldora-log-entry[data-tone="enemy"] .eldora-log-entry-flag { color:#ffaaa5; background:#311d22; border-color:#e66b6244; }
 @keyframes eldora-log-entry-in { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
 #tela-combate-global .eldora-combat-log { flex:0 1 auto; max-height:clamp(138px,30dvh,230px); }
 #tela-combate-global #combat-log-box { align-items:stretch !important; justify-content:flex-start !important; text-align:left !important; background:linear-gradient(145deg,#111c2d,#0a1220) !important; border:1px solid rgba(201,164,92,.32) !important; padding:9px !important; }
