@@ -3030,10 +3030,10 @@ class MapaScene extends Phaser.Scene {
         const basePes = Number(ator.y || 0) + alturaVisual * (1 - origemY);
         const posicaoNormalizada = Phaser.Math.Clamp(basePes / alturaMundo, 0, 1);
 
-        // Todos os atores usam a mesma faixa e continuam se ordenando pela
-        // posição no mapa. A faixa começa na camada 20 para que o mapa não
-        // desenhe "Acima do Jogador" sobre personagens, pets ou mobs.
-        return 20 + posicaoNormalizada * 6;
+        // Mantém jogador, pets e mobs acima das camadas comuns, mas abaixo
+        // de "Acima do Jogador" (depth 20), que deve cobrir os atores.
+        // A posição dos pés mantém a ordenação top-down entre os atores.
+        return 12 + posicaoNormalizada * 6;
     }
 
     calcularProfundidadeMob(mob) {
