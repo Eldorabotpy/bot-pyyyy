@@ -20,6 +20,7 @@ from modules.events.dimensional_boss_registry import BOSS_DIMENSIONAL_CONFIG
 _evento_dimensional_ativo: Optional[Dict[str, Any]] = None
 _contadores_abates_dimensional: Dict[str, Dict[str, Any]] = {}
 _CONTADOR_DIMENSIONAL_ID = "abates_global"
+_EVENTO_DIMENSIONAL_ID = "evento_ativo"
 
 
 def _colecao_estado_dimensional():
@@ -27,6 +28,93 @@ def _colecao_estado_dimensional():
         return users_collection.database["dimensional_boss_state"]
     except Exception:
         return None
+
+
+def _persistir_evento_dimensional(evento: Optional[Dict[str, Any]]) -> bool:
+    """Salva o estado completo da Fenda para sobreviver a reinícios do processo."""
+    colecao = _colecao_estado_dimensional()
+    if colecao is None:
+        print("⚠️ [DIMENSIONAL] Coleção de estado indisponível; evento não persistido.")
+        return False
+
+    if not evento:
+        return False
+
+    evento_id = str(evento.get("evento_id") or "").strip()
+    if not evento_id:
+        print("⚠️ [DIMENSIONAL] Evento sem ID; não foi persistido.")
+        return False
+
+    if evento.get("status") in ("finalizado", "cancelado"):
+        try:
+            colecao.delete_one({"_id": _EVENTO_DIMENSIONAL_ID, "evento_id": evento_id})
+            return True
+        except Exception as exc:
+            print(f"⚠️ [DIMENSIONAL] Não foi possível remover a Fenda encerrada: {exc}")
+            return False
+
+    try:
+        colecao.update_one(
+            {"_id": _EVENTO_DIMENSIONAL_ID},
+            {"$set": {
+                "evento_id": evento_id,
+                "evento": copy.deepcopy(evento),
+                "atualizado_em": _agora(),
+            }},
+            upsert=True,
+        )
+        return True
+    except Exception as exc:
+        print(f"⚠️ [DIMENSIONAL] Não foi possível persistir a Fenda ativa: {exc}")
+        return False
+
+
+def _remover_evento_dimensional_persistido(evento_id: Optional[str] = None) -> None:
+    colecao = _colecao_estado_dimensional()
+    if colecao is None:
+        return
+
+    filtro = {"_id": _EVENTO_DIMENSIONAL_ID}
+    if evento_id:
+        filtro["evento_id"] = str(evento_id)
+
+    try:
+        colecao.delete_one(filtro)
+    except Exception as exc:
+        print(f"⚠️ [DIMENSIONAL] Não foi possível limpar a Fenda persistida: {exc}")
+
+
+def _restaurar_evento_dimensional() -> Optional[Dict[str, Any]]:
+    """Restaura a Fenda ativa do Mongo quando o processo inicia sem estado local."""
+    global _evento_dimensional_ativo
+
+    if _evento_dimensional_ativo is not None:
+        return _evento_dimensional_ativo
+
+    colecao = _colecao_estado_dimensional()
+    if colecao is None:
+        return None
+
+    try:
+        registro = colecao.find_one({"_id": _EVENTO_DIMENSIONAL_ID}) or {}
+        evento = registro.get("evento")
+    except Exception as exc:
+        print(f"⚠️ [DIMENSIONAL] Não foi possível restaurar a Fenda salva: {exc}")
+        return None
+
+    if not isinstance(evento, dict) or not evento.get("evento_id"):
+        return None
+
+    if evento.get("status") in ("finalizado", "cancelado"):
+        _remover_evento_dimensional_persistido(evento.get("evento_id"))
+        return None
+
+    _evento_dimensional_ativo = evento
+    print(
+        "🌌 [DIMENSIONAL] Fenda restaurada do Mongo: "
+        f"{evento.get('evento_id')} ({evento.get('status')})"
+    )
+    return evento
 
 
 def _ler_contador_global_dimensional() -> Dict[str, Any]:
@@ -248,9 +336,16 @@ def verificar_inicio_automatico(evento: Optional[Dict[str, Any]] = None, motivo:
             "cancelado"
         )
 
+        print(
+            "🌌 [DIMENSIONAL] Fenda fechada sem participantes: "
+            f"evento={evento.get('evento_id')} "
+            f"prazo={entrada_encerra_em:.3f} agora={_agora():.3f}"
+        )
+
         evento["status"] = "cancelado"
         evento["finalizado"] = True
         _evento_dimensional_ativo = None
+        _remover_evento_dimensional_persistido(evento.get("evento_id"))
         return None
 
     if lotou:
@@ -273,12 +368,13 @@ def verificar_inicio_automatico(evento: Optional[Dict[str, Any]] = None, motivo:
     if resultado.get("success"):
         evento["inicio_automatico"] = True
         evento["inicio_motivo"] = motivo
+        _persistir_evento_dimensional(evento)
         return evento
 
     return evento
 
 def serializar_evento(evento: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
-    evento = evento or _evento_dimensional_ativo
+    evento = evento if evento is not None else obter_evento_ativo()
 
     if not evento:
         return None
@@ -518,6 +614,7 @@ def registrar_abate_mapa(
         }
 
         evento = serializar_evento(_evento_dimensional_ativo)
+        _persistir_evento_dimensional(_evento_dimensional_ativo)
 
     contador["eventos_criados"] = int(contador.get("eventos_criados", 0) or 0) + 1
     contador["ultimo_evento_id"] = evento.get("evento_id") if evento else None
@@ -584,6 +681,9 @@ def obter_status_abates_dimensional() -> Dict[str, Any]:
 
 def obter_evento_ativo() -> Optional[Dict[str, Any]]:
     global _evento_dimensional_ativo
+
+    if _evento_dimensional_ativo is None:
+        _restaurar_evento_dimensional()
 
     if not _evento_dimensional_ativo:
         return None
@@ -673,6 +773,7 @@ def criar_evento_debug(mapa: Optional[str] = None) -> Dict[str, Any]:
     }
 
     _evento_dimensional_ativo = evento
+    _persistir_evento_dimensional(evento)
     return serializar_evento(evento)
 
 
@@ -776,6 +877,8 @@ def entrar_no_evento(user_id: str) -> Dict[str, Any]:
     })
 
     evento = verificar_inicio_automatico(evento, "entrada_jogador")
+    if evento:
+        _persistir_evento_dimensional(evento)
 
     return {
         "success": True,
@@ -808,6 +911,7 @@ def sair_do_evento(user_id: str) -> Dict[str, Any]:
             "tipo": "saida",
             "texto": f"{nome} saiu da Fenda Dimensional."
         })
+        _persistir_evento_dimensional(evento)
 
     return {
         "success": True,
@@ -877,6 +981,7 @@ def iniciar_batalha(user_id: str) -> Dict[str, Any]:
         })
 
     resultado = engine.iniciar_batalha_evento(evento)
+    _persistir_evento_dimensional(evento)
 
     return {
         **resultado,
@@ -912,6 +1017,8 @@ def executar_acao(user_id: str, alvo_id: str, tipo: str = "ataque_basico", skill
     if evento.get("status") in ("vitoria", "derrota") or evento.get("finalizado"):
         _aplicar_desgaste_evento_dimensional(evento)
 
+    _persistir_evento_dimensional(evento)
+
     return {
         **resultado,
         "evento": serializar_evento(evento)
@@ -934,6 +1041,7 @@ def encerrar_evento_debug() -> Dict[str, Any]:
     _evento_dimensional_ativo["status"] = "cancelado"
     _evento_dimensional_ativo["finalizado"] = True
 
+    _remover_evento_dimensional_persistido(evento_id)
     _evento_dimensional_ativo = None
 
     return {
