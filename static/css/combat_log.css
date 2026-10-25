@@ -45,10 +45,8 @@
 .eldora-log-history-heading { flex:0 0 auto; min-height:18px; color:#d6c18e; font-size:11px; }
 .eldora-log-history-heading > span:first-child { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .eldora-log-history-heading [data-log-count],#combat-log-count { color:#9aaac0; font-weight:600; letter-spacing:0; text-transform:none; white-space:nowrap; }
-.eldora-log-history { display:flex; flex:1 1 auto; flex-direction:column; gap:3px; min-height:0; max-height:clamp(76px,18dvh,148px); overflow-y:auto !important; overflow-x:hidden; padding:0 3px 1px 0; touch-action:pan-y; -webkit-overflow-scrolling:touch; overscroll-behavior-y:contain; scrollbar-color:#687a96 #0a1220; scrollbar-width:thin; }
-.eldora-log-history::-webkit-scrollbar { width:5px; }
-.eldora-log-history::-webkit-scrollbar-track { background:#0a1220; border-radius:5px; }
-.eldora-log-history::-webkit-scrollbar-thumb { background:#687a96; border-radius:5px; }
+.eldora-log-history { display:flex; flex:1 1 auto; flex-direction:column; gap:3px; min-height:0; max-height:clamp(76px,18dvh,148px); overflow-y:auto !important; overflow-x:hidden; padding:0 1px 1px 0; touch-action:pan-y; -webkit-overflow-scrolling:touch; overscroll-behavior-y:contain; scrollbar-width:none; -ms-overflow-style:none; }
+.eldora-log-history::-webkit-scrollbar { display:none; width:0; height:0; }
 .eldora-log-history:focus-visible { outline:2px solid #c9a45c; outline-offset:2px; border-radius:5px; }
 .eldora-log-empty { padding:3px 2px; color:#a7b5c8; font:11px/1.35 'Segoe UI',Arial,sans-serif; }
 .eldora-log-entry { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:5px 8px; min-height:29px; padding:4px 6px; background:#0e1928; border:1px solid #ffffff12; border-radius:6px; animation:eldora-log-entry-in .22s ease-out both; }
@@ -76,4 +74,5 @@
     .eldora-log-entry { min-height:27px; padding:3px 5px; }
     .eldora-log-history { max-height:clamp(64px,18dvh,116px); }
 }
+@media(max-width:340px) { .eldora-log-history-heading [data-log-phase] { display:none; } }
 @media(prefers-reduced-motion:reduce) { .eldora-log-entry { animation:none; } }
