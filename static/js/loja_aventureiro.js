@@ -20,35 +20,21 @@ const merlinNumero = valor => Number(valor).toLocaleString('pt-BR');
 const merlinNomeMoeda = item => item?.moeda === 'gemas' ? 'Gemas 💎' : 'Ouro';
 function prepararRetratoMerlin() {
     const sprite = merlinEl('merlin-banner-sprite');
-    const avatar = sprite?.parentElement;
     const fallback = merlinEl('merlin-banner-fallback');
-    if (!sprite || !avatar) return;
+    if (!sprite) return;
 
-    const ajustarQuadro = () => {
-        if (!sprite.naturalWidth) {
-            sprite.hidden = true;
-            if (fallback) fallback.hidden = false;
-            return;
-        }
-        const escala = Math.min(1.5, avatar.clientWidth / 48, avatar.clientHeight / 48);
-        const tamanhoQuadro = 48 * escala;
-        sprite.style.width = `${sprite.naturalWidth * escala}px`;
-        sprite.style.height = `${sprite.naturalHeight * escala}px`;
-        sprite.style.left = `${(avatar.clientWidth - tamanhoQuadro) / 2 - tamanhoQuadro}px`;
-        sprite.style.top = `${(avatar.clientHeight - tamanhoQuadro) / 2}px`;
-        sprite.hidden = false;
-        if (fallback) fallback.hidden = true;
+    const atualizarRetrato = () => {
+        const carregado = sprite.naturalWidth > 0 && sprite.naturalHeight > 0;
+        sprite.hidden = !carregado;
+        if (fallback) fallback.hidden = carregado;
     };
 
-    if (!sprite.dataset.merlinCropListeners) {
-        sprite.dataset.merlinCropListeners = 'true';
-        sprite.addEventListener('load', ajustarQuadro, { once: true });
-        sprite.addEventListener('error', () => {
-            sprite.hidden = true;
-            if (fallback) fallback.hidden = false;
-        }, { once: true });
+    if (!sprite.dataset.merlinPortraitListeners) {
+        sprite.dataset.merlinPortraitListeners = 'true';
+        sprite.addEventListener('load', atualizarRetrato);
+        sprite.addEventListener('error', atualizarRetrato);
     }
-    if (sprite.complete) ajustarQuadro();
+    if (sprite.complete) atualizarRetrato();
 }
 function merlinImagem(item) {
     if (item?.tipo === 'skill_book') return '';
