@@ -922,6 +922,7 @@
     box-shadow: 0 0 30px rgba(0, 0, 0, .8);
     color: #fff;
 }
+.eldora-skill-modal[role="dialog"] > * { flex: 0 0 auto; }
 .eldora-skill-modal-title { margin: 0; font-size: 16px; color: #c4b5fd; font-family: Cinzel, serif; }
 .eldora-skill-modal-title.is-unavailable { color: #ef4444; }
 #aba-perfil .eldora-combat-skill-slots {
