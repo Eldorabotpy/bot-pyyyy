@@ -178,7 +178,7 @@ window.aplicarImagemItemEldora = function(imgEl, item) {
 window.getCaminhosImagemPerfilEldora = function(item) {
     const base = "https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/itens/";
     const baseRunas = "https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/runas/";
-    const cacheVersion = "20261024-2";
+    const cacheVersion = "20261025-1";
     const bruto = String(item?.base_id || item?.item_id || item?.uid || item?.id || "").trim();
     if (!bruto) return [];
 
@@ -191,7 +191,12 @@ window.getCaminhosImagemPerfilEldora = function(item) {
     const ferramenta = itemEUmaFerramenta(item);
     const caminhos = [];
     if (["skill_book", "livro", "book"].includes(tipo) || categoria === "aprendizado") {
-        caminhos.push(`https://raw.githubusercontent.com/Eldorabotpy/static-img/refs/heads/main/assets/itens/materiais/${encodeURIComponent(bruto)}.png?v=${cacheVersion}`);
+        // Alguns tomos antigos ficam no inventário pelo ID da própria skill
+        // (ex.: evo_templar_divine_light), enquanto a arte pública usa o ID
+        // canônico do tomo (tomo_evo_templar_divine_light.png).
+        const skillId = String(item?.skill_id || "").trim();
+        const idTomo = /^tomo_/i.test(bruto) ? bruto : `tomo_${skillId || bruto}`;
+        caminhos.push(`${base}materiais/${encodeURIComponent(idTomo)}.png?v=${cacheVersion}`);
     }
     const urlIcone = typeof item?.icon_url === "string" ? item.icon_url.trim() : "";
     const iconePlaceholder = /(?:seuusuario|seurepositorio|example\.com|placeholder)/i.test(urlIcone);
