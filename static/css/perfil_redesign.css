@@ -1100,7 +1100,14 @@
     line-height: 1.5;
 }
 
-.eldora-skill-upgrade-loading { padding: 28px 8px; color: #cbd5e1; text-align: center; }
+.eldora-skill-upgrade-loading {
+    display: grid;
+    min-height: 52px;
+    place-items: center;
+    padding: 16px 8px;
+    color: #cbd5e1;
+    text-align: center;
+}
 .eldora-skill-upgrade-heading {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;

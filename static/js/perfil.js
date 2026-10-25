@@ -1171,7 +1171,7 @@ async function carregarMeuPerfil() {
 
         // Mantém a aba atual. Se for primeira abertura, começa em Atributos.
         const abaInicialPerfil = window.perfilAbaAtual || 'status';
-        alternarAbaPerfil(abaInicialPerfil);
+        await alternarAbaPerfil(abaInicialPerfil);
 
         if (abaInicialPerfil === 'inv' && typeof filtrarMochila === 'function') {
             filtrarMochila(window.perfilFiltroMochilaAtual || 'todos');
@@ -2285,26 +2285,36 @@ const escaparHtmlSkillUpgrade = valor => String(valor ?? '').replace(/[&<>"']/g,
 const numeroSkillUpgrade = valor => Number(valor || 0).toLocaleString('pt-BR');
 
 window.abrirMenuAprimoramentoSkill = async function(skillId) {
-    const charId = localStorage.getItem("jogadorEldoraID");
-    if (!charId) {
-        window.avisoEldora("Entre novamente para consultar a fórmula da habilidade.");
-        return;
-    }
-    const modal = garantirModalDetalhesSkill();
-
-    const info = window._skillsDataTemp?.[skillId] || {};
-    const nome = escaparHtmlSkill(info.display_name || skillId);
-    const nomeIcone = escaparHtmlSkill(info.icon || 'default_skill');
-    const imagem = `https://raw.githubusercontent.com/Eldorabotpy/static-img/refs/heads/main/assets/sprites/skills/${nomeIcone}.png`;
-    const fallback = 'https://raw.githubusercontent.com/Eldorabotpy/static-img/refs/heads/main/assets/sprites/skills/default_skill.png';
-    modal.innerHTML = `<div class="eldora-skill-upgrade-loading">Consultando materiais e fórmula…</div>`;
+    let modal = null;
+    let info = {};
+    const requestId = (window.__skillUpgradeFormulaRequestId || 0) + 1;
+    window.__skillUpgradeFormulaRequestId = requestId;
 
     try {
-        const headers = window.portalSessionHeaders ? await window.portalSessionHeaders() : {};
+        const charId = localStorage.getItem("jogadorEldoraID");
+        if (!charId) throw new Error("Entre novamente para consultar a fórmula da habilidade.");
+
+        modal = garantirModalDetalhesSkill();
+        modal.setAttribute('role', 'dialog');
+        modal.setAttribute('aria-modal', 'true');
+        modal.setAttribute('aria-label', 'Fórmula de aprimoramento');
+        modal.setAttribute('aria-busy', 'true');
+        modal.innerHTML = `<div class="eldora-skill-upgrade-loading" role="status" aria-live="polite">Consultando materiais e fórmula…</div>`;
+
+        info = window._skillsDataTemp?.[skillId] || {};
+        const nome = escaparHtmlSkill(info.display_name || skillId);
+        const nomeIcone = escaparHtmlSkill(info.icon || 'default_skill');
+        const imagem = `https://raw.githubusercontent.com/Eldorabotpy/static-img/refs/heads/main/assets/sprites/skills/${nomeIcone}.png`;
+        const fallback = 'https://raw.githubusercontent.com/Eldorabotpy/static-img/refs/heads/main/assets/sprites/skills/default_skill.png';
+        if (typeof window.portalSessionHeaders !== 'function') {
+            throw new Error("A sessão expirou. Atualize a página e tente novamente.");
+        }
+        const headers = await window.portalSessionHeaders();
         const url = `/api/personagem/${encodeURIComponent(charId)}/habilidades/${encodeURIComponent(skillId)}/aprimoramento`;
         const res = await fetch(url, { headers });
         const data = await res.json();
         if (!res.ok || !data.sucesso) throw new Error(data.erro || 'Não foi possível consultar os requisitos.');
+        if (requestId !== window.__skillUpgradeFormulaRequestId || !modal.isConnected) return;
 
         const formula = data.formula || {};
         const ouro = formula.gold || {};
@@ -2351,6 +2361,7 @@ window.abrirMenuAprimoramentoSkill = async function(skillId) {
             </section>
             <p class="eldora-skill-upgrade-status ${formula.can_upgrade ? 'is-ready' : 'is-missing'}" role="status" aria-live="polite">${escaparHtmlSkill(formula.reason || 'Confira os requisitos.')}</p>
             <button type="button" class="eldora-skill-action is-upgrade" data-skill-upgrade-confirm ${formula.can_upgrade ? '' : 'disabled'}>${estadoBotao}</button>`;
+        modal.setAttribute('aria-busy', 'false');
 
         modal.querySelector('[data-skill-upgrade-back]')?.addEventListener('click', () => {
             const equipadas = window._skillsEquipadasTemp || {};
@@ -2363,11 +2374,18 @@ window.abrirMenuAprimoramentoSkill = async function(skillId) {
             confirmar.addEventListener('click', () => window.aprimorarSkillPeloTomo(skillId, confirmar));
         }
     } catch (erro) {
+        if (!modal) modal = garantirModalDetalhesSkill();
+        if (requestId !== window.__skillUpgradeFormulaRequestId || !modal.isConnected) return;
+        modal.setAttribute('role', 'dialog');
+        modal.setAttribute('aria-modal', 'true');
+        modal.setAttribute('aria-label', 'Fórmula de aprimoramento');
+        modal.setAttribute('aria-busy', 'false');
         modal.innerHTML = `<div class="eldora-skill-upgrade-heading">
                 <button type="button" class="eldora-skill-upgrade-back" data-skill-upgrade-back>← Voltar</button>
                 <h3>Fórmula indisponível</h3>
                 <button type="button" class="eldora-skill-upgrade-close" aria-label="Fechar" data-skill-upgrade-close>×</button>
-            </div><p class="eldora-skill-upgrade-status is-missing" role="status">${escaparHtmlSkill(erro.message)}</p>`;
+            </div><p class="eldora-skill-upgrade-status is-missing" data-skill-upgrade-error role="alert"></p>`;
+        modal.querySelector('[data-skill-upgrade-error]').textContent = erro?.message || 'Não foi possível consultar os requisitos.';
         modal.querySelector('[data-skill-upgrade-back]')?.addEventListener('click', () => {
             const equipadas = window._skillsEquipadasTemp || {};
             const slot = Object.keys(equipadas).find(key => equipadas[key] === skillId);
@@ -2398,7 +2416,10 @@ window.aprimorarSkillPeloTomo = async function(skillId, botao) {
         if (!res.ok || !data.sucesso) throw new Error(data.erro || data.mensagem || "Não foi possível aprimorar a habilidade.");
         document.getElementById('modal-skill-detalhes')?.remove();
         if (typeof carregarMeuPerfil === 'function') await carregarMeuPerfil();
-        if (typeof window.carregarMenuMagias === 'function') await window.carregarMenuMagias();
+        else if (typeof window.carregarMenuMagias === 'function') await window.carregarMenuMagias();
+        if (window.perfilAbaAtual === 'magias' && typeof window.abrirPainelAprimoramentoSkills === 'function') {
+            window.abrirPainelAprimoramentoSkills();
+        }
         if (window.alertaEldora) window.alertaEldora("Habilidade aprimorada", data.mensagem || "O nível da habilidade aumentou.", "sucesso");
     } catch (erro) {
         if (botao) {
