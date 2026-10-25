@@ -3030,9 +3030,13 @@ class MapaScene extends Phaser.Scene {
         const basePes = Number(ator.y || 0) + alturaVisual * (1 - origemY);
         const posicaoNormalizada = Phaser.Math.Clamp(basePes / alturaMundo, 0, 1);
 
-        // Reserva a faixa 12–18 para personagens e criaturas. Assim eles se
-        // ordenam entre si sem passar à frente de textos, indicadores e camadas 20+.
+        // Reserva a faixa 12–18 para jogador, pets e outros jogadores. Mobs usam
+        // uma faixa própria acima da camada "Acima do Jogador" do mapa.
         return 12 + posicaoNormalizada * 6;
+    }
+
+    calcularProfundidadeMob(mob) {
+        return this.calcularProfundidadeAtor(mob) + 8;
     }
 
     atualizarProfundidadeAtores() {
@@ -3045,8 +3049,8 @@ class MapaScene extends Phaser.Scene {
 
         const mobs = this.motorCacada?.mobsNoMapa?.getChildren?.() || [];
         mobs.forEach(mob => {
-            atualizar(mob);
-            if (mob.corruptionAura?.active) {
+            if (mob?.active) mob.setDepth(this.calcularProfundidadeMob(mob));
+            if (mob?.corruptionAura?.active) {
                 mob.corruptionAura.setDepth(mob.depth - 0.01);
             }
         });

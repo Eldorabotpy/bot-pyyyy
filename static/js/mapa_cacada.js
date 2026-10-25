@@ -1579,22 +1579,24 @@ class MotorCacada {
                 String(mobData.tipo || '').toLowerCase() === 'boss';
 
             const tamanhoMob = ehBoss ? 128 : 48;
+            const dadosProfundidade = {
+                x: mobData.x,
+                y: mobData.y,
+                displayHeight: tamanhoMob,
+                originY: 0.5,
+            };
+            const profundidadeMob = this.scene.calcularProfundidadeMob
+                ? this.scene.calcularProfundidadeMob(dadosProfundidade)
+                : this.scene.calcularProfundidadeAtor
+                    ? this.scene.calcularProfundidadeAtor(dadosProfundidade) + 8
+                    : 22;
 
             let sprite = this.scene.add.sprite(
                 mobData.x,
                 mobData.y,
                 textureKey,
                 0
-            ).setDepth(
-                this.scene.calcularProfundidadeAtor
-                    ? this.scene.calcularProfundidadeAtor({
-                        x: mobData.x,
-                        y: mobData.y,
-                        displayHeight: tamanhoMob,
-                        originY: 0.5
-                    })
-                    : 14
-            );
+            ).setDepth(profundidadeMob);
 
             sprite.setDisplaySize(
                 tamanhoMob,
