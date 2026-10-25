@@ -2302,8 +2302,8 @@ window.abrirMenuAprimoramentoSkill = async function(skillId) {
         modal.innerHTML = `<div class="eldora-skill-upgrade-loading" role="status" aria-live="polite">Consultando materiais e fórmula…</div>`;
 
         info = window._skillsDataTemp?.[skillId] || {};
-        const nome = escaparHtmlSkill(info.display_name || skillId);
-        const nomeIcone = escaparHtmlSkill(info.icon || 'default_skill');
+        const nome = escaparHtmlSkillUpgrade(info.display_name || skillId);
+        const nomeIcone = escaparHtmlSkillUpgrade(info.icon || 'default_skill');
         const imagem = `https://raw.githubusercontent.com/Eldorabotpy/static-img/refs/heads/main/assets/sprites/skills/${nomeIcone}.png`;
         const fallback = 'https://raw.githubusercontent.com/Eldorabotpy/static-img/refs/heads/main/assets/sprites/skills/default_skill.png';
         if (typeof window.portalSessionHeaders !== 'function') {
@@ -2319,7 +2319,7 @@ window.abrirMenuAprimoramentoSkill = async function(skillId) {
         const formula = data.formula || {};
         const ouro = formula.gold || {};
         const bonusPorNivel = Number(formula.bonus_per_level_pct || 4);
-        const raridade = escaparHtmlSkill(formula.rarity || 'comum');
+        const raridade = escaparHtmlSkillUpgrade(formula.rarity || 'comum');
         const multiplicadorRaridade = Number(formula.rarity_multiplier || 1);
         const ouroHtml = `<li class="eldora-skill-cost-row ${ouro.enough ? 'has-enough' : 'needs-more'}">
             <span class="eldora-skill-cost-icon">🪙</span>
@@ -2327,8 +2327,8 @@ window.abrirMenuAprimoramentoSkill = async function(skillId) {
             <b>${numeroSkillUpgrade(ouro.required)}</b>
         </li>`;
         const itensHtml = (formula.items || []).map(item => `<li class="eldora-skill-cost-row ${item.enough ? 'has-enough' : 'needs-more'}">
-            <span class="eldora-skill-cost-icon">${escaparHtmlSkill(item.emoji || '📦')}</span>
-            <span class="eldora-skill-cost-copy"><strong>${escaparHtmlSkill(item.name)}</strong><small>Possui ${numeroSkillUpgrade(item.owned)} / ${numeroSkillUpgrade(item.required)}</small></span>
+            <span class="eldora-skill-cost-icon">${escaparHtmlSkillUpgrade(item.emoji || '📦')}</span>
+            <span class="eldora-skill-cost-copy"><strong>${escaparHtmlSkillUpgrade(item.name)}</strong><small>Possui ${numeroSkillUpgrade(item.owned)} / ${numeroSkillUpgrade(item.required)}</small></span>
             <b>×${numeroSkillUpgrade(item.required)}</b>
         </li>`).join('');
         const nivelAtual = Number(formula.current_level || 1);
@@ -2359,7 +2359,7 @@ window.abrirMenuAprimoramentoSkill = async function(skillId) {
                 <p class="eldora-skill-formula-rules">${regraFormula}</p>
                 <ul>${ouroHtml}${itensHtml || '<li class="eldora-skill-cost-empty">Materiais indisponíveis para esta habilidade.</li>'}</ul>
             </section>
-            <p class="eldora-skill-upgrade-status ${formula.can_upgrade ? 'is-ready' : 'is-missing'}" role="status" aria-live="polite">${escaparHtmlSkill(formula.reason || 'Confira os requisitos.')}</p>
+            <p class="eldora-skill-upgrade-status ${formula.can_upgrade ? 'is-ready' : 'is-missing'}" role="status" aria-live="polite">${escaparHtmlSkillUpgrade(formula.reason || 'Confira os requisitos.')}</p>
             <button type="button" class="eldora-skill-action is-upgrade" data-skill-upgrade-confirm ${formula.can_upgrade ? '' : 'disabled'}>${estadoBotao}</button>`;
         modal.setAttribute('aria-busy', 'false');
 
