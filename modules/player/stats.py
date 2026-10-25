@@ -1220,9 +1220,20 @@ async def processar_turno_combate(
         validate_event_mob_owner,
     )
 
+    import time
+    inicio_perf_combate = time.perf_counter()
+    ultima_marcacao_perf = [inicio_perf_combate]
+    fases_perf_combate = []
+
+    def marcar_fase_combate(nome):
+        agora_perf = time.perf_counter()
+        fases_perf_combate.append((nome, round((agora_perf - ultima_marcacao_perf[0]) * 1000)))
+        ultima_marcacao_perf[0] = agora_perf
+
     await player_manager.clear_player_cache(ObjectId(user_id))
 
     player = users_collection.find_one({"_id": ObjectId(user_id)})
+    marcar_fase_combate("cache e leitura do jogador")
     if not player:
         return {"erro": "Herói não encontrado!"}
 
@@ -1321,11 +1332,13 @@ async def processar_turno_combate(
         return {'erro': 'Seu herói está derrotado e não pode agir.'}
     if mob_hp <= 0:
         return {'erro': 'Este monstro já foi derrotado.'}
+    marcar_fase_combate("validação de mob e grupo")
     # Cooldowns só passam depois que confirmou que era a vez do jogador.
     player, msgs_cooldown = iniciar_turno(player)
 
     aliados_ids = sala_grupo.get('membros_ids', []) if sala_grupo else None
     player_stats = await get_player_total_stats(player, aliados_ids)
+    marcar_fase_combate("cálculo de atributos")
     player_hp = int(player.get("current_hp", 50) or 0)
     player_mp = int(player.get("current_mp", 50) or 0)
     inventory = player.get("inventory", {}) or {}
@@ -1643,6 +1656,8 @@ async def processar_turno_combate(
         )
         log_turno.extend(logs_golpes)
         mob_vivo["hp_atual"] = mob_hp
+
+    marcar_fase_combate("resolver ação e dano")
 
     # A legião é estado privado deste herói e deste encontro. Os esqueletos
     # não ganham turnos próprios: atacam em conjunto durante a ação do jogador.
@@ -2373,6 +2388,7 @@ async def processar_turno_combate(
         {"_id": ObjectId(user_id)},
         {"$set": campos_atualizados}
     )
+    marcar_fase_combate("gravar personagem")
 
     # =============================================================
     # Checkpoint do monstro vivo. Abates e nascimento do chefe são salvos juntos
@@ -2546,6 +2562,16 @@ async def processar_turno_combate(
         and resultado_morte_mob.get(
             "boss_derrotado"
         )
+    )
+
+    total_perf_combate_ms = round((time.perf_counter() - inicio_perf_combate) * 1000)
+    tempo_marcado_perf_ms = sum(duracao for _, duracao in fases_perf_combate)
+    logger.warning(
+        "[COMBATE PERF] ação=%s total=%sms fases=%s restante=%sms",
+        acao,
+        total_perf_combate_ms,
+        ", ".join(f"{nome}:{duracao}ms" for nome, duracao in fases_perf_combate),
+        max(0, total_perf_combate_ms - tempo_marcado_perf_ms),
     )
 
     # =============================================================

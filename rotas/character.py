@@ -858,8 +858,8 @@ def acao_combate_migrada():
         ))
 
         duracao_acao_ms = (time.perf_counter() - inicio_acao_perf) * 1000
-        current_app.logger.info(
-            "[COMBATE] ação concluída (%s) em %.0f ms",
+        current_app.logger.warning(
+            "[COMBATE PERF] rota ação=%s total=%.0fms",
             acao,
             duracao_acao_ms,
         )
