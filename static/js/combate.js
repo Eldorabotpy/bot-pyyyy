@@ -689,6 +689,7 @@ window.iniciarCacadaApp = async function(spawnId, opcoesGrupo = {}) {
 
         document.getElementById('botoes-fim-batalha').style.display = 'none';
         document.getElementById('menu-botoes').style.display = 'grid';
+        if (!dados.grupo) definirFaseLogCombate("Sua vez");
     
         document.getElementById('combate-loading').style.display = 'none';
         document.getElementById('combate-arena').style.display = 'flex';
@@ -1029,11 +1030,28 @@ window.executarAcaoTurno = async function(tipoAcao, skillId = null, skillNome = 
     const menuSkills = document.getElementById('menu-skills-combate');
     if (menuSkills) menuSkills.style.display = 'none';
 
-    definirFaseLogCombate("Calculando turno");
+    const faseAcao = tipoAcao === "atacar"
+        ? "Ataque em andamento"
+        : tipoAcao === "magia"
+            ? "Conjurando habilidade"
+            : tipoAcao === "usar_item"
+                ? "Usando item"
+                : "Calculando turno";
+    definirFaseLogCombate(faseAcao);
     const logTitulo = document.getElementById('log-texto-1');
     const logDetalhe = document.getElementById('log-texto-2');
-    if (logTitulo) logTitulo.textContent = "Calculando ação...";
-    if (logDetalhe) logDetalhe.textContent = "";
+    if (logTitulo) logTitulo.textContent = `${faseAcao}...`;
+    if (logDetalhe) {
+        logDetalhe.textContent = tipoAcao === "atacar"
+            ? "Sua investida começou. Confirmando o resultado..."
+            : "Confirmando sua ação...";
+    }
+
+    // A investida começa no clique. O servidor continua sendo a autoridade
+    // para confirmar dano, esquiva, ataque duplo e o contra-ataque do mob.
+    if (tipoAcao === "atacar" && typeof window.animarInvestidaSprite === "function") {
+        combateDaAcao.ataqueAntecipado = window.animarInvestidaSprite("sprite-player");
+    }
 
     const charId = localStorage.getItem("jogadorEldoraID");
     const spawnIdAtual = window.dadosCombateAtual.spawnId;
@@ -1093,6 +1111,7 @@ window.executarAcaoTurno = async function(tipoAcao, skillId = null, skillNome = 
         if (salaDaAcao && (String(window.salaCombateGrupoAtual) !== String(salaDaAcao) || salasGrupoDevolvidas.has(String(salaDaAcao)))) return;
 
         if (turno.erro) {
+            delete combateDaAcao.ataqueAntecipado;
             combateDaAcao.rodadaVisualPendente = false;
             window.bloqueioDeTurno = false;
 
@@ -1108,6 +1127,7 @@ window.executarAcaoTurno = async function(tipoAcao, skillId = null, skillNome = 
         }
 
         if (turno.fugiu) {
+            delete combateDaAcao.ataqueAntecipado;
             combateDaAcao.rodadaVisualPendente = false;
             registrarEventoLogCombate({ actor: "Você", title: "Fuga", detail: turno.log?.[0]?.texto || "Você fugiu do combate.", tone: "event" });
 
@@ -1122,6 +1142,7 @@ window.executarAcaoTurno = async function(tipoAcao, skillId = null, skillNome = 
         animarAcoesDaRodada(turno, tipoAcao, skillId, skillNome);
 
     } catch(e) {
+        delete combateDaAcao.ataqueAntecipado;
         combateDaAcao.rodadaVisualPendente = false;
         window.bloqueioDeTurno = false;
         console.error(e);
@@ -1343,6 +1364,16 @@ function registrarEventoSistemaCombate(acao) {
         title: acao && acao.tipo === "durabilidade" ? "Equipamento" : "Acontecimento"
     });
 }
+
+function obterMovimentoAtaqueJogador(db) {
+    const antecipado = db?.ataqueAntecipado;
+    if (antecipado) {
+        delete db.ataqueAntecipado;
+        return antecipado;
+    }
+    return window.animarInvestidaSprite("sprite-player");
+}
+
 function animarAcoesDaRodada(turnoInfo, tipoAcao, skillId, skillNome) {
     const elemSpriteMob = document.getElementById('sprite-mob');
     const elemSpritePlayer = document.getElementById('sprite-player');
@@ -1383,6 +1414,7 @@ function animarAcoesDaRodada(turnoInfo, tipoAcao, skillId, skillNome) {
         if (window.dadosCombateAtual !== db || db.rodadaVisualCancelada) return;
         if (salaDaAnimacao && (String(window.salaCombateGrupoAtual) !== String(salaDaAnimacao) || salasGrupoDevolvidas.has(String(salaDaAnimacao)))) return;
         if (indexAcao >= logsDaRodada.length) {
+            delete db.ataqueAntecipado;
             console.info(`[COMBATE] animação da rodada concluída em ${Math.round(performance.now() - inicioAnimacaoMs)} ms.`);
             window.bloqueioDeTurno = !!(turnoInfo.vitoria || turnoInfo.derrota);
 
@@ -1564,7 +1596,7 @@ function animarAcoesDaRodada(turnoInfo, tipoAcao, skillId, skillNome) {
                     // Um golpe esquivado ou defendido ainda mostra a investida
                     // correspondente, inclusive em cada tentativa de ataque duplo.
                     const reacaoAlvo = alvoEsquivou ? animarEsquivaCombate("sprite-mob") : animarDefesaCombate("sprite-mob");
-                    await Promise.all([window.animarInvestidaSprite('sprite-player'), reacaoAlvo]);
+                    await Promise.all([obterMovimentoAtaqueJogador(db), reacaoAlvo]);
                     if (window.dadosCombateAtual !== db || db.rodadaVisualCancelada) return;
                 } else {
                     const playerEl = document.getElementById('sprite-player');
@@ -1580,7 +1612,7 @@ function animarAcoesDaRodada(turnoInfo, tipoAcao, skillId, skillNome) {
             } else {
                 // Cada registro de golpe executa e conclui sua própria investida;
                 // isso deixa o ataque duplo visível como dois movimentos distintos.
-                const movimentoInvestida = window.animarInvestidaSprite('sprite-player');
+                const movimentoInvestida = obterMovimentoAtaqueJogador(db);
                 
                 if (window.AudioManager) AudioManager.tocarSFX(ehCritico ? 'som_critico' : 'som_espada');
 
@@ -2570,6 +2602,7 @@ function atualizarControleTurnoGrupo(sala) {
     }
     if (sala && sala.estado === "aguardando") {
         window.bloqueioDeTurno = true;
+        definirFaseLogCombate("Aguardando grupo");
  
         menu.style.display = 'grid';
 
@@ -2592,6 +2625,7 @@ function atualizarControleTurnoGrupo(sala) {
     }
     if (!sala || !sala.turno_atual) {
         window.bloqueioDeTurno = false;
+        definirFaseLogCombate("Sua vez");
 
         botoes.forEach(btn => {
             btn.disabled = false;
@@ -2606,6 +2640,7 @@ function atualizarControleTurnoGrupo(sala) {
     const minhaVez = turnoAtual === meuId;
     
     window.bloqueioDeTurno = !minhaVez;
+    definirFaseLogCombate(minhaVez ? "Sua vez" : "Aguardando turno");
 
     if (minhaVez) {
         menu.style.display = 'grid';
