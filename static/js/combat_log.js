@@ -88,7 +88,7 @@
             feature.innerHTML = `<span class="eldora-log-mark" aria-hidden="true"></span><div class="eldora-log-feature-copy"><div class="eldora-log-meta"><span class="eldora-log-eyebrow">Última ação</span><span class="eldora-log-phase" data-log-phase ${phaseId ? `id="${phaseId}"` : ""} aria-live="polite">Sua vez</span></div><strong class="eldora-log-title" data-log-title ${titleId ? `id="${titleId}"` : ""}>Combate iniciado</strong><span class="eldora-log-detail" data-log-detail ${detailId ? `id="${detailId}"` : ""}>Aguardando a primeira ação.</span></div><span class="eldora-log-value" data-log-value hidden><strong data-log-number ${numberId ? `id="${numberId}"` : ""}></strong><small data-log-unit ${unitId ? `id="${unitId}"` : ""}></small></span><span class="eldora-log-flag" data-log-flag hidden></span>`;
             heading = document.createElement("div");
             heading.className = "eldora-log-history-heading";
-            heading.innerHTML = `<span>Registro da batalha</span><span data-log-count ${countId ? `id="${countId}"` : ""}>0 ações</span>`;
+            heading.innerHTML = `<span>Registro do combate</span><span class="eldora-log-phase" data-log-phase aria-live="polite">Sua vez</span><span data-log-count ${countId ? `id="${countId}"` : ""}>0/5 ações</span>`;
             feed = document.createElement("div");
             feed.className = "eldora-log-history";
             feed.setAttribute("role", "log");
@@ -108,15 +108,31 @@
             feed.setAttribute("aria-live", "polite");
         }
 
+        const headingLabel = heading.querySelector("span:first-child");
+        if (headingLabel) headingLabel.textContent = "Registro do combate";
+        if (!heading.querySelector("[data-log-phase]")) {
+            const phase = document.createElement("span");
+            phase.className = "eldora-log-phase";
+            phase.dataset.logPhase = "";
+            phase.setAttribute("aria-live", "polite");
+            phase.textContent = feature.querySelector("[data-log-phase]")?.textContent || "Sua vez";
+            heading.insertBefore(phase, heading.querySelector("[data-log-count]"));
+        }
+        const initialEntries = [...feed.querySelectorAll(".eldora-log-entry")];
+        initialEntries.slice(0, Math.max(0, initialEntries.length - 5)).forEach((entry) => entry.remove());
+
         state = { root, feature, heading, feed, count: feed.querySelectorAll(".eldora-log-entry").length, sessionKey: null, syncCounts: new Map() };
+        const countNode = heading.querySelector("[data-log-count], #combat-log-count");
+        if (countNode) countNode.textContent = `${state.count}/5 ações`;
         states.set(root, state);
         return state;
     }
 
     function setPhase(root, phase) {
         const state = ensure(resolveRoot(root));
-        const node = state?.feature.querySelector("[data-log-phase], .combat-log-phase");
-        if (node) node.textContent = String(phase || "");
+        state?.root.querySelectorAll("[data-log-phase], .combat-log-phase").forEach((node) => {
+            node.textContent = String(phase || "");
+        });
     }
 
     function clear(root, options = {}) {
@@ -132,13 +148,13 @@
         const value = state.feature.querySelector("[data-log-value], .combat-log-value");
         const flag = state.feature.querySelector("[data-log-flag], .combat-log-flag");
         const count = state.heading.querySelector("[data-log-count], #combat-log-count");
-        const phase = state.feature.querySelector("[data-log-phase], .combat-log-phase");
+        const phases = state.root.querySelectorAll("[data-log-phase], .combat-log-phase");
         if (title) title.textContent = options.title || "Combate iniciado";
         if (detail) detail.textContent = options.detail || "Aguardando a primeira ação.";
         if (value) value.hidden = true;
         if (flag) flag.hidden = true;
-        if (phase) phase.textContent = options.phase || "Sua vez";
-        if (count) count.textContent = "0 ações";
+        phases.forEach((phase) => { phase.textContent = options.phase || "Sua vez"; });
+        if (count) count.textContent = "0/5 ações";
         const empty = document.createElement("div");
         empty.className = "eldora-log-empty";
         empty.textContent = options.emptyText || "Os acontecimentos da batalha aparecerão aqui.";
@@ -155,17 +171,17 @@
         const number = state.feature.querySelector("[data-log-number], #combat-log-value-number");
         const unit = state.feature.querySelector("[data-log-unit], #combat-log-value-unit");
         const flag = state.feature.querySelector("[data-log-flag], .combat-log-flag");
-        const phase = state.feature.querySelector("[data-log-phase], .combat-log-phase");
         if (title) title.textContent = event.title;
         if (detail) detail.textContent = event.detail;
         state.feature.dataset.tone = event.tone;
-        if (phase) phase.textContent = "Turno resolvido";
+        state.root.querySelectorAll("[data-log-phase], .combat-log-phase").forEach((node) => {
+            node.textContent = "Turno resolvido";
+        });
         if (value) value.hidden = event.value === null || event.value === undefined || event.value === "";
         if (number) number.textContent = String(event.value ?? "");
         if (unit) unit.textContent = event.unit;
         if (flag) { flag.textContent = event.flag; flag.hidden = !event.flag; }
 
-        const wasNearBottom = state.feed.scrollHeight - state.feed.scrollTop - state.feed.clientHeight < 36;
         state.feed.querySelector(".eldora-log-empty")?.remove();
         const line = document.createElement("div");
         line.className = "eldora-log-entry";
@@ -190,10 +206,11 @@
             line.appendChild(val);
         }
         state.feed.appendChild(line);
-        state.count += 1;
+        const entries = state.feed.querySelectorAll(".eldora-log-entry");
+        if (entries.length > 5) entries[0].remove();
+        state.count = Math.min(5, state.count + 1);
         const count = state.heading.querySelector("[data-log-count], #combat-log-count");
-        if (count) count.textContent = `${state.count} ${state.count === 1 ? "ação" : "ações"}`;
-        if (wasNearBottom) state.feed.scrollTop = state.feed.scrollHeight;
+        if (count) count.textContent = `${state.count}/5 ações`;
     }
 
     function pushText(root, text, options = {}) {
