@@ -34,20 +34,24 @@
             </div>
             <div id="grupo-combate-container" style="display:none; position:absolute; top:45px; left:8px; z-index:20; flex-direction:column; gap:5px; max-width:180px;">
             </div>
-            <div id="hud-jogador" style="position: absolute; bottom: 8px; right: 8px; width: 140px; background: rgba(15, 23, 42, 0.9); border: 1px solid #334155; border-radius: 8px; padding: 6px; z-index: 10; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-                    <span style="color: #fff; font-size: 0.7em; font-weight: 800; letter-spacing: 0.5px;">VOCÊ</span>
-                    <span id="hud-lvl-player" style="color: #3b82f6; font-size: 0.6em; font-weight: 800;">LV.??</span>
+            <div id="hud-jogador" class="player-combat-hud" style="position: absolute; bottom: 8px; right: 8px; z-index: 10;">
+                <div class="player-combat-hud-heading">
+                    <span class="player-combat-hud-title"><span aria-hidden="true">✦</span> HERÓI</span>
+                    <span id="hud-lvl-player">LV.??</span>
                 </div>
-                
-                <div style="position: relative; height: 12px; background: #020617; border-radius: 3px; border: 1px solid #1e293b; overflow: hidden; margin-bottom: 4px;">
-                    <div id="bar-hp-player" style="width: 100%; height: 100%; background: linear-gradient(90deg, #059669, #10b981); transition: width 0.3s;"></div>
-                    <span id="val-hp-player" style="position: absolute; width: 100%; text-align: center; font-size: 0.55em; top: 0; font-weight: 900; color: #fff; text-shadow: 1px 1px #000; line-height: 11px;">0/0</span>
+                <div class="player-combat-meter player-combat-meter-hp">
+                    <span class="player-combat-meter-icon" aria-hidden="true">♥</span>
+                    <div class="player-combat-meter-track">
+                        <div id="bar-hp-player"></div>
+                        <span id="val-hp-player">0/0</span>
+                    </div>
                 </div>
-                
-                <div style="position: relative; height: 10px; background: #020617; border-radius: 3px; border: 1px solid #1e293b; overflow: hidden;">
-                    <div id="bar-mp-player" style="width: 100%; height: 100%; background: linear-gradient(90deg, #2563eb, #3b82f6); transition: width 0.3s;"></div>
-                    <span id="val-mp-player" style="position: absolute; width: 100%; text-align: center; font-size: 0.5em; top: 0; font-weight: 900; color: #fff; text-shadow: 1px 1px #000; line-height: 9px;">0/0</span>
+                <div class="player-combat-meter player-combat-meter-mp">
+                    <span class="player-combat-meter-icon" aria-hidden="true">◆</span>
+                    <div class="player-combat-meter-track">
+                        <div id="bar-mp-player"></div>
+                        <span id="val-mp-player">0/0</span>
+                    </div>
                 </div>
             </div>
 
