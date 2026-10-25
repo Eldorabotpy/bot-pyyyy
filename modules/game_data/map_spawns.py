@@ -18,6 +18,9 @@ def gerar_spawns(prefixo_regiao, lista_mobs, respawn_padrao=30):
         })
     return spawns
 
+
+TEMPO_RESPAWN_REGIOES_SEGUNDOS = 5 * 60
+
 # ==========================================
 # LISTA DE MONSTROS NO MAPA
 # Formato: ("id_do_monstro", posicao_x, posicao_y)
@@ -43,7 +46,7 @@ MAP_SPAWNS = {
         ("slime_terra", 54, 56),
         ("goblin_batedor", 59, 52),
         
-    ]),
+    ], respawn_padrao=TEMPO_RESPAWN_REGIOES_SEGUNDOS),
     
     "pradaria_inicial": gerar_spawns("pradaria", [
         
@@ -163,7 +166,7 @@ MAP_SPAWNS = {
         # 👑 CHEFE DO MAPA
         # ==========================================
         ("rei_slime", 52, 40)
-    ]),
+    ], respawn_padrao=TEMPO_RESPAWN_REGIOES_SEGUNDOS),
     
     "floresta_sombria": gerar_spawns("floresta", [
         
@@ -257,7 +260,7 @@ MAP_SPAWNS = {
         ("espectro_do_bosque", 33, 54), 
         ("espectro_do_bosque", 45, 54),
         ("espectro_do_bosque", 56, 48)
-    ]),
+    ], respawn_padrao=TEMPO_RESPAWN_REGIOES_SEGUNDOS),
     
     # ==========================================
     # ⛰️ PEDREIRA DE GRANITO (LOTADA)
@@ -343,7 +346,7 @@ MAP_SPAWNS = {
         ("basilisco_jovem", 38, 50), 
         ("basilisco_jovem", 52, 42), 
         ("basilisco_jovem", 15, 35),
-    ]),
+    ], respawn_padrao=TEMPO_RESPAWN_REGIOES_SEGUNDOS),
 
     # ==========================================
     # 🏰 DUNGEON 01 — CATACUMBAS DO REI CAÍDO
