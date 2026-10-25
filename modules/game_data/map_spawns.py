@@ -323,17 +323,17 @@ MAP_SPAWNS = {
         ("salamandra_de_pedra", 35, 51),
         ("salamandra_de_pedra", 40, 51),
         ("salamandra_de_pedra", 45, 50), 
-        ("salamandra_de_pedra", 52, 57),
+        ("salamandra_de_pedra", 40, 10),
         ("salamandra_de_pedra", 26, 45),
         ("salamandra_de_pedra", 36, 55),
         ("salamandra_de_pedra", 48, 52),
 
         # 🦇 Gárgulas de Vigia — bordas e cantos, longe do portal e das coletas
         ("gargula_de_vigia", 15, 3),
-        ("gargula_de_vigia", 55, 3),
-        ("gargula_de_vigia", 5, 55),
-        ("gargula_de_vigia", 55, 55), 
-        ("gargula_de_vigia", 50, 8),
+        ("gargula_de_vigia", 55, 16),
+        ("gargula_de_vigia", 10, 36),
+        ("gargula_de_vigia", 3, 32),
+        ("gargula_de_vigia", 50, 15),
         ("gargula_de_vigia", 10, 50),
         ("gargula_de_vigia", 48, 48), 
         ("gargula_de_vigia", 12, 45), 
@@ -345,7 +345,7 @@ MAP_SPAWNS = {
         ("basilisco_jovem", 19, 34),
         ("basilisco_jovem", 32, 49),
         ("basilisco_jovem", 52, 42),
-        ("basilisco_jovem", 18, 41),
+        ("basilisco_jovem", 18, 42),
     ], respawn_padrao=TEMPO_RESPAWN_REGIOES_SEGUNDOS),
 
     # ==========================================

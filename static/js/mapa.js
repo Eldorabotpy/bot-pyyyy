@@ -2870,7 +2870,6 @@ class MapaScene extends Phaser.Scene {
         }
         else if (this.regiaoAtual === 'pedreira_granito') {
             // Pontos no centro das clareiras, afastados das paredes e colisões.
-            spawnRecurso('pedra_1', 'pedra', '🪨 Rocha', 'item_pedra', 54, 7);
             spawnRecurso('pedra_2', 'pedra', '🪨 Rocha', 'item_pedra', 46, 14);
             spawnRecurso('veio_ferro_granito_1', 'minerio_de_ferro', '🪨 Veio de Ferro', 'item_ferro', 22, 6);
             spawnRecurso('veio_ferro_granito_2', 'minerio_de_ferro', '🪨 Veio de Ferro', 'item_ferro', 10, 14);
