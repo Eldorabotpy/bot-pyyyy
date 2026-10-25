@@ -1198,19 +1198,113 @@ function combateLogPertenceAMim(turnoInfo = {}, acao = {}) {
 }
 
 function definirFaseLogCombate(texto) {
-    window.EldoraCombatLog?.setPhase("combat-log-box", texto);
-}
-
-function limparHistoricoLogCombate(sessao = null) {
-    window.EldoraCombatLog?.clear("combat-log-box", {
-        sessionKey: sessao,
-        title: "Combate iniciado",
-        detail: "Aguardando sua primeira ação."
+    if (window.EldoraCombatLog?.setPhase) {
+        window.EldoraCombatLog.setPhase("combat-log-box", texto);
+        return;
+    }
+    const elements = montarEstruturaFallbackLogCombate();
+    elements?.root.querySelectorAll("[data-log-phase]").forEach((node) => {
+        node.textContent = String(texto || "");
     });
 }
 
+function limparHistoricoLogCombate(sessao = null) {
+    if (window.EldoraCombatLog?.clear) {
+        window.EldoraCombatLog.clear("combat-log-box", {
+            sessionKey: sessao,
+            title: "Combate iniciado",
+            detail: "Aguardando sua primeira ação."
+        });
+        return;
+    }
+
+    const elements = montarEstruturaFallbackLogCombate();
+    if (!elements) return;
+    elements.feed.replaceChildren();
+    elements.count.textContent = "0/5 ações";
+    const empty = document.createElement("div");
+    empty.className = "eldora-log-empty";
+    empty.textContent = "Os acontecimentos da batalha aparecerão aqui.";
+    elements.feed.appendChild(empty);
+}
+
 function registrarEventoLogCombate(evento) {
-    window.EldoraCombatLog?.push("combat-log-box", evento);
+    if (window.EldoraCombatLog?.push) {
+        window.EldoraCombatLog.push("combat-log-box", evento);
+        return;
+    }
+
+    const elements = montarEstruturaFallbackLogCombate();
+    if (!elements) return;
+    elements.feed.querySelector(".eldora-log-empty")?.remove();
+
+    const entry = document.createElement("div");
+    entry.className = "eldora-log-entry";
+    entry.dataset.tone = evento?.tone || "event";
+    const copy = document.createElement("div");
+    copy.className = "eldora-log-entry-copy";
+    const actor = document.createElement("span");
+    actor.className = "eldora-log-entry-actor";
+    actor.textContent = evento?.actor || "Sistema";
+    const title = document.createElement("strong");
+    title.className = "eldora-log-entry-title";
+    title.textContent = evento?.title || "Acontecimento";
+    const detail = document.createElement("span");
+    detail.className = "eldora-log-entry-detail";
+    detail.textContent = evento?.detail || evento?.text || "O combate avançou.";
+    copy.append(actor, title, detail);
+    entry.appendChild(copy);
+    if (evento?.value !== null && evento?.value !== undefined && evento?.value !== "") {
+        const value = document.createElement("span");
+        value.className = "eldora-log-entry-value";
+        value.textContent = `${evento.value}${evento.unit ? ` ${evento.unit}` : ""}`;
+        entry.appendChild(value);
+    }
+    elements.feed.appendChild(entry);
+    const entries = elements.feed.querySelectorAll(".eldora-log-entry");
+    if (entries.length > 5) entries[0].remove();
+    elements.count.textContent = `${Math.min(5, entries.length)}/5 ações`;
+}
+
+function montarEstruturaFallbackLogCombate() {
+    const root = document.getElementById("combat-log-box");
+    if (!root) return null;
+    root.classList.add("eldora-combat-log");
+
+    let heading = root.querySelector(".eldora-log-history-heading");
+    let feed = root.querySelector(".eldora-log-history");
+    if (!heading || !feed) {
+        root.replaceChildren();
+        heading = document.createElement("div");
+        heading.className = "eldora-log-history-heading";
+        const label = document.createElement("span");
+        label.textContent = "Registro do combate";
+        const phase = document.createElement("span");
+        phase.className = "eldora-log-phase";
+        phase.dataset.logPhase = "";
+        phase.textContent = "Sua vez";
+        const count = document.createElement("span");
+        count.dataset.logCount = "";
+        count.textContent = "0/5 ações";
+        heading.append(label, phase, count);
+
+        feed = document.createElement("div");
+        feed.className = "eldora-log-history";
+        feed.setAttribute("role", "log");
+        feed.setAttribute("aria-live", "polite");
+        feed.setAttribute("aria-label", "Ações da batalha");
+        feed.tabIndex = 0;
+        root.append(heading, feed);
+    }
+
+    const count = heading.querySelector("[data-log-count]");
+    if (!count) {
+        const countNode = document.createElement("span");
+        countNode.dataset.logCount = "";
+        countNode.textContent = "0/5 ações";
+        heading.appendChild(countNode);
+    }
+    return { root, heading, feed, count: heading.querySelector("[data-log-count]") };
 }
 
 function registrarEventoSistemaCombate(acao) {

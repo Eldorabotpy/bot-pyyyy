@@ -63,7 +63,8 @@
 .eldora-log-entry[data-tone="support"] .eldora-log-entry-flag { color:#a2e1b8; background:#15291f; border-color:#65cf7244; }
 .eldora-log-entry[data-tone="enemy"] .eldora-log-entry-flag { color:#ffaaa5; background:#311d22; border-color:#e66b6244; }
 @keyframes eldora-log-entry-in { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
-#tela-combate-global .eldora-combat-log { flex:0 1 auto; max-height:clamp(138px,30dvh,230px); }
+#tela-combate-global .eldora-combat-log { flex:0 1 auto; min-height:clamp(138px,28dvh,210px); max-height:clamp(138px,30dvh,230px); }
+#tela-combate-global #combat-log-box { min-height:clamp(138px,28dvh,210px) !important; }
 #tela-combate-global #combat-log-box { align-items:stretch !important; justify-content:flex-start !important; text-align:left !important; background:linear-gradient(145deg,#111c2d,#0a1220) !important; border:1px solid rgba(201,164,92,.32) !important; padding:9px !important; }
 #tela-combate-global #botoes-fim-batalha,#tela-pvp-global #pvp-botoes-fim-batalha,#tela-pve-global #pve-botoes-fim-batalha { flex:0 0 auto; padding-top:7px; border-top:1px solid #ffffff16; }
 .combat-action-panel .eldora-combat-log { flex:0 1 auto; max-height:none; }
