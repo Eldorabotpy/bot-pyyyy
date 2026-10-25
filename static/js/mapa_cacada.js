@@ -1588,8 +1588,8 @@ class MotorCacada {
             const profundidadeMob = this.scene.calcularProfundidadeMob
                 ? this.scene.calcularProfundidadeMob(dadosProfundidade)
                 : this.scene.calcularProfundidadeAtor
-                    ? this.scene.calcularProfundidadeAtor(dadosProfundidade) + 8
-                    : 22;
+                    ? this.scene.calcularProfundidadeAtor(dadosProfundidade)
+                    : 20;
 
             let sprite = this.scene.add.sprite(
                 mobData.x,
