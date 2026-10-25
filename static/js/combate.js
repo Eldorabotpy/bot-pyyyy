@@ -218,7 +218,8 @@ function mostrarNumeroDano(alvoId, valor, critico = false) {
     num.style.fontWeight = '900';
     
     num.style.fontSize = critico ? '32px' : '24px'; 
-    num.style.color = critico ? '#f1c40f' : (alvoId === 'sprite-player' ? '#ff4757' : '#ffffff');
+    const ehCuraVisual = String(valor).trim().startsWith('+');
+    num.style.color = ehCuraVisual ? '#4ade80' : critico ? '#f1c40f' : (alvoId === 'sprite-player' ? '#ff4757' : '#ffffff');
     num.style.textShadow = '2px 2px 0 #000, -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 0 6px 10px rgba(0,0,0,0.8)';
     
     const alvoRect = alvo.getBoundingClientRect();
@@ -344,6 +345,7 @@ function preloadImagemCombate(url) {
 window.preloadImagemCombate = preloadImagemCombate;
 
 window.iniciarCacadaApp = async function(spawnId, opcoesGrupo = {}) {
+    const inicioCombateMs = performance.now();
     await window.fecharOficinaRunasParaCombate?.();
     // ==========================================
     // 🛡️ TRAVA ANTI-CLIQUE FANTASMA 🛡️
@@ -476,6 +478,7 @@ window.iniciarCacadaApp = async function(spawnId, opcoesGrupo = {}) {
         // O perfil já foi carregado antes de abrir o mapa. A resposta do
         // combate traz o loadout atualizado para evitar uma segunda chamada
         // completa de perfil e outro cálculo de atributos antes da arena.
+        const inicioRequisicaoMs = performance.now();
         const res = await fetch('/api/combate/iniciar', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -487,9 +490,11 @@ window.iniciarCacadaApp = async function(spawnId, opcoesGrupo = {}) {
                 auto_cacada: opcoesGrupo.autoCacada === true
             })
         });
+        console.info(`[COMBATE] iniciar API respondeu em ${Math.round(performance.now() - inicioRequisicaoMs)} ms.`);
         
         if (!res.ok) throw new Error(`Servidor recusou a conexão (Erro HTTP ${res.status}).`);
         const dados = await res.json();
+        console.info(`[COMBATE] arena pronta em ${Math.round(performance.now() - inicioCombateMs)} ms desde o clique.`);
 
         if (dados.erro) {
             window.avisoEldora("AVISO DO SERVIDOR: " + dados.erro);
@@ -1028,6 +1033,17 @@ window.executarAcaoTurno = async function(tipoAcao, skillId = null, skillNome = 
     const charId = localStorage.getItem("jogadorEldoraID");
     const spawnIdAtual = window.dadosCombateAtual.spawnId;
 
+    // Baixa a animação de magia junto com o cálculo no servidor, evitando
+    // acrescentar o tempo do GitHub depois que o turno já foi calculado.
+    if (tipoAcao === "magia" && skillId && typeof window.preloadImagemCombate === "function") {
+        const skill = window.perfilDadosGlobais?.database_skills?.[skillId] || {};
+        const efeito = skill.anim_effect || "corte_perfurante_anim";
+        const urlEfeito = `https://raw.githubusercontent.com/Eldorabotpy/static-img/refs/heads/main/assets/efeitos/${efeito}.png`;
+        window.preloadImagemCombate(urlEfeito).catch(erro => {
+            console.warn("[COMBATE] Pré-carregamento do efeito falhou; será usada a animação alternativa.", erro);
+        });
+    }
+
     if (window.salaCombateGrupoAtual) {
         window.__ultimoEnvioCombateGrupo = {
             sala_id: String(window.salaCombateGrupoAtual || ""),
@@ -1039,6 +1055,7 @@ window.executarAcaoTurno = async function(tipoAcao, skillId = null, skillNome = 
     }
 
     try {
+        const inicioAcaoMs = performance.now();
         const res = await fetch('/api/combate/acao', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1057,6 +1074,12 @@ window.executarAcaoTurno = async function(tipoAcao, skillId = null, skillNome = 
                 player_hp_atual: window.dadosCombateAtual.playerHpAtual
             })
         });
+        const tempoApiMs = Math.round(performance.now() - inicioAcaoMs);
+        const tempoServidorMs = Number(res.headers.get("Server-Timing")?.match(/dur=([\d.]+)/)?.[1]);
+        console.info(
+            `[COMBATE] API da ação (${tipoAcao}): ${tempoApiMs} ms de resposta` +
+            (Number.isFinite(tempoServidorMs) ? `; servidor ${Math.round(tempoServidorMs)} ms.` : ".")
+        );
 
         if (!res.ok) throw new Error(`Crash no Servidor (Status ${res.status})`);
 
@@ -1321,6 +1344,7 @@ function animarAcoesDaRodada(turnoInfo, tipoAcao, skillId, skillNome) {
     const flash = document.getElementById('damage-flash');
     
     let db = window.dadosCombateAtual;
+    const inicioAnimacaoMs = performance.now();
     let indexAcao = 0;
     
     const logsDaRodada = Array.isArray(turnoInfo.log) ? turnoInfo.log : [];
@@ -1354,6 +1378,7 @@ function animarAcoesDaRodada(turnoInfo, tipoAcao, skillId, skillNome) {
         if (window.dadosCombateAtual !== db || db.rodadaVisualCancelada) return;
         if (salaDaAnimacao && (String(window.salaCombateGrupoAtual) !== String(salaDaAnimacao) || salasGrupoDevolvidas.has(String(salaDaAnimacao)))) return;
         if (indexAcao >= logsDaRodada.length) {
+            console.info(`[COMBATE] animação da rodada concluída em ${Math.round(performance.now() - inicioAnimacaoMs)} ms.`);
             window.bloqueioDeTurno = !!(turnoInfo.vitoria || turnoInfo.derrota);
 
             if (turnoInfo.mob_hp_atual !== undefined) {
@@ -1375,7 +1400,7 @@ function animarAcoesDaRodada(turnoInfo, tipoAcao, skillId, skillNome) {
                 }
                 setTimeout(() => {
                     if (window.dadosCombateAtual === db && !db.rodadaVisualCancelada) finalizarAnimacaoCombate(turnoInfo);
-                }, 1000);
+                }, 500);
 
             } else {
                 db.rodadaVisualPendente = false;
@@ -1445,7 +1470,7 @@ function animarAcoesDaRodada(turnoInfo, tipoAcao, skillId, skillNome) {
             });
 
             indexAcao++;
-            setTimeout(lerProximoLog, 900);
+            setTimeout(lerProximoLog, 180);
             return;
         }
 
@@ -1463,7 +1488,7 @@ function animarAcoesDaRodada(turnoInfo, tipoAcao, skillId, skillNome) {
                     flag: ehAtaqueDuplo ? `${totalGolpesJogador || 2} golpes` : ""
                 });
                 indexAcao++;
-                setTimeout(lerProximoLog, 260);
+                setTimeout(lerProximoLog, 90);
                 return;
             }
             let ehFalha = (txtAcao.includes("MANA") && txtAcao.includes("INSUFICIENTE")) || txtAcao.includes("FALHOU") || txtAcao.includes("ESQUIVOU") || !!acao.esquivou;
@@ -1486,7 +1511,7 @@ function animarAcoesDaRodada(turnoInfo, tipoAcao, skillId, skillNome) {
             if (danoCausado === 0 && !ehFalha && !ehCura && !acao.golpe && !acao.defendeu && !txtAcao.includes("DEFENDEU") && !txtAcao.includes("BLOQUEOU")) {
                 registrarEventoLogCombate({ actor: "Sistema", title: "Efeito de combate", detail: acao.texto || "O combate avançou.", tone: "event" });
                 indexAcao++;
-                setTimeout(lerProximoLog, 260);
+                setTimeout(lerProximoLog, 90);
                 return;
             }
 
@@ -1497,6 +1522,7 @@ function animarAcoesDaRodada(turnoInfo, tipoAcao, skillId, skillNome) {
             const tituloGolpe = Number(acao.golpe) > 0
                 ? `Golpe ${Number(acao.golpe)}/${totalGolpes}`
                 : alvoEsquivou ? "Alvo esquivou" : alvoDefendeu ? "Alvo defendeu" : ehFalha ? "Ação falhou" : ehCura ? "Suporte" : ehCritico ? "Ataque crítico" : tipoAcao === "magia" ? (skillNome || "Habilidade") : "Ataque";
+            const runaRouboVidaAtiva = acao.runa_roubo_vida_ativa === true;
             const mostrarRouboVida = acao.mostrar_roubo_vida && Number(acao.roubo_vida) > 0;
             const rouboVida = mostrarRouboVida ? Number(acao.roubo_vida) : 0;
             const detalheGolpe = mostrarRouboVida && !/\broubou\b|\broubo de vida\b/i.test(textoGolpe)
@@ -1512,7 +1538,7 @@ function animarAcoesDaRodada(turnoInfo, tipoAcao, skillId, skillNome) {
                 critico: ehCritico,
                 golpe: acao.golpe,
                 total_hits: totalGolpes,
-                flag: mostrarRouboVida ? `Roubo ${rouboVida} HP` : (ehCritico ? "Crítico" : "")
+                flag: mostrarRouboVida ? `🩸 +${rouboVida} HP` : runaRouboVidaAtiva ? "🩸 Runa ativada" : (ehCritico ? "Crítico" : "")
             });
             if (ehCura) {
                 let ehMana = txtAcao.includes("MANA");
@@ -1577,7 +1603,10 @@ function animarAcoesDaRodada(turnoInfo, tipoAcao, skillId, skillNome) {
                 if (acao.player_hp_apos_golpe !== undefined) {
                     db.playerHpAtual = Number(acao.player_hp_apos_golpe);
                     atualizarVisualBarra('bar-hp-player', db.playerHpAtual, db.playerHpMax);
-                    if (Number(acao.roubo_vida) > 0) mostrarNumeroDano('sprite-player', `+${acao.roubo_vida} HP`, false);
+                    if (runaRouboVidaAtiva) {
+                        animarEfeitoVisual('sprite-player', 'cura', '#c026d3');
+                        if (Number(acao.roubo_vida) > 0) mostrarNumeroDano('sprite-player', `+${acao.roubo_vida} HP`, false);
+                    }
                 }
                 db.mobHpAtual = Math.max(0, db.mobHpAtual - danoCausado);
                 atualizarVisualBarra('bar-hp-mob', db.mobHpAtual, db.mobHpMax);
@@ -1640,7 +1669,7 @@ function animarAcoesDaRodada(turnoInfo, tipoAcao, skillId, skillNome) {
         indexAcao++;
         const ehGolpeSeparado = Number(acao.golpe) > 0;
         const ehLinhaInformativa = acao.autor === "player" && !ehGolpeSeparado && !Number(acao.dano || acao.valor || 0) && !acao.esquivou;
-        setTimeout(lerProximoLog, ehGolpeSeparado ? 100 : ehLinhaInformativa ? 260 : 320);
+        setTimeout(lerProximoLog, ehGolpeSeparado ? 70 : ehLinhaInformativa ? 90 : 140);
     }
     lerProximoLog();
 }
@@ -1915,7 +1944,7 @@ window.animarInvestidaSprite = function(alvoId) {
         { transform: `translate(${moveX}, ${moveY}) rotate(${rot}) scale(1.06)`, offset: 0.38 },
         { transform: `translate(${moveX}, ${moveY}) rotate(${rot}) scale(1.02)`, offset: 0.58 },
         { transform: 'translate(0, 0) rotate(0) scale(1)', offset: 1 }
-    ], { duration: 500, easing: 'cubic-bezier(0.25, 1, 0.5, 1)' });
+    ], { duration: 360, easing: 'cubic-bezier(0.25, 1, 0.5, 1)' });
     return movimento.finished.catch(() => undefined);
 }
 
@@ -2489,9 +2518,9 @@ window.animarMagiaSpriteGrid = function(alvoId, nomeEfeito) {
             img.onload = img.onerror = null;
             if (!alvoValido()) { terminar(false); return; }
             animarEfeitoVisual(alvoId, 'corte', '#facc15');
-            setTimeout(() => terminar(alvoValido()), 600);
+            setTimeout(() => terminar(alvoValido()), 350);
         };
-        const limiteCarga = setTimeout(fallback, 2500);
+        const limiteCarga = setTimeout(fallback, 900);
         img.onerror = fallback;
         img.onload = () => {
             if (encerrado) return;

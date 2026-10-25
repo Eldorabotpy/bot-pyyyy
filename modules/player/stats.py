@@ -1014,14 +1014,8 @@ def _aplicar_golpes_combate(resultado, stats, hp, mp, mob_hp):
             or 1
         )
 
-        mostrar_roubo = (
-            bool(
-                stats.get(
-                    "runa_roubo_vida_ativa"
-                )
-            )
-            and cura > 0
-        )
+        runa_ativa = bool(stats.get("runa_roubo_vida_ativa")) and dano > 0
+        mostrar_roubo = runa_ativa and cura > 0
 
         esquivou = int(hit.get("damage", 0) or 0) <= 0
         if eh_multi_hit:
@@ -1029,7 +1023,11 @@ def _aplicar_golpes_combate(resultado, stats, hp, mp, mob_hp):
         else:
             mensagem = "O alvo esquivou." if esquivou else f"{dano} de dano."
         if mostrar_roubo:
-            mensagem += f" Roubou {cura} de vida."
+            mensagem += f" Roubou {cura} de vida pela Runa Vampírica."
+        elif runa_ativa and hp_antes >= int(stats.get("max_hp", hp_antes)):
+            mensagem += " Runa Vampírica ativada; HP já estava cheio."
+        elif runa_ativa:
+            mensagem += " Runa Vampírica ativada; cura abaixo de 1 HP neste golpe."
         if hit.get("critical"):
             mensagem = f"Crítico! {mensagem}"
         logs.append({
@@ -1046,6 +1044,7 @@ def _aplicar_golpes_combate(resultado, stats, hp, mp, mob_hp):
                 hit.get("critical")
             ),
             "roubo_vida": cura, "mostrar_roubo_vida": mostrar_roubo, "player_hp_apos_golpe": hp,
+            "runa_roubo_vida_ativa": runa_ativa,
             "mob_hp_apos_golpe": mob_hp,
             "anim_effect": resultado.get("anim_effect", ""),
             "tipo_skill": resultado.get("tipo_skill", ""),

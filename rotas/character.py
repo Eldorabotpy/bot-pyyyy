@@ -842,6 +842,8 @@ def acao_combate_migrada():
         sistema_cacada = current_app.config.get('SISTEMA_CACADA')
 
         # O resto do código continua igual...
+        import time
+        inicio_acao_perf = time.perf_counter()
         resultado = loop.run_until_complete(processar_turno_combate(
             user_id=user_id,
             acao=acao,
@@ -855,7 +857,15 @@ def acao_combate_migrada():
             target_id=data.get("target_id")
         ))
 
-        return jsonify(resultado)
+        duracao_acao_ms = (time.perf_counter() - inicio_acao_perf) * 1000
+        current_app.logger.info(
+            "[COMBATE] ação concluída (%s) em %.0f ms",
+            acao,
+            duracao_acao_ms,
+        )
+        resposta = jsonify(resultado)
+        resposta.headers["Server-Timing"] = f"combat;dur={duracao_acao_ms:.1f}"
+        return resposta
 
     except Exception as e:
         import traceback

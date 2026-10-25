@@ -2244,6 +2244,16 @@ class MapaScene extends Phaser.Scene {
                 }
             } catch(e) {}
 
+            const alvoManual = this.motorCacada?.alvoManualPendente;
+            const cliqueNoAlvoManual = alvoManual?.sprite?.active &&
+                Phaser.Math.Distance.Between(
+                    pointer.worldX,
+                    pointer.worldY,
+                    alvoManual.sprite.x,
+                    alvoManual.sprite.y
+                ) <= 80;
+            if (!cliqueNoAlvoManual) this.motorCacada?.cancelarAlvoManual?.();
+
             // 🤖 AUTO CAÇADA
             // Clique manual no mapa sempre cancela a Auto Caçada.
             if (
@@ -3141,6 +3151,7 @@ class MapaScene extends Phaser.Scene {
             this.isMoving = false;
 
             this.player?.body?.stop();
+            this.motorCacada?.cancelarAlvoManual?.();
 
             return;
         }
@@ -3159,6 +3170,9 @@ class MapaScene extends Phaser.Scene {
         // Verifica se o personagem já chegou perto do mob escolhido.
         if (this.motorCacada && typeof this.motorCacada.verificarAutoCacada === "function") {
             this.motorCacada.verificarAutoCacada();
+        }
+        if (this.motorCacada && typeof this.motorCacada.verificarAlvoManual === "function") {
+            this.motorCacada.verificarAlvoManual();
         }
 
         // 🛑 TRAVA DE SEGURANÇA (Não apague isso, impede o boneco de andar morto)
@@ -3218,6 +3232,9 @@ class MapaScene extends Phaser.Scene {
             this.mercadoRealPendente = null;
             this.cancelarAnimacaoParadaEspecial();
             this.inicioParadoEspecial = null;
+
+            // Movimento manual por teclado/analógico cancela a aproximação ao mob.
+            this.motorCacada?.cancelarAlvoManual?.();
 
             // 🤖 AUTO CAÇADA
             // Movimento manual por teclado/joystick cancela a Auto Caçada.

@@ -30,6 +30,7 @@ class MotorCacada {
         // Segurança contra travamento no caminho.
         this.autoCacadaUltimoReenvioMovimento = 0;
         this.autoCacadaIgnorarSpawnIds = {};
+        this.alvoManualPendente = null;
         this.caravanaQuestSprite = null;
         this.caravanaQuestMovimiento = null;
         this.caravanaQuestViajante = null;
@@ -1160,6 +1161,38 @@ class MotorCacada {
         }
     }
 
+    cancelarAlvoManual() {
+        this.alvoManualPendente = null;
+    }
+
+    verificarAlvoManual() {
+        const pendente = this.alvoManualPendente;
+        if (!pendente) return;
+
+        const player = this.scene && this.scene.player;
+        const alvo = pendente.sprite;
+        const combate = document.getElementById("tela-combate-global");
+        const combateAberto = combate && getComputedStyle(combate).display !== "none";
+
+        if (
+            !player || this.scene.isDead || player.isGathering || combateAberto ||
+            !alvo?.active || !alvo.visible || !pendente.spawnId
+        ) {
+            this.cancelarAlvoManual();
+            return;
+        }
+
+        const distancia = Phaser.Math.Distance.Between(player.x, player.y, alvo.x, alvo.y);
+        if (distancia > 80) return;
+
+        this.cancelarAlvoManual();
+        this.scene.pararPersonagem?.();
+
+        if (typeof window.iniciarCacadaApp === "function") {
+            window.iniciarCacadaApp(pendente.spawnId, { mobData: pendente.mobData });
+        }
+    }
+
     mostrarAvisoAutoCacada(titulo, mensagem, tipo = "aviso") {
 
         if (typeof window.alertaEldora === "function") {
@@ -1671,6 +1704,11 @@ class MotorCacada {
                 let distAtaque = Phaser.Math.Distance.Between(this.scene.player.x, this.scene.player.y, sprite.x, sprite.y);
 
                 if (distAtaque > 80) { 
+                    this.alvoManualPendente = {
+                        sprite,
+                        spawnId: mobData.spawn_id,
+                        mobData
+                    };
                     // 1. Faz o personagem andar na direção do monstro
                     this.scene.target.set(sprite.x, sprite.y);
                     this.scene.isMoving = true;
