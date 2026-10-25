@@ -1400,7 +1400,7 @@ function animarAcoesDaRodada(turnoInfo, tipoAcao, skillId, skillNome) {
                 }
                 setTimeout(() => {
                     if (window.dadosCombateAtual === db && !db.rodadaVisualCancelada) finalizarAnimacaoCombate(turnoInfo);
-                }, 500);
+                }, 1000);
 
             } else {
                 db.rodadaVisualPendente = false;
@@ -1470,7 +1470,7 @@ function animarAcoesDaRodada(turnoInfo, tipoAcao, skillId, skillNome) {
             });
 
             indexAcao++;
-            setTimeout(lerProximoLog, 180);
+            setTimeout(lerProximoLog, 900);
             return;
         }
 
@@ -1488,7 +1488,7 @@ function animarAcoesDaRodada(turnoInfo, tipoAcao, skillId, skillNome) {
                     flag: ehAtaqueDuplo ? `${totalGolpesJogador || 2} golpes` : ""
                 });
                 indexAcao++;
-                setTimeout(lerProximoLog, 90);
+                setTimeout(lerProximoLog, 260);
                 return;
             }
             let ehFalha = (txtAcao.includes("MANA") && txtAcao.includes("INSUFICIENTE")) || txtAcao.includes("FALHOU") || txtAcao.includes("ESQUIVOU") || !!acao.esquivou;
@@ -1511,7 +1511,7 @@ function animarAcoesDaRodada(turnoInfo, tipoAcao, skillId, skillNome) {
             if (danoCausado === 0 && !ehFalha && !ehCura && !acao.golpe && !acao.defendeu && !txtAcao.includes("DEFENDEU") && !txtAcao.includes("BLOQUEOU")) {
                 registrarEventoLogCombate({ actor: "Sistema", title: "Efeito de combate", detail: acao.texto || "O combate avançou.", tone: "event" });
                 indexAcao++;
-                setTimeout(lerProximoLog, 90);
+                setTimeout(lerProximoLog, 260);
                 return;
             }
 
@@ -1669,7 +1669,7 @@ function animarAcoesDaRodada(turnoInfo, tipoAcao, skillId, skillNome) {
         indexAcao++;
         const ehGolpeSeparado = Number(acao.golpe) > 0;
         const ehLinhaInformativa = acao.autor === "player" && !ehGolpeSeparado && !Number(acao.dano || acao.valor || 0) && !acao.esquivou;
-        setTimeout(lerProximoLog, ehGolpeSeparado ? 70 : ehLinhaInformativa ? 90 : 140);
+        setTimeout(lerProximoLog, ehGolpeSeparado ? 100 : ehLinhaInformativa ? 260 : 320);
     }
     lerProximoLog();
 }
@@ -1944,7 +1944,7 @@ window.animarInvestidaSprite = function(alvoId) {
         { transform: `translate(${moveX}, ${moveY}) rotate(${rot}) scale(1.06)`, offset: 0.38 },
         { transform: `translate(${moveX}, ${moveY}) rotate(${rot}) scale(1.02)`, offset: 0.58 },
         { transform: 'translate(0, 0) rotate(0) scale(1)', offset: 1 }
-    ], { duration: 360, easing: 'cubic-bezier(0.25, 1, 0.5, 1)' });
+    ], { duration: 500, easing: 'cubic-bezier(0.25, 1, 0.5, 1)' });
     return movimento.finished.catch(() => undefined);
 }
 
@@ -2518,9 +2518,9 @@ window.animarMagiaSpriteGrid = function(alvoId, nomeEfeito) {
             img.onload = img.onerror = null;
             if (!alvoValido()) { terminar(false); return; }
             animarEfeitoVisual(alvoId, 'corte', '#facc15');
-            setTimeout(() => terminar(alvoValido()), 350);
+            setTimeout(() => terminar(alvoValido()), 600);
         };
-        const limiteCarga = setTimeout(fallback, 900);
+        const limiteCarga = setTimeout(fallback, 2500);
         img.onerror = fallback;
         img.onload = () => {
             if (encerrado) return;
