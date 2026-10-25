@@ -18,6 +18,38 @@ let merlinCatalogo = [];
 const merlinEl = id => document.getElementById(id);
 const merlinNumero = valor => Number(valor).toLocaleString('pt-BR');
 const merlinNomeMoeda = item => item?.moeda === 'gemas' ? 'Gemas 💎' : 'Ouro';
+function prepararRetratoMerlin() {
+    const sprite = merlinEl('merlin-banner-sprite');
+    const avatar = sprite?.parentElement;
+    const fallback = merlinEl('merlin-banner-fallback');
+    if (!sprite || !avatar) return;
+
+    const ajustarQuadro = () => {
+        if (!sprite.naturalWidth) {
+            sprite.hidden = true;
+            if (fallback) fallback.hidden = false;
+            return;
+        }
+        const escala = Math.min(1.5, avatar.clientWidth / 48, avatar.clientHeight / 48);
+        const tamanhoQuadro = 48 * escala;
+        sprite.style.width = `${sprite.naturalWidth * escala}px`;
+        sprite.style.height = `${sprite.naturalHeight * escala}px`;
+        sprite.style.left = `${(avatar.clientWidth - tamanhoQuadro) / 2 - tamanhoQuadro}px`;
+        sprite.style.top = `${(avatar.clientHeight - tamanhoQuadro) / 2}px`;
+        sprite.hidden = false;
+        if (fallback) fallback.hidden = true;
+    };
+
+    if (!sprite.dataset.merlinCropListeners) {
+        sprite.dataset.merlinCropListeners = 'true';
+        sprite.addEventListener('load', ajustarQuadro, { once: true });
+        sprite.addEventListener('error', () => {
+            sprite.hidden = true;
+            if (fallback) fallback.hidden = false;
+        }, { once: true });
+    }
+    if (sprite.complete) ajustarQuadro();
+}
 function merlinImagem(item) {
     if (item?.tipo === 'skill_book') return '';
     const base = window.CATALOGO_SISTEMA ? 'https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/itens/' : '/static/assets/itens/';
@@ -31,6 +63,7 @@ window.abrirLojaAventureiro = async function() {
     lista.hidden = false;
     lista.textContent = 'Consultando mercadorias…';
     merlinEl('menu-loja-aventureiro').style.display = 'flex';
+    prepararRetratoMerlin();
     document.querySelectorAll('.btn-passe-mapa').forEach(btn => btn.style.display = 'none');
     try {
         const res = await fetch('/api/loja/catalogo');

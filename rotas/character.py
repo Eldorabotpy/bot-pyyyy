@@ -137,12 +137,31 @@ def obter_personagem_info(personagem_id):
         letra_gen = genero.lower()[0] if genero else "m"
 
         from modules.game_data.items import ITEMS_DATA
+        from modules.skill_progression import (
+            SKILL_MAX_LEVEL,
+            SKILL_POWER_BONUS_PER_LEVEL,
+            is_evolution_skill,
+            skill_is_available_to_class,
+        )
         database_skills_perfil = {
             skill_id: {
                 **skill_info,
                 "upgrade_tome_available": (
                     (ITEMS_DATA.get(f"tomo_{skill_id}") or {}).get("skill_tome_purpose") == "upgrade"
                 ),
+                "skill_upgrade_available": (
+                    not is_evolution_skill(skill_id)
+                    and (ITEMS_DATA.get(f"tomo_{skill_id}") or {}).get("type") == "skill_book"
+                    and (ITEMS_DATA.get(f"tomo_{skill_id}") or {}).get("skill_tome_purpose") in {"learn", "upgrade"}
+                    and skill_is_available_to_class(
+                        classe_atual,
+                        skill_id,
+                        skill_info.get("allowed_classes") or [],
+                    )
+                ),
+                "is_evolution_skill": is_evolution_skill(skill_id),
+                "skill_upgrade_max_level": SKILL_MAX_LEVEL,
+                "skill_upgrade_bonus_per_level_pct": int(SKILL_POWER_BONUS_PER_LEVEL * 100),
             }
             for skill_id, skill_info in SKILL_DATA.items()
         }
@@ -553,11 +572,31 @@ def api_finalizar_evolucao_classe():
         return jsonify({"sucesso": False, "erro": "Não foi possível concluir a evolução."}), 500
 
 
+@character_bp.get('/api/personagem/<personagem_id>/habilidades/<skill_id>/aprimoramento')
+def api_consultar_aprimoramento_habilidade(personagem_id, skill_id):
+    from modules.portal_auth import PlayerSessionError, require_player_identity
+    from modules.class_evolution_service import get_skill_upgrade_quote
+
+    try:
+        jogador = require_player_identity(personagem_id)
+        quote = get_skill_upgrade_quote(jogador, skill_id)
+        response = jsonify({"sucesso": True, "formula": quote})
+        response.headers["Cache-Control"] = "no-store"
+        return response
+    except PlayerSessionError as exc:
+        return jsonify({"sucesso": False, "erro": str(exc)}), exc.status_code
+    except Exception:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"sucesso": False, "erro": "Não foi possível consultar a fórmula."}), 500
+
+
 @character_bp.route('/api/personagem/aprimorar_habilidade', methods=['POST'])
 def api_aprimorar_habilidade_com_tomo():
+    from copy import deepcopy
     import asyncio
     from modules.portal_auth import PlayerSessionError, require_csrf, require_player_identity
-    from modules.class_evolution_service import process_skill_upgrade
+    from modules.class_evolution_service import apply_skill_upgrade_to_player_data
 
     try:
         require_csrf()
@@ -567,7 +606,40 @@ def api_aprimorar_habilidade_com_tomo():
         if not user_id or not skill_id:
             return jsonify({"sucesso": False, "erro": "Selecione uma habilidade para aprimorar."}), 400
         jogador = require_player_identity(user_id)
-        sucesso, mensagem, habilidade = asyncio.run(process_skill_upgrade(jogador["_id"], skill_id))
+        jogador_atualizado = deepcopy(jogador)
+        sucesso, mensagem, habilidade = apply_skill_upgrade_to_player_data(jogador_atualizado, skill_id)
+        if not sucesso:
+            return jsonify({"sucesso": False, "erro": mensagem}), 400
+
+        campos_protegidos = (
+            "gold",
+            "inventory",
+            "skills",
+            "skills_desbloqueadas",
+            "database_skills",
+            "class",
+            "class_key",
+            "classe",
+        )
+        filtro = {"_id": jogador["_id"]}
+        atualizacao = {}
+        for campo in campos_protegidos:
+            filtro[campo] = deepcopy(jogador[campo]) if campo in jogador else {"$exists": False}
+            if campo in jogador_atualizado:
+                atualizacao[campo] = jogador_atualizado[campo]
+
+        resultado = users_collection.update_one(filtro, {"$set": atualizacao})
+        if resultado.modified_count != 1:
+            return jsonify({
+                "sucesso": False,
+                "erro": "A mochila ou o nível da habilidade mudou. Atualize e tente novamente.",
+            }), 409
+
+        try:
+            from modules.player.core import clear_player_cache
+            asyncio.run(clear_player_cache(str(jogador["_id"])))
+        except Exception:
+            pass
         return jsonify({"sucesso": sucesso, "mensagem": mensagem, "habilidade": habilidade}), (200 if sucesso else 400)
     except PlayerSessionError as exc:
         return jsonify({"sucesso": False, "erro": str(exc)}), exc.status_code

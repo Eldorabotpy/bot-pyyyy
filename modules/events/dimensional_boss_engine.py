@@ -413,6 +413,11 @@ def _skill_dimensional_dados(jogador: Dict[str, Any], skill_id: str) -> Dict[str
         )
 
     raridade = str(inst.get("rarity") or inst.get("raridade") or "comum")
+    from modules.skill_progression import SKILL_MAX_LEVEL, get_skill_level_multiplier
+    try:
+        skill_level = max(1, min(SKILL_MAX_LEVEL, int(inst.get("level", 1) or 1)))
+    except (TypeError, ValueError):
+        skill_level = 1
 
     dados = copy.deepcopy(base)
 
@@ -421,6 +426,8 @@ def _skill_dimensional_dados(jogador: Dict[str, Any], skill_id: str) -> Dict[str
 
     dados.update(copy.deepcopy(dados_raridade))
     dados["raridade"] = raridade
+    dados["skill_level"] = skill_level
+    dados["skill_level_multiplier"] = get_skill_level_multiplier(skill_level)
     dados["skill_id"] = skill_id_real
     dados["skill_id_original"] = skill_id_original
 
@@ -518,6 +525,7 @@ def calcular_dano_skill_dimensional(jogador: Dict[str, Any], inimigo: Dict[str, 
         or skill.get("damage_scale")
         or 1.35
     )
+    mult *= float(skill.get("skill_level_multiplier", 1.0) or 1.0)
 
     defesa = int(inimigo.get("defense", 0) or 0)
 
@@ -550,6 +558,7 @@ def aplicar_skill_suporte_dimensional(evento: Dict[str, Any], jogador: Dict[str,
 
     total_cura = 0
     total_mana = 0
+    potency = max(1.0, float(skill.get("skill_level_multiplier", 1.0) or 1.0))
 
     party_heal = effects.get("party_heal")
     party_mana = effects.get("party_mana")
@@ -560,11 +569,11 @@ def aplicar_skill_suporte_dimensional(evento: Dict[str, Any], jogador: Dict[str,
             hp_max = int(aliado.get("hp_max", 1) or 1)
 
             if "amount_percent_max_hp" in party_heal:
-                cura = int(hp_max * float(party_heal.get("amount_percent_max_hp", 0)))
+                cura = int(hp_max * float(party_heal.get("amount_percent_max_hp", 0)) * potency)
             elif party_heal.get("heal_type") == "magic_attack":
-                cura = int(int(jogador.get("magic_attack", 0) or 0) * float(party_heal.get("heal_scale", 1.0)))
+                cura = int(int(jogador.get("magic_attack", 0) or 0) * float(party_heal.get("heal_scale", 1.0)) * potency)
             else:
-                cura = int(party_heal.get("amount_flat", 0) or 0)
+                cura = int((party_heal.get("amount_flat", 0) or 0) * potency)
 
             cura = max(0, cura)
 
@@ -585,7 +594,9 @@ def aplicar_skill_suporte_dimensional(evento: Dict[str, Any], jogador: Dict[str,
             ganho = int(party_mana.get("amount_flat", 0) or 0)
 
             if "amount_percent_max_mp" in party_mana:
-                ganho = int(mp_max * float(party_mana.get("amount_percent_max_mp", 0)))
+                ganho = int(mp_max * float(party_mana.get("amount_percent_max_mp", 0)) * potency)
+            else:
+                ganho = int(ganho * potency)
 
             ganho = max(0, ganho)
 

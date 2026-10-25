@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
+import unicodedata
 from typing import Dict, Tuple, Any, Union
 
 from bson import ObjectId
@@ -10,7 +12,12 @@ from bson import ObjectId
 from modules import player_manager
 from modules.game_data import class_evolution as evo_data
 from modules.game_data.skills import SKILL_DATA
-from modules.skill_progression import skill_is_available_to_class
+from modules.skill_progression import (
+    SKILL_MAX_LEVEL,
+    SKILL_POWER_BONUS_PER_LEVEL,
+    is_evolution_skill,
+    skill_is_available_to_class,
+)
 
 PlayerId = Union[ObjectId, str]
 
@@ -265,16 +272,228 @@ async def finalize_evolution(user_id: PlayerId, target_class: str) -> Tuple[bool
     return True, f"Você evoluiu para {target_class.title()} e aprendeu {learned} skills!"
 
 
+SKILL_UPGRADE_MAX_LEVEL = SKILL_MAX_LEVEL
+SKILL_UPGRADE_BONUS_PER_LEVEL_PCT = int(SKILL_POWER_BONUS_PER_LEVEL * 100)
+SKILL_UPGRADE_RARITY_MULTIPLIERS = {
+    "comum": 1,
+    "incomum": 2,
+    "rara": 5,
+    "epica": 10,
+    "lendaria": 20,
+}
+
+
 def _get_skill_upgrade_cost(current_level: int, rarity: str, skill_id: str) -> Dict[str, Any]:
     base_gold = 150
-    rarity_mult = {"comum": 1, "incomum": 2, "rara": 5, "epica": 10, "lendaria": 20}
-    mult = rarity_mult.get((rarity or "comum").lower(), 1)
+    rarity_key = "".join(
+        char for char in unicodedata.normalize("NFKD", str(rarity or "comum").lower())
+        if not unicodedata.combining(char)
+    )
+    mult = SKILL_UPGRADE_RARITY_MULTIPLIERS.get(rarity_key, 1)
 
-    lvl = current_level if current_level > 0 else 1
+    lvl = max(1, int(current_level or 1))
     gold_cost = int(base_gold * lvl * mult)
 
     skill_book_item_id = f"tomo_{skill_id}"
-    return {"gold": gold_cost, "items": {skill_book_item_id: 1}}
+    return {
+        "gold": gold_cost,
+        "rarity_multiplier": mult,
+        "items": {
+            skill_book_item_id: 1,
+            "pedra_de_aprimoramento": max(1, (lvl + 1) // 2),
+            "cristal_mana_bruto": max(1, (lvl + 2) // 3),
+            "essencia_purificadora": 1 + max(0, (lvl - 1) // 4),
+        },
+    }
+
+
+def _skill_entry_from_collection(collection: Any, skill_id: str):
+    if isinstance(collection, dict):
+        return collection.get(skill_id)
+    if isinstance(collection, list):
+        for entry in collection:
+            if isinstance(entry, dict) and str(entry.get("skill_id") or entry.get("id") or "") == skill_id:
+                return entry
+            if str(entry or "") == skill_id:
+                return {"unlocked": True}
+    return None
+
+
+def _item_quantity(pdata: dict, item_id: str) -> int:
+    inventory = pdata.get("inventory") or {}
+    if not isinstance(inventory, dict):
+        return 0
+    item = inventory.get(item_id)
+    if isinstance(item, dict):
+        for field in ("quantity", "qty", "qtd", "quantidade"):
+            if field in item:
+                try:
+                    return max(0, int(item.get(field) or 0))
+                except (TypeError, ValueError):
+                    return 0
+        return 1
+    try:
+        return max(0, int(item or 0))
+    except (TypeError, ValueError):
+        return 0
+
+
+def _normalize_upgrade_inventory_entries(pdata: dict, item_ids) -> None:
+    inventory = pdata.get("inventory")
+    if not isinstance(inventory, dict):
+        return
+    for item_id in item_ids:
+        item = inventory.get(item_id)
+        if not isinstance(item, dict):
+            continue
+        if "quantity" not in item:
+            for alias in ("qty", "qtd", "quantidade"):
+                if alias in item:
+                    item["quantity"] = item[alias]
+                    break
+            else:
+                # Legacy stack entries sometimes stored only the item metadata.
+                item["quantity"] = 1
+        for alias in ("qty", "qtd", "quantidade"):
+            item.pop(alias, None)
+
+
+def get_skill_upgrade_quote(pdata: dict, skill_id: str) -> Dict[str, Any]:
+    """Build the authoritative preview for an ordinary learned skill upgrade."""
+    from modules.game_data.items import ITEMS_DATA, get_display_name
+
+    skill_id = str(skill_id or "").strip()
+    quote = {
+        "skill_id": skill_id,
+        "eligible": False,
+        "can_upgrade": False,
+        "max_level": SKILL_UPGRADE_MAX_LEVEL,
+        "bonus_per_level_pct": SKILL_UPGRADE_BONUS_PER_LEVEL_PCT,
+        "current_level": 1,
+        "next_level": None,
+        "current_power_pct": 0,
+        "next_power_pct": None,
+        "gold": {"required": 0, "owned": 0, "enough": False},
+        "items": [],
+        "reason": "Habilidade não encontrada.",
+    }
+    try:
+        quote["gold"]["owned"] = max(0, int(pdata.get("gold", 0) or 0))
+    except (TypeError, ValueError):
+        quote["gold"]["owned"] = 0
+    if skill_id not in SKILL_DATA:
+        return quote
+    if is_evolution_skill(skill_id):
+        quote["reason"] = "Habilidades de evolução de classe terão uma progressão própria."
+        return quote
+
+    player_skills = pdata.get("skills")
+    unlocked_skills = pdata.get("skills_desbloqueadas")
+    skill_entry = _skill_entry_from_collection(player_skills, skill_id)
+    if skill_entry is None:
+        skill_entry = _skill_entry_from_collection(unlocked_skills, skill_id)
+    if skill_entry is None or (isinstance(skill_entry, dict) and skill_entry.get("unlocked") is False):
+        quote["reason"] = "Esta habilidade ainda não foi aprendida."
+        return quote
+    if not isinstance(skill_entry, dict):
+        skill_entry = {}
+
+    player_class = str(pdata.get("class") or pdata.get("class_key") or pdata.get("classe") or "")
+    if not skill_is_available_to_class(player_class, skill_id):
+        quote["reason"] = "Esta habilidade ainda não foi liberada para sua classe."
+        return quote
+
+    tome_id = f"tomo_{skill_id}"
+    tome = ITEMS_DATA.get(tome_id) or {}
+    tome_purpose = tome.get("skill_tome_purpose")
+    tome_skill = str((tome.get("effects") or {}).get("learn_skill") or "")
+    if (
+        tome.get("type") != "skill_book"
+        or tome_skill != skill_id
+        or tome_purpose not in {"learn", "upgrade"}
+    ):
+        quote["reason"] = "O tomo desta habilidade ainda não está configurado para aprimoramento."
+        return quote
+
+    try:
+        level = max(1, min(SKILL_UPGRADE_MAX_LEVEL, int(skill_entry.get("level", 1) or 1)))
+    except (TypeError, ValueError):
+        level = 1
+    quote.update({
+        "eligible": True,
+        "current_level": level,
+        "current_power_pct": (level - 1) * SKILL_UPGRADE_BONUS_PER_LEVEL_PCT,
+        "rarity": str(skill_entry.get("rarity") or "comum"),
+    })
+
+    costs = _get_skill_upgrade_cost(level, quote["rarity"], skill_id)
+    quote["rarity_multiplier"] = int(costs["rarity_multiplier"])
+
+    if level >= SKILL_UPGRADE_MAX_LEVEL:
+        quote["reason"] = "Esta habilidade já alcançou o nível máximo."
+        return quote
+
+    gold_owned = quote["gold"]["owned"]
+    quote["gold"] = {
+        "required": int(costs["gold"]),
+        "owned": gold_owned,
+        "enough": gold_owned >= int(costs["gold"]),
+    }
+    quote["next_level"] = level + 1
+    quote["next_power_pct"] = level * SKILL_UPGRADE_BONUS_PER_LEVEL_PCT
+
+    requirements_met = quote["gold"]["enough"]
+    for item_id, required in costs["items"].items():
+        item_info = ITEMS_DATA.get(item_id) or {}
+        owned = _item_quantity(pdata, item_id)
+        enough = owned >= int(required)
+        quote["items"].append({
+            "id": item_id,
+            "name": get_display_name(item_id),
+            "emoji": item_info.get("emoji") or "📦",
+            "icon_url": item_info.get("icon_url") or "",
+            "required": int(required),
+            "owned": owned,
+            "enough": enough,
+        })
+        requirements_met = requirements_met and enough
+
+    quote["can_upgrade"] = requirements_met
+    if requirements_met:
+        quote["reason"] = "Você tem todos os materiais para aprimorar esta habilidade."
+    else:
+        quote["reason"] = "Reúna os materiais e o ouro indicados para continuar."
+    return quote
+
+
+def apply_skill_upgrade_to_player_data(pdata: dict, skill_id: str) -> Tuple[bool, str, dict]:
+    """Consume the quoted costs and update all player skill snapshots in memory."""
+    quote = get_skill_upgrade_quote(pdata, skill_id)
+    if not quote.get("eligible") or not quote.get("can_upgrade"):
+        return False, str(quote.get("reason") or "Não foi possível aprimorar a habilidade."), {}
+
+    costs = _get_skill_upgrade_cost(quote["current_level"], quote.get("rarity", "comum"), skill_id)
+    _normalize_upgrade_inventory_entries(pdata, costs["items"])
+    if not _consume_gold(pdata, int(costs["gold"])) or not _consume_items(pdata, costs["items"]):
+        return False, "Os materiais mudaram. Atualize a mochila e tente novamente.", {}
+
+    source = _skill_entry_from_collection(pdata.get("skills"), skill_id)
+    if source is None:
+        source = _skill_entry_from_collection(pdata.get("skills_desbloqueadas"), skill_id)
+    updated_skill = dict(source) if isinstance(source, dict) else {"unlocked": True, "rarity": "comum"}
+    updated_skill["unlocked"] = True
+    updated_skill["level"] = int(quote["next_level"])
+
+    for field in ("skills", "skills_desbloqueadas", "database_skills"):
+        skill_map = pdata.get(field)
+        if not isinstance(skill_map, dict):
+            skill_map = {}
+        else:
+            skill_map = dict(skill_map)
+        skill_map[skill_id] = dict(updated_skill)
+        pdata[field] = skill_map
+
+    return True, f"Habilidade aprimorada para o nível {quote['next_level']}!", updated_skill
 
 
 async def process_skill_upgrade(user_id: PlayerId, skill_id: str) -> Tuple[bool, str, dict]:
@@ -290,59 +509,13 @@ async def process_skill_upgrade(user_id: PlayerId, skill_id: str) -> Tuple[bool,
     if skill_id not in SKILL_DATA:
         return False, "Habilidade não encontrada.", {}
 
-    skill_entry = (pdata.get("skills", {}) or {}).get(skill_id)
-    if not skill_entry:
-        return False, "Skill não aprendida.", {}
-    if not isinstance(skill_entry, dict):
-        skill_entry = {"level": 1, "rarity": "comum"}
-        pdata["skills"][skill_id] = skill_entry
-
-    player_class = str(pdata.get("class") or pdata.get("class_key") or pdata.get("classe") or "")
-    if not skill_is_available_to_class(player_class, skill_id):
-        return False, "Essa habilidade ainda não foi liberada para sua classe.", {}
-
-    lvl = int(skill_entry.get("level", 1))
-    if lvl >= 10:
-        return False, "Nível máximo!", {}
-
-    costs = _get_skill_upgrade_cost(lvl, skill_entry.get("rarity", "comum"), skill_id)
-    req_gold = int(costs["gold"])
-    req_items = costs["items"]
-
-    if int(pdata.get("gold", 0)) < req_gold:
-        return False, f"Ouro insuficiente ({req_gold}).", {}
-
-    if not _inventory_has(pdata, req_items):
-        tomo_id = list(req_items.keys())[0]
-        try:
-            from modules.game_data.items import get_display_name
-            name = get_display_name(tomo_id)
-        except Exception:
-            name = tomo_id.replace("_", " ").title()
-        return False, f"Requer: 1x {name}", {}
-
-    try:
-        from modules.game_data.items import ITEMS_DATA
-        tome = ITEMS_DATA.get(f"tomo_{skill_id}") or {}
-        if tome.get("type") != "skill_book" or tome.get("skill_tome_purpose") != "upgrade":
-            return False, "O tomo desta habilidade não está configurado para aprimoramento.", {}
-    except Exception:
-        return False, "Não foi possível validar o tomo de aprimoramento.", {}
-
-    _consume_gold(pdata, req_gold)
-    _consume_items(pdata, req_items)
-
-    new_lvl = lvl + 1
-    pdata.setdefault("skills", {})
-    pdata["skills"].setdefault(skill_id, {})
-    pdata["skills"][skill_id]["level"] = new_lvl
-    for field in ("skills_desbloqueadas", "database_skills"):
-        if not isinstance(pdata.get(field), dict):
-            pdata[field] = {}
-        pdata[field][skill_id] = dict(pdata["skills"][skill_id])
+    pdata = deepcopy(pdata)
+    sucesso, mensagem, habilidade = apply_skill_upgrade_to_player_data(pdata, skill_id)
+    if not sucesso:
+        return False, mensagem, {}
 
     await player_manager.save_player_data(oid, pdata)
-    return True, f"Skill evoluída para Nível {new_lvl}!", pdata["skills"][skill_id]
+    return True, mensagem, habilidade
 
 
 def record_evolution_trial_victory(player_data: dict, mob: dict, player_id: str) -> bool:

@@ -10,6 +10,7 @@ from typing import Dict, Optional, Tuple, Any, List, Union
 
 # --- IMPORTS ---
 from modules.game_data.skills import SKILL_DATA
+from modules.skill_progression import SKILL_MAX_LEVEL, get_skill_level_multiplier
 from modules.game_data.classes import CLASSES_DATA, get_stat_modifiers
 from modules import game_data
 from modules.game_data.class_evolution import get_evolution_options, get_class_ancestry
@@ -885,13 +886,15 @@ def _apply_passive_skill_bonuses(pdata: dict, total_stats: dict):
         if not rarity_effects_data: continue
         effects = rarity_effects_data.get("effects", {})
         if not effects: continue
+        potency = get_skill_level_multiplier(skill_info.get("level", 1))
 
         stat_bonuses = effects.get("stat_add_mult", {})
         if stat_bonuses:
             for stat, multiplier in stat_bonuses.items():
+                multiplier = float(multiplier) * potency
                 target = _map_stat_name(stat) or stat
                 if target in SPECIAL_COMBAT_FLOAT_KEYS:
-                    amount = float(multiplier)
+                    amount = multiplier
                     if target == "crit_chance_flat" and 0 < amount <= 1:
                         amount *= 100.0
                     total_stats[target] = total_stats.get(target, 0.0) + amount
@@ -903,7 +906,7 @@ def _apply_passive_skill_bonuses(pdata: dict, total_stats: dict):
                     total_stats["magic_attack"] += int(total_stats.get("magic_attack", 0) * float(multiplier))
 
         for key in ("crit_resistance_flat", "double_attack_chance_flat", "hp_regen_percent", "mp_regen_percent", "lifesteal_flat"):
-            total_stats[key] = total_stats.get(key, 0.0) + float(effects.get(key, 0.0) or 0.0)
+            total_stats[key] = total_stats.get(key, 0.0) + float(effects.get(key, 0.0) or 0.0) * potency
         if effects.get("cannot_be_dodged"):
             total_stats["cannot_be_dodged"] = True
 
@@ -911,7 +914,7 @@ def _apply_passive_skill_bonuses(pdata: dict, total_stats: dict):
         if res_bonuses:
             if "resistance" not in total_stats: total_stats["resistance"] = {}
             for res_type, value in res_bonuses.items():
-                total_stats["resistance"][res_type] = total_stats["resistance"].get(res_type, 0.0) + float(value)
+                total_stats["resistance"][res_type] = total_stats["resistance"].get(res_type, 0.0) + float(value) * potency
         if effects.get("crit_immune", False): total_stats["crit_immune"] = True 
 
         scaling = effects.get("stat_scaling")
@@ -920,7 +923,7 @@ def _apply_passive_skill_bonuses(pdata: dict, total_stats: dict):
                 src = _map_stat_name(scaling["source_stat"]) or scaling["source_stat"]
                 tgt = _map_stat_name(scaling["target_stat"]) or scaling["target_stat"]
                 val = total_stats.get(src, 0)
-                bonus = val * float(scaling["ratio"])
+                bonus = val * float(scaling["ratio"]) * potency
                 if tgt in total_stats: total_stats[tgt] += int(bonus)
                 else: total_stats[tgt] = total_stats.get(tgt, 0.0) + bonus
             except: pass
@@ -938,12 +941,14 @@ def _apply_party_aura_bonuses(ally_data: dict, target_stats: dict):
         effects = rarity_effects_data.get("effects", {})
         aura_bonuses = effects.get("party_aura", {})
         if not aura_bonuses: continue 
+        potency = get_skill_level_multiplier(skill_info.get("level", 1))
         stat_bonuses = aura_bonuses.get("stat_add_mult", {})
         if stat_bonuses:
             for stat, multiplier in stat_bonuses.items():
+                multiplier = float(multiplier) * potency
                 target = _map_stat_name(stat) or stat
                 if target in SPECIAL_COMBAT_FLOAT_KEYS:
-                    amount = float(multiplier)
+                    amount = multiplier
                     if target == "crit_chance_flat" and 0 < amount <= 1:
                         amount *= 100.0
                     target_stats[target] = target_stats.get(target, 0.0) + amount
@@ -954,12 +959,12 @@ def _apply_party_aura_bonuses(ally_data: dict, target_stats: dict):
                     target_stats[target] = target_stats.get(target, 0.0) + float(multiplier)
         for kind, amount in aura_bonuses.get("resistance_mult", {}).items():
             resistances = target_stats.setdefault("resistance", {})
-            resistances[kind] = resistances.get(kind, 0.0) + float(amount)
+            resistances[kind] = resistances.get(kind, 0.0) + float(amount) * potency
         if aura_bonuses.get("cannot_be_dodged", False): target_stats["cannot_be_dodged"] = True
         if "hp_regen_percent" in aura_bonuses:
-             target_stats["hp_regen_percent"] = target_stats.get("hp_regen_percent", 0.0) + float(aura_bonuses["hp_regen_percent"])
+             target_stats["hp_regen_percent"] = target_stats.get("hp_regen_percent", 0.0) + float(aura_bonuses["hp_regen_percent"]) * potency
         if "mp_regen_percent" in aura_bonuses:
-             target_stats["mp_regen_percent"] = target_stats.get("mp_regen_percent", 0.0) + float(aura_bonuses["mp_regen_percent"])
+             target_stats["mp_regen_percent"] = target_stats.get("mp_regen_percent", 0.0) + float(aura_bonuses["mp_regen_percent"]) * potency
 
 
 
@@ -1062,10 +1067,12 @@ def _get_skill_data_mesclada(pdata: dict, skill_id: str) -> dict | None:
 
     rarity = "comum"
     player_skills = pdata.get("skills", {})
+    skill_level = 1
     if isinstance(player_skills, dict):
         inst = player_skills.get(skill_id)
         if isinstance(inst, dict):
             rarity = inst.get("rarity", "comum") or "comum"
+            skill_level = inst.get("level", 1)
 
     rarity_data = (base_skill.get("rarity_effects", {}) or {}).get(
         rarity,
@@ -1073,6 +1080,12 @@ def _get_skill_data_mesclada(pdata: dict, skill_id: str) -> dict | None:
     ) or {}
 
     merged.update(rarity_data)
+    try:
+        normalized_level = max(1, min(SKILL_MAX_LEVEL, int(skill_level or 1)))
+    except (TypeError, ValueError):
+        normalized_level = 1
+    merged["skill_level"] = normalized_level
+    merged["skill_level_multiplier"] = get_skill_level_multiplier(normalized_level)
     return merged
 
 
@@ -1109,23 +1122,29 @@ def _is_skill_suporte(skill_data: dict | None) -> bool:
     return any(chave in effects for chave in chaves_suporte)
 
 
-def _calcular_cura_suporte(cura_def: dict, caster_stats: dict, alvo_stats: dict) -> int:
+def _calcular_cura_suporte(
+    cura_def: dict,
+    caster_stats: dict,
+    alvo_stats: dict,
+    potency_multiplier: float = 1.0,
+) -> int:
     """Calcula cura para party_heal, cura em alvo único e curas percentuais."""
     if not isinstance(cura_def, dict):
         return 0
 
     max_hp_alvo = int(alvo_stats.get("max_hp", alvo_stats.get("hp_max", 1)) or 1)
+    potency = max(1.0, float(potency_multiplier or 1.0))
 
     if "amount_flat" in cura_def:
-        return max(0, int(cura_def.get("amount_flat", 0) or 0))
+        return max(0, int((cura_def.get("amount_flat", 0) or 0) * potency))
 
     if "amount_percent_max_hp" in cura_def:
         pct = float(cura_def.get("amount_percent_max_hp", 0) or 0)
-        return max(0, int(max_hp_alvo * pct))
+        return max(0, int(max_hp_alvo * pct * potency))
 
     if "amount_based_on_def" in cura_def:
         escala = float(cura_def.get("amount_based_on_def", 0) or 0)
-        return max(0, int(int(caster_stats.get("defense", 0) or 0) * escala))
+        return max(0, int(int(caster_stats.get("defense", 0) or 0) * escala * potency))
 
     heal_type = cura_def.get("heal_type")
     heal_scale = float(cura_def.get("heal_scale", 0) or 0)
@@ -1135,28 +1154,28 @@ def _calcular_cura_suporte(cura_def: dict, caster_stats: dict, alvo_stats: dict)
         if base <= 0:
             # fallback para classes híbridas/suporte que ainda não têm magic_attack alto
             base = int(caster_stats.get("attack", 0) or 0)
-        return max(0, int(base * heal_scale))
+        return max(0, int(base * heal_scale * potency))
 
     if heal_type == "percent_max_hp":
-        return max(0, int(max_hp_alvo * heal_scale))
+        return max(0, int(max_hp_alvo * heal_scale * potency))
 
     if heal_type == "max_hp":
-        return max(0, int(int(caster_stats.get("max_hp", 0) or 0) * heal_scale))
+        return max(0, int(int(caster_stats.get("max_hp", 0) or 0) * heal_scale * potency))
 
     return 0
 
 
-def _calcular_mana_suporte(mana_def: dict, alvo_stats: dict) -> int:
+def _calcular_mana_suporte(mana_def: dict, alvo_stats: dict, potency_multiplier: float = 1.0) -> int:
     if not isinstance(mana_def, dict):
         return 0
 
     if "amount_flat" in mana_def:
-        return max(0, int(mana_def.get("amount_flat", 0) or 0))
+        return max(0, int((mana_def.get("amount_flat", 0) or 0) * max(1.0, potency_multiplier)))
 
     if "amount_percent_max_mp" in mana_def:
         max_mp = int(alvo_stats.get("max_mana", alvo_stats.get("max_mp", 0)) or 0)
         pct = float(mana_def.get("amount_percent_max_mp", 0) or 0)
-        return max(0, int(max_mp * pct))
+        return max(0, int(max_mp * pct * max(1.0, potency_multiplier)))
 
     return 0
 
@@ -1510,6 +1529,7 @@ async def processar_turno_combate(
         cura_def = effects.get("party_heal") if isinstance(effects.get("party_heal"), dict) else None
         mana_def = effects.get("party_mana") if isinstance(effects.get("party_mana"), dict) else None
         buff_def = effects.get("party_buff") if isinstance(effects.get("party_buff"), dict) else None
+        potencia_skill = float(skill_data_mesclada.get("skill_level_multiplier", 1.0) or 1.0)
 
         # Algumas skills de alvo único/party usam heal_type diretamente no effects.
         if not cura_def and (effects.get("heal_type") or effects.get("heal_scale") or effects.get("amount_percent_max_hp")):
@@ -1539,11 +1559,15 @@ async def processar_turno_combate(
             hp_max = int(alvo_stats.get("max_hp", h_sala.get("max_hp", alvo_player.get("max_hp", hp_atual))) or hp_atual)
             mp_max = int(alvo_stats.get("max_mana", h_sala.get("max_mana", alvo_player.get("max_mana", alvo_player.get("max_mp", mp_atual)))) or mp_atual)
 
-            cura = _calcular_cura_suporte(cura_def or {}, player_stats, {**alvo_stats, "max_hp": hp_max})
-            mana_rec = _calcular_mana_suporte(mana_def or {}, {**alvo_stats, "max_mana": mp_max})
+            cura = _calcular_cura_suporte(
+                cura_def or {}, player_stats, {**alvo_stats, "max_hp": hp_max}, potencia_skill
+            )
+            mana_rec = _calcular_mana_suporte(
+                mana_def or {}, {**alvo_stats, "max_mana": mp_max}, potencia_skill
+            )
 
             if effects.get("self_heal_percent") and alvo_id == str(user_id):
-                cura += int(hp_max * float(effects.get("self_heal_percent", 0) or 0))
+                cura += int(hp_max * float(effects.get("self_heal_percent", 0) or 0) * potencia_skill)
 
             novo_hp_alvo = min(hp_max, hp_atual + cura)
             novo_mp_alvo = min(mp_max, mp_atual + mana_rec)

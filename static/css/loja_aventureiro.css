@@ -27,21 +27,94 @@
     position: relative;
     border-bottom: 1px dashed rgba(202, 138, 4, 0.4);
     padding-bottom: 10px;
-    flex-shrink: 0; /* Impede que o cabeçalho seja esmagado em ecrãs pequenos */
+    flex-shrink: 0;
 }
 
-.loja-header h2 { color: #facc15; margin: 0; font-size: 1.5em; text-shadow: 0 2px 4px rgba(0,0,0,0.8); letter-spacing: 1px; }
-.loja-header p { color: #94a3b8; font-size: 0.8em; margin-top: 5px; font-style: italic; }
+#menu-loja-aventureiro .loja-header {
+    margin: 0 0 12px;
+    padding: 0;
+    border: 0;
+    text-align: left;
+}
+
+.merlin-banner {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 76px;
+    padding: 10px 36px 10px 10px;
+    border: 1px solid rgba(202, 138, 4, 0.62);
+    border-radius: 14px;
+    background: linear-gradient(112deg, rgba(31, 41, 55, 0.98), rgba(8, 15, 28, 0.98));
+    box-shadow: inset 0 0 20px rgba(202, 138, 4, 0.09), 0 5px 14px rgba(0, 0, 0, 0.28);
+}
+
+.merlin-banner-avatar {
+    position: relative;
+    flex: 0 0 76px;
+    width: 76px;
+    height: 76px;
+    overflow: hidden;
+    border: 1px solid rgba(226, 190, 102, 0.68);
+    border-radius: 12px;
+    background: radial-gradient(ellipse at 50% 42%, #34435a, #101a29 74%);
+}
+
+.merlin-banner-sprite {
+    position: absolute;
+    display: block;
+    max-width: none;
+    image-rendering: pixelated;
+}
+
+.merlin-banner-avatar img[hidden] { display: none; }
+
+.merlin-banner-fallback {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    color: #f0d58c;
+    font-size: 38px;
+    font-weight: 700;
+    text-shadow: 0 2px 8px #000;
+}
+
+.merlin-banner-fallback[hidden] { display: none; }
+
+.merlin-banner-copy { min-width: 0; }
+.merlin-banner-copy h2 {
+    margin: 0;
+    color: #facc15;
+    font-size: clamp(17px, 5vw, 21px);
+    line-height: 1.18;
+    letter-spacing: 0.35px;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+}
+.merlin-banner-copy p {
+    margin: 6px 0 0;
+    color: #b8c3d2;
+    font-size: 11px;
+    line-height: 1.4;
+    font-style: italic;
+}
 
 .btn-fechar-loja {
-    position: absolute; top: -10px; right: -10px;
+    position: absolute; top: 7px; right: 7px;
     background: #7f1d1d; border: 2px solid #ef4444; color: white;
     width: 30px; height: 30px; border-radius: 50%;
     font-size: 1.2em; font-weight: bold; cursor: pointer;
     display: flex; justify-content: center; align-items: center;
     transition: 0.2s; box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+    z-index: 2;
 }
 .btn-fechar-loja:hover { background: #ef4444; transform: scale(1.1); }
+
+#menu-loja-aventureiro .btn-fechar-loja:focus-visible,
+#lista-itens-aventureiro .loja-item-card:focus-visible {
+    outline: 2px solid #facc15;
+    outline-offset: 3px;
+}
 
 .loja-lista-scroll {
     display: flex; flex-direction: column; gap: 12px;
@@ -123,3 +196,10 @@
 }
 .btn-comprar-loja:hover { filter: brightness(1.2); }
 .btn-comprar-loja:active { transform: scale(0.95); }
+
+@media (max-width: 360px) {
+    .merlin-banner { gap: 9px; padding-left: 8px; }
+    .merlin-banner-avatar { flex-basis: 68px; width: 68px; height: 68px; }
+    .merlin-banner-copy h2 { font-size: 17px; }
+    .merlin-banner-copy p { font-size: 10px; }
+}

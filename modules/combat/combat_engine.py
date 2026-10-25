@@ -53,9 +53,14 @@ async def processar_acao_combate(
     # NOVAS VARIÁVEIS PARA O FRONTEND
     anim_effect_to_frontend = ""
     skill_type_to_frontend = "active"
+    skill_level_multiplier = 1.0
 
     if skill_id:
-        from modules.skill_progression import is_evolution_skill, skill_is_available_to_class
+        from modules.skill_progression import (
+            get_skill_level_multiplier,
+            is_evolution_skill,
+            skill_is_available_to_class,
+        )
         classe_atacante = str(
             attacker_pdata.get("class")
             or attacker_pdata.get("class_key")
@@ -77,6 +82,10 @@ async def processar_acao_combate(
             .get("skills", {})
             .get(skill_id, {})
             .get("rarity", "comum")
+        )
+        skill_instance = (attacker_pdata.get("skills") or {}).get(skill_id, {})
+        skill_level_multiplier = get_skill_level_multiplier(
+            skill_instance.get("level", 1) if isinstance(skill_instance, dict) else 1
         )
 
         canon = adapt_skill_to_canon(
@@ -170,6 +179,9 @@ async def processar_acao_combate(
         dmg_mult = float(raw_effects.get("damage_multiplier", 1.0))
     else:
         dmg_mult = 1.0
+
+    if skill_id:
+        dmg_mult *= skill_level_multiplier
 
     # Penetração (armadura/defesa física)
     defense_pen = float(damage_def.get("armor_pen", 0.0) or 0.0) if damage_def else 0.0

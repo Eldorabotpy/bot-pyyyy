@@ -18,6 +18,19 @@ Q6_INITIAL_SKILLS_BY_CLASS = {
 
 Q6_INITIAL_SKILLS = frozenset(Q6_INITIAL_SKILLS_BY_CLASS.values())
 
+SKILL_MAX_LEVEL = 10
+SKILL_POWER_BONUS_PER_LEVEL = 0.04
+
+
+def get_skill_level_multiplier(level: int | float | None) -> float:
+    """Ordinary skill ranks add 4% potency per rank above the first, capped at 10."""
+    try:
+        normalized_level = int(level or 1)
+    except (TypeError, ValueError):
+        normalized_level = 1
+    normalized_level = max(1, min(SKILL_MAX_LEVEL, normalized_level))
+    return 1.0 + (normalized_level - 1) * SKILL_POWER_BONUS_PER_LEVEL
+
 
 def evolution_skill_targets() -> dict[str, str]:
     """Map each evolution-granted skill to the class that unlocks it."""

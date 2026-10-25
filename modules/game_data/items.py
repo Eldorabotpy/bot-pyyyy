@@ -128,7 +128,10 @@ def _generate_auto_items():
             elif not tome_teaches_skill:
                 tome_description = f"Usado para aprimorar {skill_name} depois de aprendê-la na missão do Grimório."
             else:
-                tome_description = f"Ensina a habilidade: {skill_name}."
+                tome_description = (
+                    f"Ensina a habilidade: {skill_name}. Depois de aprendê-la, cópias extras "
+                    "servem como catalisador para aprimorá-la."
+                )
             
             if tomo_id not in ITEMS_DATA:
                 

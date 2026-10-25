@@ -208,6 +208,10 @@ function mercadoCaminhosImagemItem(item) {
     const pasta = mercadoObterPastaItem(item);
     const somenteFerramentas = pasta === "ferramentas";
     const caminhos = [];
+    const tipoItem = String(item?.tipo || item?.type || "").trim().toLowerCase();
+    if (tipoItem === "skill_book") {
+        caminhos.push(`/static/images/items/${encodeURIComponent(id)}.png?v=20261024-1`);
+    }
 
     const iconUrl = typeof item?.icon_url === "string" ? item.icon_url.trim() : "";
     if (/^(https?:\/\/|\/static\/)/i.test(iconUrl)
@@ -892,6 +896,10 @@ function mercadoCaminhosImagem(item) {
     const pasta = mercadoPastaItem(item);
     const somenteFerramentas = pasta === "ferramentas";
     const caminhos = [];
+    const tipoItem = String(item?.tipo || item?.type || "").trim().toLowerCase();
+    if (tipoItem === "skill_book") {
+        caminhos.push(`/static/images/items/${encodeURIComponent(id)}.png?v=20261024-1`);
+    }
 
     const iconUrl = typeof item?.icon_url === "string" ? item.icon_url.trim() : "";
     if (/^(https?:\/\/|\/static\/)/i.test(iconUrl)

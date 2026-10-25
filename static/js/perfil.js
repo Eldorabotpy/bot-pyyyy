@@ -186,8 +186,13 @@ window.getCaminhosImagemPerfilEldora = function(item) {
     const ids = [...new Set([bruto, idSemWork, "work_" + idSemWork].filter(Boolean))];
     const tipo = String(item?.tipo || item?.type || item?.categoria || item?.category || "")
         .trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const categoria = String(item?.categoria || item?.category || "")
+        .trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     const ferramenta = itemEUmaFerramenta(item);
     const caminhos = [];
+    if (["skill_book", "livro", "book"].includes(tipo) || categoria === "aprendizado") {
+        caminhos.push(`/static/images/items/${encodeURIComponent(bruto)}.png?v=${cacheVersion}`);
+    }
     const urlIcone = typeof item?.icon_url === "string" ? item.icon_url.trim() : "";
     const iconePlaceholder = /(?:seuusuario|seurepositorio|example\.com|placeholder)/i.test(urlIcone);
     if (!iconePlaceholder && /^(https?:\/\/|\/static\/)/i.test(urlIcone)
@@ -1277,9 +1282,14 @@ window.carregarMenuMagias = async function() {
         window._skillsDataTemp = pdata.database_skills || {};
         window._skillsEquipadasTemp = pdata.skills_equipadas || {};
         const skillsPossuidas = pdata.skills_desbloqueadas || {};
+        window._skillsPossuidasTemp = skillsPossuidas;
 
         let html = `<div class="eldora-profile-style-801160c3">
-                        <h4 class="eldora-profile-style-593914d0">Grimório de Eldora</h4>`;
+                        <h4 class="eldora-profile-style-593914d0">Grimório de Eldora</h4>
+                        <nav class="eldora-skill-view-tabs" aria-label="Seções de habilidades">
+                            <button type="button" class="is-active" aria-current="page">Habilidades</button>
+                            <button type="button" onclick="window.abrirPainelAprimoramentoSkills()">Aprimorar</button>
+                        </nav>`;
 
         if (Object.keys(skillsPossuidas).length === 0) {
             html += `<p class="eldora-profile-style-111cc8c9">Nenhuma habilidade aprendida ainda. Fale com a Arquimaga Selene no nível 17.</p>`;
@@ -1301,12 +1311,14 @@ window.carregarMenuMagias = async function() {
 
                 const corBorda = slotEquipado ? '#8b5cf6' : '#334155';
                 const sombra = slotEquipado ? '0 0 12px rgba(139, 92, 246, 0.5)' : 'none';
+                const nivelSkill = Math.max(1, Number(skillInst?.level || 1));
 
                 html += `
                     <div onclick="window.abrirModalSkillDetalhes('${skillId}', window._skillsDataTemp['${skillId}'], ${slotEquipado || 'null'})"
                          class="eldora-spell-card ${slotEquipado ? 'is-equipped' : ''}">
 
                         ${slotEquipado ? `<span class="eldora-profile-style-15475bc2">S${slotEquipado}</span>` : ""}
+                        <span class="eldora-spell-level">NV ${nivelSkill}</span>
 
                         <div class="eldora-profile-style-29af6337">
                             <img src="${iconPath}" onerror="this.src='${fallbackIcon}'" class="eldora-profile-style-4a466668">
@@ -1323,6 +1335,54 @@ window.carregarMenuMagias = async function() {
     }
 }
 
+window.abrirPainelAprimoramentoSkills = function() {
+    const container = document.getElementById('conteudo-perf-magias');
+    if (!container) return;
+
+    const skillsPossuidas = window._skillsPossuidasTemp || {};
+    const skillsAprimoraveis = Object.entries(skillsPossuidas).filter(([skillId]) =>
+        Boolean(window._skillsDataTemp?.[skillId]?.skill_upgrade_available)
+    );
+
+    let html = `<div class="eldora-profile-style-801160c3">
+        <div class="eldora-skill-upgrade-page-heading">
+            <div>
+                <p>Grimório de Eldora</p>
+                <h4>Aprimorar habilidades</h4>
+            </div>
+            <button type="button" class="eldora-skill-back" onclick="window.carregarMenuMagias()">← Habilidades</button>
+        </div>
+        <p class="eldora-skill-upgrade-intro">Cada nível aumenta em 4% a potência de dano, cura e bônus passivos. Habilidades de evolução de classe terão outro fluxo. Confira a fórmula antes de confirmar.</p>`;
+
+    if (!skillsAprimoraveis.length) {
+        html += `<div class="eldora-skill-upgrade-empty">Nenhuma habilidade comum aprendida e compatível com sua classe pode ser aprimorada. Habilidades de evolução de classe terão um fluxo próprio.</div>`;
+    } else {
+        html += `<div class="eldora-skill-upgrade-list">`;
+        for (const [skillId, skillInst] of skillsAprimoraveis) {
+            const info = window._skillsDataTemp[skillId] || {};
+            const nome = info.display_name || skillId.replaceAll('_', ' ');
+            const maxNivel = Number(info.skill_upgrade_max_level || 10);
+            const bonusPorNivel = Number(info.skill_upgrade_bonus_per_level_pct || 4);
+            const nivel = Math.max(1, Number(skillInst?.level || 1));
+            const icon = info.icon || 'default_skill';
+            const imagem = `https://raw.githubusercontent.com/Eldorabotpy/static-img/refs/heads/main/assets/sprites/skills/${icon}.png`;
+            const fallback = 'https://raw.githubusercontent.com/Eldorabotpy/static-img/refs/heads/main/assets/sprites/skills/default_skill.png';
+            const noMaximo = nivel >= maxNivel;
+            html += `<article class="eldora-skill-upgrade-row">
+                <img src="${imagem}" onerror="this.onerror=null;this.src='${fallback}'" alt="" loading="lazy">
+                <div class="eldora-skill-upgrade-row-copy">
+                    <strong>${nome}</strong>
+                    <span>Nível ${nivel} de ${maxNivel} · potência +${(nivel - 1) * bonusPorNivel}%</span>
+                </div>
+                <button type="button" ${noMaximo ? 'disabled' : ''} onclick="window.abrirMenuAprimoramentoSkill('${skillId}')">${noMaximo ? 'Máximo' : 'Ver fórmula'}</button>
+            </article>`;
+        }
+        html += `</div>`;
+    }
+
+    container.innerHTML = html + `</div>`;
+};
+
 // 2. Janela Modal de Detalhes da Magia (CORREÇÃO DE IMAGEM)
 window.abrirModalSkillDetalhes = function(skillId, infoDb, slotAtual) {
     let modal = document.getElementById('modal-skill-detalhes');
@@ -1335,6 +1395,8 @@ window.abrirModalSkillDetalhes = function(skillId, infoDb, slotAtual) {
 
     const magiaExiste = infoDb && infoDb.display_name;
     const nome = magiaExiste ? infoDb.display_name : '⚠️ Magia Não Encontrada';
+    const instanciaSkill = window._skillsPossuidasTemp?.[skillId];
+    const nivelSkill = Math.max(1, Number(instanciaSkill?.level || 1));
 
     let desc = magiaExiste ? infoDb.description : `ID "${skillId}" não encontrado no arquivo skills.py.`;
     let mana = 0;
@@ -1363,8 +1425,8 @@ window.abrirModalSkillDetalhes = function(skillId, infoDb, slotAtual) {
     const fallbackIconModal = `https://raw.githubusercontent.com/Eldorabotpy/static-img/refs/heads/main/assets/sprites/skills/default_skill.png`;
 
     let areaBotoes = '';
-    const botaoAprimorar = magiaExiste && infoDb.upgrade_tome_available
-        ? `<button class="eldora-skill-action is-upgrade" onclick="window.aprimorarSkillPeloTomo('${skillId}', this)">Aprimorar com tomo</button>`
+    const botaoAprimorar = magiaExiste && infoDb.skill_upgrade_available
+        ? `<button class="eldora-skill-action is-upgrade" onclick="window.abrirMenuAprimoramentoSkill('${skillId}')">Ver aprimoramento</button>`
         : '';
 
     if (slotAtual) {
@@ -1381,6 +1443,7 @@ window.abrirModalSkillDetalhes = function(skillId, infoDb, slotAtual) {
                 <div>
                     <h3 class="eldora-skill-modal-title ${magiaExiste ? '' : 'is-unavailable'}">${nome}</h3>
                     <div class="eldora-profile-style-2ed4b0fd">Mana: <span class="eldora-profile-style-c73cb885">${mana}</span> | Recarga: <span class="eldora-profile-style-e85027a3">${cooldown} turnos</span></div>
+                    <div class="eldora-skill-modal-level">Nível ${nivelSkill}/10 · Potência +${(nivelSkill - 1) * 4}%</div>
                 </div>
             </div>
             <div onclick="document.getElementById('modal-skill-detalhes').remove()" class="eldora-profile-style-bc4392d5">×</div>
@@ -2209,6 +2272,101 @@ window.aprenderHabilidadePeloTomo = async function(itemId, botao) {
     }
 };
 
+const escaparHtmlSkillUpgrade = valor => String(valor ?? '').replace(/[&<>"']/g, caractere => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+}[caractere]));
+const numeroSkillUpgrade = valor => Number(valor || 0).toLocaleString('pt-BR');
+
+window.abrirMenuAprimoramentoSkill = async function(skillId) {
+    const charId = localStorage.getItem("jogadorEldoraID");
+    const modal = document.getElementById('modal-skill-detalhes');
+    if (!charId || !modal) return;
+
+    const info = window._skillsDataTemp?.[skillId] || {};
+    const nome = escaparHtmlSkill(info.display_name || skillId);
+    const nomeIcone = escaparHtmlSkill(info.icon || 'default_skill');
+    const imagem = `https://raw.githubusercontent.com/Eldorabotpy/static-img/refs/heads/main/assets/sprites/skills/${nomeIcone}.png`;
+    const fallback = 'https://raw.githubusercontent.com/Eldorabotpy/static-img/refs/heads/main/assets/sprites/skills/default_skill.png';
+    modal.innerHTML = `<div class="eldora-skill-upgrade-loading">Consultando materiais e fórmula…</div>`;
+
+    try {
+        const headers = window.portalSessionHeaders ? await window.portalSessionHeaders() : {};
+        const url = `/api/personagem/${encodeURIComponent(charId)}/habilidades/${encodeURIComponent(skillId)}/aprimoramento`;
+        const res = await fetch(url, { headers });
+        const data = await res.json();
+        if (!res.ok || !data.sucesso) throw new Error(data.erro || 'Não foi possível consultar os requisitos.');
+
+        const formula = data.formula || {};
+        const ouro = formula.gold || {};
+        const bonusPorNivel = Number(formula.bonus_per_level_pct || 4);
+        const raridade = escaparHtmlSkill(formula.rarity || 'comum');
+        const multiplicadorRaridade = Number(formula.rarity_multiplier || 1);
+        const ouroHtml = `<li class="eldora-skill-cost-row ${ouro.enough ? 'has-enough' : 'needs-more'}">
+            <span class="eldora-skill-cost-icon">🪙</span>
+            <span class="eldora-skill-cost-copy"><strong>Ouro</strong><small>Possui ${numeroSkillUpgrade(ouro.owned)} / ${numeroSkillUpgrade(ouro.required)}</small></span>
+            <b>${numeroSkillUpgrade(ouro.required)}</b>
+        </li>`;
+        const itensHtml = (formula.items || []).map(item => `<li class="eldora-skill-cost-row ${item.enough ? 'has-enough' : 'needs-more'}">
+            <span class="eldora-skill-cost-icon">${escaparHtmlSkill(item.emoji || '📦')}</span>
+            <span class="eldora-skill-cost-copy"><strong>${escaparHtmlSkill(item.name)}</strong><small>Possui ${numeroSkillUpgrade(item.owned)} / ${numeroSkillUpgrade(item.required)}</small></span>
+            <b>×${numeroSkillUpgrade(item.required)}</b>
+        </li>`).join('');
+        const nivelAtual = Number(formula.current_level || 1);
+        const maximo = nivelAtual >= Number(formula.max_level || 10);
+        const progresso = formula.next_level
+            ? `Nível ${nivelAtual} <span>→</span> ${formula.next_level}`
+            : `Nível ${nivelAtual} · máximo`;
+        const potencia = formula.next_level
+            ? `Potência +${formula.current_power_pct || 0}% → +${formula.next_power_pct || 0}%`
+            : `Potência +${formula.current_power_pct || 0}%`;
+        const regraFormula = `<p><strong>Ouro:</strong> 150 × nível atual × raridade (${raridade} ×${multiplicadorRaridade}).</p>
+            <p><strong>Multiplicadores:</strong> comum ×1 · incomum ×2 · rara ×5 · épica ×10 · lendária ×20.</p>
+            <p><strong>Materiais:</strong> 1 tomo da habilidade; Pedra = nível ÷ 2 arredondado para cima; Cristal = nível ÷ 3 arredondado para cima; Essência = 1, +1 a cada 4 níveis acima do primeiro.</p>`;
+        const estadoBotao = formula.can_upgrade ? 'Confirmar aprimoramento' : (maximo ? 'Nível máximo' : 'Faltam materiais');
+
+        modal.innerHTML = `<div class="eldora-skill-upgrade-heading">
+                <button type="button" class="eldora-skill-upgrade-back" data-skill-upgrade-back>← Voltar</button>
+                <div class="eldora-skill-upgrade-heading-copy"><span>APRIMORAMENTO</span><h3>${nome}</h3></div>
+                <button type="button" class="eldora-skill-upgrade-close" aria-label="Fechar" data-skill-upgrade-close>×</button>
+            </div>
+            <div class="eldora-skill-upgrade-summary">
+                <img src="${imagem}" onerror="this.onerror=null;this.src='${fallback}'" alt="" class="eldora-skill-upgrade-icon">
+                <div><strong>${progresso}</strong><span>${potencia}</span></div>
+            </div>
+            <p class="eldora-skill-upgrade-explainer">Cada nível aumenta em ${bonusPorNivel}% a potência de dano, cura e recuperação de mana. Habilidades passivas também fortalecem seus bônus.</p>
+            <section class="eldora-skill-cost-panel" aria-label="Fórmula de aprimoramento">
+                <header><h4>Fórmula para este nível</h4><span>Confira o custo total antes de confirmar</span></header>
+                <p class="eldora-skill-formula-rules">${regraFormula}</p>
+                <ul>${ouroHtml}${itensHtml || '<li class="eldora-skill-cost-empty">Materiais indisponíveis para esta habilidade.</li>'}</ul>
+            </section>
+            <p class="eldora-skill-upgrade-status ${formula.can_upgrade ? 'is-ready' : 'is-missing'}" role="status" aria-live="polite">${escaparHtmlSkill(formula.reason || 'Confira os requisitos.')}</p>
+            <button type="button" class="eldora-skill-action is-upgrade" data-skill-upgrade-confirm ${formula.can_upgrade ? '' : 'disabled'}>${estadoBotao}</button>`;
+
+        modal.querySelector('[data-skill-upgrade-back]')?.addEventListener('click', () => {
+            const equipadas = window._skillsEquipadasTemp || {};
+            const slot = Object.keys(equipadas).find(key => equipadas[key] === skillId);
+            window.abrirModalSkillDetalhes(skillId, info, slot ? Number(slot.replace('slot_', '')) : null);
+        });
+        modal.querySelector('[data-skill-upgrade-close]')?.addEventListener('click', () => modal.remove());
+        const confirmar = modal.querySelector('[data-skill-upgrade-confirm]');
+        if (confirmar && formula.can_upgrade) {
+            confirmar.addEventListener('click', () => window.aprimorarSkillPeloTomo(skillId, confirmar));
+        }
+    } catch (erro) {
+        modal.innerHTML = `<div class="eldora-skill-upgrade-heading">
+                <button type="button" class="eldora-skill-upgrade-back" data-skill-upgrade-back>← Voltar</button>
+                <h3>Fórmula indisponível</h3>
+                <button type="button" class="eldora-skill-upgrade-close" aria-label="Fechar" data-skill-upgrade-close>×</button>
+            </div><p class="eldora-skill-upgrade-status is-missing" role="status">${escaparHtmlSkill(erro.message)}</p>`;
+        modal.querySelector('[data-skill-upgrade-back]')?.addEventListener('click', () => {
+            const equipadas = window._skillsEquipadasTemp || {};
+            const slot = Object.keys(equipadas).find(key => equipadas[key] === skillId);
+            window.abrirModalSkillDetalhes(skillId, info, slot ? Number(slot.replace('slot_', '')) : null);
+        });
+        modal.querySelector('[data-skill-upgrade-close]')?.addEventListener('click', () => modal.remove());
+    }
+};
+
 window.aprimorarSkillPeloTomo = async function(skillId, botao) {
     const charId = localStorage.getItem("jogadorEldoraID");
     if (!charId || !window.portalSessionHeaders) {
@@ -2217,7 +2375,7 @@ window.aprimorarSkillPeloTomo = async function(skillId, botao) {
     }
     if (botao) {
         botao.disabled = true;
-        botao.textContent = "Aprimorando…";
+        botao.textContent = "Canalizando…";
     }
     try {
         const headers = await window.portalSessionHeaders({ 'Content-Type': 'application/json' });
@@ -2235,7 +2393,7 @@ window.aprimorarSkillPeloTomo = async function(skillId, botao) {
     } catch (erro) {
         if (botao) {
             botao.disabled = false;
-            botao.textContent = "Aprimorar com tomo";
+            botao.textContent = "Confirmar aprimoramento";
         }
         if (window.alertaEldora) window.alertaEldora("Não foi possível aprimorar", erro.message, "erro");
         else window.avisoEldora(erro.message);
