@@ -152,9 +152,13 @@ window.executarAcaoPvP = function(tipoAcao, skillId = null, skillNome = null) {
     
     // Trava os botões imediatamente para evitar clique duplo
     window.bloqueioDeTurnoPvP = true;
-    document.getElementById('pvp-menu-botoes').style.display = 'none';
-    document.getElementById('pvp-bloqueio-turno').style.display = 'flex';
-    document.getElementById('pvp-bloqueio-turno').innerHTML = `<span style="color: #facc15;">Enviando ação...</span>`;
+    const menuBotoes = document.getElementById('pvp-menu-botoes');
+    const painelBloqueio = document.getElementById('pvp-bloqueio-turno');
+    if (menuBotoes) menuBotoes.style.display = 'none';
+    if (painelBloqueio) {
+        painelBloqueio.style.display = 'flex';
+        painelBloqueio.textContent = 'Enviando ação...';
+    }
 
     // Dispara via WebSocket
     if (window.eldoraSocket) {
@@ -206,7 +210,8 @@ window.processarAnimacaoTurnoPvP = function(pacoteTurno) {
             } else {
                 // Passa a vez baseando-se na flag enviada pelo servidor
                 atualizarControleDeTurno(pacoteTurno.proximo_turno_sid === window.eldoraSocket.id);
-                document.getElementById('pvp-bloqueio-turno').innerHTML = `<span style="color: #94a3b8; font-style: italic;">Aguardando turno do adversário...</span>`;
+                const painelBloqueio = document.getElementById('pvp-bloqueio-turno');
+                if (painelBloqueio) painelBloqueio.textContent = 'Aguardando turno do adversário...';
             }
             return;
         }

@@ -648,8 +648,12 @@ window.iniciarCacadaApp = async function(spawnId, opcoesGrupo = {}) {
 
         // 💥 LÓGICA DE EMBOSCADA (TREMER TELA E LOG VERMELHO)
         if (est.ambush_log) {
-            document.getElementById('log-texto-1').innerHTML = `<span style="color:#ef4444; font-weight:bold; text-shadow: 1px 1px 2px #000; font-size: 1.1em;">${est.ambush_log}</span>`;
-            document.getElementById('log-texto-2').innerText = "Você foi pego de surpresa! O que vai fazer?";
+            registrarEventoLogCombate({
+                actor: "Sistema",
+                title: "Emboscada",
+                detail: `${est.ambush_log} Você foi pego de surpresa!`,
+                tone: "warning"
+            });
             
             // Injeta o CSS do tremor mágico se não existir
             if (!document.getElementById('shake-style')) {
@@ -665,8 +669,12 @@ window.iniciarCacadaApp = async function(spawnId, opcoesGrupo = {}) {
             setTimeout(() => arena.classList.remove('shake-hard'), 450);
             
         } else {
-            document.getElementById('log-texto-1').innerHTML = `Um <span style="color:#f1c40f;">${est.mob_nome}</span> selvagem apareceu!`;
-            document.getElementById('log-texto-2').innerText = "O que você vai fazer?";
+            registrarEventoLogCombate({
+                actor: "Sistema",
+                title: "Inimigo apareceu",
+                detail: `Um ${est.mob_nome || "inimigo"} selvagem apareceu. O que você vai fazer?`,
+                tone: "event"
+            });
         }
 
         document.getElementById('botoes-fim-batalha').style.display = 'none';
@@ -1066,9 +1074,6 @@ window.executarAcaoTurno = async function(tipoAcao, skillId = null, skillNome = 
                 atualizarControleTurnoGrupo(turno.sala);
             }
 
-            document.getElementById('log-texto-1').innerHTML =
-                `<span style="color:#facc15;">⚠️ ${turno.erro}</span>`;
-            document.getElementById('log-texto-2').innerText = "";
             registrarEventoLogCombate({ actor: "Sistema", title: "Ação não concluída", detail: turno.erro, tone: "warning" });
 
             return;
@@ -1076,7 +1081,6 @@ window.executarAcaoTurno = async function(tipoAcao, skillId = null, skillNome = 
 
         if (turno.fugiu) {
             combateDaAcao.rodadaVisualPendente = false;
-            document.getElementById('log-texto-1').innerHTML = `💨 ${turno.log[0].texto.toUpperCase()}`;
             registrarEventoLogCombate({ actor: "Você", title: "Fuga", detail: turno.log?.[0]?.texto || "Você fugiu do combate.", tone: "event" });
 
             setTimeout(() => {
