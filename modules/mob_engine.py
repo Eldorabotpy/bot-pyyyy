@@ -1,7 +1,8 @@
 # modules/mob_engine.py
-import threading
-import random
+import json
 import math
+import random
+import threading
 import time
 from modules.game_data.map_spawns import MAP_SPAWNS
 from modules.game_data.monsters import MONSTERS_DATA
@@ -54,6 +55,7 @@ class GerenciadorCacada(DungeonPersistence):
 
         self._evento_corrupcao_ativo = None
         self._evento_corrupcao_refresh_at = 0.0
+        self._evento_corrupcao_sync_signature = None
         self._evento_corrupcao_lock = threading.RLock()
 
         self.inicializar_mundo()
@@ -135,8 +137,21 @@ class GerenciadorCacada(DungeonPersistence):
                 # nem remover o estado válido recebido na última consulta.
                 self._evento_corrupcao_refresh_at = 0.0
                 return self._evento_corrupcao_ativo
-        self.sincronizar_corrupcao_mobs(self._evento_corrupcao_ativo)
-        return self._evento_corrupcao_ativo
+
+            evento = self._evento_corrupcao_ativo
+            assinatura = (
+                str((evento or {}).get("_id") or (evento or {}).get("id") or ""),
+                json.dumps(
+                    (evento or {}).get("corruption") or {},
+                    sort_keys=True,
+                    separators=(",", ":"),
+                    default=str,
+                ),
+            )
+            if assinatura != self._evento_corrupcao_sync_signature:
+                self.sincronizar_corrupcao_mobs(evento)
+                self._evento_corrupcao_sync_signature = assinatura
+            return evento
 
     def sincronizar_corrupcao_mobs(self, evento=None):
         """Aplica/remove a corrupção nas instâncias globais e atualiza os mapas conectados."""
