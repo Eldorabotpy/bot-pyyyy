@@ -1342,6 +1342,7 @@ async def processar_turno_combate(
     player_hp = int(player.get("current_hp", 50) or 0)
     player_mp = int(player.get("current_mp", 50) or 0)
     inventory = player.get("inventory", {}) or {}
+    inventario_alterado = False
 
     monster_id_real = mob_vivo.get("monster_id")
     mob_template = next(
@@ -1442,6 +1443,7 @@ async def processar_turno_combate(
             inventory[skill_id] = qtd - 1
             if inventory[skill_id] <= 0:
                 inventory.pop(skill_id, None)
+        inventario_alterado = True
 
         log_turno.append({
             "autor": "player",
@@ -1679,6 +1681,7 @@ async def processar_turno_combate(
             qtd_ecto = int(ecto.get("quantity", ecto.get("qtd", 0)) or 0) if isinstance(ecto, dict) else int(ecto or 0)
             invocados = min(por_conjuracao, maximo - antes, qtd_ecto)
             if invocados > 0:
+                inventario_alterado = True
                 if isinstance(ecto, dict):
                     campo_qtd = "quantity" if "quantity" in ecto else "qtd"
                     ecto[campo_qtd] = qtd_ecto - invocados
@@ -2278,6 +2281,7 @@ async def processar_turno_combate(
             else mob_status_luta.get("loot_table", [])
         )
         for item_id in roll_loot(loot_table, player_data=player):
+            inventario_alterado = True
             recompensas["itens"].append(item_id)
 
             if item_id in inventory:
@@ -2358,6 +2362,8 @@ async def processar_turno_combate(
         from modules.combat.durability import apply_equipment_combat_wear
 
         durabilidade_resultado = apply_equipment_combat_wear(player, amount=1)
+        if durabilidade_resultado.get("alterados") or durabilidade_resultado.get("quebrados"):
+            inventario_alterado = True
         for msg_dur in durabilidade_resultado.get("mensagens", []):
             log_turno.append({
                 "autor": "sistema",
@@ -2368,21 +2374,26 @@ async def processar_turno_combate(
         inventory = player.get("inventory", inventory)
 
     campos_atualizados = {
-            "current_hp": hp_banco,
-            "rune_hunt_active": None if luta_encerrada else player.get("rune_hunt_active"),
-            "current_mp": mp_banco,
-            "inventory": inventory,
+        "current_hp": hp_banco,
+        "current_mp": mp_banco,
+        "cooldowns": cooldowns_finais,
+        "necromante_combate": None if luta_encerrada else necromante_combate,
+    }
+    if luta_encerrada:
+        campos_atualizados["rune_hunt_active"] = None
+    if inventario_alterado:
+        campos_atualizados["inventory"] = inventory
+    if mob_hp <= 0 or is_derrota:
+        campos_atualizados.update({
             "xp": player.get("xp", 0),
             "gold": player.get("gold", 0),
             "level": player.get("level", 1),
             "stat_points": player.get("stat_points", 0),
             "base_stats": player.get("base_stats", {}),
             "bestiario": bestiario,
-            "cooldowns": cooldowns_finais,
-            "necromante_combate": None if luta_encerrada else necromante_combate,
             "passe_batalha": player.get("passe_batalha", {}),
-    }
-    if "evolution_trial" in player:
+        })
+    if eh_prova_evolucao and "evolution_trial" in player:
         campos_atualizados["evolution_trial"] = player.get("evolution_trial")
     users_collection.update_one(
         {"_id": ObjectId(user_id)},
