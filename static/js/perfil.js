@@ -1383,15 +1383,22 @@ window.abrirPainelAprimoramentoSkills = function() {
     container.innerHTML = html + `</div>`;
 };
 
+function garantirModalDetalhesSkill() {
+    let modal = document.getElementById('modal-skill-detalhes');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'modal-skill-detalhes';
+        modal.classList.add('eldora-skill-modal');
+        document.body.appendChild(modal);
+    }
+    return modal;
+}
+
 // 2. Janela Modal de Detalhes da Magia (CORREÇÃO DE IMAGEM)
 window.abrirModalSkillDetalhes = function(skillId, infoDb, slotAtual) {
     let modal = document.getElementById('modal-skill-detalhes');
     if (modal) modal.remove();
-
-    modal = document.createElement('div');
-    modal.id = 'modal-skill-detalhes';
-    modal.classList.add('eldora-skill-modal');
-    document.body.appendChild(modal);
+    modal = garantirModalDetalhesSkill();
 
     const magiaExiste = infoDb && infoDb.display_name;
     const nome = magiaExiste ? infoDb.display_name : '⚠️ Magia Não Encontrada';
@@ -2279,8 +2286,11 @@ const numeroSkillUpgrade = valor => Number(valor || 0).toLocaleString('pt-BR');
 
 window.abrirMenuAprimoramentoSkill = async function(skillId) {
     const charId = localStorage.getItem("jogadorEldoraID");
-    const modal = document.getElementById('modal-skill-detalhes');
-    if (!charId || !modal) return;
+    if (!charId) {
+        window.avisoEldora("Entre novamente para consultar a fórmula da habilidade.");
+        return;
+    }
+    const modal = garantirModalDetalhesSkill();
 
     const info = window._skillsDataTemp?.[skillId] || {};
     const nome = escaparHtmlSkill(info.display_name || skillId);
