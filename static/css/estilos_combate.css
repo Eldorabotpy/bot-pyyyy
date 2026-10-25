@@ -312,8 +312,28 @@ body.combate-aberto #btn-painel-gm { display:none !important; pointer-events:non
 #tela-combate-global .modern-btn { min-height:44px; border:1px solid #3b4961; border-radius:10px; font:600 13px 'Segoe UI',Arial,sans-serif; box-shadow:0 2px 5px #0003; }
 #tela-combate-global .modern-btn:disabled { opacity:.6; cursor:default; }
 #tela-combate-global #botoes-fim-batalha .modern-btn { background:#b8944a20 !important; color:#edd8a6; border-color:#ad8b49; padding:11px; }
-#tela-combate-global #boss-bar-container { width:76% !important; padding:8px; border:1px solid #ffffff16; border-radius:10px; background:#0a1123bd; }
-#tela-combate-global #val-hp-mob { font-size:10px !important; }
+#tela-combate-global #boss-bar-container {
+    box-sizing:border-box;
+    width:min(86%, 380px) !important;
+    padding:6px 9px 5px !important;
+    border:1px solid rgba(224,190,111,.32);
+    border-radius:12px;
+    background:linear-gradient(180deg, rgba(12,20,35,.94), rgba(8,13,24,.84));
+    box-shadow:0 5px 16px rgba(0,0,0,.36);
+    backdrop-filter:blur(4px);
+}
+#tela-combate-global .mob-hud-heading { display:flex; align-items:center; justify-content:center; gap:7px; min-width:0; margin-bottom:4px; }
+#tela-combate-global #hud-nome-mob { overflow:hidden; color:#f8fafc; font:800 11px/1.2 'Segoe UI',Arial,sans-serif; letter-spacing:.35px; text-overflow:ellipsis; text-transform:uppercase; white-space:nowrap; text-shadow:0 1px 3px #000; }
+#tela-combate-global #hud-lvl-mob { flex:none; padding:2px 5px; border:1px solid rgba(248,113,113,.25); border-radius:999px; background:rgba(127,29,29,.36); color:#fca5a5; font:800 9px/1 'Segoe UI',Arial,sans-serif; }
+#tela-combate-global .mob-hud-health-track { box-sizing:border-box; position:relative; height:7px; overflow:hidden; border:1px solid rgba(255,255,255,.16); border-radius:999px; background:rgba(2,6,23,.9); }
+#tela-combate-global #bar-hp-mob { border-radius:inherit; box-shadow:0 0 8px rgba(239,68,68,.32); }
+#tela-combate-global #val-hp-mob { margin-top:2px; color:#fecaca; font:700 8px/1.1 'Segoe UI',Arial,sans-serif; text-align:right; text-shadow:0 1px 2px #000; }
+#tela-combate-global .bestiario-mob-hud { position:absolute; top:100%; left:0; z-index:99; display:flex; width:100%; align-items:center; justify-content:center; gap:5px; margin-top:4px; color:#e2e8f0; font:700 8px/1.1 'Segoe UI',Arial,sans-serif; text-align:center; }
+#tela-combate-global .bestiario-mob-mastered { flex:none; padding:3px 6px; border:1px solid rgba(234,179,8,.45); border-radius:999px; background:rgba(71,48,8,.82); color:#f7d77e; white-space:nowrap; }
+#tela-combate-global .bestiario-mob-stats { display:flex; min-width:0; align-items:center; justify-content:center; gap:clamp(5px, 2vw, 10px); padding:3px 7px; border:1px solid rgba(203,213,225,.18); border-radius:999px; background:rgba(7,12,22,.78); color:#e2e8f0; white-space:nowrap; }
+#tela-combate-global .bestiario-mob-note { padding:3px 8px; border:1px solid rgba(203,213,225,.18); border-radius:999px; background:rgba(7,12,22,.82); color:#cbd5e1; white-space:nowrap; }
+#tela-combate-global #val-hp-mob { font-size:9px !important; }
+#tela-combate-global .bestiario-mob-hud { font-size:7.5px; }
 #tela-combate-global #hud-jogador { border-radius:12px !important; background:#0a1123e8 !important; padding:8px !important; }
 #tela-combate-global button:focus-visible { outline:2px solid #ebcb83; outline-offset:2px; }
 @media(max-height:500px) { #tela-combate-global .combate-painel { padding:7px !important; gap:6px !important; } }

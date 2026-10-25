@@ -21,16 +21,16 @@
             
             <div id="arena-background" style="position: absolute; width: 100%; height: 100%; background-size: contain; background-position: center; pointer-events: none;"></div>
 
-            <div id="boss-bar-container" style="position: absolute; top: 10px; left: 50%; transform: translateX(-50%); width: 60%; z-index: 100; pointer-events: none;">
+            <div id="boss-bar-container" class="mob-hud-target" style="position: absolute; top: 10px; left: 50%; transform: translateX(-50%); width: 60%; z-index: 100; pointer-events: none;">
                 
-                <div style="display: flex; justify-content: center; gap: 8px; margin-bottom: 2px;">
-                    <span id="hud-nome-mob" style="color: #fff; font-weight: 800; font-size: 0.75em; text-transform: uppercase; text-shadow: 0 2px 4px #000;">Monstro</span>
-                    <span id="hud-lvl-mob" style="color: #ef4444; font-weight: 800; font-size: 0.65em;">LV.??</span>
+                <div class="mob-hud-heading">
+                    <span id="hud-nome-mob">Monstro</span>
+                    <span id="hud-lvl-mob">LV.??</span>
                 </div>
-                <div style="position: relative; height: 8px; background: rgba(2, 6, 23, 0.8); border: 1.5px solid #451a1a; border-radius: 10px; overflow: hidden;">
+                <div class="mob-hud-health-track">
                     <div id="bar-hp-mob" style="width: 100%; height: 100%; background: linear-gradient(90deg, #b91c1c, #ef4444); transition: width 0.4s ease-out;"></div>
                 </div>
-                <div id="val-hp-mob" style="text-align: center; color: #fca5a5; font-size: 0.5em; font-weight: 900; margin-top: 1px;">0/0</div>
+                <div id="val-hp-mob" class="mob-hud-health-value">0/0</div>
             </div>
             <div id="grupo-combate-container" style="display:none; position:absolute; top:45px; left:8px; z-index:20; flex-direction:column; gap:5px; max-width:180px;">
             </div>

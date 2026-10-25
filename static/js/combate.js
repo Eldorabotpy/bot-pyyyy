@@ -595,10 +595,7 @@ window.iniciarCacadaApp = async function(spawnId, opcoesGrupo = {}) {
         
         hudBestiario = document.createElement('div');
         hudBestiario.id = 'bestiario-mob-hud';
-        
-        // 🔥 A MÁGICA DO CSS AQUI: position: absolute e top: 100% garante que
-        // ele nasça EXATAMENTE no limite inferior da barra de vida!
-        hudBestiario.style = "position: absolute; top: 100%; margin-top: 12px; left: 0; font-size: 11.5px; text-align: center; width: 100%; display: flex; justify-content: center; flex-direction: column; align-items: center; z-index: 99;";
+        hudBestiario.className = "bestiario-mob-hud";
         
         const caixaVidaMob = document.getElementById('val-hp-mob');
         if (caixaVidaMob && caixaVidaMob.parentElement) {
@@ -611,20 +608,19 @@ window.iniciarCacadaApp = async function(spawnId, opcoesGrupo = {}) {
         const abates = est.abates_bestiario || 0;
         
         if (nivelC === 0) {
-            hudBestiario.innerHTML = `<span style="color: #94a3b8; font-style: italic; letter-spacing: 1px; text-shadow: 1px 1px 1px #000; background: rgba(0,0,0,0.5); padding: 2px 8px; border-radius: 5px;">Atributos ocultos nas sombras...</span>`;
+            hudBestiario.innerHTML = `<span class="bestiario-mob-note">Atributos ocultos</span>`;
         } else if (nivelC === 1) {
-            let faltam = 10 - abates;
-            hudBestiario.innerHTML = `
-                <div style="background: rgba(0,0,0,0.7); border: 1px solid #475569; border-radius: 5px; padding: 3px 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.5);">
-                    <span style="color: #cbd5e1;">Faltam <b>${faltam}</b> abates para atributos.</span>
-                </div>`;
+            const faltam = Math.max(0, 10 - abates);
+            hudBestiario.innerHTML = `<span class="bestiario-mob-note">${faltam} abates para revelar atributos</span>`;
         } else if (nivelC >= 2) {
-            let maestriaHtml = nivelC === 3 ? `<div style="color: #f1c40f; font-weight: bold; margin-bottom: 3px; font-size: 10px; text-shadow: 1px 1px 2px #000;">👑 ALVO DOMINADO (+5% DANO)</div>` : '';
+            const maestriaHtml = nivelC === 3
+                ? `<span class="bestiario-mob-mastered" title="Alvo dominado: +5% de dano">♛ +5% dano</span>`
+                : '';
             hudBestiario.innerHTML = `
                 ${maestriaHtml}
-                <div style="display: flex; gap: 8px; justify-content: center; background: rgba(0, 0, 0, 0); border: 1px solid ${nivelC === 3 ? '#f1c40f' : '#64748b'}; border-radius: 5px; padding: 4px 10px; color: #fff; text-shadow: 1px 1px 1px #000; box-shadow: 0 2px 5px rgba(0,0,0,0.5);">
-                    <span title="Ataque">⚔️ ${est.monster_stats.attack}</span>
-                    <span title="Defesa">🛡️ ${est.monster_stats.defense}</span>
+                <div class="bestiario-mob-stats" aria-label="Atributos do inimigo">
+                    <span title="Ataque">⚔ ${est.monster_stats.attack}</span>
+                    <span title="Defesa">🛡 ${est.monster_stats.defense}</span>
                     <span title="Agilidade">🏃 ${est.monster_stats.initiative}</span>
                     <span title="Sorte">🍀 ${est.monster_stats.luck}</span>
                 </div>
