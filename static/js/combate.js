@@ -490,7 +490,12 @@ window.iniciarCacadaApp = async function(spawnId, opcoesGrupo = {}) {
                 auto_cacada: opcoesGrupo.autoCacada === true
             })
         });
-        console.info(`[COMBATE] iniciar API respondeu em ${Math.round(performance.now() - inicioRequisicaoMs)} ms.`);
+        const tempoInicioApiMs = Math.round(performance.now() - inicioRequisicaoMs);
+        const tempoInicioServidorMs = Number(res.headers.get("Server-Timing")?.match(/dur=([\d.]+)/)?.[1]);
+        console.info(
+            `[COMBATE] iniciar API: ${tempoInicioApiMs} ms de resposta` +
+            (Number.isFinite(tempoInicioServidorMs) ? `; servidor ${Math.round(tempoInicioServidorMs)} ms.` : ".")
+        );
         
         if (!res.ok) throw new Error(`Servidor recusou a conexão (Erro HTTP ${res.status}).`);
         const dados = await res.json();

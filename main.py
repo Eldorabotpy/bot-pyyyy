@@ -726,7 +726,17 @@ def _montar_equipe_herois_grupo(grupo, regiao_atual):
 
 @app.route('/api/combate/iniciar', methods=['POST'])
 def iniciar_combate():
+    inicio_perf_inicio = time.perf_counter()
+    ultima_marcacao_inicio = [inicio_perf_inicio]
+    fases_perf_inicio = []
+
+    def marcar_fase_inicio(nome):
+        agora = time.perf_counter()
+        fases_perf_inicio.append((nome, round((agora - ultima_marcacao_inicio[0]) * 1000)))
+        ultima_marcacao_inicio[0] = agora
+
     sistema_cacada.atualizar_evento_corrupcao(force=False)
+    marcar_fase_inicio("atualizar eventos")
     try:
         data = request.json
         user_id = data.get('user_id')
@@ -744,6 +754,7 @@ def iniciar_combate():
 
         # 🔍 Busca o jogador no banco de dados
         player = users_collection.find_one({"_id": ObjectId(user_id)})
+        marcar_fase_inicio("ler personagem")
         if not player:
             return jsonify({"erro": "Herói não encontrado nos registros."})
 
@@ -769,6 +780,7 @@ def iniciar_combate():
         # 💥 FONTE ÚNICA DE STATUS DE COMBATE
         # ==========================================
         player_stats_calculados = get_combat_stats_sync(player)
+        marcar_fase_inicio("calcular atributos")
         player = aplicar_combat_stats_no_player(player, player_stats_calculados)
 
         hp_max_real = int(player_stats_calculados.get("max_hp", 50))
@@ -1209,6 +1221,7 @@ def iniciar_combate():
                             "sala_id": sala["sala_id"],
                             "sala": gcm.pacote_estado_sala(sala["sala_id"])
                         })
+        marcar_fase_inicio("preparar arena")
         users_collection.update_one({"_id": ObjectId(user_id)}, {"$set": {"rune_hunt_active": {
             "regiao": regiao_atual,
             "spawn_id": spawn_id,
@@ -1216,7 +1229,17 @@ def iniciar_combate():
             "origin": "auto_cacada" if data.get("auto_cacada") is True else "manual",
             "started_at": datetime.now(timezone.utc),
         }}})
-        return jsonify({"estado": estado, "grupo": False})
+        marcar_fase_inicio("gravar caçada")
+        duracao_inicio_ms = round((time.perf_counter() - inicio_perf_inicio) * 1000)
+        app.logger.warning(
+            "[COMBATE PERF] início total=%sms fases=%s restante=%sms",
+            duracao_inicio_ms,
+            ", ".join(f"{nome}:{duracao}ms" for nome, duracao in fases_perf_inicio),
+            max(0, duracao_inicio_ms - sum(duracao for _, duracao in fases_perf_inicio)),
+        )
+        resposta = jsonify({"estado": estado, "grupo": False})
+        resposta.headers["Server-Timing"] = f"combat-start;dur={duracao_inicio_ms:.1f}"
+        return resposta
 
     except Exception:
         import traceback
