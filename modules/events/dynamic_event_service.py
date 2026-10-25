@@ -420,19 +420,31 @@ def _event_rewards_for_player(event, player=None, character_id=None):
         if not any(item.get("item_id") == "tomo_habilidade_classe" for item in last_items):
             last_items.append({"item_id": "tomo_habilidade_classe", "quantity": 1})
     if player:
-        from modules.skill_tome_rewards import CLASS_SKILL_TOME_MARKER, resolve_class_skill_tome
         stable_character = str(character_id or player.get("_id") or "")
         for index, reward in enumerate(rewards):
-            resolved_items = []
-            for item in reward.get("items", []):
-                if item.get("item_id") != CLASS_SKILL_TOME_MARKER:
-                    resolved_items.append(item)
-                    continue
-                tome_id = resolve_class_skill_tome(player, f"{event.get('_id')}:{stable_character}:tier:{index + 1}")
-                if tome_id:
-                    resolved_items.append({**item, "item_id": tome_id})
-            reward["items"] = resolved_items
+            rewards[index] = _resolve_skill_tome_markers(
+                reward,
+                player,
+                f"{event.get('_id')}:{stable_character}:tier:{index + 1}",
+            )
     return rewards
+
+
+def _resolve_skill_tome_markers(reward, player, stable_key):
+    """Replace generic event markers with real learnable tome IDs."""
+    from modules.skill_tome_rewards import CLASS_SKILL_TOME_MARKER, resolve_class_skill_tome
+
+    resolved = deepcopy(reward or {})
+    resolved_items = []
+    for item in resolved.get("items", []):
+        if item.get("item_id") != CLASS_SKILL_TOME_MARKER:
+            resolved_items.append(item)
+            continue
+        tome_id = resolve_class_skill_tome(player, stable_key)
+        if tome_id:
+            resolved_items.append({**item, "item_id": tome_id})
+    resolved["items"] = resolved_items
+    return resolved
 
 
 def ranking(event_id, page=1, page_size=20):
@@ -542,7 +554,14 @@ def claim_reward(character_id, event_id, *, tier=None, collective=False):
                 raise EventError("A recompensa coletiva ainda não está disponível para você.")
             if participant.get("collective_claimed"):
                 raise EventError("Recompensa coletiva já resgatada.")
-            reward = event["collective_reward"]
+            player = users_collection.find_one({"_id": ObjectId(str(character_id))}, session=s)
+            if not player:
+                raise EventError("Personagem não encontrado.")
+            reward = _resolve_skill_tome_markers(
+                event["collective_reward"],
+                player,
+                f"{event.get('_id')}:{character_id}:collective",
+            )
             updated = PARTICIPANTS.update_one({**pkey, "collective_claimed": {"$ne": True}, "points": {"$gte": event["collective_min_points"]}}, {"$set": {"collective_claimed": True, "updated_at": now}}, session=s)
         else:
             index = int(tier) - 1
@@ -557,10 +576,6 @@ def claim_reward(character_id, event_id, *, tier=None, collective=False):
             updated = PARTICIPANTS.update_one({**pkey, "points": {"$gte": threshold}, "claimed_tiers": {"$ne": index}}, {"$addToSet": {"claimed_tiers": index}, "$set": {"updated_at": now}}, session=s)
         if updated.modified_count != 1:
             raise EventError("Recompensa ainda bloqueada ou já resgatada.")
-        if collective:
-            player = users_collection.find_one({"_id": ObjectId(str(character_id))}, session=s)
-            if not player:
-                raise EventError("Personagem não encontrado.")
         _apply_reward(player, reward)
         users_collection.update_one({"_id": player["_id"]}, {"$set": {"inventory": player.get("inventory", {}), "gold": player.get("gold", 0)}}, session=s)
         outcome = {"success": True, "reward": reward, "gold": player.get("gold", 0)}
