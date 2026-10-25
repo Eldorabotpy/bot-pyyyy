@@ -173,8 +173,8 @@ MAP_SPAWNS = {
         # ==========================================
         # 🗡️ ENTRADA SOMBRIA (Noroeste / Top-Left)
         # ==========================================
-        ("goblin_batedor", 5, 5), 
-        ("goblin_batedor", 8, 7), 
+        ("goblin_batedor", 3, 7),
+        ("goblin_batedor", 8, 8),
         ("goblin_batedor", 12, 4),
         ("goblin_batedor", 10, 10), 
         ("goblin_batedor", 15, 8), 
@@ -184,22 +184,22 @@ MAP_SPAWNS = {
         
         ("espectro_do_bosque", 7, 18), 
         ("espectro_do_bosque", 11, 22), 
-        ("espectro_do_bosque", 15, 17), 
+        ("espectro_do_bosque", 12, 17),
         ("espectro_do_bosque", 18, 20),
 
         # ==========================================
         # 🐺 BOSQUE DOS UIVOS (Nordeste / Top-Right)
         # ==========================================
-        ("lobo_magro", 35, 6), 
+        ("lobo_magro", 35, 7),
         ("lobo_magro", 40, 5), 
-        ("lobo_magro", 45, 8),
+        ("lobo_magro", 45, 9),
         ("lobo_magro", 38, 12), 
         ("lobo_magro", 42, 15), 
         ("lobo_magro", 48, 10),
-        ("lobo_magro", 52, 6), 
-        ("lobo_magro", 55, 12), 
+        ("lobo_magro", 52, 5),
+        ("lobo_magro", 56, 10),
         ("lobo_magro", 50, 18),
-        ("lobo_alfa", 44, 12), 
+        ("lobo_alfa", 43, 11),
         ("lobo_alfa", 49, 15), 
         ("lobo_alfa", 54, 9),
 
@@ -226,17 +226,17 @@ MAP_SPAWNS = {
         
         ("xama_goblin", 8, 30),
         ("xama_goblin", 15, 32),
-        ("xama_goblin", 10, 38), 
+        ("xama_goblin", 9, 36),
         ("xama_goblin", 5, 40),
 
         # ==========================================
         # 🍄 PÂNTANO FÚNGICO (Sudoeste / Bottom-Left)
         # ==========================================
         ("cogumelo_gigante", 6, 45),
-        ("cogumelo_gigante", 10, 42),
-        ("cogumelo_gigante", 14, 48),
+        ("cogumelo_gigante", 11, 42),
+        ("cogumelo_gigante", 14, 49),
         ("cogumelo_gigante", 8, 52), 
-        ("cogumelo_gigante", 12, 55),
+        ("cogumelo_gigante", 12, 56),
         ("cogumelo_gigante", 16, 50),
         ("cogumelo_gigante", 20, 45),
         ("cogumelo_gigante", 22, 52), 
