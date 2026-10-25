@@ -55,7 +55,7 @@ CONSUMABLES_DATA = {
         "category": "consumivel", "description": "Uma grande poção de cura 1000 HP.",
         "stackable": True,
         "effects": {"heal": 1000},
-        "price": 1000
+        "price": 400
     },
     "pocao_mana_leve": {
         "display_name": "Poção de Mana Pequena", "emoji": "💧",
@@ -221,7 +221,7 @@ CONSUMABLES_DATA = {
         "type": "consumivel",
         "category": "consumivel",
         "stackable": True,
-        "price": 1000
+        "price": 400
     },
     "nucleo_de_forja": {
         "display_name": "Núcleo de Forja",

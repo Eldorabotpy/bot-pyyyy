@@ -7,7 +7,7 @@ const CATALOGO_AVENTUREIRO = [
     { id: 'pocao_mana_media', nome: 'Poção de Mana M', preco: 300, tipo: 'potion', desc: 'Recupera 300 de MP instantaneamente.' },
     { id: 'pocao_mana_grande', nome: 'Poção de Mana G', preco: 1000, tipo: 'potion', desc: 'Recupera 1000 de MP instantaneamente.' },
     { id: 'pedra_de_aprimoramento', nome: 'Pedra de Aprimoramento', preco: 500, tipo: 'consumivel', desc: 'Um fragmento mágico usado para evoluir equipamentos na forja.' },
-    { id: 'pergaminho_de_reparo', nome: 'Pergaminho de Reparo', preco: 1000, tipo: 'consumivel', desc: 'Magia ancestral que restaura completamente a durabilidade de tudo que você veste.' },
+    { id: 'pergaminho_de_reparo', nome: 'Pergaminho de Reparo', preco: 400, tipo: 'consumivel', desc: 'Magia ancestral que restaura completamente a durabilidade de tudo que você veste.' },
     { id: 'nucleo_de_forja', nome: 'Núcleo de Forja', preco: 500, tipo: 'consumivel', desc: 'Material incandescente essencial para criar novos itens com o Ferreiro.' }
 ];
 
