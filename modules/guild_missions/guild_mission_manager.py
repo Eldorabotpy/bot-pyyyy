@@ -2334,6 +2334,21 @@ def resgatar_recompensa(
             "error": "Herói não encontrado.",
         }
 
+    from modules.player.inventory import can_add_bundle
+    fits_mochila, erro_mochila, _ = can_add_bundle(
+        jogador,
+        recompensas.get("itens", []),
+    )
+    if not fits_mochila:
+        users_collection.update_one(
+            {"_id": player_id, f"{campo}.status": STATUS_ENTREGANDO},
+            {"$set": {f"{campo}.status": STATUS_PRONTA_ENTREGA}},
+        )
+        return {
+            "success": False,
+            "error": f"{erro_mochila} Libere espaço na mochila e resgate novamente.",
+        }
+
     estado = _obter_estado(
         jogador
     )

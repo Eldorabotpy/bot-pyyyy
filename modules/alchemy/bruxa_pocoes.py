@@ -421,6 +421,13 @@ def fabricar(
     if ouro_disponivel < custo_ouro:
         return {"success": False, "error": f"Ouro insuficiente: você precisa de {custo_ouro} ouro."}
 
+    from modules.player.inventory import can_add_item, try_add_item_to_inventory
+    resultado_id = receita["result_base_id"]
+    quantidade_resultado = int(receita.get("quantity", 1) or 1)
+    fits_bag, bag_error = can_add_item(player_data, resultado_id, quantidade_resultado)
+    if not fits_bag:
+        return {"success": False, "error": bag_error}
+
     # Primeiro valida tudo.
     faltando = []
 
@@ -478,20 +485,8 @@ def fabricar(
                 ),
             }
 
-    resultado_id = receita[
-        "result_base_id"
-    ]
-
-    quantidade_resultado = receita.get(
-        "quantity",
-        1,
-    )
-
-    _adicionar_item(
-        player_data,
-        resultado_id,
-        quantidade_resultado,
-    )
+    if not try_add_item_to_inventory(player_data, resultado_id, quantidade_resultado):
+        return {"success": False, "error": "Mochila cheia. Libere espaço e tente fabricar novamente."}
 
     player_data["gold"] = ouro_disponivel - custo_ouro
 

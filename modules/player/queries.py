@@ -158,6 +158,7 @@ async def create_new_player(user_id: Union[str, ObjectId], character_name: str =
         "xp": 0,
         "gold": 100,
         "gems": 0,
+        "backpack_tier": 1,
         "pvp_points": 0,
         "pvp_wins": 0,
         "pvp_losses": 0,

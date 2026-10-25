@@ -555,10 +555,13 @@ async def _handle_victory(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
                     "obtido_em": "Catacumbas Reais",
                     "stats": {} 
                 }
-                player_inventory.add_unique_item(pdata, novo_item)
-                
-                # Registra no painel visual
-                active_raid["loot_log"].append(f"📦 **{p_name}** achou: {rarity_emoji} _{chosen_item_data['nome_exibicao']}_ ({chosen_rarity.upper()})")
+                item_uid = player_inventory.add_unique_item(pdata, novo_item)
+
+                # Registra no painel visual apenas itens que entraram na mochila.
+                if item_uid:
+                    active_raid["loot_log"].append(f"📦 **{p_name}** achou: {rarity_emoji} _{chosen_item_data['nome_exibicao']}_ ({chosen_rarity.upper()})")
+                else:
+                    active_raid["loot_log"].append(f"🎒 **{p_name}** não recebeu o saque: mochila cheia.")
 
         # Verifica Level Up e salva
         player_manager.check_and_apply_level_up(pdata)

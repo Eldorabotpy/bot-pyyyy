@@ -26,10 +26,17 @@ def prepare_profession_tool(player, profession):
             raise ValueError('Ferramenta inicial deste ofício não encontrada.')
         base, meta = starters[0]
         uid = str(uuid4())
-        inventory[uid] = {
+        tool_instance = {
             'base_id': base, 'quantity': 1, 'rarity': meta.get('rarity', 'comum'),
             'upgrade_level': 0, 'durability': deepcopy(meta['durability']),
             'crafter': 'Mestre de ofício',
         }
+        from modules.player.inventory import can_add_unique_item
+        mochila = dict(player)
+        mochila['inventory'] = inventory
+        fits_bag, bag_error = can_add_unique_item(mochila, tool_instance, uid)
+        if not fits_bag:
+            raise ValueError(bag_error)
+        inventory[uid] = tool_instance
     equipment[profession] = uid
     return inventory, equipment

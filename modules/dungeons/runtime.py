@@ -13,7 +13,7 @@ from telegram.error import BadRequest, Forbidden
 
 # --- [CORREÇÃO] IMPORTS DIRETOS DO SISTEMA NOVO (Sem player_manager) ---
 from modules.player.core import get_player_data, save_player_data
-from modules.player.inventory import add_item_to_inventory, add_gold
+from modules.player.inventory import try_add_item_to_inventory, add_gold
 from modules.player.stats import get_player_total_stats, check_and_apply_level_up
 from modules.auth_utils import get_current_player_id
 from modules import game_data
@@ -500,8 +500,13 @@ async def advance_after_victory(update, context, player_id, chat_id, combat_deta
 
     if gold > 0:
         add_gold(pdata, gold)
+    itens_entregues = []
+    mochila_bloqueou_loot = False
     for i, q, _ in items:
-        add_item_to_inventory(pdata, i, q)
+        if try_add_item_to_inventory(pdata, i, q):
+            itens_entregues.append((i, q))
+        else:
+            mochila_bloqueou_loot = True
 
     reg_key = str(combat_details.get("region_key"))
     diff_key = str(combat_details.get("difficulty"))
@@ -540,14 +545,16 @@ async def advance_after_victory(update, context, player_id, chat_id, combat_deta
         summ = f"🏆 <b>CALABOUÇO CONCLUÍDO!</b>\n\n✨ <b>XP Ganho:</b> {xp}\n💰 <b>Bônus Ouro:</b> {bonus}"
         summ += levelup_text
 
-        if items:
+        if itens_entregues:
             loot_lines = []
-            for i, q, _ in items:
+            for i, q in itens_entregues:
                 info = (game_data.ITEMS_DATA or {}).get(i, {})
                 name = info.get("display_name") or i.replace("_", " ").title()
                 emoji = info.get("emoji", "")
                 loot_lines.append(f"• {q}x {emoji} {name}")
             summ += "\n\n🎒 <b>Loot Final:</b>\n" + "\n".join(loot_lines)
+        if mochila_bloqueou_loot:
+            summ += "\n\n🎒 <b>Mochila cheia:</b> parte do loot não coube. Venda ou use itens antes das próximas lutas."
 
         await _send_battle_media(
             context,
@@ -572,6 +579,8 @@ async def advance_after_victory(update, context, player_id, chat_id, combat_deta
     await save_player_data(player_id, pdata)
 
     caption = await format_combat_message(pdata)
+    if mochila_bloqueou_loot:
+        caption += "\n\n🎒 Mochila cheia: parte do loot não coube. Libere espaço antes das próximas lutas."
     kb = [
         [
             InlineKeyboardButton("⚔️ 𝐀𝐭𝐚𝐜𝐚𝐫", callback_data="combat_attack"),

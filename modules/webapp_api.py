@@ -1,6 +1,6 @@
 import asyncio
 import traceback
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, current_app, jsonify, request
 from bson.objectid import ObjectId
 from modules.player.stats import _get_class_key_normalized
 from modules.game_data.cosmetics import CATALOGO_AVATARES, CATALOGO_BANNERS
@@ -597,6 +597,7 @@ def obter_perfil(user_id):
         from modules.game_data.equipment import SLOT_EMOJI, SLOT_ORDER
         from modules.game_data.classes import get_class_avatar
         from modules.game_data.skins import get_skin_avatar
+        from modules.player.inventory import backpack_view
         
         # 🔍 1. Busca o jogador com suporte a ObjectId ou Telegram ID
         busca_id = ObjectId(user_id) if len(str(user_id)) == 24 else int(user_id) if str(user_id).isdigit() else user_id
@@ -1392,6 +1393,7 @@ def obter_perfil(user_id):
             "quests": pdata.get("quests", {}),
             "status": status_formatados,
             "inventario": inventario_formatado, 
+            "mochila": backpack_view(pdata),
             "equipamentos": equip_formatado,
             "equipment_tools": equip_tools_cru,
             "esquiva": esquiva, "atk_duplo": atk_duplo, 
@@ -1813,8 +1815,8 @@ def api_loja_comprar():
 
         # 1. Pega as informações reais do item no Backend
         quantidade = data.get('quantidade', 1)
-        if type(quantidade) is not int or not 1 <= quantidade <= 999:
-            return jsonify({'erro': 'Escolha uma quantidade inteira entre 1 e 999.'}), 400
+        if type(quantidade) is not int or not 1 <= quantidade <= 500:
+            return jsonify({'erro': 'Escolha uma quantidade inteira entre 1 e 500 por pilha.'}), 400
         info_item = items_data.ITEMS_DATA.get(item_id)
         if not info_item:
             return jsonify({"erro": "Este item não existe na loja."}), 404
@@ -1828,6 +1830,11 @@ def api_loja_comprar():
         campo_saldo = "gems" if moeda == "gemas" else "gold"
 
         pdata = require_player_identity(str(user_id))
+
+        from modules.player.inventory import can_add_item, _item_quantity
+        pode_adicionar, motivo_mochila = can_add_item(pdata, item_id, quantidade)
+        if not pode_adicionar:
+            return jsonify({"erro": motivo_mochila}), 409
 
         saldo_atual = int(pdata.get(campo_saldo, 0) or 0)
         
@@ -1844,7 +1851,9 @@ def api_loja_comprar():
         inventario = copy.deepcopy(inventario_original)
         if item_id in inventario:
             if isinstance(inventario[item_id], dict):
-                inventario[item_id]["quantity"] = inventario[item_id].get("quantity", 1) + quantidade
+                inventario[item_id]["quantity"] = _item_quantity(inventario[item_id]) + quantidade
+                inventario[item_id].pop("qtd", None)
+                inventario[item_id].pop("qty", None)
             else:
                 inventario[item_id] += quantidade
         else:
@@ -1873,6 +1882,55 @@ def api_loja_comprar():
         return jsonify({"erro": str(exc)}), 403
     except Exception as e:
         return jsonify({"erro": "Erro na transação: " + str(e)}), 500
+
+
+@webapp_bp.route('/api/personagem/mochila/aprimorar', methods=['POST'])
+def api_aprimorar_mochila():
+    try:
+        from modules.portal_auth import PlayerSessionError, require_csrf, require_player_identity
+        from modules.player.inventory import BACKPACK_TIERS, backpack_tier, backpack_slots
+
+        require_csrf()
+        data = request.get_json(silent=True) or {}
+        pdata = require_player_identity(str(data.get("user_id") or ""))
+        tier_atual = backpack_tier(pdata)
+        proximo_tier = tier_atual + 1
+        melhoria = BACKPACK_TIERS.get(proximo_tier)
+        if not melhoria:
+            return jsonify({"erro": "Sua mochila já está no tamanho máximo."}), 400
+
+        custo = int(melhoria["cost_gems"])
+        filtro_tier = {"$in": [None, 0, 1]} if tier_atual == 1 else tier_atual
+        resultado = users_collection.update_one(
+            {"_id": pdata["_id"], "backpack_tier": filtro_tier, "gems": {"$gte": custo}},
+            {"$inc": {"gems": -custo}, "$set": {"backpack_tier": proximo_tier}},
+        )
+        if resultado.modified_count != 1:
+            return jsonify({"erro": "Saldo ou mochila mudou. Atualize o perfil e tente novamente."}), 409
+
+        try:
+            from modules.player.core import clear_player_cache
+            _run_async(clear_player_cache(str(pdata["_id"])))
+        except Exception:
+            current_app.logger.exception("Falha ao limpar cache após ampliação da mochila")
+
+        return jsonify({
+            "sucesso": True,
+            "mochila": {
+                "tier": proximo_tier,
+                "name": melhoria["name"],
+                "capacity": melhoria["capacity"],
+                "used": backpack_slots(pdata),
+            },
+            "gems": int(pdata.get("gems", 0) or 0) - custo,
+            "cost_gems": custo,
+        })
+    except PlayerSessionError as exc:
+        return jsonify({"erro": str(exc)}), exc.status_code
+    except ValueError as exc:
+        return jsonify({"erro": str(exc)}), 403
+    except Exception as exc:
+        return jsonify({"erro": "Não foi possível ampliar a mochila agora."}), 500
     
 @webapp_bp.route('/api/personagem/usar_pocao_rapida', methods=['POST'])
 def api_usar_pocao_rapida():
@@ -2844,19 +2902,12 @@ def resgatar_passe():
         elif r_tipo == "item":
             base_id = recompensa.get("id")
             qtd = recompensa.get("qtd", 1)
-            # Entrega no formato moderno (empilhável se for material/consumível)
-            encontrou = False
-            for k, v in inventario.items():
-                if isinstance(v, dict) and v.get("base_id") == base_id:
-                    v['quantity'] = v.get('quantity', 1) + qtd
-                    encontrou = True
-                    break
-            if not encontrou:
-                inventario[base_id] = {
-                    "base_id": base_id,
-                    "quantity": qtd
-                }
-            pdata["inventory"] = inventario
+            from modules.player.inventory import can_add_item, try_add_item_to_inventory
+            fits, bag_error = can_add_item(pdata, base_id, qtd)
+            if not fits:
+                return jsonify({"status": "error", "message": f"{bag_error} Libere espaço e resgate novamente."}), 409
+            try_add_item_to_inventory(pdata, base_id, qtd)
+            inventario = pdata.get("inventory", {})
 
         elif r_tipo == "banner":
             unlocked = pdata.get("unlocked_banners") or []
@@ -7443,7 +7494,16 @@ def api_companheiros(user_id):
                 return jsonify({'erro': 'Pedido inválido.'}), 400
             message = companions.mutate(user_id, lambda state: companions.action(
                 player, state, data.get('action'), data.get('family'), data.get('specialty')))
-        response = jsonify({'state': companions.view(player, companions.load(user_id)), 'message': message})
+        companion_state = companions.load(user_id)
+        if request.method == 'POST':
+            try:
+                from main import jogadores_online
+                for online in jogadores_online.values():
+                    if str(online.get('char_id') or '') == user_id:
+                        online['_pet_incubating'] = bool(companion_state.get('incubation'))
+            except Exception:
+                pass
+        response = jsonify({'state': companions.view(player, companion_state), 'message': message})
         response.headers['Cache-Control'] = 'no-store'
         return response
     except (ValueError, TypeError):

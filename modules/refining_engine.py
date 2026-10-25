@@ -125,6 +125,7 @@ def get_max_refine_quantity(player_data: dict, recipe: dict, forced_prof: str = 
 # ==============================================================================
 async def start_refine(player_data: dict, recipe_id: str) -> dict | str:
     from modules import player_manager
+    from modules.player.inventory import can_add_bundle
     
     prev = preview_refine(recipe_id, player_data)
     if not prev:
@@ -133,6 +134,12 @@ async def start_refine(player_data: dict, recipe_id: str) -> dict | str:
         return "Materiais ou nível insuficientes."
 
     inputs = prev.get("inputs", {}) or {}
+    fits_bag, bag_error, reserved_slots = can_add_bundle(
+        player_data,
+        [{"item_id": item_id, "quantity": qty} for item_id, qty in (prev.get("outputs") or {}).items()],
+    )
+    if not fits_bag:
+        return bag_error
     for item_id, qty in inputs.items():
         try:
             qty = int(qty or 0)
@@ -161,6 +168,7 @@ async def start_refine(player_data: dict, recipe_id: str) -> dict | str:
             "quantity": 1,
             "xp_gain": xp_gain,
             "profession_type": prof_type,
+            "inventory_reserved_slots": reserved_slots,
         }
     }
 
@@ -176,6 +184,7 @@ async def start_refine(player_data: dict, recipe_id: str) -> dict | str:
 
 async def start_batch_refine(player_data: dict, recipe_id: str, quantity: int, forced_prof: str = None) -> dict | str:
     from modules import player_manager
+    from modules.player.inventory import can_add_bundle
     
     rec = game_data.REFINING_RECIPES.get(recipe_id)
     if not rec: 
@@ -189,6 +198,13 @@ async def start_batch_refine(player_data: dict, recipe_id: str, quantity: int, f
     real_max = get_max_refine_quantity(player_data, rec, forced_prof)
     if quantity > real_max: quantity = real_max
     if quantity < 1: return "Materiais insuficientes."
+
+    fits_bag, bag_error, reserved_slots = can_add_bundle(
+        player_data,
+        [{"item_id": item_id, "quantity": int(amount) * quantity} for item_id, amount in (rec.get("outputs") or {}).items()],
+    )
+    if not fits_bag:
+        return bag_error
 
     inputs = rec.get("inputs", {}) or {}
     consumo_map = {}
@@ -224,6 +240,7 @@ async def start_batch_refine(player_data: dict, recipe_id: str, quantity: int, f
             "quantity": quantity,
             "xp_gain": total_xp,
             "profession_type": prof_type,
+            "inventory_reserved_slots": reserved_slots,
         }
     }
 
@@ -242,6 +259,7 @@ async def start_batch_refine(player_data: dict, recipe_id: str, quantity: int, f
 # ==============================================================================
 async def finish_refine(player_data: dict) -> dict | str | None:
     from modules import player_manager
+    from modules.player.inventory import can_add_bundle, try_add_item_to_inventory
 
     state = player_data.get("player_state", {}) or {}
     action = state.get("action")
@@ -272,6 +290,27 @@ async def finish_refine(player_data: dict) -> dict | str | None:
     outputs = rec.get("outputs", {}) or {}
     final_outputs = {}
 
+    # Libera a reserva apenas na simulação de entrega. Se um grant externo
+    # ocupou espaço por algum caminho legado, mantém o trabalho pendente para
+    # que o jogador libere espaço e tente concluir novamente.
+    details.pop("inventory_reserved_slots", None)
+    state["details"] = details
+    player_data["player_state"] = state
+    bundle = []
+    for item_id, base_amt in outputs.items():
+        try:
+            total_amt = max(0, int(base_amt or 0) * qty)
+        except (TypeError, ValueError):
+            total_amt = 0
+        if total_amt > 0:
+            bundle.append({"item_id": item_id, "quantity": total_amt})
+    fits_bag, bag_error, _ = can_add_bundle(player_data, bundle)
+    if not fits_bag:
+        details["inventory_reserved_slots"] = 0
+        state["details"] = details
+        player_data["player_state"] = state
+        return f"{bag_error} Libere espaço e conclua a refinaria novamente."
+
     for item_id, base_amt in outputs.items():
         try:
             base_amt = int(base_amt or 0)
@@ -280,8 +319,10 @@ async def finish_refine(player_data: dict) -> dict | str | None:
 
         total_amt = max(0, base_amt * qty)
         if total_amt <= 0: continue
-        player_manager.add_item_to_inventory(player_data, item_id, total_amt)
-        final_outputs[item_id] = total_amt
+        if try_add_item_to_inventory(player_data, item_id, total_amt):
+            final_outputs[item_id] = total_amt
+        else:
+            return "Mochila cheia. Libere espaço e conclua a refinaria novamente."
 
     # 2) Calcula XP
     try:

@@ -3,10 +3,173 @@
 
 import logging
 import uuid
+import time
+import copy
 from typing import Tuple, Union, Dict
 from modules import game_data
 
 logger = logging.getLogger(__name__)
+
+# Mochilas crescem em quatro etapas. Itens empilháveis ocupam um único espaço
+# e cada pilha tem limite próprio; itens únicos ocupam um espaço cada.
+BACKPACK_TIERS = {
+    1: {"name": "Mochila de Viajante", "capacity": 40, "cost_gems": 0},
+    2: {"name": "Mochila Reforçada", "capacity": 80, "cost_gems": 100},
+    3: {"name": "Mochila do Aventureiro", "capacity": 120, "cost_gems": 250},
+    4: {"name": "Mochila Real", "capacity": 160, "cost_gems": 500},
+}
+MAX_STACK_QUANTITY = 500
+_inventory_notice_at = {}
+
+
+def backpack_tier(player_data: dict) -> int:
+    try:
+        tier = int(player_data.get("backpack_tier", 1) or 1)
+    except (TypeError, ValueError):
+        tier = 1
+    return min(max(tier, 1), max(BACKPACK_TIERS))
+
+
+def backpack_capacity(player_data: dict) -> int:
+    return BACKPACK_TIERS[backpack_tier(player_data)]["capacity"]
+
+
+def backpack_slots(player_data: dict) -> int:
+    inventory = player_data.get("inventory") or {}
+    if not isinstance(inventory, dict):
+        return 0
+    slots = 0
+    for value in inventory.values():
+        try:
+            if _item_quantity(value) > 0:
+                slots += 1
+        except (TypeError, ValueError, OverflowError):
+            # Dados legados malformados ainda ocupam espaço; não os deixa
+            # permitir que novas recompensas ultrapassem o limite.
+            slots += 1
+    return slots
+
+
+def _reserved_inventory_slots(player_data: dict) -> int:
+    state = player_data.get("player_state") or {}
+    details = state.get("details") if isinstance(state, dict) else {}
+    try:
+        return max(0, int((details or {}).get("inventory_reserved_slots", 0) or 0))
+    except (TypeError, ValueError):
+        return 0
+
+
+def backpack_view(player_data: dict) -> dict:
+    tier = backpack_tier(player_data)
+    current = BACKPACK_TIERS[tier]
+    next_tier = BACKPACK_TIERS.get(tier + 1)
+    return {
+        "tier": tier,
+        "name": current["name"],
+        "used": backpack_slots(player_data),
+        "capacity": current["capacity"],
+        "stack_limit": MAX_STACK_QUANTITY,
+        "next_tier": tier + 1 if next_tier else None,
+        "next_name": next_tier["name"] if next_tier else None,
+        "next_capacity": next_tier["capacity"] if next_tier else None,
+        "next_cost_gems": next_tier["cost_gems"] if next_tier else None,
+    }
+
+
+def _item_quantity(value) -> int:
+    if isinstance(value, dict):
+        return int(value.get("quantity", value.get("qtd", value.get("qty", 1))) or 0)
+    return int(value or 0)
+
+
+def can_add_item(player_data: dict, item_id: str, quantity: int = 1) -> Tuple[bool, str]:
+    """Valida espaço e limite de pilha sem alterar o personagem."""
+    try:
+        quantity = int(quantity)
+    except (TypeError, ValueError):
+        return False, "Quantidade inválida."
+    if quantity <= 0:
+        return False, "Quantidade inválida."
+
+    inventory = player_data.get("inventory") or {}
+    if not isinstance(inventory, dict):
+        return False, "Formato da mochila inválido."
+
+    stackable = game_data.is_stackable(item_id)
+    existing = inventory.get(item_id)
+
+    if stackable:
+        try:
+            current = _item_quantity(existing) if existing is not None else 0
+        except (TypeError, ValueError, OverflowError):
+            return False, "A quantidade deste item está inválida na mochila."
+        if quantity > MAX_STACK_QUANTITY - current:
+            return False, f"Cada pilha comporta até {MAX_STACK_QUANTITY} unidades."
+        required_slots = 0 if existing is not None else 1
+    else:
+        # Este formato antigo permite quantidades inteiras numa chave. Quando
+        # a chave já representa uma instância única, cada novo grant cria uma
+        # chave de instância separada.
+        required_slots = 1 if existing is None or isinstance(existing, dict) else 0
+
+    if backpack_slots(player_data) + _reserved_inventory_slots(player_data) + required_slots > backpack_capacity(player_data):
+        return False, "Mochila cheia. Venda ou use itens, ou amplie sua mochila em Perfil → Mochila."
+    return True, ""
+
+
+def can_add_unique_item(player_data: dict, item: dict, unique_id: str = None) -> Tuple[bool, str]:
+    inventory = player_data.get("inventory") or {}
+    if not isinstance(inventory, dict):
+        return False, "Formato da mochila inválido."
+    if unique_id and unique_id in inventory:
+        return True, ""
+    if backpack_slots(player_data) + _reserved_inventory_slots(player_data) >= backpack_capacity(player_data):
+        return False, "Mochila cheia. Venda ou use itens, ou amplie sua mochila em Perfil → Mochila."
+    return True, ""
+
+
+def can_add_bundle(player_data: dict, items) -> Tuple[bool, str, int]:
+    """Simula um conjunto de recompensas e retorna quantos espaços ele reserva."""
+    probe = copy.deepcopy(player_data)
+    slots_before = backpack_slots(probe)
+    for grant in items or []:
+        if not isinstance(grant, dict):
+            continue
+        item_id = str(grant.get("item_id") or grant.get("id") or "")
+        if not item_id:
+            continue
+        try:
+            quantity = int(grant.get("quantity", grant.get("quantidade", 1)) or 1)
+        except (TypeError, ValueError):
+            return False, "Quantidade de recompensa inválida.", 0
+        can_add, reason = can_add_item(probe, item_id, quantity)
+        if not can_add:
+            return False, reason, 0
+        add_item_to_inventory(probe, item_id, quantity)
+    return True, "", max(0, backpack_slots(probe) - slots_before)
+
+
+def _notify_inventory_limit(player_data: dict, reason: str) -> None:
+    """Avisa jogador online; limita repetições para não inundar o chat."""
+    char_id = str(player_data.get("_id") or player_data.get("user_id") or "")
+    if not char_id:
+        return
+    now = time.monotonic()
+    if now - _inventory_notice_at.get(char_id, 0) < 60:
+        return
+    _inventory_notice_at[char_id] = now
+    try:
+        from main import jogadores_online, socketio
+        message = reason or "Mochila cheia. Venda ou use itens, ou amplie sua mochila em Perfil → Mochila."
+        for sid, online in list(jogadores_online.items()):
+            if str(online.get("char_id") or "") == char_id:
+                socketio.emit("novaMensagemChat", {
+                    "remetente": "🎒 Mochila",
+                    "texto": f"{message} Itens e recompensas não cabem; libere espaço e tente novamente.",
+                    "tipo": "aviso",
+                }, to=sid)
+    except Exception:
+        logger.debug("Não foi possível notificar limite da mochila para %s", char_id, exc_info=True)
 
 # ==============================================================================
 # ECONOMIA (GOLD & GEMS)
@@ -124,20 +287,18 @@ def spend_medalhas_cla(
 # GERENCIAMENTO DE ITENS (INVENTÁRIO)
 # ==============================================================================
 
-def add_item_to_inventory(player_data: dict, item_id: str, quantity: int = 1) -> dict:
+def try_add_item_to_inventory(player_data: dict, item_id: str, quantity: int = 1) -> bool:
+    can_add, reason = can_add_item(player_data, item_id, quantity)
+    if not can_add:
+        logger.warning("Grant de item bloqueado (%s): %s", item_id, reason)
+        _notify_inventory_limit(player_data, reason)
+        return False
+
     inventory = player_data.get("inventory", {})
+    if not isinstance(inventory, dict):
+        inventory = {}
 
-    item_info = game_data.ITEMS_DATA.get(
-        item_id,
-        {},
-    ) or {}
-
-    stackable = bool(
-        item_info.get(
-            "stackable",
-            False,
-        )
-    )
+    stackable = game_data.is_stackable(item_id)
 
     current = inventory.get(
         item_id
@@ -149,17 +310,7 @@ def add_item_to_inventory(player_data: dict, item_id: str, quantity: int = 1) ->
     if stackable:
 
         if isinstance(current, dict):
-
-            current_qty = int(
-                current.get(
-                    "quantity",
-                    current.get(
-                        "qtd",
-                        0,
-                    ),
-                )
-                or 0
-            )
+            current_qty = _item_quantity(current)
 
             current["base_id"] = (
                 current.get(
@@ -193,7 +344,7 @@ def add_item_to_inventory(player_data: dict, item_id: str, quantity: int = 1) ->
             )
 
         player_data["inventory"] = inventory
-        return player_data
+        return True
 
     # =========================================================
     # ⚔️ ITEM NÃO EMPILHÁVEL
@@ -213,12 +364,9 @@ def add_item_to_inventory(player_data: dict, item_id: str, quantity: int = 1) ->
             f"{item_id}_"
             f"{str(uuid.uuid4())[:8]}"
         )
-
-        return add_item_to_inventory(
-            player_data,
-            new_uid,
-            quantity,
-        )
+        inventory[new_uid] = int(quantity)
+        player_data["inventory"] = inventory
+        return True
 
     current_qty = inventory.get(
         item_id,
@@ -238,6 +386,12 @@ def add_item_to_inventory(player_data: dict, item_id: str, quantity: int = 1) ->
 
     player_data["inventory"] = inventory
 
+    return True
+
+
+def add_item_to_inventory(player_data: dict, item_id: str, quantity: int = 1) -> dict:
+    """Mantém compatibilidade dos chamadores antigos e recusa grants sem espaço."""
+    try_add_item_to_inventory(player_data, item_id, quantity)
     return player_data
 
 def remove_item_from_inventory(player_data: dict, item_id: str, quantity: int = 1) -> bool:
@@ -358,6 +512,12 @@ def add_unique_item(player_data: dict, unique_id_or_item: Union[str, dict], item
     else:
         # Fallback de erro
         logger.error(f"add_unique_item: Assinatura inválida. Args: {type(unique_id_or_item)}, {type(item_data)}")
+        return None
+
+    can_add, reason = can_add_unique_item(player_data, final_item, final_uid)
+    if not can_add:
+        logger.warning("Grant de item único bloqueado (%s): %s", final_uid, reason)
+        _notify_inventory_limit(player_data, reason)
         return None
 
     # Adiciona ao inventário

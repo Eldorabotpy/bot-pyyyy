@@ -2281,16 +2281,11 @@ async def processar_turno_combate(
             else mob_status_luta.get("loot_table", [])
         )
         for item_id in roll_loot(loot_table, player_data=player):
-            inventario_alterado = True
-            recompensas["itens"].append(item_id)
-
-            if item_id in inventory:
-                if isinstance(inventory[item_id], dict):
-                    inventory[item_id]["quantity"] = inventory[item_id].get("quantity", 0) + 1
-                else:
-                    inventory[item_id] += 1
-            else:
-                inventory[item_id] = {"base_id": item_id, "quantity": 1}
+            from modules.player.inventory import try_add_item_to_inventory
+            if try_add_item_to_inventory(player, item_id, 1):
+                inventario_alterado = True
+                recompensas["itens"].append(item_id)
+                inventory = player.get("inventory", inventory)
 
         levels_gained, points_gained, msg = check_and_apply_level_up(
             player

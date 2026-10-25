@@ -660,6 +660,7 @@ async function carregarMeuPerfil() {
         p.gold = p.gold || 0; p.gems = p.gems || 0;
         p.xp = p.xp || 0; p.xp_max = p.xp_max || 1;
         p.level = p.level || 1; p.energy = p.energy || 20;
+        p.mochila = p.mochila || { tier: 1, name: 'Mochila de Viajante', used: (p.inventario || []).length, capacity: 40, stack_limit: 500, next_tier: 2, next_name: 'Mochila Reforçada', next_capacity: 80, next_cost_gems: 100 };
 
         if (!Array.isArray(p.inventario)) {
             p.inventario = Object.entries(p.inventario).map(([id, dados]) => {
@@ -1053,6 +1054,17 @@ async function carregarMeuPerfil() {
 
         // --- Mochila: categorias construídas a partir dos metadados reais de cada item ---
         const itensInventario = Array.isArray(p.inventario) ? p.inventario : [];
+        const mochila = p.mochila || {};
+        const espacosMochila = Number(mochila.used ?? itensInventario.length);
+        const capacidadeMochila = Number(mochila.capacity || 40);
+        const progressoMochila = Math.min(100, Math.max(0, capacidadeMochila ? espacosMochila / capacidadeMochila * 100 : 0));
+        const mochilaCheia = espacosMochila >= capacidadeMochila;
+        const htmlMelhoriaMochila = mochila.next_tier
+            ? `<button type="button" class="eldora-backpack-upgrade" onclick="window.aprimorarMochilaPerfil()" ${Number(p.gems || 0) < Number(mochila.next_cost_gems || 0) ? 'disabled' : ''}>
+                    <span>Ampliar para ${Number(mochila.next_capacity).toLocaleString('pt-BR')} espaços</span>
+                    <strong>💎 ${Number(mochila.next_cost_gems || 0).toLocaleString('pt-BR')}</strong>
+               </button>`
+            : `<span class="eldora-backpack-max">Mochila no tamanho máximo</span>`;
         const contagensMochila = Object.fromEntries(FILTROS_MOCHILA.map(filtro => [
             filtro.id,
             filtro.id === 'todos' ? itensInventario.length : itensInventario.filter(item => classificarItemMochila(item) === filtro.id).length
@@ -1065,6 +1077,17 @@ async function carregarMeuPerfil() {
                 </label>
                 <span id="contagem-itens-mochila" class="eldora-inventory-count" aria-live="polite">${itensInventario.length} ${itensInventario.length === 1 ? 'item' : 'itens'}</span>
             </div>
+            <section class="eldora-backpack-summary" aria-label="Capacidade da mochila">
+                <div class="eldora-backpack-heading">
+                    <div><span>MOCHILA · NÍVEL ${Number(mochila.tier || 1)}</span><strong>${mochila.name || 'Mochila de Viajante'}</strong></div>
+                    <b>${espacosMochila}/${capacidadeMochila}<small> espaços</small></b>
+                </div>
+                <div class="eldora-backpack-track" role="progressbar" aria-valuemin="0" aria-valuemax="${capacidadeMochila}" aria-valuenow="${Math.min(espacosMochila, capacidadeMochila)}"><i style="width:${progressoMochila}%"></i></div>
+                <div class="eldora-backpack-footer">
+                    <small>${mochilaCheia ? 'Mochila cheia. Venda ou use itens para liberar espaço.' : `Até ${Number(mochila.stack_limit || 500)} unidades por pilha.`}</small>
+                    ${htmlMelhoriaMochila}
+                </div>
+            </section>
             <div id="filtros-mochila" class="eldora-inventory-filters eldora-profile-style-494596d6" role="group" aria-label="Categorias da mochila">
                 ${FILTROS_MOCHILA.map(filtro => `
                     <button type="button" class="eldora-inventory-filter${filtro.id === 'todos' ? ' is-active' : ''}" onclick="filtrarMochila('${filtro.id}')" id="btn-filtro-${filtro.id}" aria-pressed="${filtro.id === 'todos'}">
@@ -1386,6 +1409,32 @@ window.abrirPainelAprimoramentoSkills = function() {
     }
 
     container.innerHTML = html + `</div>`;
+};
+
+window.aprimorarMochilaPerfil = async function() {
+    const player = window.perfilDadosGlobais;
+    const mochila = player?.mochila;
+    if (!player || !mochila?.next_tier) return;
+    const custo = Number(mochila.next_cost_gems || 0);
+    const confirmado = await window.confirmarEldora(
+        `Ampliar para ${Number(mochila.next_capacity).toLocaleString('pt-BR')} espaços por ${custo.toLocaleString('pt-BR')} gemas?`,
+        'Melhorar mochila'
+    );
+    if (!confirmado) return;
+    try {
+        const headers = await window.portalSessionHeaders({ 'Content-Type': 'application/json' });
+        const response = await fetch('/api/personagem/mochila/aprimorar', {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ user_id: localStorage.getItem('jogadorEldoraID') })
+        });
+        const data = await response.json();
+        if (!response.ok || !data.sucesso) throw new Error(data.erro || 'Não foi possível melhorar a mochila.');
+        window.alertaEldora?.('Mochila ampliada', `${data.mochila.name}: ${data.mochila.capacity} espaços.`, 'sucesso');
+        await carregarMeuPerfil();
+    } catch (error) {
+        window.alertaEldora?.('Mochila', error.message || 'Não foi possível ampliar a mochila.', 'erro');
+    }
 };
 
 function garantirModalDetalhesSkill() {

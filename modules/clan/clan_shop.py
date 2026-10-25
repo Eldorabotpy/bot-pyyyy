@@ -930,6 +930,11 @@ def comprar_item_loja_cla(
         # 📦 NOVO INVENTÁRIO
         # ====================================================
 
+        from modules.player.inventory import can_add_item
+        fits_bag, bag_error = can_add_item(jogador, item_id, quantidade)
+        if not fits_bag:
+            return {"success": False, "error": bag_error}
+
         inventario_original = (
             jogador.get(
                 "inventory"

@@ -1,4 +1,5 @@
 import math
+import copy
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timezone, timedelta
 from modules import player_manager, crafting_registry, profession_engine
@@ -98,6 +99,17 @@ async def start_dismantle(player_data: dict, unique_item_id: str) -> Dict[str, A
     name = item.get("display_name", item.get("nome", "Item"))
     rarity = item.get("rarity", item.get("raridade", "comum"))
 
+    simulated = copy.deepcopy(player_data)
+    simulated.setdefault("inventory", {}).pop(unique_item_id, None)
+    expected = calculate_recipe_return(base_id, 1, rarity)
+    from modules.player.inventory import can_add_bundle
+    fits_bag, bag_error, reserved_slots = can_add_bundle(
+        simulated,
+        [{"item_id": item_id, "quantity": amount} for item_id, amount in expected.items()],
+    )
+    if not fits_bag:
+        return bag_error
+
     tool_result = profession_engine.validate_and_consume_tool_for_item(
         player_data=player_data,
         item_obj=item,
@@ -137,7 +149,8 @@ async def start_dismantle(player_data: dict, unique_item_id: str) -> Dict[str, A
             "work_speed": tempo_calc,
             "tool_uid": tool_result.get("tool_uid"),
             "tool_type": tool_result.get("tool_type"),
-            "tool_broke": tool_result.get("tool_broke", False)
+            "tool_broke": tool_result.get("tool_broke", False),
+            "inventory_reserved_slots": reserved_slots,
         }
     }
 
@@ -168,10 +181,24 @@ async def finish_dismantle(player_data: dict, details: dict) -> tuple[str, dict]
     
     # 1. Calcula Materiais (1 unidade)
     rewards = calculate_recipe_return(base_id, 1, rarity)
+
+    state = player_data.get("player_state") or {}
+    state_details = state.get("details") or {}
+    state_details.pop("inventory_reserved_slots", None)
+    state["details"] = state_details
+    player_data["player_state"] = state
+    from modules.player.inventory import can_add_bundle, try_add_item_to_inventory
+    fits_bag, bag_error, _ = can_add_bundle(
+        player_data,
+        [{"item_id": item_id, "quantity": amount} for item_id, amount in rewards.items()],
+    )
+    if not fits_bag:
+        return f"{bag_error} Libere espaço e conclua o desmonte novamente."
     
     # 2. Entrega
     for mat_id, qty in rewards.items():
-        player_manager.add_item_to_inventory(player_data, mat_id, qty)
+        if not try_add_item_to_inventory(player_data, mat_id, qty):
+            return "Mochila cheia. Libere espaço e conclua o desmonte novamente."
         
     # 3. Limpa Estado
     player_data["player_state"] = {"action": "idle"}
@@ -230,6 +257,20 @@ async def start_batch_dismantle(player_data: dict, base_id_filter: str, rarity_f
     if real_qty < 1:
         return "Quantidade inválida."
 
+    uids_to_remove = candidates[:real_qty]
+    simulated = copy.deepcopy(player_data)
+    simulated_inventory = simulated.setdefault("inventory", {})
+    for uid in uids_to_remove:
+        simulated_inventory.pop(uid, None)
+    expected = calculate_recipe_return(base_id_filter, real_qty, rarity_filter)
+    from modules.player.inventory import can_add_bundle
+    fits_bag, bag_error, reserved_slots = can_add_bundle(
+        simulated,
+        [{"item_id": item_id, "quantity": amount} for item_id, amount in expected.items()],
+    )
+    if not fits_bag:
+        return bag_error
+
     tool_result = None
 
     for _ in range(real_qty):
@@ -242,8 +283,6 @@ async def start_batch_dismantle(player_data: dict, base_id_filter: str, rarity_f
 
         if not tool_result.get("ok"):
             return tool_result.get("error", "Ferramenta inválida para desmontar em lote.")
-
-    uids_to_remove = candidates[:real_qty]
 
     for uid in uids_to_remove:
         if uid in inventory:
@@ -280,7 +319,8 @@ async def start_batch_dismantle(player_data: dict, base_id_filter: str, rarity_f
             "work_speed": tempo_calc,
             "tool_uid": tool_result.get("tool_uid") if tool_result else None,
             "tool_type": tool_result.get("tool_type") if tool_result else None,
-            "tool_broke": tool_result.get("tool_broke", False) if tool_result else False
+            "tool_broke": tool_result.get("tool_broke", False) if tool_result else False,
+            "inventory_reserved_slots": reserved_slots,
         }
     }
 
@@ -312,10 +352,24 @@ async def finish_dismantle_batch(player_data: dict, details: dict) -> tuple[str,
     
     # 1. Calcula Materiais (Multiplicado pela Qty)
     rewards = calculate_recipe_return(base_id, qty, rarity)
+
+    state = player_data.get("player_state") or {}
+    state_details = state.get("details") or {}
+    state_details.pop("inventory_reserved_slots", None)
+    state["details"] = state_details
+    player_data["player_state"] = state
+    from modules.player.inventory import can_add_bundle, try_add_item_to_inventory
+    fits_bag, bag_error, _ = can_add_bundle(
+        player_data,
+        [{"item_id": item_id, "quantity": amount} for item_id, amount in rewards.items()],
+    )
+    if not fits_bag:
+        return f"{bag_error} Libere espaço e conclua o desmonte novamente."
     
     # 2. Entrega
     for mat_id, amount in rewards.items():
-        player_manager.add_item_to_inventory(player_data, mat_id, amount)
+        if not try_add_item_to_inventory(player_data, mat_id, amount):
+            return "Mochila cheia. Libere espaço e conclua o desmonte novamente."
         
     # 3. Limpa Estado
     player_data["player_state"] = {"action": "idle"}

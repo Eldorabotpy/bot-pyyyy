@@ -174,6 +174,8 @@ async def give_generated_item_to_player(
     
     # O add_unique_item apenas manipula o dicionário pdata
     uid = player_manager.add_unique_item(pdata, inst) 
+    if not uid:
+        raise RuntimeError("Mochila cheia. Libere espaço antes de receber este equipamento.")
 
     if save:
         # Salva no banco (Async) usando o ID correto

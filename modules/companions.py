@@ -376,7 +376,7 @@ def profile_slot(user_id):
 
 def flush_movement(online):
     distance = online.get('_pet_distance', 0)
-    if distance and online.get('char_id') and load(online['char_id']).get('incubation'):
+    if distance and online.get('char_id') and online.get('_pet_incubating'):
         record_distance(online['char_id'], distance)
     online['_pet_distance'] = 0
 

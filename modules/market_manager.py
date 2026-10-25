@@ -122,6 +122,9 @@ def _deliver(doc, payload, quantity):
     if payload.get('type') == 'unique':
         item = payload.get('item')
         if not isinstance(item, dict) or not item: raise InvalidPurchase('Equipamento inválido.')
+        from modules.player.inventory import backpack_capacity, backpack_slots, _reserved_inventory_slots
+        if backpack_slots(doc) + _reserved_inventory_slots(doc) + quantity > backpack_capacity(doc):
+            raise InvalidPurchase('Mochila cheia. Libere espaço antes de receber este equipamento.')
         for _ in range(quantity): inv[str(uuid.uuid4())] = copy.deepcopy(item)
         return
     if payload.get('type') != 'stack': raise InvalidPurchase('Tipo de item inválido.')
@@ -129,6 +132,10 @@ def _deliver(doc, payload, quantity):
     if not isinstance(base, str) or not base: raise InvalidPurchase('Item sem identificação.')
     base = re.sub(r'_[a-fA-F0-9]{8}$', '', base)
     amount = quantity * _positive(payload.get('qty', 1), 'Tamanho do lote')
+    from modules.player.inventory import can_add_item
+    can_add, reason = can_add_item(doc, base, amount)
+    if not can_add:
+        raise InvalidPurchase(f'{reason} Libere espaço antes de concluir a compra ou devolução.')
     for key, value in inv.items():
         if (isinstance(value, dict) and value.get('base_id', key) == base) or (not isinstance(value, dict) and key == base):
             if isinstance(value, dict): _set_quantity(value, _quantity(value) + amount)

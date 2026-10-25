@@ -664,6 +664,11 @@ async def start_craft(user_id: str, recipe_id: str):
     if not _has_materials(pdata, inputs):
         return "Materiais insuficientes."
 
+    from modules.player.inventory import can_add_unique_item
+    fits_bag, bag_error = can_add_unique_item(pdata, {"base_id": rec.get("result_base_id") or recipe_id})
+    if not fits_bag:
+        return bag_error
+
     # 2.5. Validação e gasto de durabilidade da ferramenta
     # Import lazy para evitar ciclo de importação.
     try:
@@ -726,7 +731,8 @@ async def start_craft(user_id: str, recipe_id: str):
             "craft_quality": quality_calc,
             "tool_uid": tool_result.get("tool_uid"),
             "tool_type": tool_result.get("tool_type"),
-            "tool_broke": tool_result.get("tool_broke", False)
+            "tool_broke": tool_result.get("tool_broke", False),
+            "inventory_reserved_slots": 1,
         }
     }
     
@@ -1597,7 +1603,16 @@ async def finish_craft(user_id: str):
         recipe=rec,
         quality_bonus_points=quality_bonus_points
     )
-    player_manager.add_unique_item(pdata, novo_item_criado)
+    detalhes_pstate = (pstate.get("details") or {}) if isinstance(pstate, dict) else {}
+    reserva = detalhes_pstate.pop("inventory_reserved_slots", 0)
+    pdata["player_state"] = pstate
+    item_uid = player_manager.add_unique_item(pdata, novo_item_criado)
+    if not item_uid:
+        if reserva:
+            detalhes_pstate["inventory_reserved_slots"] = reserva
+        pdata["player_state"] = pstate
+        await player_manager.save_player_data(user_id, pdata)
+        return "Mochila cheia. Libere espaço e conclua a fabricação novamente."
 
     # 4. Distribuição de XP Inteligente
     xp_gain = int(rec.get("xp_gain", 10))

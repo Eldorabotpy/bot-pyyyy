@@ -562,6 +562,10 @@ def claim_reward(character_id, event_id, *, tier=None, collective=False):
                 player,
                 f"{event.get('_id')}:{character_id}:collective",
             )
+            from modules.player.inventory import can_add_bundle
+            fits, bag_error, _ = can_add_bundle(player, reward.get("items", []))
+            if not fits:
+                raise EventError(f"{bag_error} Libere espaço na mochila e resgate novamente.")
             updated = PARTICIPANTS.update_one({**pkey, "collective_claimed": {"$ne": True}, "points": {"$gte": event["collective_min_points"]}}, {"$set": {"collective_claimed": True, "updated_at": now}}, session=s)
         else:
             index = int(tier) - 1
@@ -573,6 +577,10 @@ def claim_reward(character_id, event_id, *, tier=None, collective=False):
                 raise EventError("Personagem não encontrado.")
             rewards = _event_rewards_for_player(event, player, character_id)
             reward = rewards[index]
+            from modules.player.inventory import can_add_bundle
+            fits, bag_error, _ = can_add_bundle(player, reward.get("items", []))
+            if not fits:
+                raise EventError(f"{bag_error} Libere espaço na mochila e resgate novamente.")
             updated = PARTICIPANTS.update_one({**pkey, "points": {"$gte": threshold}, "claimed_tiers": {"$ne": index}}, {"$addToSet": {"claimed_tiers": index}, "$set": {"updated_at": now}}, session=s)
         if updated.modified_count != 1:
             raise EventError("Recompensa ainda bloqueada ou já resgatada.")

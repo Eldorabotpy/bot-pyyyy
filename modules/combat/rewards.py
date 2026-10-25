@@ -128,15 +128,21 @@ def apply_and_format_victory(player_data: dict, monster_stats: dict, context=Non
     text = f"🏆 <b>VITÓRIA!</b>\n\nVocê derrotou {monster_name}!\n"
     text += f"✨ XP: +{xp_final}\n💰 Ouro: +{gold_final}\n"
 
+    itens_entregues = []
     if items:
         text += "\n<b>📦 Saque Encontrado (Partilhado!):</b>\n"
         for item_id in items:
-            # O matador recebe o item dele aqui, na memória temporária
-            player_manager.add_item_to_inventory(player_data, item_id, 1)
+            from modules.player.inventory import try_add_item_to_inventory
+            if not try_add_item_to_inventory(player_data, item_id, 1):
+                continue
             from modules import game_data
             item_def = game_data.ITEMS_DATA.get(item_id, {})
             name = item_def.get('display_name', item_id)
+            itens_entregues.append(name)
             text += f"• 1x {name}\n"
+
+    if not itens_entregues and items:
+        text += "\n🎒 Mochila cheia: nenhum item coube. Venda itens ou amplie a mochila e tente novamente.\n"
 
     return text
 

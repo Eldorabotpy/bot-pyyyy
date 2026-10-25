@@ -180,10 +180,20 @@ async def cancel_listing(*, seller_id: str, listing_id: int) -> dict:
     quantity_left = listing.get("quantity", 0) # Lotes restantes no estoque
     pack_qty = item_payload.get("qty", 1)      # Itens por lote
     total_return_qty = quantity_left * pack_qty
+
+    seller_pdata = await player_manager.get_player_data(seller_id)
+    if not seller_pdata:
+        raise GemMarketError("Não foi possível carregar sua mochila para devolver o item.")
+    base_id_limpo = item_payload.get("base_id")
+    if total_return_qty > 0:
+        from modules.player.inventory import can_add_item
+        fits_bag, bag_error = can_add_item(seller_pdata, base_id_limpo, total_return_qty)
+        if not fits_bag:
+            raise InvalidPurchase(f"{bag_error} Libere espaço para cancelar o anúncio.")
     
     # 2. Atualiza o status no MongoDB
     result = gem_market_col.update_one(
-        {"id": int(listing_id), "active": True},
+        {"id": int(listing_id), "active": True, "quantity": quantity_left},
         {"$set": {"active": False}}
     )
     
@@ -192,16 +202,17 @@ async def cancel_listing(*, seller_id: str, listing_id: int) -> dict:
     
     # 3. Devolve o item ao vendedor
     if total_return_qty > 0:
-        base_id_limpo = item_payload.get("base_id")
-        
-        # Devolução segura
-        seller_pdata = await player_manager.get_player_data(seller_id)
-        if seller_pdata:
-            player_manager.add_item_to_inventory(seller_pdata, base_id_limpo, total_return_qty) 
-            await player_manager.save_player_data(seller_id, seller_pdata)
-            await player_manager.clear_player_cache(seller_id)
-        else:
-            log.error(f"[GemMarket] Falha ao carregar pdata para devolução {listing_id} -> {seller_id}")
+        from modules.player.inventory import try_add_item_to_inventory
+        if not try_add_item_to_inventory(seller_pdata, base_id_limpo, total_return_qty):
+            # A validação acima evita essa situação no fluxo normal. Reabre o
+            # anúncio se o inventário mudou entre a validação e a entrega.
+            gem_market_col.update_one(
+                {"id": int(listing_id), "active": False, "quantity": quantity_left},
+                {"$set": {"active": True}},
+            )
+            raise InvalidPurchase("A mochila mudou durante o cancelamento. Atualize e tente novamente.")
+        await player_manager.save_player_data(seller_id, seller_pdata)
+        await player_manager.clear_player_cache(seller_id)
     
     listing["active"] = False 
     log.info(f"[GemMarket] Listagem {listing_id} cancelada. Devolvidos {total_return_qty}x {base_id_limpo}.")

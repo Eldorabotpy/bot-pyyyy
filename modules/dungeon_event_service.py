@@ -1730,6 +1730,7 @@ def _grant_chest_reward(
         inventory = {}
 
     delivered_items = []
+    bag_error = None
 
     # ========================================================
     # 🏷️ CATÁLOGO DE ITENS
@@ -1764,6 +1765,7 @@ def _grant_chest_reward(
         item_id,
         quantidade
     ):
+        nonlocal bag_error
 
         item_id = str(
             item_id
@@ -1782,6 +1784,14 @@ def _grant_chest_reward(
             not item_id
             or quantidade <= 0
         ):
+            return
+
+        from modules.player.inventory import can_add_item
+        player_snapshot = dict(player)
+        player_snapshot["inventory"] = inventory
+        fits_bag, reason = can_add_item(player_snapshot, item_id, quantidade)
+        if not fits_bag:
+            bag_error = reason
             return
 
         # Se o catálogo estiver disponível,
@@ -2097,6 +2107,13 @@ def _grant_chest_reward(
                 rune_id,
                 rune_quantity
             )
+
+    if bag_error:
+        return (
+            False,
+            {},
+            f"{bag_error} Libere espaço na mochila; o baú continuará fechado.",
+        )
 
     # ========================================================
     # 💾 SALVAR

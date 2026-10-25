@@ -1307,12 +1307,65 @@ def combate_grupo_pronto():
 # ==============================================================================
 jogadores_online = {}
 socket_invites = SocketInviteRegistry(ttl_seconds=300)
+_pet_distance_lock = Lock()
+_pet_distance_worker_guard = Lock()
+_pet_distance_worker_started = False
+
+
+def _flush_pet_movement(online):
+    if not isinstance(online, dict):
+        return
+    with _pet_distance_lock:
+        distance = float(online.get('_pet_distance', 0) or 0)
+        online['_pet_distance'] = 0
+    if distance <= 0 or not online.get('_pet_incubating') or not online.get('char_id'):
+        return
+    try:
+        from modules import companions
+        companions.record_distance(online['char_id'], distance)
+    except Exception:
+        with _pet_distance_lock:
+            online['_pet_distance'] = float(online.get('_pet_distance', 0) or 0) + distance
+        app.logger.exception('Falha ao salvar distância de incubação do companheiro')
+
+
+def _pet_distance_flush_worker():
+    while True:
+        socketio.sleep(5)
+        for sid, online in list(jogadores_online.items()):
+            if not online.get('_pet_incubating'):
+                continue
+            with _pet_distance_lock:
+                current = jogadores_online.get(sid)
+                if current is not online:
+                    continue
+                distance = float(online.get('_pet_distance', 0) or 0)
+                online['_pet_distance'] = 0
+            if distance <= 0:
+                continue
+            try:
+                from modules import companions
+                companions.record_distance(online['char_id'], distance)
+            except Exception:
+                with _pet_distance_lock:
+                    if jogadores_online.get(sid) is online:
+                        online['_pet_distance'] = float(online.get('_pet_distance', 0) or 0) + distance
+
+
+def _ensure_pet_distance_worker():
+    global _pet_distance_worker_started
+    with _pet_distance_worker_guard:
+        if _pet_distance_worker_started:
+            return
+        _pet_distance_worker_started = True
+        socketio.start_background_task(_pet_distance_flush_worker)
 
 
 def revoke_account_sockets(account_id):
     for sid, player in list(jogadores_online.items()):
         if str(player.get('account_id') or '') != str(account_id):
             continue
+        _flush_pet_movement(player)
         socket_invites.discard_socket(sid)
         try:
             socketio.server.disconnect(sid, namespace='/')
@@ -1978,6 +2031,7 @@ def handle_entrar_regiao(data):
         )
 
     for old_sid in sids_para_remover:
+        _flush_pet_movement(jogadores_online.get(old_sid))
         emit(
             'desconectarDuplicado',
             {},
@@ -1996,8 +2050,13 @@ def handle_entrar_regiao(data):
         )
 
     if player_sid in jogadores_online:
-        from modules.companions import flush_movement
-        flush_movement(jogadores_online[player_sid])
+        _flush_pet_movement(jogadores_online[player_sid])
+
+    try:
+        from modules import companions
+        pet_incubating = bool(companions.load(char_id).get('incubation'))
+    except Exception:
+        pet_incubating = False
 
     jogadores_online[player_sid] = {
         'id': player_sid,
@@ -2016,8 +2075,11 @@ def handle_entrar_regiao(data):
         'skin': data.get(
             'skin',
             'aventureiro_masculino'
-        )
+        ),
+        '_pet_incubating': pet_incubating,
+        '_pet_distance': 0,
     }
+    _ensure_pet_distance_worker()
     
     emit('jogadoresAtuais', jogadores_online, to=player_sid)
     emit(
@@ -2260,16 +2322,13 @@ def handle_move(data):
     if request.sid in jogadores_online:
         from modules import companions
         import time
+        _ensure_pet_distance_worker()
         online = jogadores_online[request.sid]
         now = time.monotonic()
-        sample, distance = companions.movement_distance(online.get('_pet_sample'), online.get('regiao'), data.get('x'), data.get('y'), now)
-        online['_pet_sample'] = sample
-        online['_pet_distance'] = online.get('_pet_distance', 0) + distance
-        if now - online.get('_pet_flush', 0) >= 1:
-            if companions.load(online['char_id']).get('incubation'):
-                companions.record_distance(online['char_id'], online['_pet_distance'])
-            online['_pet_distance'] = 0
-            online['_pet_flush'] = now
+        with _pet_distance_lock:
+            sample, distance = companions.movement_distance(online.get('_pet_sample'), online.get('regiao'), data.get('x'), data.get('y'), now)
+            online['_pet_sample'] = sample
+            online['_pet_distance'] = online.get('_pet_distance', 0) + distance
         jogadores_online[request.sid].update({'x': data.get('x'), 'y': data.get('y')})
         emit('jogadorMoveu', {'id': request.sid, 'x': data.get('x'), 'y': data.get('y')}, broadcast=True, include_self=False)
 
@@ -2285,8 +2344,7 @@ def handle_disconnect():
     _retirar_fila_coliseu(request.sid)
     _encerrar_duelo_coliseu_ao_desconectar(request.sid)
     if request.sid in jogadores_online:
-        from modules.companions import flush_movement
-        flush_movement(jogadores_online[request.sid])
+        _flush_pet_movement(jogadores_online[request.sid])
 
         jogadores_online.pop(
             request.sid,

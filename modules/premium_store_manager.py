@@ -2740,6 +2740,16 @@ def comprar_servico_gemas(
             inventario, ferramentas = prepare_profession_tool(jogador, destino)
         except ValueError as erro:
             return {'success': False, 'error': str(erro)}
+        from modules.player.inventory import can_add_unique_item
+        inventario_original_atual = jogador.get('inventory') or {}
+        simulacao_inventario = dict(inventario_original_atual)
+        simulacao_jogador = dict(jogador)
+        simulacao_jogador['inventory'] = simulacao_inventario
+        for uid_novo in set(inventario) - set(inventario_original_atual):
+            pode_receber, erro_mochila = can_add_unique_item(simulacao_jogador, inventario[uid_novo], uid_novo)
+            if not pode_receber:
+                return {'success': False, 'error': erro_mochila}
+            simulacao_inventario[uid_novo] = inventario[uid_novo]
         if reparo_ferramenta and inventario == (jogador.get('inventory') or {}) and ferramentas == (jogador.get('equipment_tools') or {}):
             return {'success': True, 'message': 'A ferramenta do ofício já está equipada.', 'saldo_gemas': int(jogador.get('gems', 0))}
 

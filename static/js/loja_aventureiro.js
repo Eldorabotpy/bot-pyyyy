@@ -122,19 +122,19 @@ window.voltarItensMerlin = function() {
 };
 window.atualizarTotalMerlin = function() {
     const qtd = Number(merlinEl('merlin-quantidade').value);
-    const valido = Number.isInteger(qtd) && qtd >= 1 && qtd <= 999;
+    const valido = Number.isInteger(qtd) && qtd >= 1 && qtd <= 500;
     merlinEl('merlin-total').textContent = valido && merlinSelecionado ? `${merlinNumero(qtd * merlinSelecionado.preco)} ${merlinNomeMoeda(merlinSelecionado)}` : 'Quantidade inválida';
     merlinEl('merlin-confirmar').disabled = !valido || merlinComprando;
 };
 window.ajustarQuantidadeMerlin = function(delta) {
     const input = merlinEl('merlin-quantidade');
-    input.value = Math.min(999, Math.max(1, (Number(input.value) || 1) + delta));
+    input.value = Math.min(500, Math.max(1, (Number(input.value) || 1) + delta));
     atualizarTotalMerlin();
 };
 window.comprarItemAventureiro = async function() {
     if (merlinComprando || !merlinSelecionado) return;
     const quantidade = Number(merlinEl('merlin-quantidade').value);
-    if (!Number.isInteger(quantidade) || quantidade < 1 || quantidade > 999) return;
+    if (!Number.isInteger(quantidade) || quantidade < 1 || quantidade > 500) return;
     const userId = localStorage.getItem('jogadorEldoraID');
     if (!userId) { merlinEl('merlin-feedback').textContent = 'Entre novamente para comprar.'; return; }
     merlinComprando = true;
