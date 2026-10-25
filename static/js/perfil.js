@@ -178,7 +178,7 @@ window.aplicarImagemItemEldora = function(imgEl, item) {
 window.getCaminhosImagemPerfilEldora = function(item) {
     const base = "https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/itens/";
     const baseRunas = "https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/runas/";
-    const cacheVersion = "20261025-1";
+    const cacheVersion = "20261025-2";
     const bruto = String(item?.base_id || item?.item_id || item?.uid || item?.id || "").trim();
     if (!bruto) return [];
 
