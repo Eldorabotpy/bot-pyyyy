@@ -51,6 +51,11 @@ CONSUMABLES_DATA = {
     },
     "pocao_cura_grande": {
         "display_name": "Poção de Cura G", "emoji": "❤️",
+        "icon_url": (
+            "https://raw.githubusercontent.com/"
+            "Eldorabotpy/static-img/main/assets/"
+            "itens/consumiveis/pocao_cura_grande.png"
+        ),
         "type": "consumivel",
         "category": "consumivel", "description": "Uma grande poção de cura 1000 HP.",
         "stackable": True,

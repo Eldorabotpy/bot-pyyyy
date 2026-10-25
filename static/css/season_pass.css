@@ -1,497 +1,1013 @@
-/* ==========================================
-   PASSE DE TEMPORADA - TRIPLE A (VERSÃO MOBILE DEFINITIVA)
-   ========================================== */
+:root {
+    color-scheme: dark;
+    --pass-ink: #07111d;
+    --pass-panel: #101c2b;
+    --pass-raised: #16263a;
+    --pass-line: rgba(209, 184, 123, .25);
+    --pass-gold: #d9b766;
+    --pass-gold-bright: #f0d895;
+    --pass-text: #f4ead2;
+    --pass-muted: #b8c4c2;
+    --pass-green: #73d5a2;
+    --pass-error: #ef8980;
+}
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+html,
 body {
-    background-color: #000000d5;
+    width: 100%;
+    height: 100vh;
+    height: 100dvh;
     margin: 0;
-    padding: 0;
-    /* A trava do celular: */
-    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-    display: flex; justify-content: center; align-items: center;
-    font-family: 'Arial', sans-serif;
+}
+
+body {
+    position: fixed;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+    padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
+    background: rgba(3, 8, 15, .9);
+    color: var(--pass-text);
+    font-family: 'IBM Plex Sans', sans-serif;
+    -webkit-tap-highlight-color: transparent;
+}
+
+button {
+    font: inherit;
+}
+
+button:focus-visible {
+    outline: 3px solid #f0d895;
+    outline-offset: 3px;
 }
 
 .pass-container {
-    background: linear-gradient(180deg, rgba(20, 25, 35, 0.98) 0%, rgba(10, 15, 20, 0.98) 100%);
-    border: 2px solid #5a4a29;
-    border-radius: 12px;
-    padding: 12px;
-    width: 95%; 
-    height: 96%; /* Respeita a tela do celular */
-    max-height: 850px;
-    color: white;
-    font-family: 'Cinzel', serif;
-    box-shadow: 0 0 30px rgba(0,0,0,0.9), inset 0 0 20px rgba(212, 175, 55, 0.05);
-    display: flex; flex-direction: column; box-sizing: border-box;
+    width: min(100%, 980px);
+    height: min(920px, 100%);
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: clamp(12px, 2vw, 22px);
+    overflow: hidden;
+    border: 1px solid rgba(217, 183, 102, .5);
+    border-radius: 18px;
+    background:
+        radial-gradient(ellipse at 50% 0%, rgba(52, 75, 104, .25), transparent 47%),
+        linear-gradient(180deg, #101c2b 0%, #09131f 100%);
+    box-shadow: 0 22px 70px rgba(0, 0, 0, .68), inset 0 1px rgba(255, 255, 255, .035);
+    color: var(--pass-text);
+    font-family: 'IBM Plex Sans', sans-serif;
 }
 
-/* ==========================================
-   CABEÇALHO ÉPICO (COM IMAGEM E ANIMAÇÃO)
-   ========================================== */
 .pass-header {
-    position: relative; 
-    text-align: center;
-    padding: 100px 10px 45px 10px; /* Altura ideal para ver a arte */
-    border-radius: 8px; 
-    background: transparent; 
-    margin-bottom: 10px;
-    border: 2px solid #fa700000; 
-    box-shadow: inset 0 -40px 30px -10px rgba(0, 0, 0, 0);
-    flex-shrink: 0;
+    position: relative;
+    display: flex;
+    align-items: end;
+    min-height: 150px;
+    flex: 0 0 auto;
+    overflow: hidden;
+    padding: 22px clamp(18px, 3vw, 34px);
+    isolation: isolate;
+    border: 1px solid rgba(232, 197, 112, .38);
+    border-radius: 14px;
+    background: #17263a;
 }
 
-/* A Imagem do Panda Brilhando */
 .pass-header-bg {
-    position: absolute; inset: 0;
-    background-image: url('https://github.com/user-attachments/assets/793f8d7d-3cb1-47b3-a2ff-1f37e5bf5be8'); 
-    background-size: cover; background-position: center;
-    opacity: 1; /* Cor 100% viva */
-    z-index: 1; border-radius: 6px;
+    position: absolute;
+    z-index: -2;
+    inset: 0;
+    border-radius: inherit;
+    background:
+        radial-gradient(ellipse at 78% 34%, rgba(212, 173, 91, .2), transparent 36%),
+        radial-gradient(ellipse at 16% 95%, rgba(73, 105, 139, .2), transparent 42%),
+        linear-gradient(115deg, #0b1725 0%, #1b2b3d 54%, #101b29 100%);
 }
 
-/* O Emblema Pulsante */
-.pass-emblem-overlay {
-    position: absolute; top: 50%; left: 50%;
-    transform: translate(-50%, -50%); 
-    width: 200px; height: auto;
-    opacity: 0.2; pointer-events: none; z-index: 2; 
+.pass-banner-placeholder {
+    position: absolute;
+    top: 12px;
+    right: 14px;
+    padding: 6px 8px;
+    border: 1px solid rgba(217, 183, 102, .42);
+    border-radius: 6px;
+    background: rgba(7, 17, 29, .58);
+    color: #e8cb86;
+    font-size: .7rem;
+    font-weight: 800;
+    letter-spacing: .1em;
+    pointer-events: none;
 }
 
-/* O Texto com Sombra Forte para Leitura */
 .pass-header-content {
-    position: relative; z-index: 3; color: #fff;
-    text-shadow: 5px 5px 5px #000, -2px -2px 2px #000, 0 0 15px #000; 
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    width: 100%;
+    gap: 12px;
+    text-shadow: 0 2px 8px #000;
+}
+
+.pass-header-kicker {
+    margin: 0 0 6px;
+    color: #f0d895;
+    font: 700 .75rem/1.2 'IBM Plex Sans', sans-serif;
+    letter-spacing: .12em;
 }
 
 .pass-header h1 {
-    font-size: 1rem; margin: 0 0 5px 0; letter-spacing: 2px;
-    color: #fff8e7; text-shadow: 3px 3px 6px #000, 0 0 20px #000;
+    margin: 0;
+    color: #fff3d1;
+    font: 700 clamp(1.25rem, 3vw, 2rem)/1.1 'Cinzel', Georgia, serif;
+    letter-spacing: .02em;
 }
 
 .level-badge {
-    position: absolute; bottom: -25px; left: 50%; transform: translateX(-50%);
-    font-size: 0.4rem; font-weight: bold; color: #ffd900;
-    background: linear-gradient(180deg, #3a2e12, #1a1405);
-    padding: 5px 25px; border-radius: 20px;
-    border: 2px solid #d4af37; box-shadow: 0 4px 10px rgba(0,0,0,0.8);
+    flex: 0 0 auto;
+    padding: 9px 12px;
+    border: 1px solid rgba(244, 217, 150, .72);
+    border-radius: 8px;
+    background: rgba(11, 20, 33, .87);
+    color: var(--pass-gold-bright);
+    font-size: .76rem;
+    font-weight: 800;
+    letter-spacing: .04em;
     white-space: nowrap;
 }
 
-/* ✨ ANIMAÇÃO DE PULSO ✨ */
-@keyframes pulseGlow {
-    0% { opacity: 0.15; transform: translate(-50%, -50%) scale(1); filter: drop-shadow(0 0 0px #d4af37); }
-    50% { opacity: 0.4; transform: translate(-50%, -50%) scale(1.1); filter: drop-shadow(0 0 20px #d4af37); }
-    100% { opacity: 0.15; transform: translate(-50%, -50%) scale(1); filter: drop-shadow(0 0 0px #d4af37); }
-}
-.anime-pulse { animation: pulseGlow 4s infinite ease-in-out; }
-
-/* ==========================================
-   BARRAS E STATUS
-   ========================================== */
-.pass-progress-container {
-    background: #0f131a; height: 22px; border-radius: 12px;
-    border: 2px solid #d4af37; position: relative; margin-bottom: 30px;
-    box-shadow: inset 0 2px 5px rgba(0,0,0,0.8); flex-shrink: 0;
+.pass-progress-block {
+    display: grid;
+    gap: 7px;
+    flex: 0 0 auto;
 }
 
-.pass-progress-bar {
-    background: linear-gradient(90deg, #d35400, #f39c12, #f1c40f);
-    height: 100%; width: 0%; transition: width 0.8s;
-    border-radius: 10px; box-shadow: 0 0 10px rgba(243, 156, 18, 0.5);
+.pass-progress-labels {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    color: var(--pass-muted);
+    font-size: .8rem;
+    font-weight: 700;
 }
 
 .pass-xp-text {
-    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-    text-align: center; line-height: 22px; font-size: 0.8rem; font-weight: bold;
-    text-shadow: 1px 1px 2px black; font-family: 'Arial', sans-serif; color: #fff;
+    color: var(--pass-gold-bright);
+    font-variant-numeric: tabular-nums;
+    text-align: end;
+}
+
+.pass-progress-container {
+    height: 13px;
+    overflow: hidden;
+    border: 1px solid rgba(217, 183, 102, .52);
+    border-radius: 999px;
+    background: #050b12;
+    box-shadow: inset 0 2px 5px rgba(0, 0, 0, .64);
+}
+
+.pass-progress-bar {
+    width: 0;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #a96e2e 0%, #d9ad51 58%, #f4dc92 100%);
+    transition: width .45s cubic-bezier(.2, .75, .25, 1);
 }
 
 .pass-status-bar {
-    display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px;
-    margin-bottom: 5px; padding: 10px; border-radius: 8px;
-    background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05);
-    flex-shrink: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 12px 20px;
+    flex: 0 0 auto;
+    padding: 12px 14px;
+    border: 1px solid var(--pass-line);
+    border-radius: 12px;
+    background: rgba(16, 29, 45, .92);
 }
 
-.pass-skin-fragments { color: #f3d78e; font-size: 0.82rem; font-weight: 700; }
-.pass-skin-fragments b { color: #fff; }
-.pass-season-fragment-rates { color: #b8c2d0; font-size: 0.72rem; }
-.pass-page-controls { display: flex; align-items: center; justify-content: center; gap: 14px; padding: 8px 4px; color: #c9d2df; font-size: 0.78rem; }
-.pass-page-controls button { padding: 7px 10px; border: 1px solid #96783d; border-radius: 6px; background: #202a39; color: #f2d38a; cursor: pointer; }
-.pass-page-controls button:disabled { opacity: .4; cursor: default; }
+.pass-status-copy,
+.pass-status-actions {
+    display: grid;
+    gap: 5px;
+    min-width: 0;
+}
 
-/* ==========================================
-   BOTÕES COM EFEITO 3D RPG
-   ========================================== */
+.pass-tier-status {
+    color: #d6e0e9;
+    font-size: .82rem;
+    font-weight: 800;
+    letter-spacing: .06em;
+}
+
+.pass-tier-status.premium {
+    color: var(--pass-gold-bright);
+}
+
+.pass-season-fragment-rates {
+    color: var(--pass-muted);
+    font-size: .78rem;
+    line-height: 1.35;
+}
+
+.pass-status-actions {
+    justify-items: end;
+}
+
+.pass-skin-fragments {
+    color: var(--pass-muted);
+    font-size: .78rem;
+    font-variant-numeric: tabular-nums;
+    text-align: end;
+}
+
+.pass-skin-fragments b {
+    margin-inline-start: 5px;
+    color: var(--pass-gold-bright);
+    font-size: .92rem;
+}
+
+.btn-premium,
+.btn-coletar-tudo,
+.btn-fechar,
+.pass-page-controls button,
+.pass-retry,
+.btn-passe-comprar,
+.btn-passe-cancelar,
+.btn-passe-continuar {
+    min-height: 44px;
+    border-radius: 9px;
+    cursor: pointer;
+    font-weight: 800;
+    transition: transform .14s ease, border-color .14s ease, background-color .14s ease, opacity .14s ease;
+}
+
 .btn-premium {
-    background: linear-gradient(180deg, #3498db, #2980b9);
-    border: none; border-bottom: 4px solid #1c5986;
-    color: white; padding: 8px 15px; border-radius: 6px; 
-    font-weight: bold; cursor: pointer; text-transform: uppercase; 
-    font-family: 'Cinzel', serif; font-size: 0.8rem;
-}
-.btn-premium:active { transform: translateY(4px); border-bottom: 0px solid #1c5986; }
-
-.btn-fechar {
-    width: 100%; padding: 14px; 
-    background: linear-gradient(180deg, #4b5563, #374151);
-    color: #e5e7eb; border: none; border-bottom: 4px solid #1f2937;
-    font-family: 'Cinzel', serif; font-weight: bold; font-size: 1rem;
-    cursor: pointer; border-radius: 8px; margin-top: 10px; flex-shrink: 0;
-    text-shadow: 1px 1px 2px #000; box-shadow: 0 4px 6px rgba(0,0,0,0.5);
-}
-.btn-fechar:active { transform: translateY(4px); border-bottom: 0px solid #1f2937; }
-
-/* ==========================================
-   LISTA DE RECOMPENSAS (ESTILO RADAR / 3 COLUNAS)
-   ========================================== */
-.pass-rewards-list {
-    display: flex; flex-direction: column; gap: 15px;
-    overflow-y: auto; padding-right: 6px; 
-    flex-grow: 1; margin-top: 10px;
+    padding: 0 14px;
+    border: 1px solid #80b9e1;
+    background: linear-gradient(180deg, #1f5f8d, #17486b);
+    color: #f3f8fc;
+    font-size: .78rem;
 }
 
-/* Scrollbar Bonita */
-.pass-rewards-list::-webkit-scrollbar { width: 4px; }
-.pass-rewards-list::-webkit-scrollbar-track { background: transparent; }
-.pass-rewards-list::-webkit-scrollbar-thumb { background: #5a4a29; border-radius: 4px; }
-
-/* A Linha principal agora usa Grid (3 colunas) */
-.reward-row {
-    display: grid; 
-    grid-template-columns: 1fr 40px 1fr; /* Esquerda, Meio, Direita */
-    gap: 10px; 
-    align-items: center; 
-    position: relative;
+.btn-premium:hover:not(:disabled),
+.btn-passe-comprar:hover,
+.btn-passe-cancelar:hover,
+.btn-passe-continuar:hover,
+.pass-page-controls button:hover:not(:disabled),
+.pass-retry:hover {
+    filter: brightness(1.12);
 }
 
-/* A Linha Vertical que liga os níveis por trás */
-.reward-row::before {
-    content: ''; position: absolute;
-    top: -25px; bottom: -25px; left: 50%;
-    transform: translateX(-50%); width: 4px;
-    background: #2c3545; z-index: 0;
+.btn-premium:disabled,
+.btn-coletar-tudo:disabled,
+.pass-page-controls button:disabled,
+.reward-box:disabled {
+    cursor: not-allowed;
 }
 
-/* O Centro (Nível) */
-.reward-level-center {
-    display: flex; justify-content: center; align-items: center; z-index: 1; position: relative;
-}
-
-/* O Losango do Nível */
-.level-diamond {
-    width: 30px; height: 30px;
-    background: linear-gradient(135deg, #3a4a63, #1e2532);
-    border: 2px solid #8e9bb0;
-    transform: rotate(45deg); /* Roda o quadrado para virar losango */
-    display: flex; justify-content: center; align-items: center;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.6);
-}
-
-/* Se completou o nível, o losango fica Verde */
-.reward-row.completed .level-diamond {
-    border-color: #2ecc71; background: linear-gradient(135deg, #27ae60, #1e3226);
-    box-shadow: 0 0 10px rgba(46, 204, 113, 0.5);
-}
-
-.level-diamond span {
-    transform: rotate(-45deg); /* Desvira o número para ele ficar reto */
-    font-weight: bold; font-size: 1.1rem; color: #fff;
-    font-family: 'Cinzel', serif;
-}
-
-/* As Caixas de Recompensa */
-.reward-box {
-    padding: 12px 5px; border-radius: 8px; text-align: center;
-    font-size: 0.75rem; font-family: 'Arial', sans-serif; font-weight: bold;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.4); 
-    display: flex; flex-direction: column; justify-content: center;
-    min-height: 55px; z-index: 1; position: relative;
-}
-
-/* Lado Esquerdo (Grátis) - Tom Azul Metálico Escuro */
-.reward-free { 
-    background: linear-gradient(180deg, #344055, #222a38); 
-    border: 2px solid #4a5a75; color: #ecf0f1; 
-}
-
-/* Lado Direito (Premium) - Tom Roxo Vivo */
-.reward-premium { 
-    background: linear-gradient(180deg, #6c3483, #4a235a); 
-    border: 2px solid #9b59b6; color: #f5eef8; 
-}
-
-/* O Cadeado no canto da caixa */
-.reward-premium.locked::after { 
-    content: "🔒"; position: absolute; right: -5px; bottom: -5px; 
-    font-size: 1.1rem; background: #111; border-radius: 50%; padding: 3px;
-    border: 1px solid #555;
-}
-
-.reward-box small { 
-    display: block; font-size: 0.6rem; margin-bottom: 4px; 
-    color: #f39c12; text-transform: uppercase; letter-spacing: 1px; 
-}
-.pass-fragment-reward { display: block; margin-top: 5px; color: #f3d78e; font-size: 0.62rem; line-height: 1.2; }
-
-/* ==========================================
-   MODAIS DE ALERTA E COMPRA DO PASSE
-   ========================================== */
-.modal-passe-overlay {
-    display: none; 
-    position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
-    background: rgba(0,0,0,0.85); z-index: 20000; 
-    justify-content: center; align-items: center; 
-    backdrop-filter: blur(4px);
-}
-
-.modal-passe-box {
-    background: linear-gradient(135deg, #1a120b, #0a0704); 
-    width: 85%; max-width: 320px; 
-    border-radius: 12px; border: 2px solid #3498db; 
-    padding: 25px 20px; text-align: center; 
-    box-shadow: inset 0 0 20px rgba(0,0,0,0.8), 0 10px 25px rgba(0,0,0,0.9);
-}
-
-.modal-passe-icon { font-size: 3.5em; margin-bottom: 10px; }
-.modal-passe-title { margin: 0 0 10px 0; font-size: 1.4em; font-family: 'Cinzel', serif; text-transform: uppercase; }
-.modal-passe-msg { color: #b0a084; font-size: 0.95em; margin-bottom: 25px; line-height: 1.4; }
-
-.modal-passe-botoes { display: flex; gap: 10px; }
-
-/* Botões Customizados */
-.btn-passe-comprar { 
-    flex: 1; padding: 12px; background: linear-gradient(180deg, #27ae60 0%, #1e8449 100%); 
-    color: white; border: 1px solid #2ecc71; border-radius: 6px; font-weight: bold; 
-    cursor: pointer; font-family: 'Cinzel', serif; text-transform: uppercase; box-shadow: 0 4px 6px rgba(0,0,0,0.5); 
-}
-.btn-passe-cancelar { 
-    flex: 1; padding: 12px; background: linear-gradient(180deg, #c0392b 0%, #922b21 100%); 
-    color: white; border: 1px solid #e74c3c; border-radius: 6px; font-weight: bold; 
-    cursor: pointer; font-family: 'Cinzel', serif; text-transform: uppercase; box-shadow: 0 4px 6px rgba(0,0,0,0.5); 
-}
-.btn-passe-continuar { 
-    width: 100%; padding: 12px; background: linear-gradient(180deg, #334155 0%, #1e293b 100%); 
-    color: white; border: 1px solid #475569; border-radius: 6px; font-weight: bold; 
-    cursor: pointer; font-family: 'Cinzel', serif; text-transform: uppercase; 
+.btn-premium:disabled {
+    border-color: rgba(184, 196, 194, .25);
+    background: #263240;
+    color: #b8c4c2;
 }
 
 .btn-coletar-tudo {
-    background: linear-gradient(135deg, #27ae60, #2ecc71);
-    color: rgb(252, 248, 4);
-    border: 2px solid #fc9a09;
-    padding: 3px 10px;
-    border-radius: 20px;
-    font-family: 'Cinzel', serif;
-    font-weight: bold;
-    font-size: 0.8em;
-    cursor: pointer;
-    box-shadow: 0 4px 10px rgba(46, 204, 113, 0.3);
-    margin: 10px auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    width: 100%;
+    flex: 0 0 auto;
+    padding: 0 14px;
+    border: 2px solid #f0ad35;
+    background: linear-gradient(180deg, #2ecc71, #1c9a55);
+    color: #092117;
+    font-size: .87rem;
+    box-shadow: 0 3px 12px rgba(0, 0, 0, .25);
+}
+
+.btn-coletar-tudo:hover:not(:disabled),
+.btn-fechar:hover {
+    filter: brightness(1.06);
+}
+
+.pass-message {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex: 0 0 auto;
+    padding: 9px 12px;
+    border: 1px solid var(--pass-line);
+    border-radius: 9px;
+    background: #132335;
+    color: var(--pass-text);
+    font-size: .83rem;
+    line-height: 1.4;
+}
+
+.pass-message[hidden] {
+    display: none;
+}
+
+[hidden] {
+    display: none !important;
+}
+
+.pass-message.error {
+    border-color: rgba(239, 137, 128, .65);
+    color: #ffd1cc;
+}
+
+.pass-retry {
+    flex: 0 0 auto;
+    padding: 0 11px;
+    border: 1px solid rgba(239, 137, 128, .6);
+    background: #34232a;
+    color: #ffd1cc;
+    font-size: .76rem;
+}
+
+.pass-rewards-list {
+    display: flex;
+    flex: 1 1 0;
+    flex-direction: column;
+    gap: 10px;
+    min-height: 0;
+    margin-top: 1px;
+    padding: 2px 6px 2px 1px;
+    overflow: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: #987a3f transparent;
+}
+
+.pass-rewards-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.pass-rewards-list::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.pass-rewards-list::-webkit-scrollbar-thumb {
+    border-radius: 8px;
+    background: #987a3f;
+}
+
+.reward-row {
+    position: relative;
+    z-index: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 42px minmax(0, 1fr);
+    align-items: stretch;
+    gap: 10px;
+    flex: 0 0 auto;
+}
+
+.reward-row::before {
+    position: absolute;
+    z-index: -1;
+    inset-block: -10px;
+    left: 50%;
+    width: 2px;
+    content: '';
+    transform: translateX(-50%);
+    background: rgba(192, 169, 116, .26);
+}
+
+.reward-level-center {
+    display: grid;
+    place-items: center;
+}
+
+.level-diamond {
+    display: grid;
+    width: 34px;
+    aspect-ratio: 1;
+    place-items: center;
+    transform: rotate(45deg);
+    border: 1px solid #45d48a;
+    border-radius: 8px;
+    background: linear-gradient(145deg, #218c58, #154c36);
+    color: #f1fff6;
+    font-size: .76rem;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    box-shadow: 0 3px 9px rgba(0, 0, 0, .4);
+}
+
+.level-diamond > span {
+    transform: rotate(-45deg);
+    font-variant-numeric: tabular-nums;
+}
+
+.reward-row.completed .level-diamond {
+    border-color: #f0d895;
+    background: linear-gradient(145deg, #2da96c, #17613f);
+    color: #fff;
+}
+
+.reward-box {
+    display: flex;
+    min-width: 0;
+    min-height: 70px;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    padding: 9px 12px;
+    border: 1px solid rgba(148, 169, 190, .28);
+    border-radius: 11px;
+    background: #132236;
+    color: #edf2f6;
+    text-align: start;
+    overflow-wrap: anywhere;
+    position: relative;
+}
+
+.reward-art {
+    position: relative;
+    display: grid;
+    width: 48px;
+    height: 48px;
+    flex: 0 0 48px;
+    place-items: center;
+    overflow: hidden;
+    border: 1px solid rgba(222, 194, 125, .3);
+    border-radius: 10px;
+    background: rgba(5, 12, 20, .52);
+}
+
+.reward-art img {
     display: block;
-    transition: transform 0.2s;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, .45));
 }
 
-.btn-coletar-tudo:active {
-    transform: scale(0.95);
+.reward-art-fallback {
+    position: absolute;
+    display: grid;
+    place-items: center;
+    inset: 0;
+    color: var(--pass-gold-bright);
+    font-size: 1.35rem;
 }
 
-/* Layout mobile: reserva espaço para as recompensas e mantém os controles legíveis. */
-@media (max-width: 600px) {
-    body {
-        min-height: 100vh;
-        min-height: 100dvh;
-    }
+.reward-art.currency-gold {
+    border-color: rgba(217, 183, 102, .52);
+    background: radial-gradient(circle at 35% 25%, #f4dc92, #b38233 68%, #66491f);
+}
 
+.reward-art.currency-gold .reward-art-fallback {
+    color: #5e4019;
+    font-size: 1.25rem;
+}
+
+.reward-copy {
+    display: flex;
+    min-width: 0;
+    flex: 1 1 auto;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 4px;
+}
+
+.reward-lock {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    display: grid;
+    width: 20px;
+    height: 20px;
+    place-items: center;
+    border: 1px solid rgba(240, 216, 149, .54);
+    border-radius: 50%;
+    background: #111a27;
+    color: #f0d895;
+}
+
+.reward-lock svg {
+    width: 11px;
+    height: 13px;
+    fill: #f0d895;
+    stroke: #f0d895;
+    stroke-width: 1.2;
+}
+
+.reward-box small {
+    color: #c9a45c;
+    font-size: .75rem;
+    font-weight: 800;
+    letter-spacing: .09em;
+}
+
+.reward-name {
+    font-size: .82rem;
+    font-weight: 700;
+    line-height: 1.25;
+}
+
+.reward-premium {
+    border-color: rgba(185, 112, 219, .72);
+    background: linear-gradient(160deg, #56326e, #382449);
+}
+
+.reward-premium small {
+    color: #f0c9ff;
+}
+
+.reward-box.available:not(:disabled) {
+    border-color: rgba(218, 185, 107, .75);
+    box-shadow: 0 3px 12px rgba(0, 0, 0, .18);
+}
+
+.reward-box.available:not(:disabled):hover {
+    transform: translateY(-1px);
+    background: #1a2d44;
+}
+
+.reward-premium.available:not(:disabled):hover {
+    background: linear-gradient(160deg, #694087, #472d5c);
+}
+
+.reward-box.resgatado {
+    border-color: rgba(115, 213, 162, .3);
+    background: #112a2b;
+    color: #c9e7d8;
+}
+
+.reward-box.unreached {
+    color: #b6c0cc;
+}
+
+.reward-box.locked {
+    border-style: dashed;
+    border-color: rgba(210, 167, 240, .26);
+    background: #171b2a;
+    color: #aaa9b8;
+}
+
+.pass-fragment-reward {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: #f0d895;
+    font-size: .7rem;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.pass-fragment-reward img {
+    width: 17px;
+    height: 17px;
+    object-fit: contain;
+}
+
+.pass-page-controls {
+    display: grid;
+    grid-template-columns: minmax(112px, 1fr) auto minmax(112px, 1fr);
+    align-items: center;
+    gap: 10px;
+    flex: 0 0 auto;
+    color: var(--pass-muted);
+    font-size: .8rem;
+    text-align: center;
+}
+
+.pass-page-controls button {
+    padding: 0 11px;
+    border: 1px solid var(--pass-line);
+    background: #17273a;
+    color: var(--pass-text);
+    font-size: .78rem;
+}
+
+.pass-page-controls button:disabled {
+    opacity: .48;
+}
+
+.pass-page-controls span {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.btn-fechar {
+    flex: 0 0 auto;
+    width: 100%;
+    padding: 0 14px;
+    border: 1px solid rgba(181, 195, 208, .3);
+    background: #172536;
+    color: #e7edf3;
+    font-size: .85rem;
+}
+
+.pass-loading,
+.pass-empty-state {
+    display: grid;
+    min-height: 110px;
+    flex: 1 0 auto;
+    place-items: center;
+    padding: 20px;
+    border: 1px dashed var(--pass-line);
+    border-radius: 12px;
+    color: var(--pass-muted);
+    font-size: .9rem;
+    line-height: 1.5;
+    text-align: center;
+}
+
+.modal-passe-overlay {
+    position: fixed;
+    z-index: 20000;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+    background: rgba(2, 7, 13, .82);
+    backdrop-filter: blur(5px);
+}
+
+.modal-passe-overlay[hidden] {
+    display: none;
+}
+
+.modal-passe-box {
+    width: min(100%, 390px);
+    padding: 24px 20px 20px;
+    border: 1px solid var(--modal-accent, var(--pass-gold));
+    border-radius: 16px;
+    background: linear-gradient(160deg, #172438, #0b1421 75%);
+    box-shadow: 0 22px 60px rgba(0, 0, 0, .6);
+    text-align: center;
+}
+
+.modal-passe-icon {
+    display: grid;
+    width: 50px;
+    aspect-ratio: 1;
+    place-items: center;
+    margin: 0 auto 14px;
+    border: 1px solid var(--modal-accent, var(--pass-gold));
+    border-radius: 14px;
+    color: var(--modal-accent, var(--pass-gold));
+    font-size: 1.5rem;
+    font-weight: 900;
+}
+
+.modal-passe-title {
+    margin: 0 0 10px;
+    color: var(--modal-accent, var(--pass-gold-bright));
+    font: 700 1.12rem/1.3 'Cinzel', Georgia, serif;
+}
+
+.modal-passe-msg {
+    margin: 0 0 22px;
+    color: #d1d9e0;
+    font-size: .92rem;
+    line-height: 1.55;
+    white-space: pre-line;
+}
+
+.modal-passe-botoes {
+    display: flex;
+    gap: 10px;
+}
+
+.btn-passe-comprar,
+.btn-passe-cancelar,
+.btn-passe-continuar {
+    flex: 1 1 0;
+    padding: 0 12px;
+    border: 1px solid rgba(217, 183, 102, .6);
+    background: #b89349;
+    color: #111a23;
+    font-size: .82rem;
+}
+
+.btn-passe-cancelar,
+.btn-passe-continuar {
+    border-color: rgba(181, 195, 208, .3);
+    background: #26364a;
+    color: #eef3f8;
+}
+
+.btn-passe-continuar {
+    width: 100%;
+}
+
+@media (min-width: 1024px) {
     .pass-container {
-        width: calc(100vw - 18px);
-        height: calc(100vh - 16px);
-        height: calc(100dvh - 16px);
-        max-height: none;
-        min-height: 0;
-        padding: 9px;
-        border-width: 1px;
-    }
-
-    .pass-header {
-        padding: 68px 8px 23px;
-        margin-bottom: 7px;
-        border: 1px solid rgba(222, 181, 89, .55);
-        overflow: visible;
-    }
-
-    .pass-header-bg {
-        background-image:
-            linear-gradient(180deg, rgba(8, 14, 23, .22), rgba(8, 14, 23, .62)),
-            url('https://github.com/user-attachments/assets/793f8d7d-3cb1-47b3-a2ff-1f37e5bf5be8');
-        background-position: center, center 46%;
-    }
-
-    .pass-emblem-overlay {
-        width: 150px;
-        opacity: .1;
-        animation: none;
-    }
-
-    .pass-header h1 {
-        font-size: 1.05rem;
-        letter-spacing: 1.4px;
-    }
-
-    .level-badge {
-        bottom: -9px;
-        padding: 4px 15px;
-        font-size: .68rem;
-    }
-
-    .pass-progress-container {
-        height: 24px;
-        margin-bottom: 13px;
-    }
-
-    .pass-xp-text {
-        line-height: 20px;
-        font-size: .78rem;
-    }
-
-    .pass-status-bar {
-        gap: 6px 8px;
-        margin-bottom: 3px;
-        padding: 8px 9px;
-        line-height: 1.3;
-    }
-
-    #status-premium {
-        font-size: .86rem;
-    }
-
-    .pass-season-fragment-rates {
-        font-size: .68rem;
-        line-height: 1.35;
-    }
-
-    .pass-skin-fragments {
-        font-size: .76rem;
-        line-height: 1.3;
-    }
-
-    .btn-premium {
-        width: 100%;
-        padding: 9px 12px;
-    }
-
-    .btn-coletar-tudo {
-        flex: 0 0 auto;
-        min-height: 40px;
-        margin: 6px auto 4px;
-        padding: 8px 14px;
-        font-size: .8rem;
+        gap: 14px;
     }
 
     .pass-rewards-list {
-        flex: 1 1 0;
-        min-height: 0;
-        margin-top: 4px;
-        padding-right: 4px;
-        gap: 9px;
-        overscroll-behavior: contain;
-        scrollbar-width: thin;
-    }
-
-    .reward-row {
-        grid-template-columns: minmax(0, 1fr) 30px minmax(0, 1fr);
-        gap: 6px;
-        flex: 0 0 auto;
+        padding-inline: 8px;
     }
 
     .reward-box {
-        box-sizing: border-box;
-        min-width: 0;
-        min-height: 56px;
-        padding: 8px 5px;
+        min-height: 76px;
+        padding-inline: 16px;
+    }
+}
+
+@media (max-width: 640px) {
+    body {
+        padding: max(4px, env(safe-area-inset-top)) max(4px, env(safe-area-inset-right)) max(4px, env(safe-area-inset-bottom)) max(4px, env(safe-area-inset-left));
+    }
+
+    .pass-container {
+        width: 100%;
+        height: 100%;
+        gap: 8px;
+        padding: 9px;
+        border-radius: 14px;
+    }
+
+    .pass-header {
+        min-height: 112px;
+        padding: 14px;
+        border-radius: 12px;
+    }
+
+    .pass-banner-placeholder {
+        top: 8px;
+        right: 8px;
+        padding: 4px 6px;
+        font-size: .7rem;
+    }
+
+    .pass-header-kicker {
+        margin-bottom: 4px;
+        font-size: .75rem;
+        letter-spacing: .09em;
+    }
+
+    .pass-header h1 {
+        max-width: 205px;
+        font-size: clamp(1.1rem, 5vw, 1.45rem);
+    }
+
+    .level-badge {
+        padding: 7px 8px;
+        font-size: .75rem;
+    }
+
+    .pass-progress-block {
+        gap: 5px;
+    }
+
+    .pass-progress-labels {
+        gap: 8px;
+        font-size: .75rem;
+    }
+
+    .pass-status-bar {
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 7px 10px;
+        padding: 9px 10px;
+        border-radius: 10px;
+    }
+
+    .pass-tier-status {
         font-size: .76rem;
-        line-height: 1.25;
-        overflow-wrap: anywhere;
+    }
+
+    .pass-season-fragment-rates {
+        max-width: 240px;
+        font-size: .75rem;
+    }
+
+    .pass-status-actions {
+        gap: 6px;
+        justify-items: end;
+    }
+
+    .pass-skin-fragments {
+        font-size: .75rem;
+        white-space: nowrap;
+    }
+
+    .pass-skin-fragments b {
+        font-size: .8rem;
+    }
+
+    .btn-premium {
+        min-height: 44px;
+        max-width: 100%;
+        padding: 0 9px;
+        font-size: .75rem;
+        line-height: 1.2;
+    }
+
+    .btn-coletar-tudo {
+        min-height: 46px;
+        font-size: .82rem;
+    }
+
+    .pass-rewards-list {
+        gap: 8px;
+        padding-inline-end: 3px;
+    }
+
+    .reward-row {
+        grid-template-columns: minmax(0, 1fr) 32px minmax(0, 1fr);
+        gap: 5px;
+    }
+
+    .reward-box {
+        min-height: 68px;
+        gap: 6px;
+        padding: 7px 7px;
+        border-radius: 9px;
+    }
+
+    .reward-art {
+        width: 38px;
+        height: 38px;
+        flex-basis: 38px;
+        border-radius: 8px;
+    }
+
+    .reward-art-fallback {
+        font-size: 1.1rem;
+    }
+
+    .reward-copy {
+        gap: 3px;
     }
 
     .reward-box small {
-        font-size: .63rem;
-        letter-spacing: .6px;
+        font-size: .75rem;
+    }
+
+    .reward-name {
+        font-size: .76rem;
     }
 
     .pass-fragment-reward {
-        font-size: .65rem;
+        font-size: .75rem;
+    }
+
+    .pass-fragment-reward img {
+        width: 14px;
+        height: 14px;
+    }
+
+    .reward-lock {
+        top: 3px;
+        right: 3px;
+        width: 16px;
+        height: 16px;
+    }
+
+    .reward-lock svg {
+        width: 9px;
+        height: 10px;
     }
 
     .level-diamond {
         width: 28px;
-        height: 28px;
-    }
-
-    .level-diamond span {
-        font-size: .95rem;
+        border-radius: 6px;
+        font-size: .75rem;
     }
 
     .pass-page-controls {
-        flex: 0 0 auto;
+        grid-template-columns: minmax(96px, 1fr) auto minmax(96px, 1fr);
         gap: 5px;
-        padding: 6px 0;
-        font-size: .66rem;
-        white-space: nowrap;
+        font-size: .75rem;
     }
 
     .pass-page-controls button {
-        flex: 1 1 0;
-        min-width: 0;
-        padding: 7px 4px;
-        font-size: .66rem;
-        white-space: nowrap;
-    }
-
-    .pass-page-controls span {
-        flex: 0 0 auto;
-        font-size: .65rem;
+        min-height: 44px;
+        padding-inline: 5px;
+        font-size: .75rem;
     }
 
     .btn-fechar {
-        flex: 0 0 auto;
         min-height: 46px;
-        margin-top: 5px;
-        padding: 10px;
-        font-size: .88rem;
     }
 }
 
-@media (max-width: 600px) and (max-height: 720px) {
-    .pass-header {
-        padding-top: 52px;
-        padding-bottom: 19px;
-    }
-
-    .pass-progress-container {
-        margin-bottom: 9px;
-    }
-
+@media (max-width: 370px) {
     .pass-status-bar {
-        padding-top: 6px;
-        padding-bottom: 6px;
+        grid-template-columns: minmax(0, 1fr);
     }
 
-    .btn-coletar-tudo {
-        min-height: 36px;
-        margin-top: 4px;
-        margin-bottom: 2px;
+    .pass-status-actions {
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
+        justify-items: stretch;
     }
 
-    .pass-rewards-list {
-        gap: 7px;
+    .pass-skin-fragments {
+        white-space: normal;
+    }
+
+    .btn-premium {
+        width: 100%;
+    }
+
+    .reward-row {
+        grid-template-columns: minmax(0, 1fr) 28px minmax(0, 1fr);
+        gap: 4px;
     }
 
     .reward-box {
-        min-height: 52px;
+        padding-inline: 7px;
     }
 
-    .btn-fechar {
-        min-height: 42px;
+    .reward-art {
+        width: 32px;
+        height: 32px;
+        flex-basis: 32px;
+    }
+
+    .reward-name {
+        font-size: .75rem;
+    }
+
+    .pass-page-controls {
+        grid-template-columns: minmax(80px, 1fr) auto minmax(80px, 1fr);
+    }
+
+    .pass-page-controls button {
+        font-size: .75rem;
+    }
+}
+
+@media (max-height: 720px) and (max-width: 640px) {
+    .pass-container {
+        gap: 6px;
+        padding: 7px;
+    }
+
+    .pass-header {
+        min-height: 90px;
+        padding: 10px 12px;
+    }
+
+    .pass-header-kicker {
+        font-size: .75rem;
+    }
+
+    .pass-status-bar {
+        padding-block: 6px;
+    }
+
+    .pass-rewards-list {
+        gap: 6px;
+    }
+
+    .reward-box {
+        min-height: 60px;
+        padding-block: 6px;
+    }
+
+    .btn-coletar-tudo,
+    .btn-fechar,
+    .pass-page-controls button {
+        min-height: 40px;
+    }
+}
+
+@media (max-width: 640px) and (orientation: landscape) {
+    .pass-container {
+        width: min(100%, 980px);
+        padding: 6px 10px;
+    }
+
+    .pass-header {
+        min-height: 76px;
+    }
+
+    .pass-status-bar {
+        grid-template-columns: 1fr auto;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        scroll-behavior: auto !important;
+        animation-duration: .01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: .01ms !important;
     }
 }

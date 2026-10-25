@@ -1,251 +1,402 @@
-// static/js/season_pass.js
 const NIVEIS_POR_PAGINA = 20;
+const NIVEIS_PASSE = 100;
+const CUSTO_PREMIUM_PASSE = 500;
 let paginaPasseAtual = 0;
 let totalNiveisPasse = 0;
+let dadosPasseAtual = null;
+let acaoPasseEmAndamento = false;
+
+function obterIdPersonagemPasse() {
+    return String(window.eldoraCharacterId || localStorage.getItem('jogadorEldoraID') || '');
+}
+
+function mostrarMensagemPasse(texto, tipo = 'info', permitirTentarNovamente = false) {
+    const aviso = document.getElementById('pass-message');
+    if (!aviso) return;
+    aviso.replaceChildren();
+    aviso.className = `pass-message ${tipo}`;
+    aviso.hidden = !texto;
+    if (!texto) return;
+
+    const conteudo = document.createElement('span');
+    conteudo.textContent = texto;
+    aviso.appendChild(conteudo);
+    if (permitirTentarNovamente) {
+        const tentar = document.createElement('button');
+        tentar.type = 'button';
+        tentar.className = 'pass-retry';
+        tentar.textContent = 'Tentar novamente';
+        tentar.addEventListener('click', carregarPasse);
+        aviso.appendChild(tentar);
+    }
+}
+
+function definirCarregamento(ativo) {
+    const lista = document.getElementById('lista-recompensas');
+    const coleta = document.getElementById('btn-coletar-tudo');
+    const premium = document.getElementById('btn-comprar-premium');
+    if (coleta) coleta.disabled = ativo || !dadosPasseAtual;
+    if (premium && ativo) premium.disabled = true;
+    if (ativo && lista) {
+        lista.replaceChildren();
+        const loading = document.createElement('div');
+        loading.className = 'pass-loading';
+        loading.setAttribute('role', 'status');
+        loading.textContent = 'Consultando a trilha...';
+        lista.appendChild(loading);
+    }
+}
 
 async function carregarPasse() {
-    let userId = localStorage.getItem('jogadorEldoraID');
-    if (!userId) {
-        userId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id || "123456789";
-    }
+    dadosPasseAtual = null;
+    definirCarregamento(true);
+    mostrarMensagemPasse('');
 
     try {
-        const response = await fetch(`/api/passe/status/${userId}`);
+        const sessao = await window.portalSessionReady;
+        if (!sessao?.authenticated) {
+            throw new Error('Entre na sua conta Eldora para consultar o Passe de Batalha.');
+        }
+
+        const userId = obterIdPersonagemPasse();
+        if (!userId) throw new Error('Selecione um personagem antes de abrir o Passe.');
+
+        const response = await fetch(`/api/passe/status/${encodeURIComponent(userId)}`, { cache: 'no-store' });
         const data = await response.json();
+        if (!response.ok || data.erro) throw new Error(data.erro || 'Não foi possível carregar o Passe.');
+        if (!data.status || !data.catalogo) throw new Error('O servidor retornou dados incompletos do Passe.');
 
-        if (data.erro) {
-            console.error("Erro ao carregar passe:", data.erro);
-            return;
-        }
-
-        const passe = data.status;
-        const catalogo = data.catalogo;
-        const fragmentosSkin = document.getElementById('fragmentos-skin-passe');
-        if (fragmentosSkin) fragmentosSkin.innerText = Number(passe.skin_fragments || 0).toLocaleString('pt-BR');
-
-        // Atualiza cabeçalho e XP
-        document.getElementById('display-nivel-atual').innerText = `NÍVEL ${passe.level}`;
-        const xpNecessario = 100;
-        const porcentagem = (passe.xp / xpNecessario) * 100;
-        document.getElementById('barra-progresso').style.width = `${porcentagem}%`;
-        document.getElementById('texto-xp').innerText = `${passe.xp} / ${xpNecessario} XP`;
-
-        // Atualiza Status Premium
-        const statusTxt = document.getElementById('status-premium');
-        const btnPremium = document.getElementById('btn-comprar-premium');
-        
-        if (passe.is_premium) {
-            statusTxt.innerHTML = 'Status: <b style="color: #f1c40f;">PREMIUM 👑</b>';
-            btnPremium.style.display = 'none';
-        } else {
-            btnPremium.style.display = 'inline-block';
-            btnPremium.onclick = comprarPassePremium; // 👈 Liga o botão à nossa nova função!
-        }
-
-        // Listas de resgatados (Para saber o que já foi pego)
-        const resgatadosFree = passe.resgatados_free || [];
-        const resgatadosPremium = passe.resgatados_premium || [];
-
-        // Desenha a lista de recompensas
+        dadosPasseAtual = data;
+        atualizarCabecalhoPasse(data.status);
+        desenharRecompensas(data.status, data.catalogo);
+        atualizarCompraPremium(data.status);
+        mostrarMensagemPasse('');
+    } catch (erro) {
+        console.error('Falha ao carregar o Passe:', erro);
         const lista = document.getElementById('lista-recompensas');
-        lista.innerHTML = ''; 
-
-        const niveis = Object.keys(catalogo).sort((a, b) => Number(a) - Number(b));
-        totalNiveisPasse = niveis.length;
-        paginaPasseAtual = Math.min(paginaPasseAtual, Math.max(0, Math.ceil(totalNiveisPasse / NIVEIS_POR_PAGINA) - 1));
-        const inicio = paginaPasseAtual * NIVEIS_POR_PAGINA;
-        niveis.slice(inicio, inicio + NIVEIS_POR_PAGINA).forEach(nivelStr => {
-            const nivel = parseInt(nivelStr);
-            const recompensa = catalogo[nivel];
-            
-            const isPremiumLocked = !passe.is_premium;
-            const isNivelAlcancado = passe.level >= nivel;
-            
-            const jaResgatouFree = resgatadosFree.includes(nivel);
-            const jaResgatouPremium = resgatadosPremium.includes(nivel);
-
-            // Classes CSS inteligentes
-            const classFree = jaResgatouFree ? "resgatado" : (isNivelAlcancado ? "disponivel" : "bloqueado");
-            const classPremium = jaResgatouPremium ? "resgatado" : (isPremiumLocked ? "locked" : (isNivelAlcancado ? "disponivel" : "bloqueado"));
-
-            const row = document.createElement('div');
-            row.className = `reward-row ${isNivelAlcancado ? 'completed' : ''}`;
-            
-            row.innerHTML = `
-                <div class="reward-box reward-free ${classFree}" onclick="resgatarPremio(${nivel}, 'free')">
-                    <small>GRÁTIS</small>
-                    ${jaResgatouFree ? "✔️ Resgatado" : recompensa.free.label}
-                    ${(recompensa.fragmentos_skin?.free || 0) > 0 ? `<span class="pass-fragment-reward">+${recompensa.fragmentos_skin.free} Fragmento de Skin ✨</span>` : ''}
-                </div>
-
-                <div class="reward-level-center">
-                    <div class="level-diamond">
-                        <span>${nivel}</span>
-                    </div>
-                </div>
-
-                <div class="reward-box reward-premium ${classPremium}" onclick="resgatarPremio(${nivel}, 'premium')">
-                    <small>PREMIUM</small>
-                    ${jaResgatouPremium ? "✔️ Resgatado" : recompensa.premium.label}
-                    ${(recompensa.fragmentos_skin?.premium || 0) > 0 ? `<span class="pass-fragment-reward">+${recompensa.fragmentos_skin.premium} Fragmentos de Skin ✨</span>` : ''}
-                </div>
-            `;
-            lista.appendChild(row);
-        });
-
-        const controles = document.getElementById('controles-pagina-passe');
-        const totalPaginas = Math.max(1, Math.ceil(niveis.length / NIVEIS_POR_PAGINA));
-        const primeiroNivel = inicio + 1;
-        const ultimoNivel = Math.min(inicio + NIVEIS_POR_PAGINA, niveis.length);
-        controles.innerHTML = `
-            <button ${paginaPasseAtual === 0 ? 'disabled' : ''} onclick="mudarPaginaPasse(-1)">← Anteriores</button>
-            <span>Níveis ${primeiroNivel}–${ultimoNivel} de ${niveis.length}</span>
-            <button ${paginaPasseAtual >= totalPaginas - 1 ? 'disabled' : ''} onclick="mudarPaginaPasse(1)">Próximos →</button>`;
-
-    } catch (err) {
-        console.error("Falha na conexão com a API do Passe:", err);
+        if (lista) {
+            lista.replaceChildren();
+            const estado = document.createElement('div');
+            estado.className = 'pass-empty-state';
+            estado.textContent = 'As recompensas aparecem aqui assim que a conexão for restabelecida.';
+            lista.appendChild(estado);
+        }
+        mostrarMensagemPasse(erro.message || 'Falha de conexão com o Passe.', 'error', true);
+    } finally {
+        definirCarregamento(false);
     }
+}
+
+function atualizarCabecalhoPasse(passe) {
+    const nivel = Math.min(NIVEIS_PASSE, Math.max(1, Number(passe.level) || 1));
+    const xp = Math.max(0, Number(passe.xp) || 0);
+    const concluido = nivel >= NIVEIS_PASSE;
+    const xpAtual = concluido ? 100 : Math.min(99, xp);
+    const badge = document.getElementById('display-nivel-atual');
+    const progress = document.getElementById('barra-progresso');
+    const progressContainer = progress?.parentElement;
+    const xpText = document.getElementById('texto-xp');
+
+    if (badge) badge.textContent = `NÍVEL ${nivel} / ${NIVEIS_PASSE}`;
+    if (progress) progress.style.width = `${xpAtual}%`;
+    if (progressContainer) progressContainer.setAttribute('aria-valuenow', String(xpAtual));
+    if (xpText) xpText.textContent = concluido ? 'Trilha concluída' : `${xpAtual} / 100 XP`;
+
+    const fragmentos = document.getElementById('fragmentos-skin-passe');
+    if (fragmentos) fragmentos.textContent = Math.max(0, Number(passe.skin_fragments) || 0).toLocaleString('pt-BR');
+}
+
+function atualizarCompraPremium(passe) {
+    const status = document.getElementById('status-premium');
+    const botao = document.getElementById('btn-comprar-premium');
+    if (status) {
+        status.textContent = passe.is_premium ? 'FAIXA PREMIUM ATIVA' : 'FAIXA GRÁTIS';
+        status.classList.toggle('premium', Boolean(passe.is_premium));
+    }
+    if (!botao) return;
+
+    if (passe.is_premium) {
+        botao.hidden = true;
+        botao.onclick = null;
+    } else {
+        botao.hidden = false;
+        botao.disabled = Number(passe.gems) < CUSTO_PREMIUM_PASSE;
+        botao.textContent = Number(passe.gems) < CUSTO_PREMIUM_PASSE
+            ? `Premium · ${Number(passe.gems || 0).toLocaleString('pt-BR')} / ${CUSTO_PREMIUM_PASSE} 💎`
+            : `Ativar Premium · ${CUSTO_PREMIUM_PASSE} 💎`;
+        botao.onclick = comprarPassePremium;
+    }
+}
+
+function criarRecompensa(nivel, tipo, recompensa, jaResgatou, nivelAlcancado, premiumAtivo, fragmentos, imagemFragmento) {
+    const faixaPremium = tipo === 'premium';
+    const bloqueada = faixaPremium && !premiumAtivo;
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = `reward-box reward-${tipo} ${jaResgatou ? 'resgatado' : ''} ${bloqueada ? 'locked' : ''} ${nivelAlcancado ? 'available' : 'unreached'}`;
+    button.disabled = jaResgatou || !nivelAlcancado || bloqueada || acaoPasseEmAndamento;
+    button.setAttribute('aria-label', `${faixaPremium ? 'Premium' : 'Grátis'}, nível ${nivel}: ${jaResgatou ? 'já resgatado' : recompensa.label}`);
+
+    const art = document.createElement('span');
+    art.className = `reward-art ${recompensa.tipo === 'gold' ? 'currency-gold' : ''}`;
+    art.setAttribute('aria-hidden', 'true');
+    const fallback = document.createElement('span');
+    fallback.className = 'reward-art-fallback';
+    fallback.textContent = recompensa.tipo === 'gold' ? '🪙' : recompensa.tipo === 'gems' ? '💎' : recompensa.tipo === 'banner' ? '⚑' : '✦';
+    art.appendChild(fallback);
+    if (recompensa.image_url) {
+        const image = document.createElement('img');
+        image.loading = 'lazy';
+        image.decoding = 'async';
+        image.src = recompensa.image_url;
+        image.alt = '';
+        image.addEventListener('load', () => { fallback.hidden = true; });
+        image.addEventListener('error', () => { image.hidden = true; });
+        art.appendChild(image);
+    }
+
+    const copy = document.createElement('span');
+    copy.className = 'reward-copy';
+    const faixa = document.createElement('small');
+    faixa.textContent = faixaPremium ? 'PREMIUM' : 'GRÁTIS';
+    const nome = document.createElement('span');
+    nome.className = 'reward-name';
+    nome.textContent = jaResgatou ? '✓ Resgatado' : recompensa.label;
+    copy.append(faixa, nome);
+
+    if (fragmentos > 0 && !jaResgatou) {
+        const extra = document.createElement('span');
+        extra.className = 'pass-fragment-reward';
+        if (imagemFragmento) {
+            const image = document.createElement('img');
+            image.loading = 'lazy';
+            image.decoding = 'async';
+            image.src = imagemFragmento;
+            image.alt = '';
+            image.addEventListener('error', () => { image.hidden = true; });
+            extra.appendChild(image);
+        }
+        const extraText = document.createElement('span');
+        extraText.textContent = `+${fragmentos} fragmento${fragmentos === 1 ? '' : 's'} para a loja`;
+        extra.appendChild(extraText);
+        copy.appendChild(extra);
+    }
+
+    button.append(art, copy);
+    if (bloqueada) {
+        const lock = document.createElement('span');
+        lock.className = 'reward-lock';
+        lock.setAttribute('aria-hidden', 'true');
+        lock.innerHTML = '<svg viewBox="0 0 16 18" focusable="false"><path d="M4 7V5a4 4 0 0 1 8 0v2"/><rect x="2" y="7" width="12" height="9" rx="2"/></svg>';
+        button.appendChild(lock);
+    }
+
+    if (!button.disabled) {
+        button.addEventListener('click', () => resgatarPremio(nivel, tipo));
+    }
+    return button;
+}
+
+function desenharRecompensas(passe, catalogo) {
+    const lista = document.getElementById('lista-recompensas');
+    const controles = document.getElementById('controles-pagina-passe');
+    if (!lista || !controles) return;
+
+    lista.replaceChildren();
+    controles.replaceChildren();
+    const niveis = Object.keys(catalogo).map(Number).filter(Number.isFinite).sort((a, b) => a - b);
+    totalNiveisPasse = niveis.length;
+    paginaPasseAtual = Math.min(paginaPasseAtual, Math.max(0, Math.ceil(totalNiveisPasse / NIVEIS_POR_PAGINA) - 1));
+
+    if (!niveis.length) {
+        const vazio = document.createElement('div');
+        vazio.className = 'pass-empty-state';
+        vazio.textContent = 'Ainda não há recompensas configuradas nesta trilha.';
+        lista.appendChild(vazio);
+        return;
+    }
+
+    const claimedFree = new Set((passe.resgatados_free || []).map(Number));
+    const claimedPremium = new Set((passe.resgatados_premium || []).map(Number));
+    const nivelAtual = Math.min(NIVEIS_PASSE, Math.max(1, Number(passe.level) || 1));
+    const start = paginaPasseAtual * NIVEIS_POR_PAGINA;
+    const pageLevels = niveis.slice(start, start + NIVEIS_POR_PAGINA);
+
+    pageLevels.forEach((nivel) => {
+        const config = catalogo[nivel] || catalogo[String(nivel)];
+        if (!config?.free || !config?.premium) return;
+
+        const row = document.createElement('article');
+        row.className = `reward-row ${nivelAtual >= nivel ? 'completed' : ''}`;
+        row.setAttribute('aria-label', `Nível ${nivel}`);
+        row.appendChild(criarRecompensa(
+            nivel, 'free', config.free, claimedFree.has(nivel), nivelAtual >= nivel, Boolean(passe.is_premium),
+            Number(config.fragmentos_skin?.free) || 0, config.fragmentos_skin?.image_url
+        ));
+
+        const center = document.createElement('div');
+        center.className = 'reward-level-center';
+        const diamond = document.createElement('span');
+        diamond.className = 'level-diamond';
+        const diamondNumber = document.createElement('span');
+        diamondNumber.textContent = String(nivel);
+        diamond.appendChild(diamondNumber);
+        center.appendChild(diamond);
+        row.appendChild(center);
+
+        row.appendChild(criarRecompensa(
+            nivel, 'premium', config.premium, claimedPremium.has(nivel), nivelAtual >= nivel, Boolean(passe.is_premium),
+            Number(config.fragmentos_skin?.premium) || 0, config.fragmentos_skin?.image_url
+        ));
+        lista.appendChild(row);
+    });
+
+    const totalPages = Math.max(1, Math.ceil(totalNiveisPasse / NIVEIS_POR_PAGINA));
+    const firstLevel = start + 1;
+    const lastLevel = Math.min(start + NIVEIS_POR_PAGINA, totalNiveisPasse);
+    const previous = document.createElement('button');
+    previous.type = 'button';
+    previous.textContent = '← Anteriores';
+    previous.disabled = paginaPasseAtual === 0;
+    previous.addEventListener('click', () => mudarPaginaPasse(-1));
+    const range = document.createElement('span');
+    range.textContent = `${firstLevel}–${lastLevel} de ${totalNiveisPasse}`;
+    const next = document.createElement('button');
+    next.type = 'button';
+    next.textContent = 'Próximos →';
+    next.disabled = paginaPasseAtual >= totalPages - 1;
+    next.addEventListener('click', () => mudarPaginaPasse(1));
+    controles.append(previous, range, next);
 }
 
 function mudarPaginaPasse(delta) {
     const totalPaginas = Math.ceil(totalNiveisPasse / NIVEIS_POR_PAGINA);
     paginaPasseAtual = Math.max(0, Math.min(totalPaginas - 1, paginaPasseAtual + delta));
-    carregarPasse();
+    if (dadosPasseAtual) desenharRecompensas(dadosPasseAtual.status, dadosPasseAtual.catalogo);
 }
 
-// 🔥 A NOVA FUNÇÃO DE RESGATE (Clica na caixa e envia pro Python) 🔥
+async function enviarAcaoPasse(url, payload) {
+    const headers = await window.portalSessionHeaders({ 'Content-Type': 'application/json' });
+    const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ user_id: obterIdPersonagemPasse(), ...payload }),
+    });
+    const data = await response.json();
+    return { response, data };
+}
+
 async function resgatarPremio(nivel, tipo) {
-    let userId = localStorage.getItem('jogadorEldoraID') || window.Telegram?.WebApp?.initDataUnsafe?.user?.id || "123456789";
-
+    if (acaoPasseEmAndamento) return;
+    acaoPasseEmAndamento = true;
+    desenharRecompensas(dadosPasseAtual.status, dadosPasseAtual.catalogo);
     try {
-        const response = await fetch('/api/passe/resgatar', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ user_id: userId, nivel: nivel, tipo: tipo })
-        });
-
-        const data = await response.json();
-
-        if (data.status === "success") {
-            // ✨ AQUI ESTÁ A MUDANÇA: Trocámos o alert pela tela dourada de sucesso!
-            alertaPasseEldora("Recompensa Resgatada!", data.message, true);
-            carregarPasse(); 
-        } else {
-            // ✨ E AQUI TAMBÉM: Tela vermelha para os bloqueios do anti-cheat
-            alertaPasseEldora("Acesso Negado", data.message, false);
-        }
-    } catch (err) {
-        // ✨ ATÉ NO ERRO: Para nunca mais ver a caixa cinzenta!
-        alertaPasseEldora("Falha Mágica", "Erro de comunicação com o servidor.", false);
+        const { response, data } = await enviarAcaoPasse('/api/passe/resgatar', { nivel, tipo });
+        if (!response.ok || data.status !== 'success') throw new Error(data.message || 'Não foi possível resgatar a recompensa.');
+        alertaPasseEldora('Recompensa resgatada', data.message, true);
+        await carregarPasse();
+    } catch (erro) {
+        alertaPasseEldora('Não foi possível resgatar', erro.message || 'Falha de comunicação com o servidor.', false);
+    } finally {
+        acaoPasseEmAndamento = false;
+        if (dadosPasseAtual) desenharRecompensas(dadosPasseAtual.status, dadosPasseAtual.catalogo);
     }
 }
 
-window.onload = carregarPasse;
-
-// 🔥 FUNÇÃO DE COMPRA DO PASSE PREMIUM 🔥
-// ==========================================
-// SISTEMA DE COMPRA E ALERTAS CUSTOMIZADOS
-// ==========================================
-
-// 1. Abre a janela de confirmação (Agora usando o CSS)
 function comprarPassePremium() {
+    const passe = dadosPasseAtual?.status || {};
+    if (Number(passe.gems) < CUSTO_PREMIUM_PASSE) {
+        alertaPasseEldora('Gemas insuficientes', `Você tem ${Number(passe.gems || 0).toLocaleString('pt-BR')} gemas. São necessárias ${CUSTO_PREMIUM_PASSE}.`, false);
+        return;
+    }
+
     let modal = document.getElementById('modal-confirmar-premium');
-    
     if (!modal) {
-        const html = `
-            <div id="modal-confirmar-premium" class="modal-passe-overlay">
-                <div class="modal-passe-box">
-                    <div class="modal-passe-icon" style="text-shadow: 0 0 15px rgba(52, 152, 219, 0.6);">💎</div>
-                    <h3 class="modal-passe-title" style="color: #3498db;">Ativar Premium</h3>
-                    <p class="modal-passe-msg">Desejas ativar o Passe Premium por <b>500 Gemas</b>? <br><br>Todos os prémios bloqueados ficarão imediatamente disponíveis!</p>
-                    <div class="modal-passe-botoes">
-                        <button onclick="executarCompraPremium()" class="btn-passe-comprar">Comprar</button>
-                        <button onclick="document.getElementById('modal-confirmar-premium').style.display='none'" class="btn-passe-cancelar">Cancelar</button>
-                    </div>
+        modal = document.createElement('div');
+        modal.id = 'modal-confirmar-premium';
+        modal.className = 'modal-passe-overlay';
+        modal.innerHTML = `
+            <section class="modal-passe-box" role="dialog" aria-modal="true" aria-labelledby="premium-title">
+                <div class="modal-passe-icon" aria-hidden="true">💎</div>
+                <h2 id="premium-title" class="modal-passe-title">Ativar faixa Premium</h2>
+                <p class="modal-passe-msg"></p>
+                <div class="modal-passe-botoes">
+                    <button type="button" class="btn-passe-comprar">Ativar Premium</button>
+                    <button type="button" class="btn-passe-cancelar">Agora não</button>
                 </div>
-            </div>`;
-        document.body.insertAdjacentHTML('beforeend', html);
-        modal = document.getElementById('modal-confirmar-premium');
+            </section>`;
+        modal.querySelector('.btn-passe-comprar').addEventListener('click', executarCompraPremium);
+        modal.querySelector('.btn-passe-cancelar').addEventListener('click', () => { modal.hidden = true; });
+        document.body.appendChild(modal);
     }
-    modal.style.display = 'flex';
+    modal.querySelector('.modal-passe-msg').textContent = `Ativar a faixa Premium por ${CUSTO_PREMIUM_PASSE} gemas? Seu saldo atual é ${Number(passe.gems || 0).toLocaleString('pt-BR')} gemas.`;
+    modal.hidden = false;
 }
 
-// 2. Executa a compra e mostra o resultado
 async function executarCompraPremium() {
-    document.getElementById('modal-confirmar-premium').style.display = 'none';
-    let userId = localStorage.getItem('jogadorEldoraID') || window.Telegram?.WebApp?.initDataUnsafe?.user?.id || "123456789";
-
+    const modal = document.getElementById('modal-confirmar-premium');
+    if (modal) modal.hidden = true;
+    if (acaoPasseEmAndamento) return;
+    acaoPasseEmAndamento = true;
     try {
-        const response = await fetch('/api/passe/comprar_premium', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ user_id: userId })
-        });
-        const data = await response.json();
-
-        if (data.sucesso) {
-            alertaPasseEldora("Bem-vindo à Elite!", data.message, true);
-            carregarPasse(); 
-        } else {
-            alertaPasseEldora("Erro na Transação", data.message, false);
-        }
-    } catch (err) {
-        alertaPasseEldora("Falha Mágica", "Erro de comunicação com o servidor.", false);
+        const { response, data } = await enviarAcaoPasse('/api/passe/comprar_premium', {});
+        if (!response.ok || !data.sucesso) throw new Error(data.message || 'Não foi possível ativar o Premium.');
+        alertaPasseEldora('Faixa Premium ativada', data.message, true);
+        await carregarPasse();
+    } catch (erro) {
+        alertaPasseEldora('Compra não concluída', erro.message || 'Falha de comunicação com o servidor.', false);
+    } finally {
+        acaoPasseEmAndamento = false;
+        if (dadosPasseAtual) desenharRecompensas(dadosPasseAtual.status, dadosPasseAtual.catalogo);
     }
 }
 
-// 3. Janela de Alerta Bonita (Totalmente limpa)
 function alertaPasseEldora(titulo, mensagem, sucesso = true) {
     let modal = document.getElementById('modal-alerta-passe');
-    let cor = sucesso ? '#f1c40f' : '#e74c3c'; 
-    let icone = sucesso ? '👑' : '❌';
-
     if (!modal) {
-        const html = `
-            <div id="modal-alerta-passe" class="modal-passe-overlay">
-                <div id="alerta-passe-box" class="modal-passe-box" style="border-color: ${cor};">
-                    <div id="alerta-passe-icone" class="modal-passe-icon" style="text-shadow: 0 0 15px ${cor}88;">${icone}</div>
-                    <h3 id="alerta-passe-titulo" class="modal-passe-title" style="color: ${cor};">${titulo}</h3>
-                    <p id="alerta-passe-msg" class="modal-passe-msg">${mensagem}</p>
-                    <button onclick="document.getElementById('modal-alerta-passe').style.display='none'" class="btn-passe-continuar">CONTINUAR</button>
-                </div>
-            </div>`;
-        document.body.insertAdjacentHTML('beforeend', html);
-        modal = document.getElementById('modal-alerta-passe');
-    } else {
-        document.getElementById('alerta-passe-icone').innerText = icone;
-        document.getElementById('alerta-passe-icone').style.textShadow = `0 0 15px ${cor}88`;
-        document.getElementById('alerta-passe-titulo').innerText = titulo;
-        document.getElementById('alerta-passe-titulo').style.color = cor;
-        document.getElementById('alerta-passe-box').style.borderColor = cor;
-        document.getElementById('alerta-passe-msg').innerHTML = mensagem;
+        modal = document.createElement('div');
+        modal.id = 'modal-alerta-passe';
+        modal.className = 'modal-passe-overlay';
+        modal.innerHTML = `
+            <section class="modal-passe-box" role="dialog" aria-modal="true" aria-labelledby="alerta-passe-titulo">
+                <div class="modal-passe-icon" aria-hidden="true"></div>
+                <h2 id="alerta-passe-titulo" class="modal-passe-title"></h2>
+                <p id="alerta-passe-msg" class="modal-passe-msg"></p>
+                <button type="button" class="btn-passe-continuar">Continuar</button>
+            </section>`;
+        modal.querySelector('.btn-passe-continuar').addEventListener('click', () => { modal.hidden = true; });
+        document.body.appendChild(modal);
     }
-    modal.style.display = 'flex';
+    const cor = sucesso ? '#e4bd69' : '#e66b62';
+    const box = modal.querySelector('.modal-passe-box');
+    box.style.setProperty('--modal-accent', cor);
+    modal.querySelector('.modal-passe-icon').textContent = sucesso ? '✓' : '!';
+    modal.querySelector('#alerta-passe-titulo').textContent = titulo;
+    modal.querySelector('#alerta-passe-msg').textContent = mensagem;
+    modal.hidden = false;
 }
 
 async function coletarTudoLiberado() {
-    let userId = localStorage.getItem('jogadorEldoraID') || window.Telegram?.WebApp?.initDataUnsafe?.user?.id;
-    
-    // Mostra um "Carregando..." básico ou troca o texto do botão
+    if (acaoPasseEmAndamento) return;
+    acaoPasseEmAndamento = true;
+    const button = document.getElementById('btn-coletar-tudo');
+    const labelOriginal = button?.textContent;
+    if (button) {
+        button.disabled = true;
+        button.textContent = 'Coletando...';
+    }
     try {
-        const response = await fetch('/api/passe/coletar_tudo', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ user_id: userId })
-        });
-
-        const data = await response.json();
-
-        if (data.status === "success") {
-            alertaPasseEldora("Baú de Tesouros!", data.message, true);
-            carregarPasse(); // Atualiza a tela para mostrar os itens como coletados
-        } else if (data.status === "info") {
-            alertaPasseEldora("Tudo em dia", data.message, false);
-        } else {
-            alertaPasseEldora("Erro", data.message, false);
-        }
-    } catch (err) {
-        alertaPasseEldora("Erro Mágico", "Falha ao conectar ao servidor.", false);
+        const { response, data } = await enviarAcaoPasse('/api/passe/coletar_tudo', {});
+        if (!response.ok || !['success', 'info'].includes(data.status)) throw new Error(data.message || 'Não foi possível coletar as recompensas.');
+        alertaPasseEldora(data.status === 'success' ? 'Recompensas coletadas' : 'Tudo em dia', data.message, data.status !== 'error');
+        await carregarPasse();
+    } catch (erro) {
+        alertaPasseEldora('Coleta não concluída', erro.message || 'Falha de comunicação com o servidor.', false);
+    } finally {
+        acaoPasseEmAndamento = false;
+        if (button) button.textContent = labelOriginal || 'Coletar recompensas disponíveis';
+        if (dadosPasseAtual) desenharRecompensas(dadosPasseAtual.status, dadosPasseAtual.catalogo);
     }
 }
 
+document.addEventListener('DOMContentLoaded', carregarPasse);

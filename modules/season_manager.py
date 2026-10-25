@@ -1,7 +1,7 @@
 # modules/season_manager.py
 from bson import ObjectId
 from modules.player.core import users_collection
-from modules.game_data.season_pass import XP_POR_NIVEL_PASSE, RECOMPENSAS_PASSE
+from modules.game_data.season_pass import adicionar_xp_passe
 
 def dar_xp_passe(player_id, xp_ganho):
     """Adiciona XP ao passe e processa level up se necessário"""
@@ -9,22 +9,13 @@ def dar_xp_passe(player_id, xp_ganho):
     if not player:
         return None
 
-    # 👇 1. Puxa o dicionário. O "or {}" garante que nunca seja None.
-    passe = player.get("passe_batalha") or {}
+    try:
+        antigo_level = int((player.get("passe_batalha") or {}).get("level", 1) or 1)
+    except (TypeError, ValueError):
+        antigo_level = 1
+    _, novo_level, novo_xp = adicionar_xp_passe(player, xp_ganho)
 
-    # 👇 2. A BLINDAGEM: Se a chave 'level' não existir dentro do dic, assume Nível 1
-    antigo_level = passe.get("level", 1)
-    antigo_xp = passe.get("xp", 0)
-    
-    novo_xp = antigo_xp + xp_ganho
-    novo_level = antigo_level
-
-    # Lógica de subir de nível (loop caso ganhe muito XP de uma vez)
-    while novo_xp >= XP_POR_NIVEL_PASSE:
-        novo_xp -= XP_POR_NIVEL_PASSE
-        novo_level += 1
-
-    # 👇 Salva as informações novas direto no banco
+    # Usa a mesma progressão e o mesmo limite de nível dos demais fluxos.
     users_collection.update_one(
         {"_id": ObjectId(player_id)},
         {

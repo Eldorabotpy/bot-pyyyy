@@ -37,7 +37,7 @@ for i in range(1, NIVEIS_PASSE_POR_TEMPORADA + 1):
     # ==========================================
     if i % 5 == 0 and i % 10 != 0:
         free = {"tipo": "item", "id": "pergaminho_de_reparo", "qtd": 2, "label": "2x Pergaminho de Reparo 📜"}
-        premium = {"tipo": "item", "id": "sigilo_de_protecao", "qtd": 3, "label": "3x Sigilo de Protecao 🛡️"}
+        premium = {"tipo": "item", "id": "sigilo_de_protecao", "qtd": 3, "label": "3x Sigilo de Proteção 🛡️"}
 
     # ==========================================
     # 3. MARCOS ÉPICOS (A cada 10 níveis)
@@ -46,9 +46,9 @@ for i in range(1, NIVEIS_PASSE_POR_TEMPORADA + 1):
         if i % 50 == 0:
             free = {"tipo": "item", "id": "pergaminho_de_reparo", "qtd": 1, "label": "1x Pergaminho de Reparo 📜"}
         else:
-            free = {"tipo": "item", "id": "sigilo_de_protecao", "qtd": 1, "label": "1x Sigilo de Protecao 🛡️"}
+            free = {"tipo": "item", "id": "sigilo_de_protecao", "qtd": 1, "label": "1x Sigilo de Proteção 🛡️"}
         
-        premium = {"tipo": "item", "id": "sigilo_protecao", "qtd": 5, "label": "5x Sigilo de Protecao 🛡️"}
+        premium = {"tipo": "item", "id": "sigilo_de_protecao", "qtd": 5, "label": "5x Sigilo de Proteção 🛡️"}
 
     # ==========================================
     # 4. ITENS CUSTOMIZADOS E DINÂMICOS (Genero)
@@ -78,25 +78,6 @@ for i in range(1, NIVEIS_PASSE_POR_TEMPORADA + 1):
             "label": "Banner Xiongmaoren S1"
         }
         
-    elif i == 50:
-        # Avatar Nível 50 - Lê o Gênero do Jogador
-        premium = {
-            "tipo": "avatar_dinamico", 
-            "id_m": "avatar_xiongmaoren_s1_m",       # Se for Homem
-            "id_f": "avatar_xiongmaoren_s1_f",       # Se for Mulher
-            "label": "Avatar 🐼 Xiongmaoren S1"
-        }
-        
-    elif i == 100:
-        free = {"tipo": "avatar", "id": "avatar_mestre_free", "label": "Avatar Mestre 🏆"}
-        # Skin Suprema Nível 100 - Lê o Gênero
-        premium = {
-            "tipo": "skin_dinamica", 
-            "id_m": "skin_xiongmaoren_s1_m", 
-            "id_f": "skin_xiongmaoren_s1_f", 
-            "label": "🐼 Xiongmaoren_s1 "
-        }
-
     # Salva no dicionário do passe
     RECOMPENSAS_PASSE[i] = {
         "free": free,
@@ -147,20 +128,37 @@ def adicionar_xp_passe(
     except (TypeError, ValueError):
         xp_ganho = 0
 
+    passe["level"] = min(
+        max(1, passe["level"]),
+        NIVEIS_PASSE_POR_TEMPORADA,
+    )
+    passe["xp"] = max(0, passe["xp"])
+    if passe["level"] >= NIVEIS_PASSE_POR_TEMPORADA:
+        passe["xp"] = 0
+
     player_data["passe_batalha"] = passe
 
     # ==========================================================
     # 🌟 ENTREGA XP
     # ==========================================================
 
+    if passe["level"] >= NIVEIS_PASSE_POR_TEMPORADA:
+        return False, passe["level"], 0
+
     passe["xp"] += max(0, xp_ganho)
 
     subiu_nivel = False
 
-    while passe["xp"] >= XP_POR_NIVEL_PASSE:
+    while (
+        passe["xp"] >= XP_POR_NIVEL_PASSE
+        and passe["level"] < NIVEIS_PASSE_POR_TEMPORADA
+    ):
         passe["level"] += 1
         passe["xp"] -= XP_POR_NIVEL_PASSE
         subiu_nivel = True
+
+    if passe["level"] >= NIVEIS_PASSE_POR_TEMPORADA:
+        passe["xp"] = 0
     return (
         subiu_nivel,
         passe["level"],

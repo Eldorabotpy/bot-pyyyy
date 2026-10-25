@@ -3,47 +3,63 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Passe de Temporada - Eldora</title>
-    <link rel="stylesheet" href="/static/css/season_pass.css?v=8">
-    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&display=swap" rel="stylesheet">
+    <meta name="theme-color" content="#07111d">
+    <title>Passe de Batalha - Eldora</title>
+    <link rel="stylesheet" href="/static/css/season_pass.css?v=9">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
 
     <div class="pass-container">
         <div class="pass-header">
             <div class="pass-header-bg"></div>
-
-            <img src="https://github.com/user-attachments/assets/e8c99a23-26c2-4deb-870e-b097951fb94b" class="pass-emblem-overlay anime-pulse" alt="Emblema Mágico">
+            <span class="pass-banner-placeholder" aria-label="Espaço reservado para o banner da temporada">ARTE DA TEMPORADA</span>
 
             <div class="pass-header-content">
-                <h1>PASSE DE BATALHA</h1>
-                <div id="display-nivel-atual" class="level-badge">NÍVEL 1</div>
+                <div>
+                    <p class="pass-header-kicker">TRILHA DE RECOMPENSAS · 100 NÍVEIS</p>
+                    <h1>Passe de Batalha</h1>
+                </div>
+                <div id="display-nivel-atual" class="level-badge">NÍVEL 1 / 100</div>
             </div>
         </div>
 
-        <div class="pass-progress-container">
-            <div id="barra-progresso" class="pass-progress-bar"></div>
-            <span id="texto-xp" class="pass-xp-text">0 / 100 XP</span>
+        <div class="pass-progress-block">
+            <div class="pass-progress-labels">
+                <span>100 XP de combate avançam 1 nível</span>
+                <span id="texto-xp" class="pass-xp-text">0 / 100 XP</span>
+            </div>
+            <div class="pass-progress-container" role="progressbar" aria-label="Progresso do nível atual" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                <div id="barra-progresso" class="pass-progress-bar"></div>
+            </div>
         </div>
 
         <div class="pass-status-bar">
-            <span id="status-premium">Status: <b style="color: #7f8c8d;">GRÁTIS</b></span>
-            <span class="pass-season-fragment-rates">Grátis: 25/mês · Pago: +60 · Total Premium: 85/mês</span>
-            <span class="pass-skin-fragments">✨ Fragmentos de Skin: <b id="fragmentos-skin-passe">0</b></span>
-            <button id="btn-comprar-premium" class="btn-premium">ATIVAR PREMIUM 💎</button>
+            <div class="pass-status-copy">
+                <span id="status-premium" class="pass-tier-status">FAIXA GRÁTIS</span>
+                <span class="pass-season-fragment-rates">25 grátis + 60 Premium por trilha. Troque por skins e avatares na loja.</span>
+            </div>
+            <div class="pass-status-actions">
+                <span class="pass-skin-fragments">Fragmentos para a loja <b id="fragmentos-skin-passe">0</b></span>
+                <button id="btn-comprar-premium" class="btn-premium" type="button">ATIVAR PREMIUM · 500 💎</button>
+            </div>
         </div>
 
-        <button onclick="coletarTudoLiberado()" class="btn-coletar-tudo">
-            🎒 COLETAR TUDO
+        <button id="btn-coletar-tudo" type="button" class="btn-coletar-tudo" onclick="coletarTudoLiberado()">
+            <span aria-hidden="true">🎒</span> Coletar recompensas disponíveis
         </button>
 
-        <div class="pass-rewards-list" id="lista-recompensas">
-            </div>
+        <div id="pass-message" class="pass-message" role="status" aria-live="polite" hidden></div>
+
+        <div class="pass-rewards-list" id="lista-recompensas" aria-label="Recompensas por nível">
+            <div class="pass-loading" role="status">Consultando a trilha...</div>
+        </div>
         <div id="controles-pagina-passe" class="pass-page-controls"></div>
         
-        <button class="btn-fechar" onclick="window.history.back()">VOLTAR AO MAPA</button>
+        <button class="btn-fechar" type="button" onclick="window.history.back()">← Voltar ao mapa</button>
     </div>
 
-    <script src="/static/js/season_pass.js?v=100"></script>
+    <script src="/static/js/portal_session.js?v=1"></script>
+    <script src="/static/js/season_pass.js?v=101"></script>
 </body>
 </html>

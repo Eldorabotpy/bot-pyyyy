@@ -11,7 +11,6 @@ from modules.player.premium import PremiumManager
 from modules.game_data.season_pass import adicionar_xp_passe
 from modules.player.core import get_player_data, save_player_data
 from modules.game_data.xp import add_combat_xp
-from modules.season_manager import dar_xp_passe
 
 # 🔥 A CORREÇÃO: Puxar do MongoDB em vez da Memória!
 from modules.combat.party_engine import parties_collection
