@@ -473,49 +473,9 @@ window.iniciarCacadaApp = async function(spawnId, opcoesGrupo = {}) {
             return;
         }
 
-        // 🛠️ NOVO: O Jogo baixa as suas magias atuais ANTES de entrar na arena!
-        try {
-            const resPerfil = await fetch(
-                `/api/personagem/${charId}?t=${new Date().getTime()}`
-            );
-
-            const perfilCombate =
-                await resPerfil.json();
-
-            const perfilAnterior =
-                window.perfilDadosGlobais || {};
-
-            // =====================================================
-            // 🛡️ NÃO DESTRUIR O ESTADO DA CAMPANHA
-            // =====================================================
-            //
-            // O endpoint usado pelo combate serve principalmente
-            // para atualizar skills e dados de combate.
-            //
-            // Nunca devemos apagar quests que já foram carregadas
-            // pelo perfil oficial.
-            // =====================================================
-
-            window.perfilDadosGlobais = {
-                ...perfilAnterior,
-                ...perfilCombate,
-
-                quests: {
-                    ...(perfilAnterior.quests || {}),
-                    ...(perfilCombate.quests || {})
-                }
-            };
-
-            // ✅ Cada batalha começa com as skills prontas no frontend.
-            if (window.perfilDadosGlobais) {
-                window.perfilDadosGlobais.cooldowns = {};
-            }
-
-        } catch(e) {
-            console.warn("Aviso: Não foi possível carregar as magias antes do combate.", e);
-        }
-
-        // Continua o combate normalmente...
+        // O perfil já foi carregado antes de abrir o mapa. A resposta do
+        // combate traz o loadout atualizado para evitar uma segunda chamada
+        // completa de perfil e outro cálculo de atributos antes da arena.
         const res = await fetch('/api/combate/iniciar', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -542,6 +502,33 @@ window.iniciarCacadaApp = async function(spawnId, opcoesGrupo = {}) {
         }
 
         const est = dados.estado;
+        const perfilAnterior = window.perfilDadosGlobais || {};
+        const skillsDesbloqueadas =
+            est.skills_desbloqueadas ??
+            est.skills ??
+            perfilAnterior.skills_desbloqueadas ??
+            perfilAnterior.skills ??
+            {};
+        const skillsEquipadas =
+            est.skills_equipadas ??
+            est.equipped_skills ??
+            perfilAnterior.skills_equipadas ??
+            perfilAnterior.equipped_skills ??
+            {};
+        window.perfilDadosGlobais = {
+            ...perfilAnterior,
+            skills: skillsDesbloqueadas,
+            skills_desbloqueadas: skillsDesbloqueadas,
+            skills_equipadas: skillsEquipadas,
+            equipped_skills: skillsEquipadas,
+            database_skills:
+                est.database_skills ??
+                perfilAnterior.database_skills ??
+                perfilAnterior.skills_database ??
+                {},
+            cooldowns: {}
+        };
+
         const bgArena = (typeof FUNDOS_ARENAS !== 'undefined' && FUNDOS_ARENAS[est.regiao]) ? FUNDOS_ARENAS[est.regiao] : "https://placehold.co/600x400/111/222?text=Arena+Desconhecida";
         
         // ==========================================

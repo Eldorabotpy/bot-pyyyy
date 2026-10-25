@@ -1024,6 +1024,30 @@ def iniciar_combate():
             else pastas_github.get(regiao_atual, regiao_atual)
         )
         link_imagem_monstro = f"https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/mob/combate/{nome_da_pasta}/{mob_data.get('id')}.png"
+
+        skills_desbloqueadas = player.get("skills")
+        if not isinstance(skills_desbloqueadas, dict):
+            skills_desbloqueadas = player.get("skills_desbloqueadas", {})
+        if not isinstance(skills_desbloqueadas, dict):
+            skills_desbloqueadas = {}
+
+        skills_equipadas = player.get("equipped_skills")
+        if not isinstance(skills_equipadas, dict):
+            skills_equipadas = player.get("skills_equipadas", {})
+        if not isinstance(skills_equipadas, dict):
+            skills_equipadas = {}
+
+        skill_ids_combate = {str(skill_id) for skill_id in skills_desbloqueadas}
+        skill_ids_combate.update(
+            str(skill_id)
+            for skill_id in skills_equipadas.values()
+            if skill_id
+        )
+        database_skills_combate = {
+            skill_id: SKILL_DATA[skill_id]
+            for skill_id in skill_ids_combate
+            if skill_id in SKILL_DATA
+        }
         
         # Estado final enviado para o combate.js
         estado = {
@@ -1064,6 +1088,9 @@ def iniciar_combate():
             "player_stats": {"max_hp": hp_max_real, "max_mana": mp_max_real}, 
             "classe_player": player.get('class', 'aventureiro'),
             "genero_player": player.get('gender', 'masculino'),
+            "skills_desbloqueadas": skills_desbloqueadas,
+            "skills_equipadas": skills_equipadas,
+            "database_skills": database_skills_combate,
             "nivel_conhecimento": nivel_conhecimento,
             "abates_bestiario": abates,
             "ambush_log": ambush_log 
