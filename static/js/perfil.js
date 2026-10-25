@@ -178,7 +178,7 @@ window.aplicarImagemItemEldora = function(imgEl, item) {
 window.getCaminhosImagemPerfilEldora = function(item) {
     const base = "https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/itens/";
     const baseRunas = "https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/runas/";
-    const cacheVersion = "20261024-1";
+    const cacheVersion = "20261024-2";
     const bruto = String(item?.base_id || item?.item_id || item?.uid || item?.id || "").trim();
     if (!bruto) return [];
 
@@ -191,7 +191,7 @@ window.getCaminhosImagemPerfilEldora = function(item) {
     const ferramenta = itemEUmaFerramenta(item);
     const caminhos = [];
     if (["skill_book", "livro", "book"].includes(tipo) || categoria === "aprendizado") {
-        caminhos.push(`/static/images/items/${encodeURIComponent(bruto)}.png?v=${cacheVersion}`);
+        caminhos.push(`https://raw.githubusercontent.com/Eldorabotpy/static-img/refs/heads/main/assets/itens/materiais/${encodeURIComponent(bruto)}.png?v=${cacheVersion}`);
     }
     const urlIcone = typeof item?.icon_url === "string" ? item.icon_url.trim() : "";
     const iconePlaceholder = /(?:seuusuario|seurepositorio|example\.com|placeholder)/i.test(urlIcone);

@@ -210,7 +210,7 @@ function mercadoCaminhosImagemItem(item) {
     const caminhos = [];
     const tipoItem = String(item?.tipo || item?.type || "").trim().toLowerCase();
     if (tipoItem === "skill_book") {
-        caminhos.push(`/static/images/items/${encodeURIComponent(id)}.png?v=20261024-1`);
+        caminhos.push(`https://raw.githubusercontent.com/Eldorabotpy/static-img/refs/heads/main/assets/itens/materiais/${encodeURIComponent(id)}.png?v=20261024-2`);
     }
 
     const iconUrl = typeof item?.icon_url === "string" ? item.icon_url.trim() : "";
@@ -898,7 +898,7 @@ function mercadoCaminhosImagem(item) {
     const caminhos = [];
     const tipoItem = String(item?.tipo || item?.type || "").trim().toLowerCase();
     if (tipoItem === "skill_book") {
-        caminhos.push(`/static/images/items/${encodeURIComponent(id)}.png?v=20261024-1`);
+        caminhos.push(`https://raw.githubusercontent.com/Eldorabotpy/static-img/refs/heads/main/assets/itens/materiais/${encodeURIComponent(id)}.png?v=20261024-2`);
     }
 
     const iconUrl = typeof item?.icon_url === "string" ? item.icon_url.trim() : "";
