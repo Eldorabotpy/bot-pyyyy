@@ -1,4 +1,4 @@
-// Itens fixos do Mercador; os tomos são carregados dinamicamente pelo catálogo do servidor.
+// Catálogo fixo do Mercador. Tomos são obtidos por outros fluxos do jogo.
 const CATALOGO_AVENTUREIRO = [
     { id: 'pocao_cura_leve', nome: 'Poção de Cura P', preco: 100, tipo: 'potion', desc: 'Recupera 100 de HP instantaneamente.' },
     { id: 'pocao_cura_media', nome: 'Poção de Cura M', preco: 300, tipo: 'potion', desc: 'Recupera 300 de HP instantaneamente.' },
@@ -41,10 +41,7 @@ window.abrirLojaAventureiro = async function() {
             const oficial = oficiais.get(item.id);
             return oficial ? [{...item, ...oficial, desc: oficial.descricao || item.desc}] : [];
         });
-        const tomos = (dados.itens || [])
-            .filter(item => item.tipo === 'skill_book')
-            .map(item => ({...item, nome: item.nome, desc: item.descricao, emoji: item.emoji || '📘'}));
-        merlinCatalogo = [...fixos, ...tomos];
+        merlinCatalogo = fixos;
         lista.replaceChildren();
         merlinCatalogo.forEach(item => {
             const button = document.createElement('button');

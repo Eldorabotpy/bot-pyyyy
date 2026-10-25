@@ -1236,6 +1236,7 @@ async def processar_turno_combate(
     eh_evento_dungeon = is_dungeon_event_mob(
         mob_vivo
     )
+    eh_prova_evolucao = bool(mob_vivo and mob_vivo.get("evolution_trial"))
 
     if (
         eh_evento_dungeon
@@ -1247,6 +1248,15 @@ async def processar_turno_combate(
         return {
             "erro": "Esse encontro pertence a outro jogador."
         }
+
+    if eh_prova_evolucao:
+        prova_personagem = player.get("evolution_trial") or {}
+        if (
+            str(mob_vivo.get("evolution_trial_owner_id") or "") != str(user_id or "")
+            or str(prova_personagem.get("monster_id") or "") != str(mob_vivo.get("monster_id") or "")
+            or prova_personagem.get("status") != "started"
+        ):
+            return {"erro": "Esta prova de evolução não pertence ao seu personagem ou não está ativa."}
 
     mob_hp = int(mob_vivo.get("hp_atual", mob_vivo.get("hp", 0)) or 0)
 
@@ -1366,6 +1376,14 @@ async def processar_turno_combate(
     # =============================================================
     # 4. AÇÃO DO JOGADOR
     # =============================================================
+    if acao == "magia" and skill_id:
+        from modules.skill_progression import is_evolution_skill, skill_is_available_to_class
+        classe_atacante = str(
+            player.get("class") or player.get("class_key") or player.get("classe") or ""
+        )
+        if is_evolution_skill(skill_id) and not skill_is_available_to_class(classe_atacante, skill_id):
+            return {"erro": "Essa habilidade ainda não foi liberada pela evolução da sua classe."}
+
     skill_data_mesclada = _get_skill_data_mesclada(player, skill_id) if acao == "magia" and skill_id else None
     eh_skill_suporte = _is_skill_suporte(skill_data_mesclada)
 
@@ -1749,6 +1767,16 @@ async def processar_turno_combate(
                 or {}
             )
 
+            if eh_prova_evolucao:
+                from modules.class_evolution_service import record_evolution_trial_victory
+                if record_evolution_trial_victory(player, mob_vivo, str(user_id)):
+                    log_turno.append({
+                        "autor": "sistema",
+                        "texto": "Prova vencida! Volte ao perfil e confirme sua evolução de classe.",
+                        "dano": 0,
+                        "tipo": "evolucao",
+                    })
+
             if mob_vivo.get("quest_event_id") == "q3_varek_provacao":
                 try:
                     from modules.quest_caravana import registrar_abate
@@ -1767,7 +1795,7 @@ async def processar_turno_combate(
         # Pontos do evento são derivados somente desta vitória validada pelo motor.
         # O ID é escrito no próprio mob antes de contabilizar para que chamadas
         # repetidas do mesmo resultado não criem uma segunda contribuição.
-        if not eh_evento_dungeon:
+        if not eh_evento_dungeon and not eh_prova_evolucao:
             try:
                 from modules.events.dynamic_event_service import contribute
                 from uuid import uuid4
@@ -1835,20 +1863,20 @@ async def processar_turno_combate(
                 import logging
                 logging.getLogger(__name__).exception("Falha ao registrar conclusão de dungeon no evento")
 
-        if monster_id_real and not eh_evento_dungeon:
+        if monster_id_real and not eh_evento_dungeon and not eh_prova_evolucao:
             bestiario[monster_id_real] = bestiario.get(monster_id_real, 0) + 1
             from modules import companions
             companions.record_victory(user_id, monster_id_real)
 
         xp_ganho_base = (
             0
-            if eh_evento_dungeon
+            if eh_evento_dungeon or eh_prova_evolucao
             else int(mob_status_luta.get("xp_reward", 0))
         )
 
         ouro_ganho_base = (
             0
-            if eh_evento_dungeon
+            if eh_evento_dungeon or eh_prova_evolucao
             else int(mob_status_luta.get("gold_drop", 0))
         )
 
@@ -1858,7 +1886,7 @@ async def processar_turno_combate(
         # =============================================================
         # 👹 EVENTO DE DUNGEON NÃO USA RECOMPENSA DE PARTY
         # =============================================================
-        if eh_evento_dungeon:
+        if eh_evento_dungeon or eh_prova_evolucao:
             em_grupo = False
             xp_final = 0
             ouro_final = 0
@@ -1880,7 +1908,7 @@ async def processar_turno_combate(
                 registrar_abate
             )
 
-            if monster_id_real and not eh_evento_dungeon:
+            if monster_id_real and not eh_evento_dungeon and not eh_prova_evolucao:
 
                 # =====================================================
                 # 👥 DESCOBRE O TIPO REAL DO COMBATE
@@ -2046,7 +2074,7 @@ async def processar_turno_combate(
                 registrar_abate_cla
             )
 
-            if monster_id_real and not eh_evento_dungeon:
+            if monster_id_real and not eh_evento_dungeon and not eh_prova_evolucao:
 
                 herois_sala_cla = {}
 
@@ -2212,7 +2240,7 @@ async def processar_turno_combate(
             if eh_evento_dungeon
             else mob_status_luta.get("loot_table", [])
         )
-        for item_id in roll_loot(loot_table):
+        for item_id in roll_loot(loot_table, player_data=player):
             recompensas["itens"].append(item_id)
 
             if item_id in inventory:
@@ -2302,9 +2330,7 @@ async def processar_turno_combate(
             })
         inventory = player.get("inventory", inventory)
 
-    users_collection.update_one(
-        {"_id": ObjectId(user_id)},
-        {"$set": {
+    campos_atualizados = {
             "current_hp": hp_banco,
             "rune_hunt_active": None if luta_encerrada else player.get("rune_hunt_active"),
             "current_mp": mp_banco,
@@ -2318,7 +2344,12 @@ async def processar_turno_combate(
             "cooldowns": cooldowns_finais,
             "necromante_combate": None if luta_encerrada else necromante_combate,
             "passe_batalha": player.get("passe_batalha", {}),
-        }}
+    }
+    if "evolution_trial" in player:
+        campos_atualizados["evolution_trial"] = player.get("evolution_trial")
+    users_collection.update_one(
+        {"_id": ObjectId(user_id)},
+        {"$set": campos_atualizados}
     )
 
     # =============================================================

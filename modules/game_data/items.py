@@ -61,7 +61,8 @@ ITEMS_DATA = {}
 MARKET_ITEMS = {} 
 
 for _item_data in EVOLUTION_ITEMS_DATA.values():
-    _item_data.setdefault("tradable", True)
+    # Materiais da árvore de evolução são obtidos no jogo, sem anúncio no mercado.
+    _item_data["tradable"] = False
     _item_data.setdefault("market_currency", "gems")
     _item_data.setdefault("market_min_price", 30)
 
@@ -113,9 +114,21 @@ def _generate_auto_items():
     # --- AUTOMATIZAÇÃO DE TOMOS DE SKILL ---
     try:
         from modules.game_data.skills import SKILL_DATA
+        from modules.skill_progression import (
+            is_skill_tome_learnable,
+            is_evolution_skill,
+        )
         for skill_id, info in SKILL_DATA.items():
             tomo_id = f"tomo_{skill_id}"
             skill_name = info.get('display_name', skill_id)
+            tome_teaches_skill = is_skill_tome_learnable(skill_id)
+            tome_purpose = "learn" if tome_teaches_skill else "upgrade"
+            if is_evolution_skill(skill_id):
+                tome_description = f"Usado para aprimorar {skill_name} depois de desbloqueá-la pela evolução de classe."
+            elif not tome_teaches_skill:
+                tome_description = f"Usado para aprimorar {skill_name} depois de aprendê-la na missão do Grimório."
+            else:
+                tome_description = f"Ensina a habilidade: {skill_name}."
             
             if tomo_id not in ITEMS_DATA:
                 
@@ -132,8 +145,9 @@ def _generate_auto_items():
                     "display_name": f"Tomo: {skill_name}",
                     "emoji": emoji,
                     "type": "skill_book",
+                    "skill_tome_purpose": tome_purpose,
                     "category": "aprendizado", 
-                    "description": f"Ensina a habilidade: {skill_name}.",
+                    "description": tome_description,
                     "stackable": True, 
                     
                     "tradable": True,
@@ -146,10 +160,22 @@ def _generate_auto_items():
                     }
                 }
                 generated += 1
+            else:
+                ITEMS_DATA[tomo_id]["skill_tome_purpose"] = tome_purpose
+                ITEMS_DATA[tomo_id]["description"] = tome_description
+
+            # Só tomos comuns de aprendizado podem circular no mercado.
+            ITEMS_DATA[tomo_id]["tradable"] = tome_teaches_skill
+            ITEMS_DATA[tomo_id]["market_currency"] = "gems"
+            if tome_teaches_skill:
+                ITEMS_DATA[tomo_id].setdefault("market_min_price", 30)
                 
             if skill_id not in ITEMS_DATA:
                 ITEMS_DATA[skill_id] = ITEMS_DATA[tomo_id].copy()
                 ITEMS_DATA[skill_id]["display_name"] += " (Item)"
+            else:
+                ITEMS_DATA[skill_id]["skill_tome_purpose"] = tome_purpose
+                ITEMS_DATA[skill_id]["tradable"] = tome_teaches_skill
                 
     except ImportError: pass
     except Exception as e: logger.error(f"Auto-Items Skill Error: {e}")

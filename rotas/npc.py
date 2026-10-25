@@ -83,18 +83,8 @@ def npc_entregar_missao():
         classe_do_player = player.get("class", "aventureiro").lower()
         
         # Mapa de skills baseado no seu skills.py
-        skills_iniciais = {
-            "guerreiro": "guerreiro_corte_perfurante",
-            "mago": "mago_bola_de_fogo",
-            "cacador": "cacador_flecha_precisa",
-            "assassino": "assassino_ataque_furtivo",
-            "monge": "monge_rajada_de_punhos",
-            "samurai": "samurai_corte_iaijutsu",
-            "berserker": "berserker_golpe_selvagem",
-            "curandeiro": "curandeiro_chama_sagrada",
-            "bardo": "bardo_nota_cortante",
-            "necromante": "necromante_levantar_esqueletos"
-        }
+        from modules.skill_progression import Q6_INITIAL_SKILLS_BY_CLASS
+        skills_iniciais = Q6_INITIAL_SKILLS_BY_CLASS
         
         skill_id = skills_iniciais.get(classe_do_player)
         

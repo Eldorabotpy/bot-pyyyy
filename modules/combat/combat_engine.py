@@ -55,6 +55,23 @@ async def processar_acao_combate(
     skill_type_to_frontend = "active"
 
     if skill_id:
+        from modules.skill_progression import is_evolution_skill, skill_is_available_to_class
+        classe_atacante = str(
+            attacker_pdata.get("class")
+            or attacker_pdata.get("class_key")
+            or attacker_pdata.get("classe")
+            or ""
+        )
+        if is_evolution_skill(skill_id) and not skill_is_available_to_class(classe_atacante, skill_id):
+            return {
+                "total_damage": 0,
+                "log_messages": ["⚠️ Essa habilidade ainda não foi liberada pela evolução da sua classe."],
+                "num_hits": 0,
+                "attacker_mp_left": attacker_current_mp,
+                "anim_effect": "",
+                "tipo_skill": "",
+            }
+
         rarity = (
             attacker_pdata
             .get("skills", {})

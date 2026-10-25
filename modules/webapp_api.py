@@ -616,18 +616,8 @@ def obter_perfil(user_id):
         # =====================================================
 
         try:
-            SKILLS_INICIAIS_Q6 = {
-                "guerreiro_corte_perfurante",
-                "mago_bola_de_fogo",
-                "assassino_ataque_furtivo",
-                "cacador_flecha_precisa",
-                "curandeiro_chama_sagrada",
-                "berserker_golpe_selvagem",
-                "samurai_corte_iaijutsu",
-                "monge_rajada_de_punhos",
-                "bardo_nota_cortante",
-                "necromante_levantar_esqueletos",
-            }
+            from modules.skill_progression import Q6_INITIAL_SKILLS
+            SKILLS_INICIAIS_Q6 = Q6_INITIAL_SKILLS
 
             # -----------------------------------------
             # 🔮 LÊ AS SKILLS DO JOGADOR
@@ -797,18 +787,8 @@ def obter_perfil(user_id):
         # =====================================================
 
         try:
-            SKILLS_INICIAIS_Q6 = {
-                "guerreiro_corte_perfurante",
-                "mago_bola_de_fogo",
-                "assassino_ataque_furtivo",
-                "cacador_flecha_precisa",
-                "curandeiro_chama_sagrada",
-                "berserker_golpe_selvagem",
-                "samurai_corte_iaijutsu",
-                "monge_rajada_de_punhos",
-                "bardo_nota_cortante",
-                "necromante_levantar_esqueletos",
-            }
+            from modules.skill_progression import Q6_INITIAL_SKILLS
+            SKILLS_INICIAIS_Q6 = Q6_INITIAL_SKILLS
 
             # -----------------------------------------
             # 🔮 LÊ AS SKILLS DO JOGADOR
@@ -1027,6 +1007,8 @@ def obter_perfil(user_id):
                     "tradable": info_item.get("tradable", True) and obj_item.get("tradable", True),
                     "tipo": info_item.get("type", obj_item.get("type", "material")),
                     "categoria": info_item.get("category", obj_item.get("category", "")),
+                    "skill_tome_purpose": info_item.get("skill_tome_purpose", ""),
+                    "skill_id": (info_item.get("effects") or {}).get("learn_skill", ""),
                     "slot": info_item.get("slot", obj_item.get("slot", "")),
                     "class_req": info_item.get(
                         "class_req",
@@ -1791,19 +1773,8 @@ MERLIN_ITENS = ('pocao_cura_leve', 'pocao_cura_media', 'pocao_cura_grande',
                 'pedra_de_aprimoramento', 'pergaminho_de_reparo', 'nucleo_de_forja')
 
 
-def _merlin_itens_disponiveis(items_data):
-    tomos = [
-        item_id
-        for item_id, info in items_data.ITEMS_DATA.items()
-        if item_id.startswith("tomo_")
-        and info.get("type") == "skill_book"
-        and (info.get("effects") or {}).get("learn_skill")
-    ]
-    return tuple(dict.fromkeys((*MERLIN_ITENS, *tomos)))
-
-
 def _moeda_loja_merlin(info_item):
-    return "gemas" if info_item.get("type") == "skill_book" else "ouro"
+    return "ouro"
 
 
 @webapp_bp.get('/api/loja/catalogo')
@@ -1821,7 +1792,7 @@ def api_loja_catalogo():
             'descricao': items_data.ITEMS_DATA[key].get('description', ''),
             'emoji': items_data.ITEMS_DATA[key].get('emoji', '📦'),
         }
-        for key in _merlin_itens_disponiveis(items_data)
+        for key in MERLIN_ITENS
         if key in items_data.ITEMS_DATA
     ]})
 
@@ -1837,8 +1808,7 @@ def api_loja_comprar():
         data = request.get_json(silent=True) or {}
         user_id = data.get("user_id")
         item_id = data.get("item_id")
-        itens_disponiveis = _merlin_itens_disponiveis(items_data)
-        if item_id not in itens_disponiveis:
+        if item_id not in MERLIN_ITENS:
             return jsonify({'erro': 'Este item não é vendido por Merlin.'}), 400
 
         # 1. Pega as informações reais do item no Backend
@@ -2039,6 +2009,14 @@ def api_usar_item_direto():
             return jsonify({'erro': 'Apresente esta carta à recepcionista da Guilda. Ela será recolhida no seu registro.'}), 400
         quantidade = item_obj.get("quantity", item_obj) if isinstance(item_obj, dict) else item_obj
         info_item = items_data.ITEMS_DATA.get(base_id, {})
+
+        if info_item.get("type") == "skill_book":
+            return jsonify({
+                "erro": (
+                    "Use este tomo pela ação indicada na Mochila ou no Grimório; "
+                    "tomos de evolução aprimoram habilidades já desbloqueadas."
+                )
+            }), 400
         
         # 👇 1. SE CLICOU NO PERGAMINHO: Aciona o reparo em massa!
         if base_id in ["pergaminho_durabilidade", "pergaminho_de_reparo"]:

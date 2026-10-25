@@ -102,6 +102,21 @@ def _payload(listing):
     return payload
 
 
+def _listing_is_sellable(listing):
+    """Reject stale listings for evolution materials and upgrade-only tomes."""
+    payload = _payload(listing)
+    item = payload.get('item') if payload.get('type') == 'unique' else None
+    base = (item or {}).get('base_id') or payload.get('base_id') or ''
+    base = re.sub(r'_[a-fA-F0-9]{8}$', '', str(base))
+    info = ITEMS_DATA.get(base) or {}
+    if not info or info.get('tradable') is False or base in EVOLUTION_ITEMS_DATA:
+        return False
+    return not (
+        info.get('type') == 'skill_book'
+        and info.get('skill_tome_purpose', 'learn') != 'learn'
+    )
+
+
 def _deliver(doc, payload, quantity):
     inv = doc.setdefault('inventory', {})
     if payload.get('type') == 'unique':
@@ -195,6 +210,8 @@ def _active(listing_id, session):
     if not listing: raise ListingNotFound('Anúncio não encontrado.')
     if not listing.get('active') or int(listing.get('quantity',0)) <= 0:
         raise ListingInactive('Anúncio já comprado ou cancelado.')
+    if not _listing_is_sellable(listing):
+        raise ListingInactive('Este item não pode mais ser vendido no mercado.')
     return listing
 
 
@@ -262,9 +279,11 @@ def list_active(*, region_key=None, base_id=None, sort_by='created_at', ascendin
         variants = [str(viewer_id), _player_id(viewer_id)]
         query.pop('target_buyer_id')
         query['$or'] = [{'target_buyer_id':None}, {'target_buyer_id':{'$in':variants}}, {'seller_id':{'$in':variants}}]
-    return list(market_col.find(query).sort('unit_price' if sort_by == 'price' else 'created_at', 1 if ascending else -1).skip((max(1,page)-1)*page_size).limit(page_size))
+    listings = list(market_col.find(query).sort('unit_price' if sort_by == 'price' else 'created_at', 1 if ascending else -1).skip((max(1,page)-1)*page_size).limit(page_size))
+    return [listing for listing in listings if _listing_is_sellable(listing)]
 
 
 def list_by_seller(seller_id):
     if market_col is None: return []
-    return list(market_col.find({'active':True,'seller_id':{'$in':[str(seller_id),_player_id(seller_id)]}}))
+    listings = list(market_col.find({'active':True,'seller_id':{'$in':[str(seller_id),_player_id(seller_id)]}}))
+    return [listing for listing in listings if _listing_is_sellable(listing)]

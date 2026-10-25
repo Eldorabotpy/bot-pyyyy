@@ -9,6 +9,8 @@ from bson import ObjectId
 
 from modules import player_manager
 from modules.game_data import class_evolution as evo_data
+from modules.game_data.skills import SKILL_DATA
+from modules.skill_progression import skill_is_available_to_class
 
 PlayerId = Union[ObjectId, str]
 
@@ -49,7 +51,7 @@ def _consume_gold(pdata: Dict, amount: int) -> bool:
 
 
 def get_player_evolution_status(pdata: dict) -> Dict[str, Any]:
-    current_class = (pdata.get("class") or "").lower()
+    current_class = str(pdata.get("class") or pdata.get("class_key") or pdata.get("classe") or "").lower()
     current_level = int(pdata.get("level") or 1)
 
     evo_options_list = evo_data.get_evolution_options(current_class, current_level)
@@ -60,7 +62,16 @@ def get_player_evolution_status(pdata: dict) -> Dict[str, Any]:
 
     min_lvl = int(evo_opt.get("min_level", 999))
     if current_level < min_lvl:
-        return {"status": "locked", "message": f"Requer Nível {min_lvl}.", "option": evo_opt}
+        return {
+            "status": "locked",
+            "message": f"Requer Nível {min_lvl}.",
+            "level": current_level,
+            "required_level": min_lvl,
+            "option": evo_opt,
+            "path_nodes": [],
+            "all_nodes_complete": False,
+            "trial": pdata.get("evolution_trial") or None,
+        }
 
     ascension_path = evo_opt.get("ascension_path", [])
 
@@ -68,12 +79,19 @@ def get_player_evolution_status(pdata: dict) -> Dict[str, Any]:
     if not ascension_path:
         req_items = evo_opt.get("required_items", {}) or {}
         if _inventory_has(pdata, req_items):
-            return {"status": "trial_ready", "option": evo_opt, "all_nodes_complete": True}
+            return {
+                "status": "trial_ready", "option": evo_opt,
+                "all_nodes_complete": True, "path_nodes": [],
+                "trial": pdata.get("evolution_trial") or None,
+                "level": current_level, "required_level": min_lvl,
+            }
         return {
             "status": "path_available",
             "path_nodes": [],
             "option": evo_opt,
-            "all_nodes_complete": False
+            "all_nodes_complete": False,
+            "trial": pdata.get("evolution_trial") or None,
+            "level": current_level, "required_level": min_lvl,
         }
 
     player_progress = pdata.get("evolution_progress", {}) or {}
@@ -106,7 +124,9 @@ def get_player_evolution_status(pdata: dict) -> Dict[str, Any]:
         "status": "path_available",
         "option": evo_opt,
         "path_nodes": path_nodes,
-        "all_nodes_complete": all_nodes_complete
+        "all_nodes_complete": all_nodes_complete,
+        "trial": pdata.get("evolution_trial") or None,
+        "level": current_level, "required_level": min_lvl,
     }
 
 
@@ -157,6 +177,7 @@ async def start_evolution_trial(user_id: PlayerId, target_class: str) -> dict:
     if not pdata:
         return {"success": False, "message": "Jogador não encontrado."}
 
+    target_class = str(target_class or "").strip().lower()
     status = get_player_evolution_status(pdata)
 
     if (status.get("option", {}) or {}).get("to") != target_class:
@@ -166,11 +187,28 @@ async def start_evolution_trial(user_id: PlayerId, target_class: str) -> dict:
         return {"success": False, "message": "Complete a árvore primeiro."}
 
     opt = status.get("option", {}) or {}
+    if not opt.get("trial_monster_id"):
+        return {"success": False, "message": "Esta evolução ainda não possui uma prova configurada."}
+    current_trial = pdata.get("evolution_trial") or {}
+    if (
+        isinstance(current_trial, dict)
+        and current_trial.get("target_class") == target_class
+        and current_trial.get("status") == "won"
+    ):
+        return {"success": True, "trial_monster_id": opt["trial_monster_id"], "already_won": True}
+
     if "ascension_path" not in opt:
         req_items = opt.get("required_items", {}) or {}
         if not _consume_items(pdata, req_items):
             return {"success": False, "message": "Erro ao consumir itens."}
-        await player_manager.save_player_data(oid, pdata)
+
+    pdata["evolution_trial"] = {
+        "target_class": target_class,
+        "monster_id": opt["trial_monster_id"],
+        "status": "started",
+        "path_complete": True,
+    }
+    await player_manager.save_player_data(oid, pdata)
 
     return {"success": True, "trial_monster_id": opt.get("trial_monster_id")}
 
@@ -187,17 +225,41 @@ async def finalize_evolution(user_id: PlayerId, target_class: str) -> Tuple[bool
     if not pdata or not opt:
         return False, "Dados inválidos."
 
+    status = get_player_evolution_status(pdata)
+    trial = pdata.get("evolution_trial") or {}
+    target_class = str(target_class or "").strip().lower()
+    if (status.get("option", {}) or {}).get("to") != target_class:
+        return False, "Essa não é a próxima evolução da sua classe."
+    if int(pdata.get("level") or 1) < int(opt.get("min_level") or 999):
+        return False, f"Você precisa do nível {opt.get('min_level')} para evoluir."
+    if not isinstance(trial, dict) or trial.get("target_class") != target_class:
+        return False, "Inicie a prova de evolução antes de concluir."
+    if not trial.get("path_complete") or trial.get("status") != "won":
+        return False, "Derrote o guardião da evolução para concluir."
+    if (status.get("all_nodes_complete") is not True) and opt.get("ascension_path"):
+        return False, "Complete todas as etapas da evolução primeiro."
+
     pdata["class"] = target_class
+    pdata["class_key"] = target_class
     pdata["evolution_progress"] = {}
 
-    if "skills" not in pdata or not isinstance(pdata["skills"], dict):
-        pdata["skills"] = {}
+    for field in ("skills", "skills_desbloqueadas", "database_skills"):
+        if not isinstance(pdata.get(field), dict):
+            pdata[field] = {}
 
     learned = 0
     for sid in (opt.get("unlocks_skills", []) or []):
         if sid and sid not in pdata["skills"]:
-            pdata["skills"][sid] = {"rarity": "comum", "level": 1}
+            learned_skill = {"unlocked": True, "rarity": "comum", "level": 1, "progress": 0}
+            pdata["skills"][sid] = learned_skill.copy()
+            pdata["skills_desbloqueadas"][sid] = learned_skill.copy()
+            pdata["database_skills"][sid] = learned_skill.copy()
             learned += 1
+        elif sid:
+            for field in ("skills_desbloqueadas", "database_skills"):
+                pdata[field].setdefault(sid, dict(pdata["skills"][sid]))
+
+    pdata["evolution_trial"] = None
 
     await player_manager.save_player_data(oid, pdata)
     return True, f"Você evoluiu para {target_class.title()} e aprendeu {learned} skills!"
@@ -225,9 +287,19 @@ async def process_skill_upgrade(user_id: PlayerId, skill_id: str) -> Tuple[bool,
     if not pdata:
         return False, "Erro player.", {}
 
+    if skill_id not in SKILL_DATA:
+        return False, "Habilidade não encontrada.", {}
+
     skill_entry = (pdata.get("skills", {}) or {}).get(skill_id)
     if not skill_entry:
         return False, "Skill não aprendida.", {}
+    if not isinstance(skill_entry, dict):
+        skill_entry = {"level": 1, "rarity": "comum"}
+        pdata["skills"][skill_id] = skill_entry
+
+    player_class = str(pdata.get("class") or pdata.get("class_key") or pdata.get("classe") or "")
+    if not skill_is_available_to_class(player_class, skill_id):
+        return False, "Essa habilidade ainda não foi liberada para sua classe.", {}
 
     lvl = int(skill_entry.get("level", 1))
     if lvl >= 10:
@@ -249,6 +321,14 @@ async def process_skill_upgrade(user_id: PlayerId, skill_id: str) -> Tuple[bool,
             name = tomo_id.replace("_", " ").title()
         return False, f"Requer: 1x {name}", {}
 
+    try:
+        from modules.game_data.items import ITEMS_DATA
+        tome = ITEMS_DATA.get(f"tomo_{skill_id}") or {}
+        if tome.get("type") != "skill_book" or tome.get("skill_tome_purpose") != "upgrade":
+            return False, "O tomo desta habilidade não está configurado para aprimoramento.", {}
+    except Exception:
+        return False, "Não foi possível validar o tomo de aprimoramento.", {}
+
     _consume_gold(pdata, req_gold)
     _consume_items(pdata, req_items)
 
@@ -256,6 +336,26 @@ async def process_skill_upgrade(user_id: PlayerId, skill_id: str) -> Tuple[bool,
     pdata.setdefault("skills", {})
     pdata["skills"].setdefault(skill_id, {})
     pdata["skills"][skill_id]["level"] = new_lvl
+    for field in ("skills_desbloqueadas", "database_skills"):
+        if not isinstance(pdata.get(field), dict):
+            pdata[field] = {}
+        pdata[field][skill_id] = dict(pdata["skills"][skill_id])
 
     await player_manager.save_player_data(oid, pdata)
     return True, f"Skill evoluída para Nível {new_lvl}!", pdata["skills"][skill_id]
+
+
+def record_evolution_trial_victory(player_data: dict, mob: dict, player_id: str) -> bool:
+    """Mark a trial complete only after its private, owner-checked mob is defeated."""
+    trial = player_data.get("evolution_trial") or {}
+    if not isinstance(trial, dict) or trial.get("status") != "started":
+        return False
+    if not mob or not mob.get("evolution_trial"):
+        return False
+    if str(mob.get("evolution_trial_owner_id") or "") != str(player_id or ""):
+        return False
+    if str(mob.get("monster_id") or "") != str(trial.get("monster_id") or ""):
+        return False
+    trial["status"] = "won"
+    player_data["evolution_trial"] = trial
+    return True

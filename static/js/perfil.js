@@ -67,7 +67,7 @@ function classificarItemMochila(item) {
     const slotsProfissao = new Set(['tool', 'ferramenta', 'lenhador', 'minerador', 'colhedor', 'esfolador', 'ferreiro', 'armeiro', 'alfaiate', 'joalheiro', 'curtidor', 'alquimista', 'fundidor']);
     if (tipo === 'tool' || tipo === 'ferramenta' || slot === 'tool' || slot.startsWith('tool_') || slotsProfissao.has(slot) || toolType) return 'profissao';
 
-    if (tipo === 'skill_book' || id.startsWith('tomo_')) return 'livros';
+    if (tipo === 'skill_book') return 'livros';
     if (['essencia', 'essencias', 'essence'].includes(tipo) || categoria === 'essencia' || id.startsWith('essencia_')) return 'essencias';
     if (['runa', 'rune'].includes(tipo) || categoria === 'runas' || categoria === 'socketable' || id.startsWith('runa_')) return 'runas';
 
@@ -1208,7 +1208,7 @@ window.alternarAbaPerfil = function(abaID) {
     }
 
     if (abaID === 'skins') carregarMenuSkins();
-    if (abaID === 'magias') carregarMenuMagias();
+    if (abaID === 'magias') return carregarMenuMagias();
     if (abaID === 'inv') filtrarMochila(window.perfilFiltroMochilaAtual || 'todos');
 }
 
@@ -1363,11 +1363,14 @@ window.abrirModalSkillDetalhes = function(skillId, infoDb, slotAtual) {
     const fallbackIconModal = `https://raw.githubusercontent.com/Eldorabotpy/static-img/refs/heads/main/assets/sprites/skills/default_skill.png`;
 
     let areaBotoes = '';
+    const botaoAprimorar = magiaExiste && infoDb.upgrade_tome_available
+        ? `<button class="eldora-skill-action is-upgrade" onclick="window.aprimorarSkillPeloTomo('${skillId}', this)">Aprimorar com tomo</button>`
+        : '';
 
     if (slotAtual) {
-        areaBotoes = `<button class="eldora-skill-action is-remove" onclick="window.processarEquiparSkill('', ${slotAtual})">Desequipar (Slot ${slotAtual})</button>`;
+        areaBotoes = `<button class="eldora-skill-action is-remove" onclick="window.processarEquiparSkill('', ${slotAtual})">Desequipar (Slot ${slotAtual})</button>${botaoAprimorar}`;
     } else {
-        areaBotoes = `<button class="eldora-skill-action is-equip" onclick="window.iniciarEquiparSkill('${skillId}')" ${!magiaExiste ? 'disabled' : ''}>Equipar</button>`;
+        areaBotoes = `<button class="eldora-skill-action is-equip" onclick="window.iniciarEquiparSkill('${skillId}')" ${!magiaExiste ? 'disabled' : ''}>Equipar</button>${botaoAprimorar}`;
     }
 
     // Adicionei this.onerror=null para evitar que ele quebre de vez se o fallback também falhar
@@ -1840,6 +1843,13 @@ window.abrirModalItem = function(idAlvo, origem) {
         if (['weapon', 'armor', 'helmet', 'boots', 'ring', 'necklace', 'earring', 'equipamento', 'tool', 'arma', 'armadura', 'lenhador', 'minerador', 'colhedor', 'esfolador', 'ferreiro', 'armeiro', 'alfaiate', 'joalheiro', 'curtidor'].includes(t)) {
             botoesHtml = `<button onclick="usarOuEquiparItem('${itemData.id}')" class="eldora-profile-style-7c693876">Equipar</button>`;
         }
+        else if (t === 'skill_book' && itemData.skill_tome_purpose === 'upgrade') {
+            const skillIdDoTomo = String(itemData.skill_id || '').replace(/[^a-zA-Z0-9_-]/g, '');
+            botoesHtml = `
+                <div class="eldora-profile-style-3198545b">Este tomo não ensina uma habilidade. Use-o no Grimório para aprimorar uma habilidade que você já aprendeu.</div>
+                ${skillIdDoTomo ? `<button onclick="window.abrirSkillParaAprimorar('${skillIdDoTomo}')" class="eldora-profile-style-873b2342">Abrir no Grimório</button>` : ''}
+            `;
+        }
         else if (t === 'skill_book') {
             botoesHtml = `
                 <div class="eldora-profile-style-3198545b">📘 Este tomo ensina uma habilidade compatível com sua classe. Depois, equipe-a no Grimório para usá-la em combate.</div>
@@ -2197,6 +2207,56 @@ window.aprenderHabilidadePeloTomo = async function(itemId, botao) {
         if (window.alertaEldora) window.alertaEldora("Não foi possível aprender", erro.message, "erro");
         else window.avisoEldora(erro.message);
     }
+};
+
+window.aprimorarSkillPeloTomo = async function(skillId, botao) {
+    const charId = localStorage.getItem("jogadorEldoraID");
+    if (!charId || !window.portalSessionHeaders) {
+        window.avisoEldora("Entre novamente para aprimorar uma habilidade.");
+        return;
+    }
+    if (botao) {
+        botao.disabled = true;
+        botao.textContent = "Aprimorando…";
+    }
+    try {
+        const headers = await window.portalSessionHeaders({ 'Content-Type': 'application/json' });
+        const res = await fetch('/api/personagem/aprimorar_habilidade', {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ user_id: charId, skill_id: skillId })
+        });
+        const data = await res.json();
+        if (!res.ok || !data.sucesso) throw new Error(data.erro || data.mensagem || "Não foi possível aprimorar a habilidade.");
+        document.getElementById('modal-skill-detalhes')?.remove();
+        if (typeof carregarMeuPerfil === 'function') await carregarMeuPerfil();
+        if (typeof window.carregarMenuMagias === 'function') await window.carregarMenuMagias();
+        if (window.alertaEldora) window.alertaEldora("Habilidade aprimorada", data.mensagem || "O nível da habilidade aumentou.", "sucesso");
+    } catch (erro) {
+        if (botao) {
+            botao.disabled = false;
+            botao.textContent = "Aprimorar com tomo";
+        }
+        if (window.alertaEldora) window.alertaEldora("Não foi possível aprimorar", erro.message, "erro");
+        else window.avisoEldora(erro.message);
+    }
+};
+
+window.abrirSkillParaAprimorar = async function(skillId) {
+    if (typeof window.fecharModalItem === 'function') window.fecharModalItem();
+    if (typeof window.alternarAbaPerfil === 'function') {
+        await window.alternarAbaPerfil('magias');
+    } else if (typeof window.carregarMenuMagias === 'function') {
+        await window.carregarMenuMagias();
+    }
+    const info = window._skillsDataTemp?.[skillId];
+    if (!info || !window.abrirModalSkillDetalhes) {
+        window.avisoEldora("Esta habilidade ainda não está no seu Grimório.");
+        return;
+    }
+    const equipadas = window._skillsEquipadasTemp || {};
+    const slot = Object.keys(equipadas).find(key => equipadas[key] === skillId);
+    window.abrirModalSkillDetalhes(skillId, info, slot ? Number(slot.replace('slot_', '')) : null);
 };
 
 window.usarPergaminhoReparoRapido = async function() {

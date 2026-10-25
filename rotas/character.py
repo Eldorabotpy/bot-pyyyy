@@ -123,18 +123,8 @@ def obter_personagem_info(personagem_id):
             skills_certas = {}
         
         if q6.get("status") == "resgatada" and not skills_certas:
-            SKILL_INICIAL = {
-                "guerreiro": "guerreiro_corte_perfurante",
-                "mago": "mago_bola_de_fogo",
-                "assassino": "assassino_ataque_furtivo",
-                "cacador": "cacador_flecha_precisa",
-                "curandeiro": "curandeiro_chama_sagrada",
-                "berserker": "berserker_golpe_selvagem",
-                "samurai": "samurai_corte_iaijutsu",
-                "monge": "monge_rajada_de_punhos",
-                "bardo": "bardo_nota_cortante",
-                "necromante": "necromante_levantar_esqueletos"
-            }
+            from modules.skill_progression import Q6_INITIAL_SKILLS_BY_CLASS
+            SKILL_INICIAL = Q6_INITIAL_SKILLS_BY_CLASS
             id_certo = SKILL_INICIAL.get(classe_atual, "ataque_basico")
             skills_certas[id_certo] = {"unlocked": True, "rarity": "comum"}
             
@@ -145,6 +135,17 @@ def obter_personagem_info(personagem_id):
         base_skin = skin_id if skin_id else classe_base
         nome_sprite_mapa = f"{base_skin}_{genero.lower()}"
         letra_gen = genero.lower()[0] if genero else "m"
+
+        from modules.game_data.items import ITEMS_DATA
+        database_skills_perfil = {
+            skill_id: {
+                **skill_info,
+                "upgrade_tome_available": (
+                    (ITEMS_DATA.get(f"tomo_{skill_id}") or {}).get("skill_tome_purpose") == "upgrade"
+                ),
+            }
+            for skill_id, skill_info in SKILL_DATA.items()
+        }
 
         # ✨ CÁLCULO DO XP NECESSÁRIO
         from modules.game_data.xp import _xp_formula
@@ -185,7 +186,7 @@ def obter_personagem_info(personagem_id):
             "equipped_skin": skin_id, 
             "unlocked_skins": unlocked, 
             "skin_mapa": nome_sprite_mapa,
-            "database_skills": SKILL_DATA,
+            "database_skills": database_skills_perfil,
             "skills_desbloqueadas": skills_certas,
             "skills_equipadas": pdata.get("equipped_skills", {}),
             "pocao_equipada_hp": pdata.get("pocao_equipada_hp"),
@@ -241,6 +242,22 @@ def api_equipar_skill():
             if skill_id not in skills_possuidas:
                 return jsonify({"sucesso": False, "erro": "Você não possui o conhecimento desta magia."})
 
+            from modules.game_data.skills import SKILL_DATA
+            from modules.skill_progression import skill_is_available_to_class
+            skill_info = SKILL_DATA.get(str(skill_id)) or {}
+            classe_jogador = str(
+                jogador.get("class") or jogador.get("class_key") or jogador.get("classe") or ""
+            )
+            if not skill_info or not skill_is_available_to_class(
+                classe_jogador,
+                str(skill_id),
+                skill_info.get("allowed_classes") or [],
+            ):
+                return jsonify({
+                    "sucesso": False,
+                    "erro": "Essa habilidade ainda não foi liberada para sua classe.",
+                }), 403
+
             # Se a magia já estiver equipada em OUTRO slot, tira de lá primeiro
             for k, v in list(equipadas.items()):
                 if v == skill_id:
@@ -274,7 +291,12 @@ def api_aprender_habilidade_com_tomo():
     )
     from modules.game_data.items import ITEMS_DATA
     from modules.game_data.skills import SKILL_DATA
-    from modules.game_data.class_evolution import can_player_use_skill
+    from modules.skill_progression import (
+        is_evolution_skill,
+        is_q6_initial_skill,
+        is_skill_tome_learnable,
+        skill_is_available_to_class,
+    )
 
     try:
         require_csrf()
@@ -305,6 +327,18 @@ def api_aprender_habilidade_com_tomo():
         if info_item.get("type") != "skill_book" or not skill_id or not skill_info:
             return jsonify({"sucesso": False, "erro": "Este item não é um tomo de habilidade válido."}), 400
 
+        if (
+            not is_skill_tome_learnable(skill_id)
+            or info_item.get("skill_tome_purpose", "learn") != "learn"
+        ):
+            if is_evolution_skill(skill_id):
+                erro_progressao = "Esta habilidade é liberada somente ao concluir a evolução de classe correspondente."
+            elif is_q6_initial_skill(skill_id):
+                erro_progressao = "Esta habilidade inicial é aprendida ao concluir a missão do Grimório com Selene."
+            else:
+                erro_progressao = "Este tomo serve para aprimorar uma habilidade já aprendida, não para ensiná-la."
+            return jsonify({"sucesso": False, "erro": erro_progressao}), 403
+
         classes_permitidas = (
             info_item.get("class_req")
             or info_item.get("required_class")
@@ -314,7 +348,7 @@ def api_aprender_habilidade_com_tomo():
         if isinstance(classes_permitidas, str):
             classes_permitidas = [classes_permitidas]
         classe_jogador = str(jogador.get("class") or jogador.get("class_key") or jogador.get("classe") or "aventureiro")
-        if not can_player_use_skill(classe_jogador, classes_permitidas):
+        if not skill_is_available_to_class(classe_jogador, skill_id, classes_permitidas):
             return jsonify({
                 "sucesso": False,
                 "erro": "Seu personagem ainda não pode aprender essa habilidade.",
@@ -430,6 +464,117 @@ def api_aprender_habilidade_com_tomo():
         import traceback
         traceback.print_exc()
         return jsonify({"sucesso": False, "erro": "Não foi possível aprender a habilidade agora."}), 500
+
+
+@character_bp.route('/api/personagem/evolucao/<personagem_id>', methods=['GET'])
+def api_status_evolucao_classe(personagem_id):
+    from modules.portal_auth import PlayerSessionError, require_player_identity
+    from modules.class_evolution_service import get_player_evolution_status
+
+    try:
+        jogador = require_player_identity(personagem_id)
+        status = get_player_evolution_status(jogador)
+        opcao = status.get("option") or {}
+        return jsonify({
+            "sucesso": True,
+            "classe": str(jogador.get("class") or jogador.get("class_key") or jogador.get("classe") or "aventureiro"),
+            "level": int(jogador.get("level") or 1),
+            "status": status.get("status"),
+            "mensagem": status.get("message", ""),
+            "opcao": {
+                "from": opcao.get("from"),
+                "to": opcao.get("to"),
+                "tier_num": opcao.get("tier_num"),
+                "display_name": opcao.get("display_name"),
+                "desc": opcao.get("desc"),
+                "min_level": opcao.get("min_level"),
+                "trial_monster_id": opcao.get("trial_monster_id"),
+            } if opcao else None,
+            "etapas": status.get("path_nodes", []),
+            "todas_etapas_concluidas": bool(status.get("all_nodes_complete")),
+            "prova": status.get("trial"),
+        })
+    except PlayerSessionError as exc:
+        return jsonify({"sucesso": False, "erro": str(exc)}), exc.status_code
+    except Exception:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"sucesso": False, "erro": "Não foi possível carregar a evolução."}), 500
+
+
+@character_bp.route('/api/personagem/evolucao/etapa', methods=['POST'])
+def api_concluir_etapa_evolucao():
+    import asyncio
+    from modules.portal_auth import PlayerSessionError, require_csrf, require_player_identity
+    from modules.class_evolution_service import attempt_ascension_node
+
+    try:
+        require_csrf()
+        data = request.get_json(silent=True) or {}
+        user_id = str(data.get("user_id") or "")
+        node_id = str(data.get("node_id") or "").strip()
+        if not user_id or not node_id:
+            return jsonify({"sucesso": False, "erro": "Selecione uma etapa da evolução."}), 400
+        jogador = require_player_identity(user_id)
+        sucesso, mensagem = asyncio.run(attempt_ascension_node(jogador["_id"], node_id))
+        return jsonify({"sucesso": sucesso, "mensagem": mensagem}), (200 if sucesso else 400)
+    except PlayerSessionError as exc:
+        return jsonify({"sucesso": False, "erro": str(exc)}), exc.status_code
+    except Exception:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"sucesso": False, "erro": "Não foi possível registrar essa etapa."}), 500
+
+
+# A prova será iniciada pela região própria quando ela for implementada.
+
+
+@character_bp.route('/api/personagem/evolucao/finalizar', methods=['POST'])
+def api_finalizar_evolucao_classe():
+    import asyncio
+    from modules.portal_auth import PlayerSessionError, require_csrf, require_player_identity
+    from modules.class_evolution_service import finalize_evolution
+
+    try:
+        require_csrf()
+        data = request.get_json(silent=True) or {}
+        user_id = str(data.get("user_id") or "")
+        target_class = str(data.get("target_class") or "").strip().lower()
+        if not user_id or not target_class:
+            return jsonify({"sucesso": False, "erro": "Dados incompletos para concluir a evolução."}), 400
+        jogador = require_player_identity(user_id)
+        sucesso, mensagem = asyncio.run(finalize_evolution(jogador["_id"], target_class))
+        return jsonify({"sucesso": sucesso, "mensagem": mensagem}), (200 if sucesso else 400)
+    except PlayerSessionError as exc:
+        return jsonify({"sucesso": False, "erro": str(exc)}), exc.status_code
+    except Exception:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"sucesso": False, "erro": "Não foi possível concluir a evolução."}), 500
+
+
+@character_bp.route('/api/personagem/aprimorar_habilidade', methods=['POST'])
+def api_aprimorar_habilidade_com_tomo():
+    import asyncio
+    from modules.portal_auth import PlayerSessionError, require_csrf, require_player_identity
+    from modules.class_evolution_service import process_skill_upgrade
+
+    try:
+        require_csrf()
+        data = request.get_json(silent=True) or {}
+        user_id = str(data.get("user_id") or "")
+        skill_id = str(data.get("skill_id") or "").strip()
+        if not user_id or not skill_id:
+            return jsonify({"sucesso": False, "erro": "Selecione uma habilidade para aprimorar."}), 400
+        jogador = require_player_identity(user_id)
+        sucesso, mensagem, habilidade = asyncio.run(process_skill_upgrade(jogador["_id"], skill_id))
+        return jsonify({"sucesso": sucesso, "mensagem": mensagem, "habilidade": habilidade}), (200 if sucesso else 400)
+    except PlayerSessionError as exc:
+        return jsonify({"sucesso": False, "erro": str(exc)}), exc.status_code
+    except Exception:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"sucesso": False, "erro": "Não foi possível aprimorar a habilidade."}), 500
     
 @character_bp.route('/api/npc/missao/grimorio', methods=['POST'])
 def api_missao_grimorio():

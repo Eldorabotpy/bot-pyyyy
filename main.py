@@ -798,6 +798,16 @@ def iniciar_combate():
         ):
             return jsonify({"erro": "Esse encontro pertence a outro aventureiro."}), 403
 
+        eh_prova_evolucao = bool(mob_vivo and mob_vivo.get("evolution_trial"))
+        if eh_prova_evolucao:
+            prova_personagem = player.get("evolution_trial") or {}
+            if (
+                str(mob_vivo.get("evolution_trial_owner_id") or "") != str(user_id)
+                or str(prova_personagem.get("monster_id") or "") != str(mob_vivo.get("monster_id") or "")
+                or prova_personagem.get("status") != "started"
+            ):
+                return jsonify({"erro": "Esta prova de evolução não pertence ao seu personagem ou não está ativa."}), 403
+
         # ==========================================
         # 🏰 MOB ESPECIAL DE EVENTO DA DUNGEON
         # ==========================================
@@ -884,7 +894,8 @@ def iniciar_combate():
         mob_data = None
 
         for categoria, mobs in MONSTERS_DATA.items():
-            if categoria.startswith('_'): continue
+            if categoria.startswith('_') and not (eh_prova_evolucao and categoria == "_evolution_trials"):
+                continue
             for m in mobs:
                 if m.get('id') == monster_id_real:
                     mob_data = m
@@ -1025,6 +1036,7 @@ def iniciar_combate():
             # ==========================================
             "evento_dungeon": eh_evento_dungeon,
             "evento_caravana": eh_evento_caravana,
+            "prova_evolucao": eh_prova_evolucao,
 
             # ==========================================
             # 👑 IDENTIFICAÇÃO DO BOSS
@@ -1087,7 +1099,7 @@ def iniciar_combate():
 
         grupo = (
             None
-            if eh_evento_dungeon
+            if eh_evento_dungeon or eh_prova_evolucao
             else obter_grupo_do_jogador(
                 str(user_id)
             )

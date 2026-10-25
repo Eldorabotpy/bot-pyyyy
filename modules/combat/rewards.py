@@ -289,6 +289,9 @@ async def processar_recompensa_abate(matador_id, xp_base_combate, xp_base_passe,
                             for item_index, item_id in enumerate(itens_looteados):
                                 item_aliado = item_id
                                 if (ITEMS_DATA.get(item_id) or {}).get("type") == "skill_book":
+                                    tome_data = ITEMS_DATA.get(item_id) or {}
+                                    if tome_data.get("skill_tome_purpose", "learn") != "learn":
+                                        continue
                                     item_aliado = resolve_class_skill_tome(
                                         pdata,
                                         f"party:{matador_id}:{membro_id_str}:{item_index}",
