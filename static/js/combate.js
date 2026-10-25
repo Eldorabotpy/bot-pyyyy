@@ -567,6 +567,13 @@ window.iniciarCacadaApp = async function(spawnId, opcoesGrupo = {}) {
             abatesBestiario: est.abates_bestiario,
             monsterStats: est.monster_stats
         };
+        limparHistoricoLogCombate(String(spawnId || "cacada"));
+        registrarEventoLogCombate({
+            actor: "Sistema",
+            title: "Combate iniciado",
+            detail: `Encontro contra ${est.mob_nome || "um inimigo"}.`,
+            tone: "event"
+        });
 
         // ==========================================
         // 📖 INJETANDO O HUD DO BESTIÁRIO (CORRIGIDO)
@@ -1004,8 +1011,11 @@ window.executarAcaoTurno = async function(tipoAcao, skillId = null, skillNome = 
     const menuSkills = document.getElementById('menu-skills-combate');
     if (menuSkills) menuSkills.style.display = 'none';
 
-    document.getElementById('log-texto-1').innerHTML = "<span style='color: #f1c40f;'>Calculando...</span>";
-    document.getElementById('log-texto-2').innerText = "";
+    definirFaseLogCombate("Calculando turno");
+    const logTitulo = document.getElementById('log-texto-1');
+    const logDetalhe = document.getElementById('log-texto-2');
+    if (logTitulo) logTitulo.textContent = "Calculando ação...";
+    if (logDetalhe) logDetalhe.textContent = "";
 
     const charId = localStorage.getItem("jogadorEldoraID");
     const spawnIdAtual = window.dadosCombateAtual.spawnId;
@@ -1058,8 +1068,8 @@ window.executarAcaoTurno = async function(tipoAcao, skillId = null, skillNome = 
 
             document.getElementById('log-texto-1').innerHTML =
                 `<span style="color:#facc15;">⚠️ ${turno.erro}</span>`;
-
             document.getElementById('log-texto-2').innerText = "";
+            registrarEventoLogCombate({ actor: "Sistema", title: "Ação não concluída", detail: turno.erro, tone: "warning" });
 
             return;
         }
@@ -1067,6 +1077,7 @@ window.executarAcaoTurno = async function(tipoAcao, skillId = null, skillNome = 
         if (turno.fugiu) {
             combateDaAcao.rodadaVisualPendente = false;
             document.getElementById('log-texto-1').innerHTML = `💨 ${turno.log[0].texto.toUpperCase()}`;
+            registrarEventoLogCombate({ actor: "Você", title: "Fuga", detail: turno.log?.[0]?.texto || "Você fugiu do combate.", tone: "event" });
 
             setTimeout(() => {
                 window.bloqueioDeTurno = false;
@@ -1182,9 +1193,31 @@ function combateLogPertenceAMim(turnoInfo = {}, acao = {}) {
     return !!turnoInfo.__pacoteDoMeuTurno;
 }
 
-function animarAcoesDaRodada(turnoInfo, tipoAcao, skillId, skillNome) { 
-    const elemLog1 = document.getElementById('log-texto-1');
-    const elemLog2 = document.getElementById('log-texto-2');
+function definirFaseLogCombate(texto) {
+    window.EldoraCombatLog?.setPhase("combat-log-box", texto);
+}
+
+function limparHistoricoLogCombate(sessao = null) {
+    window.EldoraCombatLog?.clear("combat-log-box", {
+        sessionKey: sessao,
+        title: "Combate iniciado",
+        detail: "Aguardando sua primeira ação."
+    });
+}
+
+function registrarEventoLogCombate(evento) {
+    window.EldoraCombatLog?.push("combat-log-box", evento);
+}
+
+function registrarEventoSistemaCombate(acao) {
+    registrarEventoLogCombate({
+        actor: "Sistema",
+        text: String((acao && acao.texto) || "O combate avançou."),
+        tone: acao && acao.tipo === "durabilidade" ? "warning" : "event",
+        title: acao && acao.tipo === "durabilidade" ? "Equipamento" : "Acontecimento"
+    });
+}
+function animarAcoesDaRodada(turnoInfo, tipoAcao, skillId, skillNome) {
     const elemSpriteMob = document.getElementById('sprite-mob');
     const elemSpritePlayer = document.getElementById('sprite-player');
     const flash = document.getElementById('damage-flash');
@@ -1192,9 +1225,8 @@ function animarAcoesDaRodada(turnoInfo, tipoAcao, skillId, skillNome) {
     let db = window.dadosCombateAtual;
     let indexAcao = 0;
     
-    // 👇 1. AGORA TEMOS DUAS MEMÓRIAS: UMA PARA VOCÊ E UMA PARA O MONSTRO 👇
-    let logPlayerVisual = ""; 
-    let logMobVisual = "";
+    const logsDaRodada = Array.isArray(turnoInfo.log) ? turnoInfo.log : [];
+    const totalGolpesJogador = logsDaRodada.reduce((maior, log) => Math.max(maior, Number(log?.golpe) || 0), 0);
     
     if (turnoInfo.sala) {
         window.estadoCombateGrupoAtual = turnoInfo.sala;
@@ -1223,7 +1255,7 @@ function animarAcoesDaRodada(turnoInfo, tipoAcao, skillId, skillNome) {
     async function lerProximoLog() {
         if (window.dadosCombateAtual !== db || db.rodadaVisualCancelada) return;
         if (salaDaAnimacao && (String(window.salaCombateGrupoAtual) !== String(salaDaAnimacao) || salasGrupoDevolvidas.has(String(salaDaAnimacao)))) return;
-        if (indexAcao >= turnoInfo.log.length) {
+        if (indexAcao >= logsDaRodada.length) {
             window.bloqueioDeTurno = !!(turnoInfo.vitoria || turnoInfo.derrota);
 
             if (turnoInfo.mob_hp_atual !== undefined) {
@@ -1250,7 +1282,7 @@ function animarAcoesDaRodada(turnoInfo, tipoAcao, skillId, skillNome) {
             } else {
                 db.rodadaVisualPendente = false;
                 document.getElementById('menu-botoes').style.display = 'grid';
-                elemLog1.innerHTML = `<span style="color:#e74c3c; font-family: 'Cinzel', serif;">O QUE VOCÊ VAI FAZER?</span>`;
+                definirFaseLogCombate("Sua vez");
                 if (turnoInfo.sala) {
                     window.estadoCombateGrupoAtual = turnoInfo.sala;
                     renderizarGrupoCombate(turnoInfo.sala);
@@ -1259,23 +1291,6 @@ function animarAcoesDaRodada(turnoInfo, tipoAcao, skillId, skillNome) {
                     atualizarControleTurnoGrupo(window.estadoCombateGrupoAtual);
                 }
                 
-                // 👇 3. INJETAMOS OS DOIS LOGS EMPILHADOS AQUI 👇
-                if (logPlayerVisual !== "" || logMobVisual !== "") {
-                    let historicoHtml = `<div style="font-size: 0.9em; background: rgba(0,0,0,0.3); border-radius: 6px; padding: 6px 10px; margin-top: 8px; border: 1px dashed #334155; display: inline-block; text-align: center; line-height: 1.4;">`;
-                    
-                    if (logPlayerVisual) {
-                        historicoHtml += `<div style="margin-bottom: ${logMobVisual ? '4px' : '0'}; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.8));">👤 ${logPlayerVisual}</div>`;
-                    }
-                    if (logMobVisual) {
-                        historicoHtml += `<div style="filter: drop-shadow(0 2px 2px rgba(0,0,0,0.8));">👹 ${logMobVisual}</div>`;
-                    }
-                    
-                    historicoHtml += `</div>`;
-                    elemLog2.innerHTML = historicoHtml;
-                } else {
-                    elemLog2.innerText = "";
-                }
-
                 const pendente = db.estadoGrupoAposAnimacao;
                 delete db.estadoGrupoAposAnimacao;
                 if (pendente) aplicarEstadoCombateGrupo(pendente.dados, pendente.origem);
@@ -1293,7 +1308,7 @@ function animarAcoesDaRodada(turnoInfo, tipoAcao, skillId, skillNome) {
             return;
         }
 
-        const acao = turnoInfo.log[indexAcao];
+        const acao = logsDaRodada[indexAcao];
 
         const souAutorDestaAcao = combateLogPertenceAMim(turnoInfo, acao);
 
@@ -1320,10 +1335,16 @@ function animarAcoesDaRodada(turnoInfo, tipoAcao, skillId, skillNome) {
                 setTimeout(() => window.animarDanoSprite('sprite-mob'), 100);
             }
 
-            logPlayerVisual = `<span style="color:#93c5fd;">🛡️ ${nomeAliado} agiu e causou <b style="color:#ef4444;">${danoAliado}</b> de dano.</span>`;
-
-            elemLog1.innerHTML = logPlayerVisual;
-            elemLog2.innerText = "";
+            registrarEventoLogCombate({
+                actor: nomeAliado,
+                title: Number(acao.golpe) ? `Golpe ${Number(acao.golpe)}/${totalGolpesJogador}` : "Ataque de aliado",
+                detail: acao.texto || `Causou ${danoAliado} de dano.`,
+                value: danoAliado,
+                unit: "DANO",
+                tone: "ally",
+                golpe: acao.golpe,
+                total_hits: totalGolpesJogador
+            });
 
             indexAcao++;
             setTimeout(lerProximoLog, 900);
@@ -1333,8 +1354,22 @@ function animarAcoesDaRodada(turnoInfo, tipoAcao, skillId, skillNome) {
         if (acao.autor === "player") {
 
             let txtAcao = (acao.texto || "").toUpperCase();
-            let ehFalha = (txtAcao.includes("MANA") && txtAcao.includes("INSUFICIENTE")) || txtAcao.includes("FALHOU") || txtAcao.includes("ESQUIVOU");
-            let ehCura = txtAcao.includes("USOU") || txtAcao.includes("CUROU") || txtAcao.includes("🧪");
+            const ehInfo = acao.is_attack_event === false || acao.tipo_skill === "info";
+            if (ehInfo) {
+                const ehAtaqueDuplo = txtAcao.includes("ATAQUE DUPLO");
+                registrarEventoLogCombate({
+                    actor: ehAtaqueDuplo ? "Você" : "Sistema",
+                    title: ehAtaqueDuplo ? "Ataque duplo" : "Efeito de combate",
+                    detail: acao.texto || "O combate avançou.",
+                    tone: ehAtaqueDuplo ? "player" : "event",
+                    flag: ehAtaqueDuplo ? `${totalGolpesJogador || 2} golpes` : ""
+                });
+                indexAcao++;
+                setTimeout(lerProximoLog, 260);
+                return;
+            }
+            let ehFalha = (txtAcao.includes("MANA") && txtAcao.includes("INSUFICIENTE")) || txtAcao.includes("FALHOU") || txtAcao.includes("ESQUIVOU") || !!acao.esquivou;
+            let ehCura = acao.tipo_skill === "support" || txtAcao.includes("CUROU") || txtAcao.includes("🧪");
             let ehCritico = !!acao.critico || txtAcao.includes("CRÍTICO");
 
             let danoCausado = Number(acao.dano) || Number(acao.valor) || 0;
@@ -1349,37 +1384,36 @@ function animarAcoesDaRodada(turnoInfo, tipoAcao, skillId, skillNome) {
 
             danoCausado = Math.max(0, danoCausado); 
 
-            // 👇 A MÁGICA: Filtra textos do servidor para não gerar ataques falsos! 👇
-            if (danoCausado === 0 && !ehFalha && !ehCura && !acao.golpe) {
-                elemLog1.innerHTML = `<span style="color:#facc15; font-style:italic;">${acao.texto}</span>`;
-                elemLog2.innerText = "";
+            // Ignora registros sem dano que não representam esquiva, defesa ou suporte.
+            if (danoCausado === 0 && !ehFalha && !ehCura && !acao.golpe && !acao.defendeu && !txtAcao.includes("DEFENDEU") && !txtAcao.includes("BLOQUEOU")) {
+                registrarEventoLogCombate({ actor: "Sistema", title: "Efeito de combate", detail: acao.texto || "O combate avançou.", tone: "event" });
                 indexAcao++;
-                setTimeout(lerProximoLog, 800); // 800ms para a pessoa ler rápido
-                return; // 👈 PÁRA AQUI! Não faz animação nem desconta vida
-            } 
+                setTimeout(lerProximoLog, 260);
+                return;
+            }
 
-            // 👇 2A. SALVAMOS O LOG DO JOGADOR 👇
-            if (ehCura) {
-                let corTextoCura = (txtAcao.includes("MANA") || txtAcao.includes("ELIXIR") || txtAcao.includes("MÍSTICA")) ? "#3b82f6" : "#2ecc71";
-                logPlayerVisual = `<span style="color:${corTextoCura};">${acao.texto}</span>`;
-            } else if (ehFalha) {
-                logPlayerVisual = `<span style="color:#ef4444; font-weight:bold; font-size:14px;">${acao.texto}</span>`;
-            } else if (ehCritico) {
-                let prefixo = (tipoAcao === 'magia' && skillNome) ? `✨ ${skillNome.toUpperCase()} CRÍTICO!` : `💥 ATAQUE CRÍTICO!`;
-                logPlayerVisual = `<span style="color:#FFD700; font-weight:bold;">${prefixo} <span style="font-size:1.1em;">${danoCausado}</span> DE DANO!</span>`;
-            } else {
-                let prefixo = (tipoAcao === 'magia' && skillNome) ? `✨ Usou <span style="color:#c4b5fd;">${skillNome}</span> e causou` : `⚔️ Você causou`;
-                logPlayerVisual = `<span style="color:#ffffff;">${prefixo} <span style="color:#ef4444; font-weight:bold;">${danoCausado}</span> de dano!</span>`;
-            }
-            
-            if (acao.golpe) {
-                const textoRoubo = acao.mostrar_roubo_vida && Number(acao.roubo_vida) > 0
-                    ? ` · <b style="color:#4ade80;">roubou ${Number(acao.roubo_vida)} de vida</b>` : '';
-                logPlayerVisual = `<span style="color:#fff;">${ehCritico ? '💥 Crítico! ' : ''}Ataque ${Number(acao.golpe)}: <b style="color:#f87171;">${danoCausado} de dano</b>${textoRoubo}</span>`;
-            }
-            elemLog1.innerHTML = logPlayerVisual; // Mostra na tela na hora da animação
-            elemLog2.innerText = "";
-            
+            const totalGolpes = Number(acao.total_hits || acao.num_hits || totalGolpesJogador || 1);
+            const textoGolpe = acao.texto || (ehCura ? "Recuperou recursos." : `Causou ${danoCausado} de dano.`);
+            const alvoEsquivou = !!acao.esquivou || txtAcao.includes("ESQUIVOU");
+            const alvoDefendeu = !!acao.defendeu || txtAcao.includes("DEFENDEU") || txtAcao.includes("BLOQUEOU");
+            const tituloGolpe = Number(acao.golpe) > 0
+                ? `Golpe ${Number(acao.golpe)}/${totalGolpes}`
+                : alvoEsquivou ? "Alvo esquivou" : alvoDefendeu ? "Alvo defendeu" : ehFalha ? "Ação falhou" : ehCura ? "Suporte" : ehCritico ? "Ataque crítico" : tipoAcao === "magia" ? (skillNome || "Habilidade") : "Ataque";
+            const detalheGolpe = acao.mostrar_roubo_vida && Number(acao.roubo_vida) > 0
+                ? `${textoGolpe} Roubo de vida: ${Number(acao.roubo_vida)} HP.`
+                : textoGolpe;
+            registrarEventoLogCombate({
+                actor: "Você",
+                title: tituloGolpe,
+                detail: detalheGolpe,
+                value: ehCura || ehFalha || alvoEsquivou || alvoDefendeu ? null : danoCausado,
+                unit: ehCura ? "HP" : "DANO",
+                tone: alvoEsquivou ? "dodge" : alvoDefendeu ? "defense" : ehFalha ? "warning" : ehCura ? "support" : ehCritico ? "critical" : "player",
+                critico: ehCritico,
+                golpe: acao.golpe,
+                total_hits: totalGolpes,
+                flag: acao.mostrar_roubo_vida && Number(acao.roubo_vida) > 0 ? `Roubo ${Number(acao.roubo_vida)} HP` : (ehCritico ? "Crítico" : "")
+            });
             if (ehCura) {
                 let ehMana = txtAcao.includes("MANA");
                 animarEfeitoVisual('sprite-player', 'cura', ehMana ? '#3b82f6' : '#2ecc71');
@@ -1393,18 +1427,29 @@ function animarAcoesDaRodada(turnoInfo, tipoAcao, skillId, skillNome) {
                     db.playerMpAtual = turnoInfo.player_mp;
                     atualizarVisualBarra('bar-mp-player', db.playerMpAtual, db.playerMpMax, true);
                 }
-            } else if (ehFalha) {
-                const playerEl = document.getElementById('sprite-player');
-                if (playerEl) {
-                    playerEl.animate([
+            } else if (ehFalha || !!acao.defendeu || txtAcao.includes("DEFENDEU") || txtAcao.includes("BLOQUEOU")) {
+                const alvoDefendeu = !!acao.defendeu || txtAcao.includes("DEFENDEU") || txtAcao.includes("BLOQUEOU");
+                if (alvoEsquivou || alvoDefendeu) {
+                    // Um golpe esquivado ou defendido ainda mostra a investida
+                    // correspondente, inclusive em cada tentativa de ataque duplo.
+                    const reacaoAlvo = alvoEsquivou ? animarEsquivaCombate("sprite-mob") : animarDefesaCombate("sprite-mob");
+                    await Promise.all([window.animarInvestidaSprite('sprite-player'), reacaoAlvo]);
+                    if (window.dadosCombateAtual !== db || db.rodadaVisualCancelada) return;
+                } else {
+                    const playerEl = document.getElementById('sprite-player');
+                    if (playerEl) {
+                    await playerEl.animate([
                         { transform: 'translate(0, 0)' },
                         { transform: 'translate(-5px, 0)' },
                         { transform: 'translate(5px, 0)' },
                         { transform: 'translate(0, 0)' }
-                    ], { duration: 300 });
+                    ], { duration: 300 }).finished.catch(() => undefined);
+                    }
                 }
             } else {
-                window.animarInvestidaSprite('sprite-player');
+                // Cada registro de golpe executa e conclui sua própria investida;
+                // isso deixa o ataque duplo visível como dois movimentos distintos.
+                const movimentoInvestida = window.animarInvestidaSprite('sprite-player');
                 
                 if (window.AudioManager) AudioManager.tocarSFX(ehCritico ? 'som_critico' : 'som_espada');
 
@@ -1422,8 +1467,11 @@ function animarAcoesDaRodada(turnoInfo, tipoAcao, skillId, skillNome) {
                     let isSuporte = acao.tipo_skill === 'support';
                     let alvoDaAnimacao = isSuporte ? 'sprite-player' : 'sprite-mob';
                     await window.animarMagiaSpriteGrid(alvoDaAnimacao, nomeSprite);
+                    await movimentoInvestida;
                     if (window.dadosCombateAtual !== db || db.rodadaVisualCancelada) return;
                 } else {
+                    await movimentoInvestida;
+                    if (window.dadosCombateAtual !== db || db.rodadaVisualCancelada) return;
                     animarEfeitoVisual('sprite-mob', tipoVisual, corEfeito);
                 }
                 if (acao.player_hp_apos_golpe !== undefined) {
@@ -1450,12 +1498,18 @@ function animarAcoesDaRodada(turnoInfo, tipoAcao, skillId, skillNome) {
             }
 
             danoTomado = Math.max(0, danoTomado);
-
-            // 👇 2B. SALVAMOS O LOG DO MONSTRO 👇
-            logMobVisual = `<span style="color:#8B0000;">Atacou! Você perdeu <span style="color:#FFD700; font-weight:bold;">${danoTomado}</span> de HP.</span>`;
-            
-            elemLog1.innerHTML = `<span style="color:#8B0000;">Inimigo atacou! Perdeu <span style="color:#FFD700; font-weight:bold;">${danoTomado}</span> de HP.</span>`; 
-            elemLog2.innerText = ""; 
+            const textoMob = String(acao.texto || "");
+            const textoMobLower = textoMob.toLocaleLowerCase("pt-BR");
+            const esquivou = !!acao.esquivou || textoMobLower.includes("esquivou");
+            const defendeu = !!acao.defendeu || textoMobLower.includes("defendeu") || textoMobLower.includes("bloqueou");
+            registrarEventoLogCombate({
+                actor: db.mobNome || "Inimigo",
+                title: esquivou ? "Você esquivou" : defendeu ? "Você defendeu" : "Ataque inimigo",
+                detail: textoMob || (esquivou ? "Você evitou o golpe." : defendeu ? "Você bloqueou o golpe." : `Causou ${danoTomado} de dano.`),
+                value: esquivou || defendeu ? null : danoTomado,
+                unit: "DANO",
+                tone: esquivou ? "dodge" : defendeu ? "defense" : "enemy"
+            });
             
             db.playerHpAtual -= danoTomado;
             
@@ -1470,7 +1524,7 @@ function animarAcoesDaRodada(turnoInfo, tipoAcao, skillId, skillNome) {
             if (window.AudioManager) AudioManager.tocarSFX('som_monstro');
             animarEfeitoVisual('sprite-player', 'corte', '#9b59b6');
             
-            window.animarInvestidaSprite('sprite-mob');
+            await window.animarInvestidaSprite('sprite-mob');
             if (danoTomado > 0) {
                 setTimeout(() => window.animarDanoSprite('sprite-player'), 100);
             }
@@ -1479,10 +1533,14 @@ function animarAcoesDaRodada(turnoInfo, tipoAcao, skillId, skillNome) {
                 flash.style.opacity = "1";
                 setTimeout(() => { flash.style.opacity = "0"; }, 150);
             }
+        } else {
+            registrarEventoSistemaCombate(acao);
         }
 
         indexAcao++;
-        setTimeout(lerProximoLog, 1200); 
+        const ehGolpeSeparado = Number(acao.golpe) > 0;
+        const ehLinhaInformativa = acao.autor === "player" && !ehGolpeSeparado && !Number(acao.dano || acao.valor || 0) && !acao.esquivou;
+        setTimeout(lerProximoLog, ehGolpeSeparado ? 100 : ehLinhaInformativa ? 260 : 320);
     }
     lerProximoLog();
 }
@@ -1538,7 +1596,7 @@ function finalizarAnimacaoCombate(dados) {
     }
     
     if (dados.vitoria) {
-        log1.innerHTML = `<span class="titulo-vitoria" style="color:#2ecc71; font-weight:bold;">✨ O INIMIGO FOI DERROTADO! ✨</span>`;
+        registrarEventoLogCombate({ actor: "Sistema", title: "Vitória", detail: `${window.dadosCombateAtual.mobNome || "O inimigo"} foi derrotado.`, tone: "support", flag: "Combate encerrado" });
         
         let barraHpMob = document.getElementById('bar-hp-mob');
         if (barraHpMob) barraHpMob.style.width = '0%';
@@ -1556,12 +1614,9 @@ function finalizarAnimacaoCombate(dados) {
         }
 
     } else {
-        log1.innerHTML = `<span style='color:#e74c3c; font-weight:bold;'>💀 VOCÊ DESMAIOU...</span>`;
         const ouro = dados.ouro_perdido || 0; 
         const xp = dados.xp_perdido || 0;
-        log2.innerHTML = `<span style='color:#94a3b8; font-size: 0.9em;'>Os guardas te arrastaram para a segurança...</span><br>` +
-                         `<span style="color: #ef4444; font-weight: bold; font-size: 1.1em; text-shadow: 1px 1px 2px #000;">` +
-                         `Punição: -${ouro} Ouro e -${xp} XP</span>`;
+        registrarEventoLogCombate({ actor: "Sistema", title: "Derrota", detail: `Você desmaiou. Penalidade: -${ouro} Ouro e -${xp} XP.`, tone: "enemy", flag: "Combate encerrado" });
     }
     
     document.getElementById('menu-botoes').style.display = "none";
@@ -1600,29 +1655,15 @@ function finalizarAnimacaoCombate(dados) {
         // 📦 LOGICA DE ITENS (COM AVISO DE VAZIO) 📦
         // ==========================================
         const itensDropados = dados.recompensas?.itens || dados.recompensas?.drops || dados.recompensas?.loot || [];
-        let htmlItens = "";
-
-        if (itensDropados.length > 0) {
-            // Se caíram itens, desenhamos os cartões roxos
-            htmlItens = `<div style="display: flex; gap: 5px; justify-content: center; margin-top: 8px; flex-wrap: wrap;">`;
-            itensDropados.forEach(item => {
-                let nomeItem = typeof item === 'string' ? item : (item.nome || item.name || item.item_id || "Item");
-                nomeItem = nomeItem.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-                htmlItens += `<div style="border: 1px solid #9b59b6; color: #d689e3; background: rgba(155, 89, 182, 0.15); padding: 2px 8px; border-radius: 10px; font-size: 0.85em; font-weight: bold; box-shadow: 0 0 5px rgba(155, 89, 182, 0.3);">📦 +1 ${nomeItem}</div>`;
-            });
-            htmlItens += `</div>`;
-        } else {
-            // 👇 SE NÃO CAIU NADA, MOSTRAMOS ESTE AVISO 👇
-            htmlItens = `<div style="color: #64748b; font-size: 0.8em; margin-top: 10px; font-style: italic; letter-spacing: 0.5px;">Nenhum item encontrado nesta batalha.</div>`;
-        }
-        
-        log2.innerHTML = `
-            <div class="log-recompensas" style="display: flex; gap: 10px; justify-content: center; margin-top: 8px;">
-                <div style="border: 1px solid #f1c40f; color: #f1c40f; background: rgba(241, 196, 15, 0.1); padding: 2px 8px; border-radius: 10px; font-weight: bold;">💰 +${gold}</div>
-                <div style="border: 1px solid #3498db; color: #3498db; background: rgba(52, 152, 219, 0.1); padding: 2px 8px; border-radius: 10px; font-weight: bold;">🌟 +${xpGanho} XP</div>
-            </div>
-            ${htmlItens}
-        `;
+        const nomesItens = itensDropados.map(item => typeof item === "string" ? item : (item.nome || item.name || item.item_id || "Item"));
+        registrarEventoLogCombate({
+            actor: "Recompensas",
+            title: "Vitória concluída",
+            detail: `+${gold} Ouro • +${xpGanho} XP • ${nomesItens.length ? nomesItens.join(", ") : "nenhum item encontrado"}.`,
+            value: `+${gold}`,
+            unit: "OURO",
+            tone: "support"
+        });
     }
 }
 
@@ -1762,18 +1803,43 @@ function sairDaArena(retornoConfirmado = false) {
 
 window.animarInvestidaSprite = function(alvoId) {
     const el = document.getElementById(alvoId);
-    if (!el) return;
+    if (!el) return Promise.resolve();
     
     const isPlayer = alvoId === 'sprite-player';
-    const moveX = isPlayer ? '40px' : '-40px';
-    const moveY = isPlayer ? '-40px' : '40px';
-    const rot = isPlayer ? '15deg' : '-15deg';
+    const moveX = isPlayer ? '38px' : '-38px';
+    const moveY = isPlayer ? '-7px' : '7px';
+    const rot = isPlayer ? '5deg' : '-5deg';
 
-    el.animate([
-        { transform: 'translate(0, 0) rotate(0) scale(1)' },
-        { transform: `translate(${moveX}, ${moveY}) rotate(${rot}) scale(1.15)`, offset: 0.15 },
+    const movimento = el.animate([
+        { transform: 'translate(0, 0) rotate(0) scale(1)', offset: 0 },
+        { transform: `translate(${moveX}, ${moveY}) rotate(${rot}) scale(1.06)`, offset: 0.38 },
+        { transform: `translate(${moveX}, ${moveY}) rotate(${rot}) scale(1.02)`, offset: 0.58 },
         { transform: 'translate(0, 0) rotate(0) scale(1)', offset: 1 }
-    ], { duration: 600, easing: 'cubic-bezier(0.25, 1, 0.5, 1)' });
+    ], { duration: 500, easing: 'cubic-bezier(0.25, 1, 0.5, 1)' });
+    return movimento.finished.catch(() => undefined);
+}
+
+function animarEsquivaCombate(alvoId) {
+    const el = document.getElementById(alvoId);
+    if (!el) return Promise.resolve();
+    const recuo = alvoId === "sprite-mob" ? "18px" : "-18px";
+    const movimento = el.animate([
+        { transform: "translate(0, 0)", opacity: 1 },
+        { transform: `translate(${recuo}, 0)`, opacity: 0.58, offset: 0.45 },
+        { transform: "translate(0, 0)", opacity: 1 }
+    ], { duration: 420, easing: "ease-out" });
+    return movimento.finished.catch(() => undefined);
+}
+
+function animarDefesaCombate(alvoId) {
+    const el = document.getElementById(alvoId);
+    if (!el) return Promise.resolve();
+    const animacao = el.animate([
+        { transform: "translate(0,0)", filter: "brightness(1)" },
+        { transform: "translate(0,-5px)", filter: "brightness(1.7) saturate(1.35)" },
+        { transform: "translate(0,0)", filter: "brightness(1)" }
+    ], { duration: 360, easing: "ease-out" });
+    return animacao.finished.catch(() => undefined);
 }
 
 window.animarDanoSprite = function(alvoId) {
@@ -3132,20 +3198,7 @@ function raidCriarTelaSeNaoExiste() {
                 </div>
             </div>
 
-            <div id="raid-log" style="
-                margin:8px;
-                flex:1 1 auto;
-                min-height:72px;
-                max-height:115px;
-                background:rgba(2,6,23,.92);
-                border:1px solid #24334d;
-                border-radius:12px;
-                padding:6px;
-                overflow-y:auto;
-                font-size:12px;
-                line-height:1.35;
-                color:#cbd5e1;
-            "></div>
+            <div id="raid-log" class="eldora-combat-log" data-combat-log role="region" aria-label="Registro da invasão" style="flex:1 1 auto; min-height:110px;"></div>
 
             <div id="raid-menu-botoes" style="
                 display:grid;
@@ -3177,21 +3230,7 @@ function raidCriarTelaSeNaoExiste() {
 function raidAdicionarLog(html) {
     const box = document.getElementById("raid-log");
     if (!box) return;
-
-    const linha = document.createElement("div");
-    linha.className = "raid-log-line";
-    linha.innerHTML = html;
-
-    linha.animate(
-        [
-            { opacity: 0, transform: "translateX(-6px)" },
-            { opacity: 1, transform: "translateX(0)" }
-        ],
-        { duration: 180 }
-    );
-
-    box.appendChild(linha);
-    box.scrollTop = box.scrollHeight;
+    window.EldoraCombatLog?.pushText(box, html, { actor: "Sistema" });
 }
 window.raidAdicionarLog = raidAdicionarLog;
 
@@ -3577,6 +3616,7 @@ function raidAnimarInvestida(atacanteId) {
 }
 
 function raidAnimarLogVisual(log, pacoteTurno) {
+    if (log?.is_attack_event === false || (!log?.is_inimigo && !log?.alvo_id)) return;
     const inimigo = !!log.is_inimigo;
     const dano = raidDanoDoLog(log);
     const texto = String(log.texto || "").toLowerCase();
@@ -3629,6 +3669,12 @@ function raidAnimarLogVisual(log, pacoteTurno) {
         }
         
         const alvoVisual = tipoSkill === "support" ? "raid-sprite-heroi" : "raid-sprite-mob";
+
+        // Cada acerto de uma habilidade multi-hit também mostra a aproximação
+        // do herói, sincronizada com o evento individual recebido do servidor.
+        if (alvoVisual === "raid-sprite-mob") {
+            raidAnimarInvestida("raid-sprite-heroi");
+        }
 
         if (animEffect && typeof window.animarMagiaSpriteGrid === "function") {
             window.animarMagiaSpriteGrid(alvoVisual, animEffect);
@@ -4173,8 +4219,7 @@ window.iniciarInterfaceRaid = async function(estadoRaid) {
     if (window.AudioManager) {
         window.AudioManager.tocarMusica("bgm_batalha");
     }
-    const log = document.getElementById("raid-log");
-    if (log) log.innerHTML = "";
+    window.EldoraCombatLog?.clear("raid-log", { sessionKey: String(window.raidInvasaoAtual?.raid_id || Date.now()), title: "Invasão iniciada", detail: "A defesa do reino começou." });
 
     raidAdicionarLog(`<span style="color:#facc15;font-weight:bold;">⚔️ A raid da invasão começou!</span>`);
     raidRenderizar();
@@ -4311,7 +4356,22 @@ window.processarAnimacaoTurnoRaid = function(pacoteTurno) {
 
     logs.forEach((log, index) => {
         setTimeout(() => {
-            raidAdicionarLog(raidFormatarLog(log, pacoteTurno));
+            const mensagem = String(log.texto || "");
+            if (window.EldoraCombatLog) {
+                window.EldoraCombatLog.push("raid-log", {
+                    actor: log.autor_nome || log.autor_id || "Sistema",
+                    text: mensagem,
+                    detail: mensagem,
+                    dano: log.dano,
+                    golpe: log.golpe,
+                    total_hits: log.total_hits,
+                    critico: log.critico || mensagem.toLowerCase().includes("crítico"),
+                    is_inimigo: !!log.is_inimigo,
+                    tone: log.is_inimigo ? "enemy" : undefined
+                });
+            } else {
+                raidAdicionarLog(raidFormatarLog(log, pacoteTurno));
+            }
             raidAnimarLogVisual(log, pacoteTurno);
 
             if (log.alvo_id && log.novo_hp !== undefined) {
@@ -4328,10 +4388,10 @@ window.processarAnimacaoTurnoRaid = function(pacoteTurno) {
 
                 raidRenderizar();
             }
-        }, index * 430);
+        }, index * 650);
     });
 
-    const tempoFinal = Math.max(450, logs.length * 430 + 220);
+    const tempoFinal = Math.max(650, logs.length * 650 + 220);
 
     setTimeout(() => {
         if (pacoteTurno.proximo_turno_id) {
@@ -4580,17 +4640,7 @@ if (typeof window.iniciarInterfaceRaid !== "function") {
                     <div id="raid-lista-mobs" style="display:flex;flex-direction:column;gap:6px;"></div>
                 </div>
 
-                <div id="raid-log" style="
-                    flex:1;
-                    margin:0 8px 8px;
-                    padding:8px;
-                    overflow-y:auto;
-                    border:1px solid #334155;
-                    border-radius:10px;
-                    background:#020617;
-                    font-size:12px;
-                    line-height:1.4;
-                "></div>
+                <div id="raid-log" class="eldora-combat-log" data-combat-log role="region" aria-label="Registro da invasão" style="flex:1; min-height:110px; margin:0 8px 8px;"></div>
 
                 <div id="raid-menu-botoes" style="
                     display:grid;
@@ -4638,14 +4688,7 @@ if (typeof window.iniciarInterfaceRaid !== "function") {
     function raidAdicionarLog(html) {
         const box = document.getElementById("raid-log");
         if (!box) return;
-
-        const linha = document.createElement("div");
-        linha.className = "raid-log-line";
-        linha.style.cssText = "padding:4px 2px;border-bottom:1px solid rgba(148,163,184,.12);";
-        linha.innerHTML = html;
-
-        box.appendChild(linha);
-        box.scrollTop = box.scrollHeight;
+        window.EldoraCombatLog?.pushText(box, html, { actor: "Sistema" });
     }
 
     window.raidAdicionarLog = raidAdicionarLog;
@@ -4749,8 +4792,7 @@ if (typeof window.iniciarInterfaceRaid !== "function") {
             window.AudioManager.tocarMusica("bgm_batalha");
         }
 
-        const log = document.getElementById("raid-log");
-        if (log) log.innerHTML = "";
+        window.EldoraCombatLog?.clear("raid-log", { sessionKey: String(window.raidInvasaoAtual?.raid_id || Date.now()), title: "Invasão iniciada", detail: "A defesa do reino começou." });
 
         raidAdicionarLog(`<span style="color:#facc15;font-weight:900;">⚔️ A defesa da invasão começou!</span>`);
         raidRenderizar();

@@ -13,6 +13,8 @@ def _normalizar_jogador_para_raid(jog: dict) -> dict:
     jog = dict(jog or {})
     stats = get_combat_stats_sync(jog)
     jog = aplicar_combat_stats_no_player(jog, stats)
+    jog["initiative"] = int(stats.get("initiative", jog.get("initiative", 5)) or 5)
+    jog["double_attack_chance_flat"] = float(stats.get("double_attack_chance_flat", jog.get("double_attack_chance_flat", 0)) or 0)
     return jog
 
 
@@ -32,6 +34,7 @@ def criar_sala_raid(raid_id, grupo_jogadores, monstros_gerados, socketio, metada
             "mp": int(jog.get("current_mp", jog.get("max_mana", 50)) or 0),
             "max_mp": int(jog.get("max_mana", 50) or 50),
             "initiative": int(jog.get("initiative", 5) or 5),
+            "double_attack_chance_flat": float(jog.get("double_attack_chance_flat", 0) or 0),
             "attack": int(jog.get("attack", 10) or 10),
             "defense": int(jog.get("defense", 3) or 3),
             "magic_attack": int(jog.get("magic_attack", 0) or 0),
@@ -198,7 +201,8 @@ def processar_turno_raid(raid_id, atacante_sid, acao, alvo_id, skill_id=None):
             "texto": msg_cd,
             "is_inimigo": False,
             "acao": "cooldown_pronto",
-            "dano": 0
+            "dano": 0,
+            "is_attack_event": False
         })
 
     if acao in ("item", "usar_item"):
@@ -275,31 +279,71 @@ def processar_turno_raid(raid_id, atacante_sid, acao, alvo_id, skill_id=None):
             return {"log": [{"autor_id": jogador["id"], "autor_nome": jogador["nome"], "texto": logs_skill[0] if logs_skill else f"{skill_nome} não pôde ser usada.", "is_inimigo": False, "acao": "falha_skill", "skill_id": skill_id, "skill_nome": skill_nome, "anim_effect": "", "tipo_skill": "erro", "dano": 0}], "raid_encerrada": False, "atacante_id": jogador_id, "novo_mp": jogador.get("mp"), "cooldowns": player_db.get("cooldowns", {})}
 
         hp_antes = int(alvo.get("hp", 0) or 0)
-        dano_real = min(hp_antes, dano)
-        alvo["hp"] = max(0, hp_antes - dano)
-        raid["participacao"][jogador_id]["dano"] += max(0, dano_real)
-
+        golpes = resultado.get("hits", []) or []
+        golpes_por_log = {int(golpe.get("log_index", -1)): golpe for golpe in golpes}
+        hp_restante = hp_antes
+        dano_real = 0
+        primeiro_golpe_real = True
         if not logs_skill:
             logs_skill = [f"causou {dano} de dano!"]
 
         for idx, msg in enumerate(logs_skill):
-            ultimo = idx == len(logs_skill) - 1
+            golpe = golpes_por_log.get(idx)
             texto = str(msg)
-            if idx == 0:
-                texto = f"usou {skill_nome}: {texto}"
-            log_turno.append({"autor_id": jogador["id"], "autor_nome": jogador["nome"], "texto": texto, "is_inimigo": False, "alvo_id": alvo["id"] if ultimo else None, "novo_hp": alvo["hp"] if ultimo else None, "dano": dano if ultimo else 0, "acao": "magia", "skill_id": skill_id, "skill_nome": skill_nome, "anim_effect": (resultado.get("anim_effect") or skill_anim_effect) if ultimo else "", "tipo_skill": resultado.get("tipo_skill") or skill_tipo})
+            evento_golpe = golpe is not None and hp_restante > 0
+            dano_golpe = min(hp_restante, max(0, int(golpe.get("damage", 0) or 0))) if evento_golpe else 0
+            if evento_golpe:
+                hp_restante -= dano_golpe
+                dano_real += dano_golpe
+                if primeiro_golpe_real:
+                    texto = f"Usou {skill_nome}: {texto}"
+                    primeiro_golpe_real = False
+            log_turno.append({
+                "autor_id": jogador["id"], "autor_nome": jogador["nome"], "texto": texto,
+                "is_inimigo": False, "alvo_id": alvo["id"] if evento_golpe else None,
+                "novo_hp": hp_restante if evento_golpe else None, "dano": dano_golpe,
+                "acao": "magia", "is_attack_event": evento_golpe,
+                "golpe": int(golpe.get("hit_number", 0) or 0) if evento_golpe and len(golpes) > 1 else None,
+                "total_hits": len(golpes) if evento_golpe else None,
+                "critico": bool(golpe.get("critical")) if evento_golpe else False,
+                "skill_id": skill_id, "skill_nome": skill_nome,
+                "anim_effect": (resultado.get("anim_effect") or skill_anim_effect) if evento_golpe else "",
+                "tipo_skill": resultado.get("tipo_skill") or skill_tipo
+            })
+        alvo["hp"] = hp_restante
+        raid["participacao"][jogador_id]["dano"] += max(0, dano_real)
 
     else:
         atk_heroi = int(jogador.get("attack", 10) or 10)
         def_monstro = int(alvo.get("defense", 1) or 1)
-        dano = max(1, int((atk_heroi * random.uniform(0.95, 1.15)) - (def_monstro * 0.85)))
+        chance_duplo = min(50.0, max(0.0, int(jogador.get("initiative", 0) or 0) * 0.25 + float(jogador.get("double_attack_chance_flat", 0) or 0)))
+        tentativas = 2 if random.random() * 100.0 < chance_duplo else 1
+        hp_restante = int(alvo.get("hp", 0) or 0)
+        golpes = []
+        for indice in range(tentativas):
+            if hp_restante <= 0:
+                break
+            dano_bruto = max(1, int((atk_heroi * random.uniform(0.95, 1.15)) - (def_monstro * 0.85)))
+            dano_golpe = min(hp_restante, dano_bruto)
+            hp_restante -= dano_golpe
+            golpes.append({"numero": indice + 1, "dano": dano_golpe, "dano_bruto": dano_bruto, "hp_apos": hp_restante})
 
-        hp_antes = int(alvo.get("hp", 0) or 0)
-        dano_real = min(hp_antes, dano)
-        alvo["hp"] = max(0, hp_antes - dano)
+        dano_real = sum(golpe["dano"] for golpe in golpes)
+        alvo["hp"] = hp_restante
         raid["participacao"][jogador_id]["dano"] += max(0, dano_real)
-
-        log_turno.append({"autor_id": jogador["id"], "autor_nome": jogador["nome"], "texto": f"atacou {alvo['nome']} causando {dano} de dano!", "is_inimigo": False, "alvo_id": alvo["id"], "novo_hp": alvo["hp"], "dano": dano, "acao": "atacar"})
+        if len(golpes) > 1:
+            log_turno.append({"autor_id": jogador["id"], "autor_nome": jogador["nome"], "texto": "⚡ Ataque duplo!", "is_inimigo": False, "acao": "ataque_duplo", "dano": 0, "is_attack_event": False})
+        for golpe in golpes:
+            total_golpes = len(golpes)
+            prefixo = f"Golpe {golpe['numero']}/{total_golpes}: " if total_golpes > 1 else ""
+            log_turno.append({
+                "autor_id": jogador["id"], "autor_nome": jogador["nome"],
+                "texto": f"{prefixo}atacou {alvo['nome']} causando {golpe['dano']} de dano!",
+                "is_inimigo": False, "alvo_id": alvo["id"], "novo_hp": golpe["hp_apos"],
+                "dano": golpe["dano"], "acao": "atacar", "is_attack_event": True,
+                "golpe": golpe["numero"] if total_golpes > 1 else None,
+                "total_hits": total_golpes if total_golpes > 1 else None
+            })
 
     if alvo["hp"] <= 0:
         alvo_morto_id = str(alvo["id"])
@@ -310,7 +354,8 @@ def processar_turno_raid(raid_id, atacante_sid, acao, alvo_id, skill_id=None):
             "texto": "foi destruído!",
             "is_inimigo": False,
             "acao": "morte",
-            "dano": 0
+            "dano": 0,
+            "is_attack_event": False
         })
 
         _remover_morto_da_ordem(raid, alvo_morto_id)
@@ -427,7 +472,7 @@ def processar_turno_raid(raid_id, atacante_sid, acao, alvo_id, skill_id=None):
             dano_mob = max(1, int((atk_mob * random.uniform(0.90, 1.15)) - (def_vitima * 0.55)))
             vitima["hp"] = max(0, int(vitima.get("hp", 0) or 0) - dano_mob)
 
-            log_turno.append({"autor_id": mob["id"], "autor_nome": mob["nome"], "texto": f"atacou {vitima['nome']} e causou {dano_mob} de dano!", "is_inimigo": True, "alvo_id": vitima["id"], "novo_hp": vitima["hp"]})
+            log_turno.append({"autor_id": mob["id"], "autor_nome": mob["nome"], "texto": f"atacou {vitima['nome']} e causou {dano_mob} de dano!", "is_inimigo": True, "alvo_id": vitima["id"], "novo_hp": vitima["hp"], "dano": dano_mob, "acao": "ataque_inimigo", "is_attack_event": True})
 
             if vitima["hp"] <= 0:
                 log_turno.append({"autor_id": vitima["id"], "autor_nome": vitima["nome"], "texto": "caiu em combate!", "is_inimigo": False})

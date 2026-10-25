@@ -761,6 +761,7 @@ def entrar_no_evento(user_id: str) -> Dict[str, Any]:
         "attack": int(stats.get("attack", 5) or 5),
         "defense": int(stats.get("defense", 0) or 0),
         "initiative": int(stats.get("initiative", 5) or 5),
+        "double_attack_chance_flat": float(stats.get("double_attack_chance_flat", 0) or 0),
         "luck": int(stats.get("luck", 0) or 0),
         "magic_attack": int(stats.get("magic_attack", 0) or 0),
         "vivo": True,

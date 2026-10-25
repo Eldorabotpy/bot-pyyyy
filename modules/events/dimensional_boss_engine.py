@@ -958,40 +958,73 @@ def aplicar_ataque_jogador_na_rodada(evento: Dict[str, Any], item: Dict[str, Any
         _log(evento, f"{jogador.get('nome', 'Herói')} tentou atacar o boss, mas a barreira dimensional bloqueou o golpe.")
         return
 
-    resultado_dano = calcular_dano_basico(jogador, alvo)
-    dano = int(resultado_dano["dano"])
-    critico = bool(resultado_dano["critico"])
-
-    hp_atual = int(alvo.get("hp", 0) or 0)
-    hp_novo = max(0, hp_atual - dano)
-
-    alvo["hp"] = hp_novo
-
     nome_jogador = jogador.get("nome", "Herói")
     nome_alvo = alvo.get("nome", "inimigo")
 
-    if critico:
-        texto_log = f"{nome_jogador} acertou CRÍTICO de {dano} em {nome_alvo}!"
-    else:
-        texto_log = f"{nome_jogador} causou {dano} de dano em {nome_alvo}."
+    chance_duplo = min(
+        50.0,
+        max(
+            0.0,
+            int(jogador.get("initiative", 0) or 0) * 0.25
+            + float(jogador.get("double_attack_chance_flat", 0) or 0),
+        ),
+    )
+    tentativas = 2 if random.random() * 100.0 < chance_duplo else 1
+    hp_estimado = max(0, int(alvo.get("hp", 0) or 0))
+    golpes = []
+    for _ in range(tentativas):
+        if hp_estimado <= 0:
+            break
+        resultado_dano = calcular_dano_basico(jogador, alvo)
+        dano_bruto = max(0, int(resultado_dano.get("dano", 0) or 0))
+        dano = min(hp_estimado, dano_bruto)
+        hp_estimado -= dano
+        golpes.append({"dano": dano, "critico": bool(resultado_dano.get("critico")), "hp_apos": hp_estimado})
 
-    _log(evento, texto_log)
+    if len(golpes) > 1:
+        texto_duplo = f"{nome_jogador} iniciou um ataque duplo!"
+        _log(evento, texto_duplo)
+        evento.setdefault("_animacoes_rodada", []).append({
+            "ator_tipo": "jogador",
+            "ator_id": str(item.get("ator_id", "")),
+            "autor_id": str(item.get("ator_id", "")),
+            "autor_nome": nome_jogador,
+            "acao": "ataque_duplo",
+            "dano": 0,
+            "texto": texto_duplo,
+            "is_inimigo": False,
+            "is_attack_event": False
+        })
 
-    evento.setdefault("_animacoes_rodada", []).append({
-        "ator_tipo": "jogador",
-        "ator_id": str(item.get("ator_id", "")),
-        "autor_id": str(item.get("ator_id", "")),
-        "autor_nome": nome_jogador,
-        "acao": "ataque_basico",
-        "alvo_tipo": "inimigo",
-        "alvo_id": str(alvo.get("id", item.get("alvo_id", ""))),
-        "alvo_nome": nome_alvo,
-        "dano": dano,
-        "critico": critico,
-        "novo_hp": hp_novo,
-        "texto": texto_log,
-        "is_inimigo": False
-    })
+    for numero, golpe in enumerate(golpes, start=1):
+        prefixo = f"Golpe {numero}/{len(golpes)}: " if len(golpes) > 1 else ""
+        if golpe["critico"]:
+            texto_log = f"{prefixo}{nome_jogador} acertou CRÍTICO de {golpe['dano']} em {nome_alvo}!"
+        else:
+            texto_log = f"{prefixo}{nome_jogador} causou {golpe['dano']} de dano em {nome_alvo}."
+
+        _log(evento, texto_log)
+        evento.setdefault("_animacoes_rodada", []).append({
+            "ator_tipo": "jogador",
+            "ator_id": str(item.get("ator_id", "")),
+            "autor_id": str(item.get("ator_id", "")),
+            "autor_nome": nome_jogador,
+            "acao": "ataque_basico",
+            "alvo_tipo": "inimigo",
+            "alvo_id": str(alvo.get("id", item.get("alvo_id", ""))),
+            "alvo_nome": nome_alvo,
+            "dano": golpe["dano"],
+            "critico": golpe["critico"],
+            "novo_hp": golpe["hp_apos"],
+            "texto": texto_log,
+            "is_inimigo": False,
+            "is_attack_event": True,
+            "golpe": numero if len(golpes) > 1 else None,
+            "total_hits": len(golpes) if len(golpes) > 1 else None
+        })
+
+    dano_total = sum(golpe["dano"] for golpe in golpes)
+    alvo["hp"] = hp_estimado
 
     participacao = evento.setdefault("participacao", {})
     dados_part = participacao.setdefault(str(item.get("ator_id", "")), {
@@ -999,10 +1032,10 @@ def aplicar_ataque_jogador_na_rodada(evento: Dict[str, Any], item: Dict[str, Any
         "cura": 0,
         "rodadas": 0
     })
-    dados_part["dano"] = int(dados_part.get("dano", 0) or 0) + dano
+    dados_part["dano"] = int(dados_part.get("dano", 0) or 0) + dano_total
     dados_part["rodadas"] = int(dados_part.get("rodadas", 0) or 0) + 1
 
-    if hp_novo <= 0:
+    if hp_estimado <= 0:
         alvo["vivo"] = False
         _log(evento, f"{nome_alvo} foi derrotado!", "morte")
 

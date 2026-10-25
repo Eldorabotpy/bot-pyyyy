@@ -212,27 +212,31 @@
 
     function dimensionalAnimarInvestida(atacanteId) {
         const el = document.getElementById(atacanteId);
-        if (!el) return;
+        if (!el) return Promise.resolve();
 
+        let movimento;
         if (atacanteId === "dimensional-sprite-heroi") {
-            el.animate(
+            movimento = el.animate(
                 [
-                    { transform: "translate(0,0) scale(1)" },
-                    { transform: "translate(58px,-24px) scale(1.08)" },
+                    { transform: "translate(0,0) scale(1)", offset: 0 },
+                    { transform: "translate(42px,-8px) scale(1.05)", offset: 0.42 },
+                    { transform: "translate(42px,-8px) scale(1.02)", offset: 0.6 },
                     { transform: "translate(0,0) scale(1)" }
                 ],
-                { duration: 520, easing: "cubic-bezier(.2,1,.3,1)" }
+                { duration: 500, easing: "cubic-bezier(.2,1,.3,1)" }
             );
         } else {
-            el.animate(
+            movimento = el.animate(
                 [
-                    { transform: "scaleX(-1) translate(0,0)" },
-                    { transform: "scaleX(-1) translate(48px,-16px)" },
+                    { transform: "scaleX(-1) translate(0,0)", offset: 0 },
+                    { transform: "scaleX(-1) translate(40px,-8px)", offset: 0.42 },
+                    { transform: "scaleX(-1) translate(40px,-8px)", offset: 0.6 },
                     { transform: "scaleX(-1) translate(0,0)" }
                 ],
-                { duration: 520, easing: "cubic-bezier(.2,1,.3,1)" }
+                { duration: 500, easing: "cubic-bezier(.2,1,.3,1)" }
             );
         }
+        return movimento.finished.catch(() => undefined);
     }
 
         const DIMENSIONAL_URL_EFEITOS_SKILLS = "https://raw.githubusercontent.com/Eldorabotpy/static-img/refs/heads/main/assets/efeitos/";
@@ -753,30 +757,7 @@
     function dimensionalAdicionarLogVisual(html) {
         const box = document.getElementById("dimensional-log");
         if (!box) return;
-
-        instalarControleScrollLogDimensional();
-
-        const deveIrParaFim =
-            box.dataset.usuarioScrollManual !== "1" ||
-            dimensionalLogPertoDoFim(box);
-
-        const linha = document.createElement("div");
-        linha.className = "dimensional-log-line";
-        linha.innerHTML = html;
-
-        linha.animate(
-            [
-                { opacity: 0, transform: "translateX(-6px)" },
-                { opacity: 1, transform: "translateX(0)" }
-            ],
-            { duration: 180 }
-        );
-
-        box.appendChild(linha);
-
-        if (deveIrParaFim) {
-            box.scrollTop = box.scrollHeight;
-        }
+        window.EldoraCombatLog?.pushText(box, html, { actor: "Sistema" });
     }
 
     function dimensionalFormatarLogVisual(log) {
@@ -868,7 +849,8 @@
         `;
     }
 
-    function dimensionalAnimarLogVisual(log) {
+    async function dimensionalAnimarLogVisual(log) {
+        if (log?.is_attack_event === false || log?.acao === "falha_skill" || log?.tipo_skill === "erro") return;
         const inimigo = !!log.is_inimigo;
         const dano = dimensionalDanoDoLog(log);
         const cura = Number(log.cura || 0);
@@ -916,7 +898,7 @@
                 window.AudioManager.tocarSFX("som_monstro");
             }
 
-            dimensionalAnimarInvestida("dimensional-sprite-inimigo");
+            await dimensionalAnimarInvestida("dimensional-sprite-inimigo");
 
             setTimeout(() => {
                 dimensionalTremerSprite("dimensional-sprite-heroi");
@@ -967,7 +949,11 @@
                 return;
             }
 
+            const movimento = log.is_attack_event === true
+                ? dimensionalAnimarInvestida("dimensional-sprite-heroi")
+                : Promise.resolve();
             dimensionalAnimarSpritesheetSkill(log, "dimensional-sprite-inimigo");
+            await movimento;
 
             setTimeout(() => {
                 dimensionalTremerSprite("dimensional-sprite-inimigo");
@@ -997,7 +983,7 @@
             window.AudioManager.tocarSFX(critico ? "som_critico" : "som_espada");
         }
 
-        dimensionalAnimarInvestida("dimensional-sprite-heroi");
+        await dimensionalAnimarInvestida("dimensional-sprite-heroi");
 
         setTimeout(() => {
             if (typeof animarEfeitoVisual === "function") {
@@ -1009,7 +995,7 @@
         }, 230);
     }
 
-    function dimensionalProcessarAnimacoesRodada(animacoes) {
+    async function dimensionalProcessarAnimacoesRodada(animacoes) {
         const logs = Array.isArray(animacoes) ? animacoes : [];
 
         console.log("🎬 [DIMENSIONAL ANIMAÇÕES]", logs);
@@ -1020,19 +1006,15 @@
             return;
         }
 
-        logs.forEach((log, index) => {
-            setTimeout(() => {
-                dimensionalAdicionarLogVisual(dimensionalFormatarLogVisual(log));
-                dimensionalAnimarLogVisual(log);
-            }, index * 520);
-        });
-
-        const tempoFinal = Math.max(650, logs.length * 520 + 350);
-
-        setTimeout(() => {
+        try {
+            for (const log of logs) {
+                await dimensionalAnimarLogVisual(log);
+            }
+            await new Promise(resolve => setTimeout(resolve, 350));
+        } finally {
             window.bloqueioTurnoDimensional = false;
             renderizarTelaBossDimensional(window.eventoDimensionalAtual);
-        }, tempoFinal);
+        }
     }
 
     function dimensionalValor(entidade, chaves) {
@@ -2900,7 +2882,6 @@
             if (contador) contador.innerText = "0/20";
             if (listaHerois) listaHerois.innerHTML = `<div style="color:#94a3b8;">Nenhum jogador.</div>`;
             if (listaInimigos) listaInimigos.innerHTML = `<div style="color:#94a3b8;">Nenhum inimigo.</div>`;
-            if (logBox) logBox.innerHTML = "";
             if (aviso) aviso.innerText = "Aguardando...";
             dimensionalAplicarSpriteInimigo(null, null);
             renderizarAcoesBossDimensional(null);
@@ -3127,77 +3108,23 @@
         }
 
         if (logBox) {
-            instalarControleScrollLogDimensional();
-
-            const estavaNoFim = dimensionalLogPertoDoFim(logBox);
-            const scrollAnterior = logBox.scrollTop;
-            const usuarioLendoHistorico = logBox.dataset.usuarioScrollManual === "1";
-
-            const logs = evento.logs || [];
-
-            const logsLimpos = logs
-                .filter(l => {
-                    const txt = String(l.texto || "").toLowerCase();
-
-                    if (txt.includes("preparou ataque contra")) return false;
-                    if (txt.includes("rodada") && txt.includes("começou")) return false;
-
-                    return true;
-                })
-                .slice(-40);
-
-            logBox.innerHTML = logsLimpos.map(l => {
-                const txt = String(l.texto || "").toLowerCase();
-
-                if (txt.includes("rodada") && txt.includes("terminou")) {
-                    return `
-                        <div style="
-                            text-align:center;
-                            color:#94a3b8;
-                            font-size:10px;
-                            font-weight:900;
-                            margin:4px 0;
-                            opacity:.85;
-                        ">
-                            ${dimensionalEscapeHtml(l.texto || "")}
-                        </div>
-                    `;
-                }
-
-                const pacote = {
-                    ...l,
-                    texto: l.texto || "",
-                    autor_nome: "",
-                    is_inimigo: false
-                };
-
-                if (txt.includes(" usou ")) {
-                    pacote.acao = "magia";
-                    pacote.autor_nome = String(l.texto || "").split(" usou ")[0] || "Herói";
-                    pacote.skill_nome = "Skill";
-                } else if (txt.includes("atacou") && txt.includes("causou")) {
-                    pacote.acao = "ataque_inimigo";
-                    pacote.is_inimigo = true;
-                    pacote.autor_nome = String(l.texto || "").split(" atacou ")[0] || "Inimigo";
-                } else if (txt.includes("curou")) {
-                    pacote.acao = "cura_inimigo";
-                    pacote.is_inimigo = true;
-                    pacote.autor_nome = String(l.texto || "").split(" curou ")[0] || "Sacerdote";
-                } else if (txt.includes("crítico") || txt.includes("causou")) {
-                    pacote.acao = "ataque_basico";
-                    pacote.autor_nome = String(l.texto || "").split(" causou ")[0] || "Herói";
-                }
-
-                return dimensionalFormatarLogVisual(pacote);
-            }).join("");
-
-            if (usuarioLendoHistorico && !estavaNoFim) {
-                logBox.scrollTop = scrollAnterior;
-            } else {
-                logBox.scrollTop = logBox.scrollHeight;
-            }
+            const logs = (Array.isArray(evento.logs) ? evento.logs : []).filter(log => {
+                const texto = String(log.texto || "").toLowerCase();
+                return !texto.includes("preparou ataque contra") && !(texto.includes("rodada") && texto.includes("começou"));
+            });
+            const sessionKey = String(evento.evento_id || evento.id || evento.boss_id || "dimensional");
+            window.EldoraCombatLog?.sync(logBox, logs.map(log => ({
+                id: log.id || log.log_id || "",
+                text: String(log.texto || ""),
+                actor: log.autor_nome || (log.is_inimigo ? "Inimigo" : "Herói"),
+                is_inimigo: !!log.is_inimigo,
+                damage: log.dano ?? log.damage,
+                critico: !!log.critico,
+                golpe: log.golpe || log.hit_number,
+                total_hits: log.total_hits || log.num_hits,
+                type: log.tipo || log.acao || "combate"
+            })), sessionKey);
         }
-
         renderizarAcoesBossDimensional(evento);
     };
 

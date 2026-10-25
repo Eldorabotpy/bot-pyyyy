@@ -333,8 +333,6 @@ body.combate-aberto #btn-painel-gm { display:none !important; pointer-events:non
 #pvp-caixa-logs-scroll, .pvp-log-scroll { box-sizing:border-box; width:100%; min-height:1.4em; max-height:82px; overflow:hidden !important; scrollbar-width:none !important; -ms-overflow-style:none; display:flex; flex-direction:column; gap:5px; padding:6px 8px; text-align:left; font:0.95em/1.35 monospace,sans-serif; background:rgba(0,0,0,.38); border-radius:6px; }
 #pvp-combat-panel::-webkit-scrollbar, #pvp-log-box::-webkit-scrollbar, #pvp-caixa-logs-scroll::-webkit-scrollbar,
 #pve-combat-panel::-webkit-scrollbar, #pve-log-box::-webkit-scrollbar, #pve-log-content::-webkit-scrollbar { display:none !important; width:0 !important; height:0 !important; }
-#pvp-caixa-logs-scroll > div, #pve-log-content > div { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; overflow-wrap:anywhere; }
-#pve-log-content { min-height:1.35em; }
 
 @media(max-height:520px) and (orientation:landscape) {
     #tela-pvp-global, #tela-pve-global { overflow-y:auto; }

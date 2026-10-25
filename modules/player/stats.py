@@ -997,7 +997,7 @@ def _aplicar_golpes_combate(resultado, stats, hp, mp, mob_hp):
     for index, texto in enumerate(resultado.get("log_messages", [])):
         hit = por_log.get(index)
         if hit is None:
-            logs.append({"autor": "player", "texto": texto, "dano": 0})
+            logs.append({"autor": "player", "texto": texto, "dano": 0, "is_attack_event": False})
             continue
         if mob_hp <= 0:
             break
@@ -1023,21 +1023,20 @@ def _aplicar_golpes_combate(resultado, stats, hp, mp, mob_hp):
             and cura > 0
         )
 
+        esquivou = int(hit.get("damage", 0) or 0) <= 0
         if eh_multi_hit:
-            mensagem = (
-                f"Ataque {numero}: "
-                f"{dano} de dano."
-            )
+            mensagem = f"Golpe {numero}: o alvo esquivou." if esquivou else f"Golpe {numero}: {dano} de dano."
         else:
-            mensagem = (
-                f"{dano} de dano."
-            )
+            mensagem = "O alvo esquivou." if esquivou else f"{dano} de dano."
         if mostrar_roubo:
             mensagem += f" Roubou {cura} de vida."
         if hit.get("critical"):
             mensagem = f"Crítico! {mensagem}"
         logs.append({
             "autor": "player", "texto": mensagem, "dano": dano,
+            "is_attack_event": True,
+            "esquivou": esquivou,
+            "total_hits": len(hits) if eh_multi_hit else None,
             "golpe": (
                 numero
                 if eh_multi_hit

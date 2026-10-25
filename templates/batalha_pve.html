@@ -33,8 +33,10 @@
         <div id="pve-combat-panel" class="combat-action-panel" style="background: #020617; border: 1px solid #334155; padding: 10px; display: flex; flex-direction: column; gap: 8px; flex: 1;">
             
             <!-- Log de Batalha -->
-            <div id="pve-log-box" style="font-size: 0.85em; color: #cbd5e1; background: #0f172a; padding: 8px; border-radius: 6px; border: 1px solid #1e293b;">
-                <div id="pve-log-content"></div>
+            <div id="pve-log-content" class="eldora-combat-log" data-combat-log role="region" aria-label="Registro da batalha PvE">
+                <div class="eldora-log-feature" data-tone="neutral"><span class="eldora-log-mark" aria-hidden="true"></span><div class="eldora-log-feature-copy"><div class="eldora-log-meta"><span class="eldora-log-eyebrow">Última ação</span><span class="eldora-log-phase" data-log-phase>Aguardando</span></div><strong class="eldora-log-title" data-log-title>Batalha iniciada</strong><span class="eldora-log-detail" data-log-detail>Aguardando o primeiro turno.</span></div><span class="eldora-log-value" data-log-value hidden><strong data-log-number></strong><small data-log-unit></small></span><span class="eldora-log-flag" data-log-flag hidden></span></div>
+                <div class="eldora-log-history-heading"><span>Registro da batalha</span><span data-log-count>0 ações</span></div>
+                <div class="eldora-log-history" role="log" aria-live="polite" aria-label="Ações da batalha" tabindex="0"><div class="eldora-log-empty">Os acontecimentos da batalha aparecerão aqui.</div></div>
             </div>
 
             <!-- Botões de Ação -->

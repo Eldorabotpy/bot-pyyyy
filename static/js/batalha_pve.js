@@ -7,17 +7,8 @@ let pveBatalhaAtual = null;
 function adicionarLinhaLogPvE(texto, cor = '#e2e8f0', destaque = false) {
     const logBox = document.getElementById('pve-log-content');
     if (!logBox) return;
-
-    const linha = document.createElement('div');
-    linha.className = 'pve-log-entry';
-    linha.textContent = String(texto ?? '');
-    linha.style.color = cor;
-    if (destaque) linha.style.fontWeight = 'bold';
-    logBox.appendChild(linha);
-
-    while (logBox.children.length > 2) {
-        logBox.removeChild(logBox.firstElementChild);
-    }
+    const tone = cor === '#10b981' || cor === '#facc15' ? 'support' : cor === '#ef4444' ? 'enemy' : undefined;
+    window.EldoraCombatLog?.pushText(logBox, texto, { actor: destaque ? 'Sistema' : 'Combate', tone, title: destaque ? 'Resultado' : undefined });
 }
 
 // Escutando Eventos Globais
@@ -56,12 +47,7 @@ if (window.socket) {
         
         // Adiciona Logs
         if (dados.logs && dados.logs.length > 0) {
-            dados.logs.forEach(msg => {
-                let cor = '#e2e8f0';
-                if (String(msg).includes('CRÍTICO')) cor = '#ef4444';
-                else if (String(msg).includes('💚')) cor = '#10b981';
-                adicionarLinhaLogPvE(msg, cor);
-            });
+            window.EldoraCombatLog?.sync('pve-log-content', dados.logs, String(dados.battle_id));
         }
 
         // Se a batalha acabou, mostra os botões de voltar
@@ -84,8 +70,8 @@ function abrirTelaBatalhaPvE(dados) {
     document.getElementById('tela-pve-global').style.display = 'flex';
     document.getElementById('pve-menu-botoes').style.display = 'grid';
     document.getElementById('pve-botoes-fim-batalha').style.display = 'none';
-    document.getElementById('pve-log-content').innerHTML = '';
-    adicionarLinhaLogPvE('Batalha começou!', '#facc15');
+    window.EldoraCombatLog?.clear('pve-log-content', { sessionKey: String(dados.battle_id || Date.now()), title: 'Batalha iniciada', detail: `Confronto contra ${dados.monstro?.nome || 'um inimigo'}.` });
+    adicionarLinhaLogPvE(`Batalha contra ${dados.monstro?.nome || 'o inimigo'} começou!`, '#facc15');
     
     // Configura o Monstro
     document.getElementById('nome-monstro-pve').innerText = dados.monstro.nome || 'Monstro';

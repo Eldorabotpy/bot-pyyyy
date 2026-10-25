@@ -3331,6 +3331,62 @@ def _retirar_fila_coliseu(sid):
             fila[:] = [item for item in fila if item != sid]
         fila_coliseu_entrada.pop(sid, None)
 
+def _montar_logs_pvp_por_golpe(resultado, autor_sid, alvo_hp, acao):
+    """Converte o resultado comum do motor em eventos visuais golpe a golpe."""
+    mensagens = list(resultado.get("log_messages", []) or [])
+    hits = list(resultado.get("hits", []) or [])
+    hits_por_log = {int(hit.get("log_index", -1)): hit for hit in hits}
+    hp_restante = max(0, int(alvo_hp or 0))
+    planejados = {}
+
+    for indice, _mensagem in enumerate(mensagens):
+        hit = hits_por_log.get(indice)
+        if hit is None or hp_restante <= 0:
+            continue
+        bruto = max(0, int(hit.get("damage", 0) or 0))
+        aplicado = min(hp_restante, bruto)
+        hp_restante -= aplicado
+        planejados[indice] = {"dano": aplicado, "hp": hp_restante, "bruto": bruto, "hit": hit}
+
+    total_golpes = len(planejados)
+    logs = []
+    for indice, mensagem in enumerate(mensagens):
+        golpe = planejados.get(indice)
+        if golpe is None:
+            logs.append({
+                "autor_sid": autor_sid,
+                "texto": str(mensagem),
+                "dano": 0,
+                "tipo_skill": "info",
+                "anim_effect": "",
+                "is_attack_event": False
+            })
+            continue
+
+        hit = golpe["hit"]
+        numero = int(hit.get("hit_number", 1) or 1)
+        texto = str(mensagem)
+        esquivou = golpe["bruto"] <= 0
+        if esquivou and "esquiv" not in texto.lower():
+            texto = f"Golpe {numero}: o alvo esquivou." if total_golpes > 1 else "O alvo esquivou."
+        logs.append({
+            "autor_sid": autor_sid,
+            "texto": texto,
+            "dano": golpe["dano"],
+            "golpe": numero if total_golpes > 1 else None,
+            "total_hits": total_golpes if total_golpes > 1 else None,
+            "critico": bool(hit.get("critical")),
+            "esquivou": esquivou,
+            "anim_effect": resultado.get("anim_effect", ""),
+            "tipo_skill": resultado.get("tipo_skill", ""),
+            "acao": acao,
+            "is_attack_event": True,
+            "hp_alvo_apos_golpe": golpe["hp"]
+        })
+
+    return logs, hp_restante
+
+
 @socketio.on('enviarAcaoPvP')
 def handle_acao_pvp(dados):
     sid = request.sid
@@ -3397,16 +3453,11 @@ def handle_acao_pvp(dados):
             attacker_current_hp=atacante['hp'], attacker_current_mp=atacante['mp']
         ))
 
-        dano_causado = resultado.get('total_damage', 0)
-        alvo['hp'] = max(0, alvo['hp'] - dano_causado)
+        novos_logs, hp_restante = _montar_logs_pvp_por_golpe(resultado, sid, alvo['hp'], acao)
+        alvo['hp'] = hp_restante
         atacante['mp'] = resultado.get('attacker_mp_left', atacante['mp'])
         novo_hp = alvo['hp']
-
-        for msg in resultado.get('log_messages', []):
-            log_turno.append({
-                "autor_sid": sid, "texto": msg, "dano": dano_causado if msg == resultado['log_messages'][-1] else 0,
-                "anim_effect": resultado.get('anim_effect', ''), "tipo_skill": resultado.get('tipo_skill', '')
-            })
+        log_turno.extend(novos_logs)
 
     if alvo['hp'] <= 0:
         vencedor_sid = atacante['sid']
@@ -3438,18 +3489,15 @@ def handle_acao_pvp(dados):
             log_turno.append({"autor_sid": espelho["sid"], "texto": "O adversário perdeu a concentração e não conseguiu atacar.", "dano": 0, "tipo_skill": "info", "anim_effect": ""})
             resultado_espelho = {"total_damage": 0, "log_messages": [], "attacker_mp_left": espelho["mp"]}
 
-        dano_espelho = max(0, int(resultado_espelho.get("total_damage", 0) or 0))
-        heroi["hp"] = max(0, heroi["hp"] - dano_espelho)
+        logs_espelho, hp_heroi_restante = _montar_logs_pvp_por_golpe(
+            resultado_espelho,
+            espelho["sid"],
+            heroi["hp"],
+            "atacar"
+        )
+        heroi["hp"] = hp_heroi_restante
         espelho["mp"] = resultado_espelho.get("attacker_mp_left", espelho["mp"])
-        mensagens_ataque = resultado_espelho.get("log_messages", [])
-        for indice, mensagem in enumerate(mensagens_ataque):
-            log_turno.append({
-                "autor_sid": espelho["sid"],
-                "texto": mensagem,
-                "dano": dano_espelho if indice == len(mensagens_ataque) - 1 else 0,
-                "anim_effect": resultado_espelho.get("anim_effect", ""),
-                "tipo_skill": resultado_espelho.get("tipo_skill", ""),
-            })
+        log_turno.extend(logs_espelho)
         if heroi["hp"] <= 0:
             vencedor_sid = espelho["sid"]
 

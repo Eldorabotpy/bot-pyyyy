@@ -100,17 +100,11 @@ window.iniciarInterfacePvP = function(estado_arena) {
     
     // Limpa a caixa de scroll se for um novo duelo
     const containerLog = document.getElementById('pvp-caixa-logs-scroll');
-    if (containerLog) containerLog.innerHTML = '';
+    window.EldoraCombatLog?.clear(containerLog, { sessionKey: String(estado_arena.duelo_id || Date.now()), title: "Duelo iniciado", detail: `O duelo contra ${estado_arena.oponente_nome} começou.` });
     
     // Dispara a mensagem inicial usando a nova função
     if (typeof window.adicionarLogPvP === 'function') {
-        window.adicionarLogPvP(`⚔️ O duelo contra <span style="color:#ef4444; font-weight:bold;">${estado_arena.oponente_nome}</span> começou!`);
-        
-        // Esconde os textos antigos para não conflitar com a caixa nova
-        const log1 = document.getElementById('pvp-log-texto-1');
-        const log2 = document.getElementById('pvp-log-texto-2');
-        if (log1) log1.style.display = 'none';
-        if (log2) log2.style.display = 'none';
+        window.adicionarLogPvP(`⚔️ O duelo contra ${estado_arena.oponente_nome} começou!`);
     } else {
         // Fallback de segurança
         const log1 = document.getElementById('pvp-log-texto-1');
@@ -197,16 +191,13 @@ window.processarAnimacaoTurnoPvP = function(pacoteTurno) {
             window.perfilDadosGlobais.cooldowns = pacoteTurno.cooldowns;
         }
     }
-    const elemLog1 = document.getElementById('pvp-log-texto-1');
-    const elemLog2 = document.getElementById('pvp-log-texto-2');
-    
     let db = window.dadosPvPAtual;
     let indexAcao = 0;
     
     // Esconde o painel de "aguardando..." durante a animação
     document.getElementById('pvp-bloqueio-turno').style.display = 'none';
 
-    function lerProximoLogPvP() {
+    async function lerProximoLogPvP() {
         if (indexAcao >= pacoteTurno.log.length) {
             
             // 👇 BUG RESOLVIDO: O JavaScript agora procura pelo nome certo (vencedor_sid)
@@ -224,9 +215,14 @@ window.processarAnimacaoTurnoPvP = function(pacoteTurno) {
         const euSouOAtacante = (acao.autor_sid === window.eldoraSocket.id);
         
         let txtAcao = (acao.texto || "").toUpperCase();
-        let ehFalha = txtAcao.includes("FALHOU") || txtAcao.includes("ESQUIVOU") || txtAcao.includes("INSUFICIENTE");
-        let ehCura = txtAcao.includes("CURA") || txtAcao.includes("USOU");
-        let ehCritico = txtAcao.includes("CRÍTICO");
+        let ehInfo = acao.is_attack_event === false || acao.tipo_skill === "info";
+        const alvoEsquivou = !!acao.esquivou || txtAcao.includes("ESQUIVOU");
+        const alvoDefendeu = !!acao.defendeu || txtAcao.includes("DEFENDEU") || txtAcao.includes("BLOQUEOU");
+        const falhaAtacante = txtAcao.includes("FALHOU") || txtAcao.includes("INSUFICIENTE") || acao.tipo_skill === "erro";
+        let ehFalha = falhaAtacante || alvoEsquivou;
+        let ehDefesa = alvoDefendeu;
+        let ehCura = acao.tipo_skill === "support" || txtAcao.includes("CURA") || txtAcao.includes("CUROU");
+        let ehCritico = !!acao.critico || txtAcao.includes("CRÍTICO");
         let danoCausado = Math.max(0, Number(acao.dano) || 0);
 
         // Identifica quem é quem na tela
@@ -236,18 +232,29 @@ window.processarAnimacaoTurnoPvP = function(pacoteTurno) {
         const atacanteId = euSouOAtacante ? meuSpriteId : oponenteSpriteId;
         const alvoId = euSouOAtacante ? oponenteSpriteId : meuSpriteId;
         
-        // 👇 NOVO: Definindo as cores e o nome para o log scrollável
-        const corTexto = euSouOAtacante ? "#38bdf8" : "#ef4444"; 
         const nomeAtacante = euSouOAtacante ? "Você" : (window.dadosPvPAtual.oponenteNome || "Oponente");
 
-        // 👇 NOVO: Log Visual usando o sistema de Scroll em vez de sobrescrever elemLog1
-        if (typeof window.adicionarLogPvP === 'function') {
-            window.adicionarLogPvP(`<strong style="color:${corTexto};">${nomeAtacante}:</strong> <span style="color:#e2e8f0;">${acao.texto}</span>`);
-        } else {
-            // Fallback de segurança caso a função não seja encontrada
-            if (typeof elemLog1 !== 'undefined' && elemLog1) {
-                elemLog1.innerHTML = `<span style="color:${corTexto}; font-weight:bold;">${acao.texto}</span>`;
-            }
+        const numeroGolpe = Number(acao.golpe || acao.hit_number || 0);
+        const totalGolpes = Number(acao.total_hits || acao.num_hits || 0);
+        const ehAtaqueDuplo = txtAcao.includes("ATAQUE DUPLO");
+        window.EldoraCombatLog?.push('pvp-caixa-logs-scroll', {
+            actor: nomeAtacante,
+            text: acao.texto || "Ação de combate.",
+            detail: acao.texto || "Ação de combate.",
+            title: numeroGolpe ? `Golpe ${numeroGolpe}${totalGolpes ? `/${totalGolpes}` : ""}` : ehAtaqueDuplo ? "Ataque duplo" : undefined,
+            golpe: numeroGolpe,
+            total_hits: totalGolpes,
+            value: ehInfo || ehFalha || ehDefesa ? null : danoCausado,
+            unit: "DANO",
+            tone: ehDefesa ? "defense" : ehFalha ? "dodge" : ehCritico ? "critical" : ehCura ? "support" : ehAtaqueDuplo || euSouOAtacante ? "player" : "enemy",
+            is_inimigo: !euSouOAtacante,
+            critico: ehCritico
+        });
+
+        if (ehInfo) {
+            indexAcao++;
+            setTimeout(lerProximoLogPvP, 360);
+            return;
         }
 
         if (ehCura) {
@@ -262,11 +269,18 @@ window.processarAnimacaoTurnoPvP = function(pacoteTurno) {
                 atualizarBarraPvP('bar-hp-oponente', db.oponenteHpAtual, db.oponenteHpMax);
             }
             
+        } else if (alvoEsquivou || alvoDefendeu) {
+            // O atacante avança em cada tentativa; em seguida o alvo mostra
+            // a esquiva/defesa daquele golpe, inclusive no ataque duplo.
+            const reacaoAlvo = alvoDefendeu
+                ? animarDefesaPvP(alvoId, !euSouOAtacante)
+                : animarEsquivaPvP(alvoId, !euSouOAtacante);
+            await Promise.all([animarInvestidaPvP(atacanteId, !euSouOAtacante), reacaoAlvo]);
         } else if (ehFalha) {
-            animarEsquivaPvP(alvoId, !euSouOAtacante);
+            await animarFalhaPvP(atacanteId, !euSouOAtacante);
         } else {
             // Ataque Bem Sucedido!
-            animarInvestidaPvP(atacanteId, !euSouOAtacante);
+            const movimentoInvestida = animarInvestidaPvP(atacanteId, !euSouOAtacante);
             
             if (euSouOAtacante) {
                 db.oponenteHpAtual = Math.max(0, db.oponenteHpAtual - danoCausado);
@@ -291,10 +305,12 @@ window.processarAnimacaoTurnoPvP = function(pacoteTurno) {
             } else {
                 animarEfeitoVisualPvP(alvoId, 'corte', ehCritico ? '#facc15' : '#ef4444');
             }
+            await movimentoInvestida;
         }
 
         indexAcao++;
-        setTimeout(lerProximoLogPvP, 1300); // Ritmo do duelo
+        const ehGolpeSeparado = numeroGolpe > 0;
+        setTimeout(lerProximoLogPvP, ehGolpeSeparado ? 90 : 260);
     }
     
     lerProximoLogPvP();
@@ -306,18 +322,33 @@ window.processarAnimacaoTurnoPvP = function(pacoteTurno) {
 
 function animarInvestidaPvP(spriteId, isOponente) {
     const el = document.getElementById(spriteId);
-    if (!el) return;
+    if (!el) return Promise.resolve();
     
     // O Oponente precisa preservar o scaleX(-1) para não virar de costas!
     const transformBase = isOponente ? 'scaleX(-1)' : '';
-    const moveX = isOponente ? '-50px' : '50px';
-    const moveY = isOponente ? '30px' : '-30px';
+    const moveX = isOponente ? '-42px' : '42px';
+    const moveY = isOponente ? '5px' : '-5px';
 
-    el.animate([
-        { transform: `${transformBase} translate(0, 0) scaleY(1)` },
-        { transform: `${transformBase} translate(${moveX}, ${moveY}) scaleY(1.15)`, offset: 0.2 },
+    const animacao = el.animate([
+        { transform: `${transformBase} translate(0, 0) scaleY(1)`, offset: 0 },
+        { transform: `${transformBase} translate(${moveX}, ${moveY}) scaleY(1.04)`, offset: 0.4 },
+        { transform: `${transformBase} translate(${moveX}, ${moveY}) scaleY(1.02)`, offset: 0.58 },
         { transform: `${transformBase} translate(0, 0) scaleY(1)`, offset: 1 }
     ], { duration: 500, easing: 'cubic-bezier(0.25, 1, 0.5, 1)' });
+    return animacao.finished.catch(() => undefined);
+}
+
+function animarFalhaPvP(spriteId, isOponente) {
+    const el = document.getElementById(spriteId);
+    if (!el) return Promise.resolve();
+    const base = isOponente ? 'scaleX(-1)' : '';
+    const animacao = el.animate([
+        { transform: `${base} translate(0,0)` },
+        { transform: `${base} translate(-4px,0)` },
+        { transform: `${base} translate(4px,0)` },
+        { transform: `${base} translate(0,0)` }
+    ], { duration: 260 });
+    return animacao.finished.catch(() => undefined);
 }
 
 function animarDanoRecebidoPvP(spriteId) {
@@ -343,15 +374,28 @@ function animarDanoRecebidoPvP(spriteId) {
 
 function animarEsquivaPvP(spriteId, isOponente) {
     const el = document.getElementById(spriteId);
-    if (!el) return;
+    if (!el) return Promise.resolve();
     const transformBase = isOponente ? 'scaleX(-1)' : '';
     const recuo = isOponente ? '20px' : '-20px';
 
-    el.animate([
+    const animacao = el.animate([
         { transform: `${transformBase} translate(0, 0)`, opacity: 1 },
         { transform: `${transformBase} translate(${recuo}, 0)`, opacity: 0.5, offset: 0.5 },
         { transform: `${transformBase} translate(0, 0)`, opacity: 1, offset: 1 }
     ], { duration: 400 });
+    return animacao.finished.catch(() => undefined);
+}
+
+function animarDefesaPvP(spriteId, isOponente) {
+    const el = document.getElementById(spriteId);
+    if (!el) return Promise.resolve();
+    const base = isOponente ? "scaleX(-1)" : "";
+    const animacao = el.animate([
+        { transform: `${base} translate(0,0)`, filter: "brightness(1)" },
+        { transform: `${base} translate(0,-5px)`, filter: "brightness(1.8) saturate(1.6)" },
+        { transform: `${base} translate(0,0)`, filter: "brightness(1)" }
+    ], { duration: 360, easing: "ease-out" });
+    return animacao.finished.catch(() => undefined);
 }
 
 function animarEfeitoVisualPvP(alvoId, tipoEfeito, corExtra) {
@@ -564,37 +608,5 @@ window.abrirMenuItensPvP = function() {
 // Log compacto: mantém somente as duas mensagens mais recentes, sem rolagem.
 // ==========================================
 window.adicionarLogPvP = function(textoHTML) {
-    let containerLog = document.getElementById('pvp-caixa-logs-scroll');
-    
-    // Se a caixa ainda não existe, nós a criamos substituindo os textos antigos
-    if (!containerLog) {
-        const oldLog1 = document.getElementById('pvp-log-texto-1');
-        if (oldLog1) {
-            const parentBox = oldLog1.parentElement;
-            parentBox.innerHTML = ''; // Limpa os antigos
-            
-            containerLog = document.createElement('div');
-            containerLog.id = 'pvp-caixa-logs-scroll';
-            
-            // O CSS limita o log ao espaço de duas mensagens e não cria uma barra de rolagem.
-            containerLog.className = 'pvp-log-scroll';
-            
-            parentBox.appendChild(containerLog);
-        }
-    }
-
-    if (containerLog) {
-        const novaLinha = document.createElement('div');
-        novaLinha.innerHTML = textoHTML;
-        // Efeito suave ao aparecer a mensagem
-        novaLinha.animate([
-            {opacity: 0, transform: 'translateX(-5px)'}, 
-            {opacity: 1, transform: 'translateX(0)'}
-        ], {duration: 300});
-        
-        containerLog.appendChild(novaLinha);
-        while (containerLog.children.length > 2) {
-            containerLog.removeChild(containerLog.firstElementChild);
-        }
-    }
+    window.EldoraCombatLog?.pushText('pvp-caixa-logs-scroll', textoHTML, { actor: "Sistema" });
 };
