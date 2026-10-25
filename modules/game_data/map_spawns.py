@@ -267,7 +267,7 @@ MAP_SPAWNS = {
     # ==========================================
     "pedreira_granito": gerar_spawns("pedreira", [
         # ⛏️ Kobolds Escavadores — entrada norte e trilhas do oeste
-        ("kobold_escavador", 5, 9),
+        ("kobold_escavador", 13, 8),
         ("kobold_escavador", 15, 14),
         ("kobold_escavador", 15, 20),
         ("kobold_escavador", 10, 19),
@@ -284,7 +284,7 @@ MAP_SPAWNS = {
         ("kobold_escavador", 16, 28),
 
         # 🪨 Tatus de Rocha — travessias centrais e do lado leste
-        ("tatu_de_rocha", 28, 24),
+        ("tatu_de_rocha", 30, 35),
         ("tatu_de_rocha", 31, 26),
         ("tatu_de_rocha", 23, 32),
         ("tatu_de_rocha", 34, 28),
@@ -329,7 +329,7 @@ MAP_SPAWNS = {
         ("salamandra_de_pedra", 48, 52),
 
         # 🦇 Gárgulas de Vigia — bordas e cantos, longe do portal e das coletas
-        ("gargula_de_vigia", 15, 3),
+        ("gargula_de_vigia", 20, 8),
         ("gargula_de_vigia", 55, 16),
         ("gargula_de_vigia", 10, 36),
         ("gargula_de_vigia", 3, 32),
