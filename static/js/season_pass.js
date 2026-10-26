@@ -231,11 +231,18 @@ function desenharRecompensas(passe, catalogo) {
         const config = catalogo[nivel] || catalogo[String(nivel)];
         if (!config?.free || !config?.premium) return;
 
+        const resgatouFree = claimedFree.has(nivel);
+        const resgatouPremium = claimedPremium.has(nivel);
+        const nivelAlcancado = nivelAtual >= nivel;
+        const premioDisponivel = nivelAlcancado && (
+            !resgatouFree || (Boolean(passe.is_premium) && !resgatouPremium)
+        );
+        const premioResgatado = resgatouFree || resgatouPremium;
         const row = document.createElement('article');
-        row.className = `reward-row ${nivelAtual >= nivel ? 'completed' : ''}`;
+        row.className = `reward-row ${premioDisponivel || premioResgatado ? 'active' : 'locked'}`;
         row.setAttribute('aria-label', `Nível ${nivel}`);
         row.appendChild(criarRecompensa(
-            nivel, 'free', config.free, claimedFree.has(nivel), nivelAtual >= nivel, Boolean(passe.is_premium),
+            nivel, 'free', config.free, resgatouFree, nivelAlcancado, Boolean(passe.is_premium),
             Number(config.fragmentos_skin?.free) || 0, config.fragmentos_skin?.image_url
         ));
 
@@ -250,7 +257,7 @@ function desenharRecompensas(passe, catalogo) {
         row.appendChild(center);
 
         row.appendChild(criarRecompensa(
-            nivel, 'premium', config.premium, claimedPremium.has(nivel), nivelAtual >= nivel, Boolean(passe.is_premium),
+            nivel, 'premium', config.premium, resgatouPremium, nivelAlcancado, Boolean(passe.is_premium),
             Number(config.fragmentos_skin?.premium) || 0, config.fragmentos_skin?.image_url
         ));
         lista.appendChild(row);
