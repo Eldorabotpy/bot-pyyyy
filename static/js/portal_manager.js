@@ -51,6 +51,12 @@ class PortalManager {
                 nome: 'Pedreira de Granito',
                 icone: '⛏️',
                 descricao: 'Minas e rochas ancestrais'
+            },
+
+            campos_linho: {
+                nome: 'Campos de Linho',
+                icone: '🌾',
+                descricao: 'Campos de linho e trilhas rurais'
             }
 
         };
