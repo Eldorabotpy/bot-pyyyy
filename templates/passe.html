@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#07111d">
     <title>Passe de Batalha - Eldora</title>
-    <link rel="stylesheet" href="/static/css/season_pass.css?v=9">
+    <link rel="stylesheet" href="/static/css/season_pass.css?v=10">
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -36,17 +36,17 @@
 
         <div class="pass-status-bar">
             <div class="pass-status-copy">
-                <span id="status-premium" class="pass-tier-status">FAIXA GRÁTIS</span>
-                <span class="pass-season-fragment-rates">25 grátis + 60 Premium por trilha. Troque por skins e avatares na loja.</span>
+                <span id="status-premium" class="pass-tier-status">Passe gratuito</span>
+                <span class="pass-season-fragment-rates">Fragmentos podem ser trocados por skins e avatares na loja.</span>
             </div>
             <div class="pass-status-actions">
-                <span class="pass-skin-fragments">Fragmentos para a loja <b id="fragmentos-skin-passe">0</b></span>
+                <span class="pass-skin-fragments"><span aria-hidden="true">✦</span> Fragmentos <b id="fragmentos-skin-passe">0</b></span>
                 <button id="btn-comprar-premium" class="btn-premium" type="button">ATIVAR PREMIUM · 500 💎</button>
             </div>
         </div>
 
         <button id="btn-coletar-tudo" type="button" class="btn-coletar-tudo" onclick="coletarTudoLiberado()">
-            <span aria-hidden="true">🎒</span> Coletar recompensas disponíveis
+            <span aria-hidden="true">✦</span> Coletar tudo
         </button>
 
         <div id="pass-message" class="pass-message" role="status" aria-live="polite" hidden></div>
@@ -60,6 +60,6 @@
     </div>
 
     <script src="/static/js/portal_session.js?v=1"></script>
-    <script src="/static/js/season_pass.js?v=101"></script>
+    <script src="/static/js/season_pass.js?v=102"></script>
 </body>
 </html>

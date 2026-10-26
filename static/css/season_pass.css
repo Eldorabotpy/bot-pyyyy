@@ -188,9 +188,9 @@ button:focus-visible {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
-    gap: 12px 20px;
+    gap: 8px 16px;
     flex: 0 0 auto;
-    padding: 12px 14px;
+    padding: 9px 12px;
     border: 1px solid var(--pass-line);
     border-radius: 12px;
     background: rgba(16, 29, 45, .92);
@@ -199,40 +199,58 @@ button:focus-visible {
 .pass-status-copy,
 .pass-status-actions {
     display: grid;
-    gap: 5px;
+    gap: 6px;
     min-width: 0;
 }
 
 .pass-tier-status {
-    color: #d6e0e9;
-    font-size: .82rem;
+    justify-self: start;
+    padding: 4px 9px;
+    border: 1px solid rgba(217, 183, 102, .4);
+    border-radius: 999px;
+    background: rgba(7, 17, 29, .66);
+    color: #e7d09a;
+    font-size: .75rem;
     font-weight: 800;
-    letter-spacing: .06em;
+    letter-spacing: .015em;
+    line-height: 1.1;
 }
 
 .pass-tier-status.premium {
+    border-color: rgba(240, 216, 149, .75);
+    background: rgba(115, 82, 30, .3);
     color: var(--pass-gold-bright);
 }
 
 .pass-season-fragment-rates {
     color: var(--pass-muted);
-    font-size: .78rem;
+    font-size: .75rem;
     line-height: 1.35;
 }
 
 .pass-status-actions {
-    justify-items: end;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
 }
 
 .pass-skin-fragments {
     color: var(--pass-muted);
-    font-size: .78rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: .75rem;
     font-variant-numeric: tabular-nums;
-    text-align: end;
+    white-space: nowrap;
+}
+
+.pass-skin-fragments > span {
+    color: var(--pass-gold-bright);
+    font-size: .95rem;
 }
 
 .pass-skin-fragments b {
-    margin-inline-start: 5px;
     color: var(--pass-gold-bright);
     font-size: .92rem;
 }
@@ -286,15 +304,24 @@ button:focus-visible {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 9px;
-    width: 100%;
+    align-self: center;
+    gap: 8px;
+    width: fit-content;
+    min-width: 168px;
+    max-width: 100%;
     flex: 0 0 auto;
-    padding: 0 14px;
-    border: 2px solid #f0ad35;
-    background: linear-gradient(180deg, #2ecc71, #1c9a55);
-    color: #092117;
-    font-size: .87rem;
-    box-shadow: 0 3px 12px rgba(0, 0, 0, .25);
+    padding: 0 18px;
+    border: 1px solid #f0d895;
+    background: linear-gradient(180deg, #d6b766, #a77d32);
+    color: #171b21;
+    font-size: .8rem;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, .24), inset 0 1px rgba(255, 255, 255, .28);
+}
+
+.btn-coletar-tudo > span {
+    color: #f8ebc5;
+    font-size: 1rem;
+    text-shadow: 0 1px 3px rgba(62, 39, 4, .8);
 }
 
 .btn-coletar-tudo:hover:not(:disabled),
@@ -749,7 +776,7 @@ button:focus-visible {
         top: 8px;
         right: 8px;
         padding: 4px 6px;
-        font-size: .7rem;
+        font-size: .75rem;
     }
 
     .pass-header-kicker {
@@ -780,12 +807,12 @@ button:focus-visible {
     .pass-status-bar {
         grid-template-columns: minmax(0, 1fr) auto;
         gap: 7px 10px;
-        padding: 9px 10px;
+        padding: 8px 10px;
         border-radius: 10px;
     }
 
     .pass-tier-status {
-        font-size: .76rem;
+        font-size: .7rem;
     }
 
     .pass-season-fragment-rates {
@@ -794,8 +821,9 @@ button:focus-visible {
     }
 
     .pass-status-actions {
-        gap: 6px;
+        display: grid;
         justify-items: end;
+        gap: 5px;
     }
 
     .pass-skin-fragments {
@@ -816,8 +844,9 @@ button:focus-visible {
     }
 
     .btn-coletar-tudo {
-        min-height: 46px;
-        font-size: .82rem;
+        min-height: 44px;
+        min-width: 160px;
+        font-size: .78rem;
     }
 
     .pass-rewards-list {
@@ -906,13 +935,14 @@ button:focus-visible {
 
 @media (max-width: 370px) {
     .pass-status-bar {
-        grid-template-columns: minmax(0, 1fr);
+        grid-template-columns: minmax(0, 1fr) auto;
     }
 
     .pass-status-actions {
-        grid-template-columns: minmax(0, 1fr) auto;
-        align-items: center;
-        justify-items: stretch;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 5px;
     }
 
     .pass-skin-fragments {
@@ -920,7 +950,9 @@ button:focus-visible {
     }
 
     .btn-premium {
-        width: 100%;
+        width: auto;
+        padding-inline: 8px;
+        font-size: .75rem;
     }
 
     .reward-row {

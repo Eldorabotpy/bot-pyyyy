@@ -110,7 +110,7 @@ function atualizarCompraPremium(passe) {
     const status = document.getElementById('status-premium');
     const botao = document.getElementById('btn-comprar-premium');
     if (status) {
-        status.textContent = passe.is_premium ? 'FAIXA PREMIUM ATIVA' : 'FAIXA GRÁTIS';
+        status.textContent = passe.is_premium ? 'Passe Premium ativo' : 'Passe gratuito';
         status.classList.toggle('premium', Boolean(passe.is_premium));
     }
     if (!botao) return;
