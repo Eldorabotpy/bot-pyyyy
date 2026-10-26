@@ -2,7 +2,11 @@
 from flask import Blueprint, jsonify, request, render_template
 from bson.objectid import ObjectId
 from modules.player.core import users_collection
-from modules.game_data.season_pass import NIVEIS_PASSE_POR_TEMPORADA, RECOMPENSAS_PASSE
+from modules.game_data.season_pass import (
+    FRAGMENTOS_SKIN_REALOCADOS_POR_FAIXA,
+    NIVEIS_PASSE_POR_TEMPORADA,
+    RECOMPENSAS_PASSE,
+)
 from modules.game_data.skins import SKIN_SHOP_CATALOG
 
 # Cria o Blueprint do Passe
@@ -157,35 +161,159 @@ def _clear_pass_player_cache(player_id):
         logging.getLogger(__name__).debug("Não foi possível limpar o cache após atualizar o Passe", exc_info=True)
 
 
-def _catalogo_passe_com_imagens():
+def _niveis_resgatados(passe, faixa):
+    niveis = set()
+    for valor in passe.get(f"resgatados_{faixa}") or []:
+        try:
+            niveis.add(int(valor))
+        except (TypeError, ValueError):
+            continue
+    return niveis
+
+
+def _migrar_fragmentos_passe(jogador):
+    """Preserva fragmentos já pagos e compensa níveis já resgatados antes da realocação."""
     from copy import deepcopy
+
+    for _ in range(3):
+        passe = deepcopy(jogador.get("passe_batalha") or {})
+        if passe.get("fragmentos_skin_migracao_v1"):
+            return jogador
+
+        ja_recebidos = {"free": [], "premium": []}
+        compensacao = 0
+        resgatados = {faixa: _niveis_resgatados(passe, faixa) for faixa in ("free", "premium")}
+        for faixa, realocacoes in FRAGMENTOS_SKIN_REALOCADOS_POR_FAIXA.items():
+            for nivel_origem, (nivel_destino, quantidade) in realocacoes.items():
+                if nivel_origem in resgatados[faixa]:
+                    ja_recebidos[faixa].append(nivel_destino)
+                elif nivel_destino in resgatados[faixa]:
+                    compensacao += quantidade
+
+        filtro = {"_id": jogador["_id"], "passe_batalha.fragmentos_skin_migracao_v1": {"$ne": True}}
+        _snapshot_filter(filtro, jogador, "passe_batalha.resgatados_free")
+        _snapshot_filter(filtro, jogador, "passe_batalha.resgatados_premium")
+        atualizacao = {
+            "$set": {
+                "passe_batalha.fragmentos_skin_migracao_v1": True,
+                "passe_batalha.fragmentos_skin_ja_recebidos": ja_recebidos,
+            }
+        }
+        if compensacao:
+            atualizacao["$inc"] = {"skin_fragments": compensacao}
+
+        salvo = users_collection.update_one(filtro, atualizacao)
+        if salvo.modified_count:
+            passe["fragmentos_skin_migracao_v1"] = True
+            passe["fragmentos_skin_ja_recebidos"] = ja_recebidos
+            jogador["passe_batalha"] = passe
+            jogador["skin_fragments"] = int(jogador.get("skin_fragments", 0) or 0) + compensacao
+            if compensacao:
+                _clear_pass_player_cache(jogador["_id"])
+            return jogador
+
+        jogador = users_collection.find_one({"_id": jogador["_id"]}) or jogador
+    return jogador
+
+
+def _fragmentos_skin_para_resgate(passe, nivel, faixa, reward_set):
+    ja_recebidos = (passe.get("fragmentos_skin_ja_recebidos") or {}).get(faixa, [])
+    if nivel in {int(valor) for valor in ja_recebidos}:
+        return 0
+    return int((reward_set.get("fragmentos_skin") or {}).get(faixa, 0) or 0)
+
+
+def _imagem_recompensa(reward):
     from modules import game_data
 
+    assets = "https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/"
+    reward_type = reward.get("tipo")
+    if reward_type == "gold":
+        return f"{assets}perfil/ouro.png"
+    if reward_type == "gems":
+        return f"{assets}itens/consumiveis/gems.png"
+    if reward_type == "banner" and reward.get("id") == "banner_xiongmaoren_s1":
+        return f"{assets}banners/banner_xiongmaoren_s1.png"
+    if reward_type == "item":
+        item_id = reward.get("id")
+        item_data = game_data.ITEMS_DATA.get(item_id, {})
+        if item_data.get("icon_url"):
+            return item_data["icon_url"]
+        fallbacks = {
+            "pocao_cura_grande": "itens/consumiveis/pocao_cura_grande.png",
+            "pergaminho_de_reparo": "itens/consumiveis/pergaminho_de_reparo.png",
+            "sigilo_de_protecao": "itens/consumiveis/sigilo_de_protecao.png",
+        }
+        if item_id in fallbacks:
+            return f"{assets}{fallbacks[item_id]}"
+    return ""
+
+
+def _resumo_visual_recompensa(reward):
+    from modules import game_data
+
+    reward_type = reward.get("tipo")
+    item_id = reward.get("id")
+    quantity = int(reward.get("qtd", 1) or 1)
+    if reward_type == "gold":
+        name = "Ouro"
+        prefix = "+"
+    elif reward_type == "gems":
+        name = "Gemas"
+        prefix = "+"
+    elif reward_type == "item":
+        name = game_data.ITEMS_DATA.get(item_id, {}).get("display_name") or reward.get("label", "Item")
+        prefix = "×"
+    elif reward_type == "banner":
+        name = reward.get("label", "Banner")
+        prefix = "×"
+        quantity = 1
+    else:
+        name = reward.get("label", "Recompensa")
+        prefix = "×"
+
+    return {
+        "tipo": reward_type,
+        "id": item_id or reward_type,
+        "nome": name,
+        "quantidade": quantity,
+        "prefixo": prefix,
+        "image_url": _imagem_recompensa(reward),
+    }
+
+
+def _resumo_visual_fragmentos(quantidade):
+    assets = "https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/"
+    return {
+        "tipo": "fragmento_skin",
+        "id": "fragmento_skin",
+        "nome": "Fragmentos para a Loja",
+        "quantidade": int(quantidade),
+        "prefixo": "+",
+        "image_url": f"{assets}itens/consumiveis/fragmento_skin.png",
+    }
+
+
+def _agregar_recompensas_visuais(recompensas):
+    agregadas = {}
+    for recompensa in recompensas:
+        chave = (recompensa["tipo"], recompensa["id"], recompensa["nome"], recompensa["prefixo"], recompensa["image_url"])
+        if chave not in agregadas:
+            agregadas[chave] = dict(recompensa)
+        else:
+            agregadas[chave]["quantidade"] += recompensa["quantidade"]
+    return list(agregadas.values())
+
+
+def _catalogo_passe_com_imagens():
+    from copy import deepcopy
     catalog = deepcopy(RECOMPENSAS_PASSE)
     assets = "https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/"
-    item_fallbacks = {
-        "pocao_cura_grande": "itens/consumiveis/pocao_cura_grande.png",
-        "pergaminho_de_reparo": "itens/consumiveis/pergaminho_de_reparo.png",
-        "sigilo_de_protecao": "itens/consumiveis/sigilo_de_protecao.png",
-    }
 
     for level_data in catalog.values():
         for track in ("free", "premium"):
             reward = level_data.get(track) or {}
-            reward_type = reward.get("tipo")
-            image_url = ""
-            if reward_type == "item":
-                item_id = reward.get("id")
-                item_data = game_data.ITEMS_DATA.get(item_id, {})
-                image_url = item_data.get("icon_url") or (
-                    f"{assets}{item_fallbacks[item_id]}" if item_id in item_fallbacks else ""
-                )
-            elif reward_type == "gold":
-                image_url = f"{assets}perfil/ouro.png"
-            elif reward_type == "gems":
-                image_url = f"{assets}itens/consumiveis/gems.png"
-            elif reward_type == "banner" and reward.get("id") == "banner_xiongmaoren_s1":
-                image_url = f"{assets}banners/banner_xiongmaoren_s1.png"
+            image_url = _imagem_recompensa(reward) if reward else ""
             if image_url:
                 reward["image_url"] = image_url
 
@@ -224,6 +352,7 @@ def status_passe(user_id):
     jogador, erro = _jogador_da_sessao(user_id)
     if erro:
         return erro
+    jogador = _migrar_fragmentos_passe(jogador)
     passe = jogador.get("passe_batalha") or {}
     try:
         level = int(passe.get("level", 1) or 1)
@@ -232,6 +361,14 @@ def status_passe(user_id):
         gemas = int(jogador.get("gems", 0) or 0)
     except (TypeError, ValueError):
         return jsonify({"erro": "Dados do Passe inválidos. Atualize o personagem e tente novamente."}), 409
+    catalogo = _catalogo_passe_com_imagens()
+    ja_recebidos = passe.get("fragmentos_skin_ja_recebidos") or {}
+    for faixa in ("free", "premium"):
+        for nivel in ja_recebidos.get(faixa, []) or []:
+            nivel_config = catalogo.get(int(nivel))
+            if nivel_config:
+                nivel_config["fragmentos_skin"][faixa] = 0
+
     response = jsonify({
         "status": {
             "level": min(max(1, level), NIVEIS_PASSE_POR_TEMPORADA),
@@ -242,7 +379,7 @@ def status_passe(user_id):
             "skin_fragments": max(0, fragmentos),
             "gems": max(0, gemas),
         },
-        "catalogo": _catalogo_passe_com_imagens(),
+        "catalogo": catalogo,
     })
     response.headers["Cache-Control"] = "no-store"
     return response
@@ -258,6 +395,7 @@ def api_resgatar_passe():
         jogador, erro = _jogador_da_sessao(dados.get("user_id"))
         if erro:
             return erro
+        jogador = _migrar_fragmentos_passe(jogador)
         try:
             nivel = int(dados.get("nivel"))
         except (TypeError, ValueError):
@@ -298,7 +436,7 @@ def api_resgatar_passe():
             increments["gold"] = result["gold"]
         if result.get("gems"):
             increments["gems"] = result["gems"]
-        fragmentos = int((reward_config.get("fragmentos_skin") or {}).get(tipo, 0) or 0)
+        fragmentos = _fragmentos_skin_para_resgate(passe, nivel, tipo, reward_config)
         if fragmentos:
             increments["skin_fragments"] = fragmentos
         if increments:
@@ -326,8 +464,14 @@ def api_resgatar_passe():
             return jsonify(status="error", message="O passe mudou enquanto você resgatava. Atualize a tela e tente novamente."), 409
 
         _clear_pass_player_cache(jogador["_id"])
-        fragment_message = f"\n✨ +{fragmentos} fragmentos para a Loja de Skins" if fragmentos else ""
-        return jsonify(status="success", message=f"Recebeu: {reward.get('label', 'Recompensa')}!{fragment_message}")
+        recompensas_visuais = [_resumo_visual_recompensa(reward)]
+        if fragmentos:
+            recompensas_visuais.append(_resumo_visual_fragmentos(fragmentos))
+        return jsonify(
+            status="success",
+            message="A recompensa foi entregue.",
+            recompensas=recompensas_visuais,
+        )
     except PlayerSessionError as erro:
         return jsonify(status="error", message=str(erro)), erro.status_code
     except ValueError as erro:
@@ -390,6 +534,7 @@ def api_coletar_tudo():
         jogador, erro = _jogador_da_sessao(dados.get("user_id"))
         if erro:
             return erro
+        jogador = _migrar_fragmentos_passe(jogador)
 
         passe = jogador.get("passe_batalha") or {}
         level = min(max(1, int(passe.get("level", 1) or 1)), NIVEIS_PASSE_POR_TEMPORADA)
@@ -403,6 +548,7 @@ def api_coletar_tudo():
         jogador["inventory"] = deepcopy(inventory_before)
         membership = {}
         claims = {"free": [], "premium": []}
+        recompensas_visuais = []
         totals = {"gold": 0, "gems": 0, "skin_fragments": 0, "rewards": 0, "blocked": 0}
 
         for nivel in range(1, level + 1):
@@ -422,7 +568,11 @@ def api_coletar_tudo():
                 totals["gold"] += applied.get("gold", 0)
                 totals["gems"] += applied.get("gems", 0)
                 totals["rewards"] += 1
-                totals["skin_fragments"] += int((reward_set.get("fragmentos_skin") or {}).get(tipo, 0) or 0)
+                recompensas_visuais.append(_resumo_visual_recompensa(reward))
+                fragmentos_nivel = _fragmentos_skin_para_resgate(passe, nivel, tipo, reward_set)
+                totals["skin_fragments"] += fragmentos_nivel
+                if fragmentos_nivel:
+                    recompensas_visuais.append(_resumo_visual_fragmentos(fragmentos_nivel))
                 claims[tipo].append(nivel)
 
         if not totals["rewards"]:
@@ -469,15 +619,14 @@ def api_coletar_tudo():
             return jsonify(status="error", message="O passe mudou durante a coleta. Atualize a tela e tente novamente."), 409
 
         _clear_pass_player_cache(jogador["_id"])
-        resumo = (
-            f"{totals['rewards']} recompensa(s) coletada(s).\n"
-            f"✨ +{totals['skin_fragments']} fragmentos para a Loja de Skins\n"
-            f"💰 +{totals['gold']} ouro\n"
-            f"💎 +{totals['gems']} gemas"
-        )
+        resumo = f"{totals['rewards']} recompensa(s) coletada(s)."
         if totals["blocked"]:
             resumo += f"\n{totals['blocked']} recompensa(s) de item ficaram pendentes porque a mochila está cheia."
-        return jsonify(status="success", message=resumo)
+        return jsonify(
+            status="success",
+            message=resumo,
+            recompensas=_agregar_recompensas_visuais(recompensas_visuais),
+        )
     except PlayerSessionError as erro:
         return jsonify(status="error", message=str(erro)), erro.status_code
     except ValueError as erro:

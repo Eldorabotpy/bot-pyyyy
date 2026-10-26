@@ -14,6 +14,7 @@ NIVEIS_FRAGMENTOS_GRATIS = set(range(INTERVALO_FRAGMENTOS_GRATIS, NIVEIS_PASSE_P
 NIVEIS_FRAGMENTOS_PREMIUM = set(range(INTERVALO_FRAGMENTOS_PREMIUM, NIVEIS_PASSE_POR_TEMPORADA + 1, INTERVALO_FRAGMENTOS_PREMIUM))
 
 RECOMPENSAS_PASSE = {}
+FRAGMENTOS_SKIN_REALOCADOS_POR_FAIXA = {"free": {}, "premium": {}}
 
 # O GERADOR COMPLETO: Matemática Modesta + Coleção S1 (1 a 100)
 for i in range(1, NIVEIS_PASSE_POR_TEMPORADA + 1):
@@ -22,52 +23,52 @@ for i in range(1, NIVEIS_PASSE_POR_TEMPORADA + 1):
     # 1. BASE DOS NÍVEIS (Modesto)
     # ==========================================
     ouro_free = 50 + (i * 2) 
-    free = {"tipo": "gold", "qtd": ouro_free, "label": f"{ouro_free} Ouro 💰"}
+    free = {"tipo": "gold", "qtd": ouro_free, "label": f"{ouro_free} Ouro"}
     
     gemas_premium = 5 + (i // 10) 
     ouro_premium = 150 + (i * 5)
     
     if i % 2 == 0:
-        premium = {"tipo": "gold", "qtd": ouro_premium, "label": f"{ouro_premium} Ouro extra 💰"}
+        premium = {"tipo": "gold", "qtd": ouro_premium, "label": f"{ouro_premium} Ouro extra"}
     else:
-        premium = {"tipo": "gems", "qtd": gemas_premium, "label": f"{gemas_premium} Gemas 💎"}
+        premium = {"tipo": "gems", "qtd": gemas_premium, "label": f"{gemas_premium} Gemas"}
 
     # ==========================================
     # 2. ITENS A CADA 5 NÍVEIS (Poções e Pó)
     # ==========================================
     if i % 5 == 0 and i % 10 != 0:
-        free = {"tipo": "item", "id": "pergaminho_de_reparo", "qtd": 2, "label": "2x Pergaminho de Reparo 📜"}
-        premium = {"tipo": "item", "id": "sigilo_de_protecao", "qtd": 3, "label": "3x Sigilo de Proteção 🛡️"}
+        free = {"tipo": "item", "id": "pergaminho_de_reparo", "qtd": 2, "label": "2x Pergaminho de Reparo"}
+        premium = {"tipo": "item", "id": "sigilo_de_protecao", "qtd": 3, "label": "3x Sigilo de Proteção"}
 
     # ==========================================
     # 3. MARCOS ÉPICOS (A cada 10 níveis)
     # ==========================================
     if i % 10 == 0:
         if i % 50 == 0:
-            free = {"tipo": "item", "id": "pergaminho_de_reparo", "qtd": 1, "label": "1x Pergaminho de Reparo 📜"}
+            free = {"tipo": "item", "id": "pergaminho_de_reparo", "qtd": 1, "label": "1x Pergaminho de Reparo"}
         else:
-            free = {"tipo": "item", "id": "sigilo_de_protecao", "qtd": 1, "label": "1x Sigilo de Proteção 🛡️"}
+            free = {"tipo": "item", "id": "sigilo_de_protecao", "qtd": 1, "label": "1x Sigilo de Proteção"}
         
-        premium = {"tipo": "item", "id": "sigilo_de_protecao", "qtd": 5, "label": "5x Sigilo de Proteção 🛡️"}
+        premium = {"tipo": "item", "id": "sigilo_de_protecao", "qtd": 5, "label": "5x Sigilo de Proteção"}
 
     # ==========================================
     # 4. ITENS CUSTOMIZADOS E DINÂMICOS (Genero)
     # ==========================================
     if i == 1:
-        # Em vez de Avatar, damos um Kit Inicial de Gemas ou Poções
+        # Cosméticos ficam na Loja; o primeiro nível mantém uma recompensa de Gemas.
         premium = {
             "tipo": "gems", 
             "qtd": 5, 
-            "label": "5 Gemas 💎"
+            "label": "5 Gemas"
         }
         
     elif i == 10:
-        # Removida a skin daqui para manter apenas a do nível 100
+        # Recompensa especial de poções; cosméticos pertencem à Loja de Skins.
         premium = {
             "tipo": "item", 
             "id": "pocao_cura_grande", 
             "qtd": 5, 
-            "label": "5x Poção de Cura (G) 🧪"
+            "label": "5x Poção de Cura (G)"
         }
                 
     elif i == 30:
@@ -87,6 +88,36 @@ for i in range(1, NIVEIS_PASSE_POR_TEMPORADA + 1):
             "premium": FRAGMENTOS_SKIN_POR_MARCO_PREMIUM if i in NIVEIS_FRAGMENTOS_PREMIUM else 0,
         },
     }
+
+
+def _realocar_fragmentos_para_ouro():
+    """Mantém fragmentos na faixa de ouro; itens não carregam fragmentos."""
+    for tipo_faixa in ("free", "premium"):
+        transferencias = []
+        for nivel, dados in RECOMPENSAS_PASSE.items():
+            quantidade = int((dados.get("fragmentos_skin") or {}).get(tipo_faixa, 0) or 0)
+            recompensa = dados.get(tipo_faixa) or {}
+            if quantidade > 0 and recompensa.get("tipo") != "gold":
+                transferencias.append((nivel, quantidade))
+                dados["fragmentos_skin"][tipo_faixa] = 0
+
+        for nivel_origem, quantidade in transferencias:
+            nivel_destino = next((
+                nivel for nivel in range(nivel_origem + 1, NIVEIS_PASSE_POR_TEMPORADA + 1)
+                if (RECOMPENSAS_PASSE[nivel].get(tipo_faixa) or {}).get("tipo") == "gold"
+            ), None)
+            if nivel_destino is None:
+                nivel_destino = next((
+                    nivel for nivel in range(nivel_origem - 1, 0, -1)
+                    if (RECOMPENSAS_PASSE[nivel].get(tipo_faixa) or {}).get("tipo") == "gold"
+                ), None)
+            if nivel_destino is None:
+                raise ValueError(f"Não há recompensa de ouro para receber os fragmentos da faixa {tipo_faixa}.")
+            RECOMPENSAS_PASSE[nivel_destino]["fragmentos_skin"][tipo_faixa] += quantidade
+            FRAGMENTOS_SKIN_REALOCADOS_POR_FAIXA[tipo_faixa][nivel_origem] = (nivel_destino, quantidade)
+
+
+_realocar_fragmentos_para_ouro()
 
 def adicionar_xp_passe(
     player_data: dict,

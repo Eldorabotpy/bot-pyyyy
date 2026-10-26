@@ -296,7 +296,7 @@ async function resgatarPremio(nivel, tipo) {
     try {
         const { response, data } = await enviarAcaoPasse('/api/passe/resgatar', { nivel, tipo });
         if (!response.ok || data.status !== 'success') throw new Error(data.message || 'Não foi possível resgatar a recompensa.');
-        alertaPasseEldora('Recompensa resgatada', data.message, true);
+        alertaPasseEldora('Recompensa resgatada', data.message, true, data.recompensas);
         await carregarPasse();
     } catch (erro) {
         alertaPasseEldora('Não foi possível resgatar', erro.message || 'Falha de comunicação com o servidor.', false);
@@ -354,7 +354,49 @@ async function executarCompraPremium() {
     }
 }
 
-function alertaPasseEldora(titulo, mensagem, sucesso = true) {
+function preencherRecompensasAlerta(conteiner, recompensas) {
+    conteiner.replaceChildren();
+    const lista = Array.isArray(recompensas) ? recompensas : [];
+    conteiner.hidden = lista.length === 0;
+
+    lista.forEach((recompensa) => {
+        const cartao = document.createElement('div');
+        cartao.className = `modal-passe-recompensa ${recompensa.tipo === 'fragmento_skin' ? 'fragmento' : ''}`;
+        cartao.setAttribute('role', 'listitem');
+
+        const arte = document.createElement('span');
+        arte.className = 'modal-passe-recompensa-arte';
+        arte.setAttribute('aria-hidden', 'true');
+        const fallback = document.createElement('span');
+        fallback.className = 'modal-passe-recompensa-fallback';
+        fallback.textContent = '✦';
+        arte.appendChild(fallback);
+
+        if (recompensa.image_url) {
+            const imagem = document.createElement('img');
+            imagem.alt = '';
+            imagem.loading = 'eager';
+            imagem.decoding = 'async';
+            imagem.addEventListener('load', () => { fallback.hidden = true; }, { once: true });
+            imagem.addEventListener('error', () => { imagem.remove(); }, { once: true });
+            imagem.src = recompensa.image_url;
+            arte.appendChild(imagem);
+        }
+
+        const detalhes = document.createElement('span');
+        detalhes.className = 'modal-passe-recompensa-detalhes';
+        const quantidade = document.createElement('strong');
+        const prefixo = String(recompensa.prefixo || '×');
+        quantidade.textContent = `${prefixo}${Math.max(1, Number(recompensa.quantidade) || 1).toLocaleString('pt-BR')}`;
+        const nome = document.createElement('span');
+        nome.textContent = String(recompensa.nome || 'Recompensa');
+        detalhes.append(quantidade, nome);
+        cartao.append(arte, detalhes);
+        conteiner.appendChild(cartao);
+    });
+}
+
+function alertaPasseEldora(titulo, mensagem, sucesso = true, recompensas = []) {
     let modal = document.getElementById('modal-alerta-passe');
     if (!modal) {
         modal = document.createElement('div');
@@ -365,6 +407,7 @@ function alertaPasseEldora(titulo, mensagem, sucesso = true) {
                 <div class="modal-passe-icon" aria-hidden="true"></div>
                 <h2 id="alerta-passe-titulo" class="modal-passe-title"></h2>
                 <p id="alerta-passe-msg" class="modal-passe-msg"></p>
+                <div class="modal-passe-recompensas" role="list" aria-label="Itens recebidos" hidden></div>
                 <button type="button" class="btn-passe-continuar">Continuar</button>
             </section>`;
         modal.querySelector('.btn-passe-continuar').addEventListener('click', () => { modal.hidden = true; });
@@ -376,6 +419,7 @@ function alertaPasseEldora(titulo, mensagem, sucesso = true) {
     modal.querySelector('.modal-passe-icon').textContent = sucesso ? '✓' : '!';
     modal.querySelector('#alerta-passe-titulo').textContent = titulo;
     modal.querySelector('#alerta-passe-msg').textContent = mensagem;
+    preencherRecompensasAlerta(modal.querySelector('.modal-passe-recompensas'), sucesso ? recompensas : []);
     modal.hidden = false;
 }
 
@@ -391,7 +435,7 @@ async function coletarTudoLiberado() {
     try {
         const { response, data } = await enviarAcaoPasse('/api/passe/coletar_tudo', {});
         if (!response.ok || !['success', 'info'].includes(data.status)) throw new Error(data.message || 'Não foi possível coletar as recompensas.');
-        alertaPasseEldora(data.status === 'success' ? 'Recompensas coletadas' : 'Tudo em dia', data.message, data.status !== 'error');
+        alertaPasseEldora(data.status === 'success' ? 'Recompensas coletadas' : 'Tudo em dia', data.message, data.status !== 'error', data.recompensas);
         await carregarPasse();
     } catch (erro) {
         alertaPasseEldora('Coleta não concluída', erro.message || 'Falha de comunicação com o servidor.', false);
