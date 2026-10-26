@@ -793,46 +793,36 @@ button:focus-visible {
 .modal-passe-recompensa {
     display: flex;
     min-width: 0;
-    min-height: 60px;
     align-items: center;
     gap: 9px;
-    padding: 7px 9px;
-    border: 1px solid rgba(217, 183, 102, .38);
-    border-radius: 10px;
-    background: linear-gradient(145deg, #18283c, #101c2b);
+    padding: 4px;
     text-align: start;
 }
 
-.modal-passe-recompensa.fragmento {
-    border-color: rgba(240, 216, 149, .72);
-    background: linear-gradient(145deg, rgba(106, 77, 30, .54), rgba(34, 29, 24, .96));
-}
-
 .modal-passe-recompensas.single .modal-passe-recompensa {
-    min-height: 150px;
+    min-height: 0;
     flex-direction: column;
     justify-content: center;
-    gap: 10px;
-    padding: 16px;
+    gap: 12px;
+    padding: 0;
     text-align: center;
 }
 
 .modal-passe-recompensa-arte {
     position: relative;
     display: grid;
-    width: 42px;
-    height: 42px;
-    flex: 0 0 42px;
+    width: 48px;
+    height: 48px;
+    flex: 0 0 48px;
     place-items: center;
     overflow: hidden;
-    border-radius: 8px;
-    background: rgba(3, 9, 16, .48);
+    background: transparent;
 }
 
 .modal-passe-recompensas.single .modal-passe-recompensa-arte {
-    width: 62px;
-    height: 62px;
-    flex-basis: 62px;
+    width: 76px;
+    height: 76px;
+    flex-basis: 76px;
 }
 
 .modal-passe-recompensa-arte img {
