@@ -605,8 +605,7 @@ class MapaScene extends Phaser.Scene {
             'tiles_campos_linho_linho',
             'tiles_campos_linho_agua',
             'tiles_campos_linho_construcao',
-            'tiles_campos_linho_objetos_rurais',
-            'tiles_campos_linho_grama_estradas'
+            'tiles_campos_linho_objetos_rurais'
         ].forEach(chave => {
 
             if (this.textures.exists(chave)) {
@@ -625,8 +624,6 @@ class MapaScene extends Phaser.Scene {
         // ==========================================
         const camadasBaixas = this.regiaoAtual === 'campos_linho'
             ? [
-                'chao',
-                'Chao',
                 'chao1',
                 'Chao1',
                 'canteiros_linho',
@@ -668,6 +665,22 @@ class MapaScene extends Phaser.Scene {
             'pedras2',
             'pedreira_base'
         ];
+
+        // O PNG de grama e estradas já é o mapa completo de 60×60 tiles.
+        // Desenhá-lo como uma única imagem evita que uma falha no vínculo
+        // da camada Chao do Tiled deixe Campos de Linho com o fundo preto.
+        if (
+            this.regiaoAtual === 'campos_linho' &&
+            this.textures.exists('tiles_campos_linho_grama_estradas')
+        ) {
+            this.add.image(
+                0,
+                0,
+                'tiles_campos_linho_grama_estradas'
+            )
+                .setOrigin(0, 0)
+                .setDepth(-1);
+        }
 
         camadasBaixas.forEach(l => {
 
