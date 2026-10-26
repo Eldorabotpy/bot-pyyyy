@@ -180,6 +180,8 @@ def _catalogo_passe_com_imagens():
                 image_url = item_data.get("icon_url") or (
                     f"{assets}{item_fallbacks[item_id]}" if item_id in item_fallbacks else ""
                 )
+            elif reward_type == "gold":
+                image_url = f"{assets}perfil/ouro.png"
             elif reward_type == "gems":
                 image_url = f"{assets}itens/consumiveis/gems.png"
             elif reward_type == "banner" and reward.get("id") == "banner_xiongmaoren_s1":
