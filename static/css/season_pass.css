@@ -71,7 +71,7 @@ button:focus-visible {
     position: relative;
     display: flex;
     align-items: end;
-    min-height: 150px;
+    min-height: clamp(220px, 28vh, 240px);
     flex: 0 0 auto;
     overflow: hidden;
     padding: 22px clamp(18px, 3vw, 34px);
@@ -87,24 +87,9 @@ button:focus-visible {
     inset: 0;
     border-radius: inherit;
     background:
-        radial-gradient(ellipse at 78% 34%, rgba(212, 173, 91, .2), transparent 36%),
-        radial-gradient(ellipse at 16% 95%, rgba(73, 105, 139, .2), transparent 42%),
-        linear-gradient(115deg, #0b1725 0%, #1b2b3d 54%, #101b29 100%);
-}
-
-.pass-banner-placeholder {
-    position: absolute;
-    top: 12px;
-    right: 14px;
-    padding: 6px 8px;
-    border: 1px solid rgba(217, 183, 102, .42);
-    border-radius: 6px;
-    background: rgba(7, 17, 29, .58);
-    color: #e8cb86;
-    font-size: .7rem;
-    font-weight: 800;
-    letter-spacing: .1em;
-    pointer-events: none;
+        linear-gradient(90deg, rgba(7, 17, 29, .9) 0%, rgba(7, 17, 29, .72) 27%, rgba(7, 17, 29, .2) 56%, rgba(7, 17, 29, .04) 100%),
+        linear-gradient(0deg, rgba(4, 10, 18, .34), transparent 58%),
+        url('https://raw.githubusercontent.com/Eldorabotpy/bot-pyyyy/main/static/images/central_eldora/banner-passe-personagens.webp') center 36% / cover no-repeat;
 }
 
 .pass-header-content {
@@ -112,7 +97,6 @@ button:focus-visible {
     z-index: 1;
     display: flex;
     align-items: end;
-    justify-content: space-between;
     width: 100%;
     gap: 12px;
     text-shadow: 0 2px 8px #000;
@@ -133,6 +117,10 @@ button:focus-visible {
 }
 
 .level-badge {
+    position: absolute;
+    z-index: 1;
+    top: 16px;
+    right: clamp(18px, 3vw, 34px);
     flex: 0 0 auto;
     padding: 9px 12px;
     border: 1px solid rgba(244, 217, 150, .72);
@@ -772,13 +760,6 @@ button:focus-visible {
         border-radius: 12px;
     }
 
-    .pass-banner-placeholder {
-        top: 8px;
-        right: 8px;
-        padding: 4px 6px;
-        font-size: .75rem;
-    }
-
     .pass-header-kicker {
         margin-bottom: 4px;
         font-size: .75rem;
@@ -791,6 +772,8 @@ button:focus-visible {
     }
 
     .level-badge {
+        top: 8px;
+        right: 8px;
         padding: 7px 8px;
         font-size: .75rem;
     }
