@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#07111d">
     <title>Passe de Batalha - Eldora</title>
-    <link rel="stylesheet" href="/static/css/season_pass.css?v=18">
+    <link rel="stylesheet" href="/static/css/season_pass.css?v=20">
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -50,11 +50,9 @@
 
         <div id="pass-message" class="pass-message" role="status" aria-live="polite" hidden></div>
 
-        <div class="pass-rewards-list" id="lista-recompensas" aria-label="Recompensas por nível">
+        <div class="pass-rewards-list" id="lista-recompensas" role="region" tabindex="0" aria-label="Recompensas do Passe, níveis 1 a 100">
             <div class="pass-loading" role="status">Consultando a trilha...</div>
         </div>
-        <div id="controles-pagina-passe" class="pass-page-controls"></div>
-        
         <button class="btn-fechar" type="button" onclick="window.history.back()">
             <span class="pass-back-triangle" aria-hidden="true"></span>
             <span>Voltar</span>
@@ -62,6 +60,6 @@
     </div>
 
     <script src="/static/js/portal_session.js?v=1"></script>
-    <script src="/static/js/season_pass.js?v=106"></script>
+    <script src="/static/js/season_pass.js?v=107"></script>
 </body>
 </html>

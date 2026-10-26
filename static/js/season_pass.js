@@ -1,8 +1,5 @@
-const NIVEIS_POR_PAGINA = 20;
 const NIVEIS_PASSE = 100;
 const CUSTO_PREMIUM_PASSE = 500;
-let paginaPasseAtual = 0;
-let totalNiveisPasse = 0;
 let dadosPasseAtual = null;
 let acaoPasseEmAndamento = false;
 
@@ -212,14 +209,11 @@ function criarRecompensa(nivel, tipo, recompensa, jaResgatou, nivelAlcancado, pr
 
 function desenharRecompensas(passe, catalogo) {
     const lista = document.getElementById('lista-recompensas');
-    const controles = document.getElementById('controles-pagina-passe');
-    if (!lista || !controles) return;
+    if (!lista) return;
 
+    const posicaoRolagem = lista.scrollTop;
     lista.replaceChildren();
-    controles.replaceChildren();
     const niveis = Object.keys(catalogo).map(Number).filter(Number.isFinite).sort((a, b) => a - b);
-    totalNiveisPasse = niveis.length;
-    paginaPasseAtual = Math.min(paginaPasseAtual, Math.max(0, Math.ceil(totalNiveisPasse / NIVEIS_POR_PAGINA) - 1));
 
     if (!niveis.length) {
         const vazio = document.createElement('div');
@@ -232,10 +226,8 @@ function desenharRecompensas(passe, catalogo) {
     const claimedFree = new Set((passe.resgatados_free || []).map(Number));
     const claimedPremium = new Set((passe.resgatados_premium || []).map(Number));
     const nivelAtual = Math.min(NIVEIS_PASSE, Math.max(1, Number(passe.level) || 1));
-    const start = paginaPasseAtual * NIVEIS_POR_PAGINA;
-    const pageLevels = niveis.slice(start, start + NIVEIS_POR_PAGINA);
 
-    pageLevels.forEach((nivel) => {
+    niveis.forEach((nivel) => {
         const config = catalogo[nivel] || catalogo[String(nivel)];
         if (!config?.free || !config?.premium) return;
 
@@ -263,29 +255,7 @@ function desenharRecompensas(passe, catalogo) {
         ));
         lista.appendChild(row);
     });
-
-    const totalPages = Math.max(1, Math.ceil(totalNiveisPasse / NIVEIS_POR_PAGINA));
-    const firstLevel = start + 1;
-    const lastLevel = Math.min(start + NIVEIS_POR_PAGINA, totalNiveisPasse);
-    const previous = document.createElement('button');
-    previous.type = 'button';
-    previous.textContent = '← Anteriores';
-    previous.disabled = paginaPasseAtual === 0;
-    previous.addEventListener('click', () => mudarPaginaPasse(-1));
-    const range = document.createElement('span');
-    range.textContent = `${firstLevel}–${lastLevel} de ${totalNiveisPasse}`;
-    const next = document.createElement('button');
-    next.type = 'button';
-    next.textContent = 'Próximos →';
-    next.disabled = paginaPasseAtual >= totalPages - 1;
-    next.addEventListener('click', () => mudarPaginaPasse(1));
-    controles.append(previous, range, next);
-}
-
-function mudarPaginaPasse(delta) {
-    const totalPaginas = Math.ceil(totalNiveisPasse / NIVEIS_POR_PAGINA);
-    paginaPasseAtual = Math.max(0, Math.min(totalPaginas - 1, paginaPasseAtual + delta));
-    if (dadosPasseAtual) desenharRecompensas(dadosPasseAtual.status, dadosPasseAtual.catalogo);
+    lista.scrollTop = posicaoRolagem;
 }
 
 async function enviarAcaoPasse(url, payload) {

@@ -246,7 +246,6 @@ button:focus-visible {
 .btn-premium,
 .btn-coletar-tudo,
 .btn-fechar,
-.pass-page-controls button,
 .pass-retry,
 .btn-passe-comprar,
 .btn-passe-cancelar,
@@ -270,14 +269,12 @@ button:focus-visible {
 .btn-passe-comprar:hover,
 .btn-passe-cancelar:hover,
 .btn-passe-continuar:hover,
-.pass-page-controls button:hover:not(:disabled),
 .pass-retry:hover {
     filter: brightness(1.12);
 }
 
 .btn-premium:disabled,
 .btn-coletar-tudo:disabled,
-.pass-page-controls button:disabled,
 .reward-box:disabled {
     cursor: not-allowed;
 }
@@ -372,6 +369,12 @@ button:focus-visible {
     display: none;
     width: 0;
     height: 0;
+}
+
+.pass-rewards-list:focus-visible {
+    outline: 2px solid var(--pass-gold-bright);
+    outline-offset: 2px;
+    border-radius: 8px;
 }
 
 .reward-row {
@@ -629,34 +632,6 @@ button:focus-visible {
     width: 18px;
     height: 18px;
     object-fit: contain;
-}
-
-.pass-page-controls {
-    display: grid;
-    grid-template-columns: minmax(112px, 1fr) auto minmax(112px, 1fr);
-    align-items: center;
-    gap: 10px;
-    flex: 0 0 auto;
-    color: var(--pass-muted);
-    font-size: .8rem;
-    text-align: center;
-}
-
-.pass-page-controls button {
-    padding: 0 11px;
-    border: 1px solid var(--pass-line);
-    background: #17273a;
-    color: var(--pass-text);
-    font-size: .78rem;
-}
-
-.pass-page-controls button:disabled {
-    opacity: .48;
-}
-
-.pass-page-controls span {
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
 }
 
 .btn-fechar {
@@ -1077,18 +1052,6 @@ button:focus-visible {
         font-size: .75rem;
     }
 
-    .pass-page-controls {
-        grid-template-columns: minmax(96px, 1fr) auto minmax(96px, 1fr);
-        gap: 5px;
-        font-size: .75rem;
-    }
-
-    .pass-page-controls button {
-        min-height: 44px;
-        padding-inline: 5px;
-        font-size: .75rem;
-    }
-
     .btn-fechar {
         min-height: 46px;
     }
@@ -1139,13 +1102,6 @@ button:focus-visible {
         font-size: .75rem;
     }
 
-    .pass-page-controls {
-        grid-template-columns: minmax(80px, 1fr) auto minmax(80px, 1fr);
-    }
-
-    .pass-page-controls button {
-        font-size: .75rem;
-    }
 }
 
 @media (max-height: 720px) and (max-width: 640px) {
@@ -1177,8 +1133,7 @@ button:focus-visible {
     }
 
     .btn-coletar-tudo,
-    .btn-fechar,
-    .pass-page-controls button {
+    .btn-fechar {
         min-height: 40px;
     }
 }
