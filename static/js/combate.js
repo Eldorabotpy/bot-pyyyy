@@ -7,7 +7,13 @@ function atualizarBotaoRetornoGrupo() {
     const grupo = !!window.salaCombateGrupoAtual && sala?.tipo === 'cacada';
     const lider = String(sala?.lider_id) === String(localStorage.getItem('jogadorEldoraID'));
     botao.disabled = grupo && (!lider || retornoGrupoPendente);
-    botao.textContent = grupo ? (lider ? 'Voltar com o grupo ao mapa' : 'Aguardando o líder voltar ao mapa…') : '⬅️ Voltar ao Mapa';
+    botao.textContent = 'Voltar';
+    botao.title = grupo && !lider
+        ? 'Aguardando o líder voltar ao mapa'
+        : grupo && retornoGrupoPendente
+            ? 'Aguardando o retorno do grupo'
+            : 'Voltar ao mapa';
+    botao.setAttribute('aria-label', botao.title);
 }
 function receberRetornoGrupo(sala) {
     const id = String(sala?.sala_id || '');

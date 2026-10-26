@@ -733,14 +733,6 @@ class MotorCacada {
             telaCombate.style.display !== "none" &&
             getComputedStyle(telaCombate).display !== "none";
 
-        // Se quiser mostrar no combate de caçada, deixa true quando a tela de combate estiver aberta.
-        const estaEmCombateCacada =
-            combateAberto &&
-            window.dadosCombateAtual &&
-            !window.salaCombateGrupoAtual &&
-            !window.estadoCombateGrupoAtual &&
-            !window.raidInvasaoAtual;
-
         const menuAberto =
             document.body.classList.contains("menu-aberto") ||
             document.body.classList.contains("ui-modal-aberta") ||
@@ -759,7 +751,8 @@ class MotorCacada {
             "loja-reino-container",
             "loja-aventureiro-container",
             "tela-raid-invasao",
-            "tela-pvp-global"
+            "tela-pvp-global",
+            "tela-pve-global"
         ];
 
         const algumaUiAberta = idsBloqueadores.some(id => {
@@ -771,7 +764,8 @@ class MotorCacada {
         });
 
         const podeMostrar =
-            (estaNoMapa || estaEmCombateCacada) &&
+            estaNoMapa &&
+            !combateAberto &&
             !menuAberto &&
             !algumaUiAberta;
 

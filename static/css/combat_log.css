@@ -67,6 +67,8 @@
 #tela-combate-global #combat-log-box { min-height:clamp(138px,28dvh,210px) !important; }
 #tela-combate-global #combat-log-box { align-items:stretch !important; justify-content:flex-start !important; text-align:left !important; background:linear-gradient(145deg,#111c2d,#0a1220) !important; border:1px solid rgba(201,164,92,.32) !important; padding:9px !important; }
 #tela-combate-global #botoes-fim-batalha,#tela-pvp-global #pvp-botoes-fim-batalha,#tela-pve-global #pve-botoes-fim-batalha { flex:0 0 auto; padding-top:7px; border-top:1px solid #ffffff16; }
+#tela-combate-global #botoes-fim-batalha { justify-content:flex-start; padding:4px 8px 8px; border-top:0; }
+#tela-combate-global #botoes-fim-batalha .modern-btn { width:auto !important; min-width:78px; min-height:36px; padding:4px 14px !important; border-radius:8px; font-size:12px; box-shadow:0 2px 6px #0004; }
 .combat-action-panel .eldora-combat-log { flex:0 1 auto; max-height:none; }
 #tela-pvp-global .eldora-combat-log,#tela-pve-global .eldora-combat-log { max-height:min(34dvh,270px); }
 #tela-pvp-global .combat-action-panel,#tela-pve-global .combat-action-panel { max-height:52dvh; }
