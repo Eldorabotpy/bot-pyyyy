@@ -201,11 +201,15 @@ class MapaScene extends Phaser.Scene {
                 tiles_campos_linho_agua: 'campos_linho_agua.png',
                 tiles_campos_linho_construcao: 'campos_linho_construcao.png',
                 tiles_campos_linho_objetos_rurais: 'campos_linho_objetos_rurais.png',
-                tiles_campos_linho_grama_estradas: 'campos_linho_grama_estradas.png'
+                tiles_campos_linho_grama_estradas: 'campos_linho_grama_estradas.png',
+                tiles_campos_linho_bosque_lilas: 'campos_linho_bosque_lilas.png'
             };
 
             Object.entries(tilesetsCamposLinho).forEach(([chave, arquivo]) => {
-                this.load.image(chave, `/static/images/tilesets/${arquivo}`);
+                this.load.image(
+                    chave,
+                    `/static/images/tilesets/${arquivo}?v=9974`
+                );
             });
         }
         if (this.regiaoAtual === 'pedreira_granito') {
@@ -503,29 +507,68 @@ class MapaScene extends Phaser.Scene {
         }
 
         if (this.regiaoAtual === 'campos_linho') {
-            const texturasPorArquivo = {
-                'campos_linho_linho.png': 'tiles_campos_linho_linho',
-                'campos_linho_agua.png': 'tiles_campos_linho_agua',
-                'campos_linho_construcao.png': 'tiles_campos_linho_construcao',
-                'campos_linho_objetos_rurais.png': 'tiles_campos_linho_objetos_rurais',
-                'campos_linho_grama_estradas.png': 'tiles_campos_linho_grama_estradas'
+            const texturasPorFirstgid = {
+                1: 'tiles_campos_linho_linho',
+                3601: 'tiles_campos_linho_agua',
+                7201: 'tiles_campos_linho_construcao',
+                10801: 'tiles_campos_linho_objetos_rurais',
+                14401: 'tiles_campos_linho_grama_estradas'
+            };
+            const texturasPorNome = {
+                campos_linho_linho: 'tiles_campos_linho_linho',
+                campos_linho_agua: 'tiles_campos_linho_agua',
+                campos_linho_construcao: 'tiles_campos_linho_construcao',
+                campos_linho_grama_estradas: 'tiles_campos_linho_grama_estradas'
             };
 
             map.tilesets.forEach(tileset => {
-                const arquivoImagem = String(tileset.image || '')
-                    .replace(/\\/g, '/')
-                    .split('/')
-                    .pop();
-                const chaveTextura = texturasPorArquivo[arquivoImagem];
+                const nomeTileset = String(tileset.name || '');
+                const chaveTextura =
+                    texturasPorFirstgid[tileset.firstgid] ||
+                    texturasPorNome[nomeTileset] ||
+                    (nomeTileset.toLowerCase().includes('carro')
+                        ? 'tiles_campos_linho_objetos_rurais'
+                        : null);
 
-                if (!chaveTextura || !this.textures.exists(chaveTextura)) return;
+                if (!chaveTextura) {
+                    console.warn(
+                        '[Campos de Linho] Tileset sem textura mapeada:',
+                        tileset.name,
+                        tileset.firstgid
+                    );
+                    return;
+                }
+
+                if (!this.textures.exists(chaveTextura)) {
+                    console.warn(
+                        '[Campos de Linho] Textura não carregada:',
+                        chaveTextura,
+                        'para',
+                        tileset.name
+                    );
+                    return;
+                }
 
                 const tilesetCarregado = map.addTilesetImage(
                     tileset.name,
                     chaveTextura
                 );
 
-                if (tilesetCarregado) todosTilesets.push(tilesetCarregado);
+                if (tilesetCarregado) {
+                    todosTilesets.push(tilesetCarregado);
+                    console.info(
+                        '[Campos de Linho] Tileset vinculado:',
+                        tileset.name,
+                        '→',
+                        chaveTextura
+                    );
+                } else {
+                    console.warn(
+                        '[Campos de Linho] Phaser não encontrou o tileset no TMJ:',
+                        tileset.name,
+                        tileset.firstgid
+                    );
+                }
             });
         }
 
@@ -665,6 +708,20 @@ class MapaScene extends Phaser.Scene {
             'pedras2',
             'pedreira_base'
         ];
+
+        // Cartela em tela cheia, transparente fora do bosque lilás no sudeste.
+        if (
+            this.regiaoAtual === 'campos_linho' &&
+            this.textures.exists('tiles_campos_linho_bosque_lilas')
+        ) {
+            this.add.image(
+                0,
+                0,
+                'tiles_campos_linho_bosque_lilas'
+            )
+                .setOrigin(0, 0)
+                .setDepth(1);
+        }
 
         // O PNG de grama e estradas já é o mapa completo de 60×60 tiles.
         // Desenhá-lo como uma única imagem evita que uma falha no vínculo
