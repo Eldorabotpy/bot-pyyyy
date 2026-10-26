@@ -364,21 +364,14 @@ button:focus-visible {
     padding: 2px 6px 2px 1px;
     overflow: auto;
     overscroll-behavior: contain;
-    scrollbar-width: thin;
-    scrollbar-color: #987a3f transparent;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
 }
 
 .pass-rewards-list::-webkit-scrollbar {
-    width: 6px;
-}
-
-.pass-rewards-list::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-.pass-rewards-list::-webkit-scrollbar-thumb {
-    border-radius: 8px;
-    background: #987a3f;
+    display: none;
+    width: 0;
+    height: 0;
 }
 
 .reward-row {
@@ -667,13 +660,34 @@ button:focus-visible {
 }
 
 .btn-fechar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    align-self: flex-end;
+    gap: 8px;
     flex: 0 0 auto;
-    width: 100%;
-    padding: 0 14px;
-    border: 1px solid rgba(181, 195, 208, .3);
+    width: auto;
+    min-width: 92px;
+    min-height: 38px;
+    padding: 0 10px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--pass-muted);
+    font-size: .78rem;
+}
+
+.pass-back-triangle {
+    width: 0;
+    height: 0;
+    border-top: 5px solid transparent;
+    border-right: 7px solid currentColor;
+    border-bottom: 5px solid transparent;
+}
+
+.btn-fechar:hover {
+    border-color: var(--pass-line);
     background: #172536;
-    color: #e7edf3;
-    font-size: .85rem;
+    color: var(--pass-text);
 }
 
 .pass-loading,
