@@ -195,6 +195,19 @@ class MapaScene extends Phaser.Scene {
         this.load.image('tiles_casas', '/static/images/tilesets/casas.png'); 
         this.load.image('tiles_hpg', '/static/images/tilesets/HPGLobbyTileset.png');
         this.load.image('tiles_arvores', '/static/images/tilesets/arvores.png');
+        if (this.regiaoAtual === 'campos_linho') {
+            const tilesetsCamposLinho = {
+                tiles_campos_linho_linho: 'campos_linho_linho.png',
+                tiles_campos_linho_agua: 'campos_linho_agua.png',
+                tiles_campos_linho_construcao: 'campos_linho_construcao.png',
+                tiles_campos_linho_objetos_rurais: 'campos_linho_objetos_rurais.png',
+                tiles_campos_linho_grama_estradas: 'campos_linho_grama_estradas.png'
+            };
+
+            Object.entries(tilesetsCamposLinho).forEach(([chave, arquivo]) => {
+                this.load.image(chave, `/static/images/tilesets/${arquivo}`);
+            });
+        }
         if (this.regiaoAtual === 'pedreira_granito') {
             this.load.image('tiles_pedreira', '/static/images/tilesets/pedreira.png');
         }
@@ -489,6 +502,33 @@ class MapaScene extends Phaser.Scene {
             );
         }
 
+        if (this.regiaoAtual === 'campos_linho') {
+            const texturasPorArquivo = {
+                'campos_linho_linho.png': 'tiles_campos_linho_linho',
+                'campos_linho_agua.png': 'tiles_campos_linho_agua',
+                'campos_linho_construcao.png': 'tiles_campos_linho_construcao',
+                'campos_linho_objetos_rurais.png': 'tiles_campos_linho_objetos_rurais',
+                'campos_linho_grama_estradas.png': 'tiles_campos_linho_grama_estradas'
+            };
+
+            map.tilesets.forEach(tileset => {
+                const arquivoImagem = String(tileset.image || '')
+                    .replace(/\\/g, '/')
+                    .split('/')
+                    .pop();
+                const chaveTextura = texturasPorArquivo[arquivoImagem];
+
+                if (!chaveTextura || !this.textures.exists(chaveTextura)) return;
+
+                const tilesetCarregado = map.addTilesetImage(
+                    tileset.name,
+                    chaveTextura
+                );
+
+                if (tilesetCarregado) todosTilesets.push(tilesetCarregado);
+            });
+        }
+
         if (map.tilesets.some(t => t.name === 'pedreira')) {
             todosTilesets.push(
                 map.addTilesetImage('pedreira', 'tiles_pedreira')
@@ -561,7 +601,12 @@ class MapaScene extends Phaser.Scene {
             'tiles_casas',
             'tiles_hpg',
             'tiles_arvores',
-            'tiles_pedreira'
+            'tiles_pedreira',
+            'tiles_campos_linho_linho',
+            'tiles_campos_linho_agua',
+            'tiles_campos_linho_construcao',
+            'tiles_campos_linho_objetos_rurais',
+            'tiles_campos_linho_grama_estradas'
         ].forEach(chave => {
 
             if (this.textures.exists(chave)) {
@@ -578,7 +623,17 @@ class MapaScene extends Phaser.Scene {
         // ==========================================
         // 🗺️ CAMADAS BAIXAS DOS MAPAS
         // ==========================================
-        const camadasBaixas = [
+        const camadasBaixas = this.regiaoAtual === 'campos_linho'
+            ? [
+                'chao',
+                'chao1',
+                'canteiros_linho',
+                'casas',
+                'campos_linho_arvores',
+                'campos_linho_agua',
+                'Decoracao'
+            ]
+            : [
             // DUNGEON
             'fundo',
             'chao',
