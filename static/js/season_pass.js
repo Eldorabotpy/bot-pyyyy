@@ -131,25 +131,35 @@ function atualizarCompraPremium(passe) {
 function criarRecompensa(nivel, tipo, recompensa, jaResgatou, nivelAlcancado, premiumAtivo, fragmentos, imagemFragmento) {
     const faixaPremium = tipo === 'premium';
     const bloqueada = faixaPremium && !premiumAtivo;
+    const fragmentoNoLugarDoOuro = recompensa.tipo === 'skin_fragments'
+        || (recompensa.tipo === 'gold' && fragmentos > 0);
+    const recompensaExibida = fragmentoNoLugarDoOuro && recompensa.tipo !== 'skin_fragments'
+        ? {
+            tipo: 'skin_fragments',
+            label: `${fragmentos} ${fragmentos === 1 ? 'Fragmento' : 'Fragmentos'}`,
+            image_url: imagemFragmento,
+        }
+        : recompensa;
+    const fragmentosExtras = fragmentoNoLugarDoOuro ? 0 : fragmentos;
     const button = document.createElement('button');
     button.type = 'button';
-    button.className = `reward-box reward-${tipo} ${fragmentos > 0 ? 'has-fragment' : ''} ${jaResgatou ? 'resgatado' : ''} ${bloqueada ? 'locked' : ''} ${nivelAlcancado ? 'available' : 'unreached'}`;
+    button.className = `reward-box reward-${tipo} ${fragmentoNoLugarDoOuro ? 'fragment-main' : ''} ${fragmentosExtras > 0 ? 'has-fragment' : ''} ${jaResgatou ? 'resgatado' : ''} ${bloqueada ? 'locked' : ''} ${nivelAlcancado ? 'available' : 'unreached'}`;
     button.disabled = jaResgatou || !nivelAlcancado || bloqueada || acaoPasseEmAndamento;
-    const descricaoFragmentos = fragmentos > 0 ? `, mais ${fragmentos} fragmento${fragmentos === 1 ? '' : 's'} para a Loja` : '';
-    button.setAttribute('aria-label', `${faixaPremium ? 'Premium' : 'Grátis'}, nível ${nivel}: ${jaResgatou ? 'já resgatado' : recompensa.label}${descricaoFragmentos}`);
+    const descricaoFragmentos = fragmentosExtras > 0 ? `, mais ${fragmentosExtras} fragmento${fragmentosExtras === 1 ? '' : 's'} para a Loja` : '';
+    button.setAttribute('aria-label', `${faixaPremium ? 'Premium' : 'Grátis'}, nível ${nivel}: ${jaResgatou ? 'já resgatado' : recompensaExibida.label}${descricaoFragmentos}`);
 
     const art = document.createElement('span');
-    art.className = `reward-art ${recompensa.tipo === 'gold' ? 'currency-gold' : ''}`;
+    art.className = `reward-art ${recompensaExibida.tipo === 'gold' ? 'currency-gold' : ''} ${recompensaExibida.tipo === 'skin_fragments' ? 'currency-fragment' : ''}`;
     art.setAttribute('aria-hidden', 'true');
     const fallback = document.createElement('span');
     fallback.className = 'reward-art-fallback';
-    fallback.textContent = recompensa.tipo === 'gold' ? '🪙' : recompensa.tipo === 'gems' ? '💎' : recompensa.tipo === 'banner' ? '⚑' : '✦';
+    fallback.textContent = recompensaExibida.tipo === 'gold' ? '🪙' : recompensaExibida.tipo === 'gems' ? '💎' : recompensaExibida.tipo === 'banner' ? '⚑' : '✦';
     art.appendChild(fallback);
-    if (recompensa.image_url) {
+    if (recompensaExibida.image_url) {
         const image = document.createElement('img');
         image.loading = 'lazy';
         image.decoding = 'async';
-        image.src = recompensa.image_url;
+        image.src = recompensaExibida.image_url;
         image.alt = '';
         image.addEventListener('load', () => { fallback.hidden = true; });
         image.addEventListener('error', () => { image.hidden = true; });
@@ -162,12 +172,12 @@ function criarRecompensa(nivel, tipo, recompensa, jaResgatou, nivelAlcancado, pr
     faixa.textContent = faixaPremium ? 'PREMIUM' : 'GRÁTIS';
     const nome = document.createElement('span');
     nome.className = 'reward-name';
-    nome.textContent = jaResgatou ? '✓ Resgatado' : recompensa.label;
+    nome.textContent = jaResgatou ? '✓ Resgatado' : recompensaExibida.label;
     copy.append(faixa, nome);
 
     button.append(art, copy);
 
-    if (fragmentos > 0) {
+    if (fragmentosExtras > 0) {
         const extra = document.createElement('span');
         extra.className = `pass-fragment-reward ${jaResgatou ? 'claimed' : ''}`;
         extra.setAttribute('aria-hidden', 'true');
@@ -181,7 +191,7 @@ function criarRecompensa(nivel, tipo, recompensa, jaResgatou, nivelAlcancado, pr
             extra.appendChild(image);
         }
         const extraText = document.createElement('span');
-        extraText.textContent = `+${fragmentos} fragmento${fragmentos === 1 ? '' : 's'}`;
+        extraText.textContent = `+${fragmentosExtras} fragmento${fragmentosExtras === 1 ? '' : 's'}`;
         extra.appendChild(extraText);
         button.appendChild(extra);
     }
@@ -358,10 +368,13 @@ function preencherRecompensasAlerta(conteiner, recompensas) {
     conteiner.replaceChildren();
     const lista = Array.isArray(recompensas) ? recompensas : [];
     conteiner.hidden = lista.length === 0;
+    conteiner.classList.toggle('single', lista.length === 1);
+    conteiner.classList.toggle('multiple', lista.length > 1);
 
     lista.forEach((recompensa) => {
         const cartao = document.createElement('div');
-        cartao.className = `modal-passe-recompensa ${recompensa.tipo === 'fragmento_skin' ? 'fragmento' : ''}`;
+        const ehFragmento = ['fragmento_skin', 'skin_fragments'].includes(recompensa.tipo);
+        cartao.className = `modal-passe-recompensa ${ehFragmento ? 'fragmento' : ''}`;
         cartao.setAttribute('role', 'listitem');
 
         const arte = document.createElement('span');
@@ -419,7 +432,9 @@ function alertaPasseEldora(titulo, mensagem, sucesso = true, recompensas = []) {
     modal.querySelector('.modal-passe-icon').textContent = sucesso ? '✓' : '!';
     modal.querySelector('#alerta-passe-titulo').textContent = titulo;
     modal.querySelector('#alerta-passe-msg').textContent = mensagem;
-    preencherRecompensasAlerta(modal.querySelector('.modal-passe-recompensas'), sucesso ? recompensas : []);
+    const listaRecompensas = sucesso ? recompensas : [];
+    box.classList.toggle('has-recompensas', Array.isArray(listaRecompensas) && listaRecompensas.length > 0);
+    preencherRecompensasAlerta(modal.querySelector('.modal-passe-recompensas'), listaRecompensas);
     modal.hidden = false;
 }
 

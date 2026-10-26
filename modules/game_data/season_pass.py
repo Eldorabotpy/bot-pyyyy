@@ -91,7 +91,7 @@ for i in range(1, NIVEIS_PASSE_POR_TEMPORADA + 1):
 
 
 def _realocar_fragmentos_para_ouro():
-    """Mantém fragmentos na faixa de ouro; itens não carregam fragmentos."""
+    """Mantém fragmentos nos níveis de ouro para substituir a recompensa de ouro."""
     for tipo_faixa in ("free", "premium"):
         transferencias = []
         for nivel, dados in RECOMPENSAS_PASSE.items():

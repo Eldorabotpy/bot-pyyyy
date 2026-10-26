@@ -223,6 +223,23 @@ def _fragmentos_skin_para_resgate(passe, nivel, faixa, reward_set):
     return int((reward_set.get("fragmentos_skin") or {}).get(faixa, 0) or 0)
 
 
+def _premio_passe_com_fragmentos(passe, nivel, faixa, reward_set):
+    """Troca o ouro por fragmentos nos níveis que carregam os dois prêmios."""
+    from copy import deepcopy
+
+    reward = deepcopy(reward_set.get(faixa) or {})
+    fragmentos = _fragmentos_skin_para_resgate(passe, nivel, faixa, reward_set)
+    if reward.get("tipo") == "gold" and fragmentos > 0:
+        label = "Fragmento" if fragmentos == 1 else "Fragmentos"
+        return {
+            "tipo": "skin_fragments",
+            "id": "fragmento_skin",
+            "qtd": fragmentos,
+            "label": f"{fragmentos} {label}",
+        }, 0
+    return reward, fragmentos
+
+
 def _imagem_recompensa(reward):
     from modules import game_data
 
@@ -232,6 +249,8 @@ def _imagem_recompensa(reward):
         return f"{assets}perfil/ouro.png"
     if reward_type == "gems":
         return f"{assets}itens/consumiveis/gems.png"
+    if reward_type == "skin_fragments":
+        return f"{assets}itens/consumiveis/fragmento_skin.png"
     if reward_type == "banner" and reward.get("id") == "banner_xiongmaoren_s1":
         return f"{assets}banners/banner_xiongmaoren_s1.png"
     if reward_type == "item":
@@ -260,6 +279,9 @@ def _resumo_visual_recompensa(reward):
         prefix = "+"
     elif reward_type == "gems":
         name = "Gemas"
+        prefix = "+"
+    elif reward_type == "skin_fragments":
+        name = "Fragmentos para a Loja"
         prefix = "+"
     elif reward_type == "item":
         name = game_data.ITEMS_DATA.get(item_id, {}).get("display_name") or reward.get("label", "Item")
@@ -305,14 +327,16 @@ def _agregar_recompensas_visuais(recompensas):
     return list(agregadas.values())
 
 
-def _catalogo_passe_com_imagens():
+def _catalogo_passe_com_imagens(passe):
     from copy import deepcopy
     catalog = deepcopy(RECOMPENSAS_PASSE)
     assets = "https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/"
 
-    for level_data in catalog.values():
+    for nivel, level_data in catalog.items():
         for track in ("free", "premium"):
-            reward = level_data.get(track) or {}
+            reward, fragmentos = _premio_passe_com_fragmentos(passe, int(nivel), track, level_data)
+            level_data[track] = reward
+            level_data["fragmentos_skin"][track] = fragmentos
             image_url = _imagem_recompensa(reward) if reward else ""
             if image_url:
                 reward["image_url"] = image_url
@@ -331,6 +355,9 @@ def _apply_pass_reward(player, reward, membership):
         return {"gold": int(reward.get("qtd", 0) or 0)}
     if reward_type == "gems":
         return {"gems": int(reward.get("qtd", 0) or 0)}
+    if reward_type == "skin_fragments":
+        quantity = int(reward.get("qtd", 0) or 0)
+        return {"skin_fragments": quantity} if quantity > 0 else {"invalid": True}
     if reward_type == "item":
         from modules.player.inventory import try_add_item_to_inventory
         item_id = str(reward.get("id") or "")
@@ -361,13 +388,7 @@ def status_passe(user_id):
         gemas = int(jogador.get("gems", 0) or 0)
     except (TypeError, ValueError):
         return jsonify({"erro": "Dados do Passe inválidos. Atualize o personagem e tente novamente."}), 409
-    catalogo = _catalogo_passe_com_imagens()
-    ja_recebidos = passe.get("fragmentos_skin_ja_recebidos") or {}
-    for faixa in ("free", "premium"):
-        for nivel in ja_recebidos.get(faixa, []) or []:
-            nivel_config = catalogo.get(int(nivel))
-            if nivel_config:
-                nivel_config["fragmentos_skin"][faixa] = 0
+    catalogo = _catalogo_passe_com_imagens(passe)
 
     response = jsonify({
         "status": {
@@ -417,7 +438,7 @@ def api_resgatar_passe():
             return jsonify(status="error", message="Esta recompensa já foi resgatada."), 409
 
         reward_config = RECOMPENSAS_PASSE[nivel]
-        reward = reward_config.get(tipo)
+        reward, fragmentos = _premio_passe_com_fragmentos(passe, nivel, tipo, reward_config)
         if not reward:
             return jsonify(status="error", message="Recompensa não configurada."), 404
 
@@ -436,9 +457,9 @@ def api_resgatar_passe():
             increments["gold"] = result["gold"]
         if result.get("gems"):
             increments["gems"] = result["gems"]
-        fragmentos = _fragmentos_skin_para_resgate(passe, nivel, tipo, reward_config)
-        if fragmentos:
-            increments["skin_fragments"] = fragmentos
+        fragmentos_aplicados = int(result.get("skin_fragments", 0) or 0) + fragmentos
+        if fragmentos_aplicados:
+            increments["skin_fragments"] = fragmentos_aplicados
         if increments:
             update["$inc"] = increments
         for field, values in membership.items():
@@ -556,7 +577,7 @@ def api_coletar_tudo():
             for tipo, already_claimed in (("free", free_claimed), ("premium", premium_claimed)):
                 if tipo == "premium" and not premium:
                     continue
-                reward = reward_set.get(tipo)
+                reward, fragmentos_nivel = _premio_passe_com_fragmentos(passe, nivel, tipo, reward_set)
                 if nivel in already_claimed or not reward:
                     continue
                 applied = _apply_pass_reward(jogador, reward, membership)
@@ -567,10 +588,10 @@ def api_coletar_tudo():
                     return jsonify(status="error", message=f"A recompensa do nível {nivel} está configurada incorretamente."), 500
                 totals["gold"] += applied.get("gold", 0)
                 totals["gems"] += applied.get("gems", 0)
+                fragmentos_aplicados = int(applied.get("skin_fragments", 0) or 0)
                 totals["rewards"] += 1
                 recompensas_visuais.append(_resumo_visual_recompensa(reward))
-                fragmentos_nivel = _fragmentos_skin_para_resgate(passe, nivel, tipo, reward_set)
-                totals["skin_fragments"] += fragmentos_nivel
+                totals["skin_fragments"] += fragmentos_aplicados + fragmentos_nivel
                 if fragmentos_nivel:
                     recompensas_visuais.append(_resumo_visual_fragmentos(fragmentos_nivel))
                 claims[tipo].append(nivel)

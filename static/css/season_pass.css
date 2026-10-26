@@ -462,6 +462,11 @@ button:focus-visible {
     padding: 7px 10px;
 }
 
+.reward-box.fragment-main {
+    border-color: rgba(240, 216, 149, .78);
+    background: linear-gradient(145deg, #26334a, #19243a 72%, #302a43);
+}
+
 .reward-box.has-fragment > .reward-art {
     grid-column: 1;
     grid-row: 1;
@@ -510,6 +515,11 @@ button:focus-visible {
 .reward-art.currency-gold .reward-art-fallback {
     color: #5e4019;
     font-size: 1.25rem;
+}
+
+.reward-art.currency-fragment {
+    border-color: rgba(229, 191, 255, .72);
+    background: linear-gradient(145deg, #533779, #2b2445 72%, #17253b);
 }
 
 .reward-copy {
@@ -711,6 +721,10 @@ button:focus-visible {
     text-align: center;
 }
 
+.modal-passe-box.has-recompensas {
+    width: min(100%, 420px);
+}
+
 .modal-passe-icon {
     display: grid;
     width: 50px;
@@ -750,6 +764,18 @@ button:focus-visible {
     scrollbar-color: #987a3f transparent;
 }
 
+.modal-passe-recompensas[hidden] {
+    display: none;
+}
+
+.modal-passe-recompensas.single {
+    grid-template-columns: minmax(0, min(100%, 270px));
+    justify-content: center;
+    max-height: none;
+    margin: -8px auto 18px;
+    overflow: visible;
+}
+
 .modal-passe-recompensa {
     display: flex;
     min-width: 0;
@@ -768,6 +794,15 @@ button:focus-visible {
     background: linear-gradient(145deg, rgba(106, 77, 30, .54), rgba(34, 29, 24, .96));
 }
 
+.modal-passe-recompensas.single .modal-passe-recompensa {
+    min-height: 150px;
+    flex-direction: column;
+    justify-content: center;
+    gap: 10px;
+    padding: 16px;
+    text-align: center;
+}
+
 .modal-passe-recompensa-arte {
     position: relative;
     display: grid;
@@ -778,6 +813,12 @@ button:focus-visible {
     overflow: hidden;
     border-radius: 8px;
     background: rgba(3, 9, 16, .48);
+}
+
+.modal-passe-recompensas.single .modal-passe-recompensa-arte {
+    width: 62px;
+    height: 62px;
+    flex-basis: 62px;
 }
 
 .modal-passe-recompensa-arte img {
@@ -804,10 +845,19 @@ button:focus-visible {
     gap: 2px;
 }
 
+.modal-passe-recompensas.single .modal-passe-recompensa-detalhes {
+    align-items: center;
+    gap: 4px;
+}
+
 .modal-passe-recompensa-detalhes strong {
     color: #ffe6a0;
     font-size: .9rem;
     font-variant-numeric: tabular-nums;
+}
+
+.modal-passe-recompensas.single .modal-passe-recompensa-detalhes strong {
+    font-size: 1.08rem;
 }
 
 .modal-passe-recompensa-detalhes > span {
