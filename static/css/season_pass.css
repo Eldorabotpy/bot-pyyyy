@@ -764,8 +764,14 @@ button:focus-visible {
     margin: -8px 0 18px;
     overflow: auto;
     overscroll-behavior: contain;
-    scrollbar-width: thin;
-    scrollbar-color: #987a3f transparent;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.modal-passe-recompensas::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
 }
 
 .modal-passe-recompensas[hidden] {
