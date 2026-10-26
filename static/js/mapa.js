@@ -626,11 +626,17 @@ class MapaScene extends Phaser.Scene {
         const camadasBaixas = this.regiaoAtual === 'campos_linho'
             ? [
                 'chao',
+                'Chao',
                 'chao1',
+                'Chao1',
                 'canteiros_linho',
+                'Canteiros linho',
                 'casas',
+                'Casas',
                 'campos_linho_arvores',
+                'Campos linho arvores',
                 'campos_linho_agua',
+                'Campos linho agua',
                 'Decoracao'
             ]
             : [
