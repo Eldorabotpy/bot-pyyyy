@@ -452,6 +452,26 @@ button:focus-visible {
     position: relative;
 }
 
+.reward-box.has-fragment {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 5px 8px;
+    min-height: 86px;
+    padding: 7px 10px;
+}
+
+.reward-box.has-fragment > .reward-art {
+    grid-column: 1;
+    grid-row: 1;
+}
+
+.reward-box.has-fragment > .reward-copy {
+    grid-column: 2;
+    grid-row: 1;
+}
+
 .reward-art {
     position: relative;
     display: grid;
@@ -578,18 +598,33 @@ button:focus-visible {
 }
 
 .pass-fragment-reward {
-    display: inline-flex;
+    grid-column: 1 / -1;
+    grid-row: 2;
+    display: flex;
     align-items: center;
-    gap: 4px;
-    color: #f0d895;
-    font-size: .7rem;
-    font-weight: 700;
-    line-height: 1.2;
+    justify-content: center;
+    gap: 6px;
+    min-height: 24px;
+    padding: 3px 8px;
+    border: 1px solid rgba(240, 216, 149, .58);
+    border-radius: 7px;
+    background: linear-gradient(180deg, rgba(132, 97, 37, .54), rgba(65, 48, 22, .74));
+    color: #ffe7a2;
+    font-size: .75rem;
+    font-weight: 800;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.pass-fragment-reward.claimed {
+    border-color: rgba(115, 213, 162, .5);
+    background: linear-gradient(180deg, rgba(38, 101, 77, .56), rgba(19, 59, 49, .8));
+    color: #c9e7d8;
 }
 
 .pass-fragment-reward img {
-    width: 17px;
-    height: 17px;
+    width: 18px;
+    height: 18px;
     object-fit: contain;
 }
 
@@ -849,6 +884,12 @@ button:focus-visible {
         border-radius: 9px;
     }
 
+    .reward-box.has-fragment {
+        min-height: 82px;
+        gap: 4px 6px;
+        padding: 6px 7px;
+    }
+
     .reward-art {
         width: 38px;
         height: 38px;
@@ -877,8 +918,8 @@ button:focus-visible {
     }
 
     .pass-fragment-reward img {
-        width: 14px;
-        height: 14px;
+        width: 16px;
+        height: 16px;
     }
 
     .reward-lock {
@@ -945,6 +986,10 @@ button:focus-visible {
 
     .reward-box {
         padding-inline: 7px;
+    }
+
+    .reward-box.has-fragment {
+        padding-inline: 6px;
     }
 
     .reward-art {

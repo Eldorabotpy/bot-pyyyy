@@ -133,9 +133,10 @@ function criarRecompensa(nivel, tipo, recompensa, jaResgatou, nivelAlcancado, pr
     const bloqueada = faixaPremium && !premiumAtivo;
     const button = document.createElement('button');
     button.type = 'button';
-    button.className = `reward-box reward-${tipo} ${jaResgatou ? 'resgatado' : ''} ${bloqueada ? 'locked' : ''} ${nivelAlcancado ? 'available' : 'unreached'}`;
+    button.className = `reward-box reward-${tipo} ${fragmentos > 0 ? 'has-fragment' : ''} ${jaResgatou ? 'resgatado' : ''} ${bloqueada ? 'locked' : ''} ${nivelAlcancado ? 'available' : 'unreached'}`;
     button.disabled = jaResgatou || !nivelAlcancado || bloqueada || acaoPasseEmAndamento;
-    button.setAttribute('aria-label', `${faixaPremium ? 'Premium' : 'Grátis'}, nível ${nivel}: ${jaResgatou ? 'já resgatado' : recompensa.label}`);
+    const descricaoFragmentos = fragmentos > 0 ? `, mais ${fragmentos} fragmento${fragmentos === 1 ? '' : 's'} para a Loja` : '';
+    button.setAttribute('aria-label', `${faixaPremium ? 'Premium' : 'Grátis'}, nível ${nivel}: ${jaResgatou ? 'já resgatado' : recompensa.label}${descricaoFragmentos}`);
 
     const art = document.createElement('span');
     art.className = `reward-art ${recompensa.tipo === 'gold' ? 'currency-gold' : ''}`;
@@ -164,9 +165,12 @@ function criarRecompensa(nivel, tipo, recompensa, jaResgatou, nivelAlcancado, pr
     nome.textContent = jaResgatou ? '✓ Resgatado' : recompensa.label;
     copy.append(faixa, nome);
 
-    if (fragmentos > 0 && !jaResgatou) {
+    button.append(art, copy);
+
+    if (fragmentos > 0) {
         const extra = document.createElement('span');
-        extra.className = 'pass-fragment-reward';
+        extra.className = `pass-fragment-reward ${jaResgatou ? 'claimed' : ''}`;
+        extra.setAttribute('aria-hidden', 'true');
         if (imagemFragmento) {
             const image = document.createElement('img');
             image.loading = 'lazy';
@@ -177,12 +181,11 @@ function criarRecompensa(nivel, tipo, recompensa, jaResgatou, nivelAlcancado, pr
             extra.appendChild(image);
         }
         const extraText = document.createElement('span');
-        extraText.textContent = `+${fragmentos} fragmento${fragmentos === 1 ? '' : 's'} para a loja`;
+        extraText.textContent = `+${fragmentos} fragmento${fragmentos === 1 ? '' : 's'}`;
         extra.appendChild(extraText);
-        copy.appendChild(extra);
+        button.appendChild(extra);
     }
 
-    button.append(art, copy);
     if (bloqueada) {
         const lock = document.createElement('span');
         lock.className = 'reward-lock';
