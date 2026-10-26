@@ -200,15 +200,15 @@ class MapaScene extends Phaser.Scene {
                 tiles_campos_linho_linho: 'campos_linho_linho.png',
                 tiles_campos_linho_agua: 'campos_linho_agua.png',
                 tiles_campos_linho_construcao: 'campos_linho_construcao.png',
-                tiles_campos_linho_objetos_rurais: 'campos_linho_objetos_rurais.png',
                 tiles_campos_linho_grama_estradas: 'campos_linho_grama_estradas.png',
-                tiles_campos_linho_bosque_lilas: 'campos_linho_bosque_lilas.png'
+                tiles_campos_linho_bosque_lilas: 'campos_linho_bosque_lilas.png',
+                tiles_campos_linho_vegetacao_rara: 'campos_linho_vegetacao_rara.png'
             };
 
             Object.entries(tilesetsCamposLinho).forEach(([chave, arquivo]) => {
                 this.load.image(
                     chave,
-                    `/static/images/tilesets/${arquivo}?v=9974`
+                    `/static/images/tilesets/${arquivo}?v=9975`
                 );
             });
         }
@@ -507,13 +507,6 @@ class MapaScene extends Phaser.Scene {
         }
 
         if (this.regiaoAtual === 'campos_linho') {
-            const texturasPorFirstgid = {
-                1: 'tiles_campos_linho_linho',
-                3601: 'tiles_campos_linho_agua',
-                7201: 'tiles_campos_linho_construcao',
-                10801: 'tiles_campos_linho_objetos_rurais',
-                14401: 'tiles_campos_linho_grama_estradas'
-            };
             const texturasPorNome = {
                 campos_linho_linho: 'tiles_campos_linho_linho',
                 campos_linho_agua: 'tiles_campos_linho_agua',
@@ -523,19 +516,18 @@ class MapaScene extends Phaser.Scene {
 
             map.tilesets.forEach(tileset => {
                 const nomeTileset = String(tileset.name || '');
-                const chaveTextura =
-                    texturasPorFirstgid[tileset.firstgid] ||
-                    texturasPorNome[nomeTileset] ||
-                    (nomeTileset.toLowerCase().includes('carro')
-                        ? 'tiles_campos_linho_objetos_rurais'
-                        : null);
+                const chaveTextura = texturasPorNome[nomeTileset];
 
                 if (!chaveTextura) {
-                    console.warn(
-                        '[Campos de Linho] Tileset sem textura mapeada:',
-                        tileset.name,
-                        tileset.firstgid
-                    );
+                    // O tileset de árvores já foi associado pelo fluxo comum.
+                    // portal_anim não é usado por nenhuma camada deste mapa.
+                    if (nomeTileset !== 'arvores' && nomeTileset !== 'portal_anim') {
+                        console.warn(
+                            '[Campos de Linho] Tileset sem textura mapeada:',
+                            tileset.name,
+                            tileset.firstgid
+                        );
+                    }
                     return;
                 }
 
@@ -647,8 +639,7 @@ class MapaScene extends Phaser.Scene {
             'tiles_pedreira',
             'tiles_campos_linho_linho',
             'tiles_campos_linho_agua',
-            'tiles_campos_linho_construcao',
-            'tiles_campos_linho_objetos_rurais'
+            'tiles_campos_linho_construcao'
         ].forEach(chave => {
 
             if (this.textures.exists(chave)) {
@@ -709,18 +700,19 @@ class MapaScene extends Phaser.Scene {
             'pedreira_base'
         ];
 
-        // Cartela em tela cheia, transparente fora do bosque lilás no sudeste.
-        if (
-            this.regiaoAtual === 'campos_linho' &&
-            this.textures.exists('tiles_campos_linho_bosque_lilas')
-        ) {
-            this.add.image(
-                0,
-                0,
-                'tiles_campos_linho_bosque_lilas'
-            )
-                .setOrigin(0, 0)
-                .setDepth(1);
+        // Cartelas em canvas do tamanho do mapa, transparentes fora dos
+        // elementos decorativos posicionados em suas coordenadas originais.
+        if (this.regiaoAtual === 'campos_linho') {
+            [
+                { chave: 'tiles_campos_linho_bosque_lilas', profundidade: 1 },
+                { chave: 'tiles_campos_linho_vegetacao_rara', profundidade: 2 }
+            ].forEach(({ chave, profundidade }) => {
+                if (!this.textures.exists(chave)) return;
+
+                this.add.image(0, 0, chave)
+                    .setOrigin(0, 0)
+                    .setDepth(profundidade);
+            });
         }
 
         // O PNG de grama e estradas já é o mapa completo de 60×60 tiles.
