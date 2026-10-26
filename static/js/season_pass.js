@@ -28,13 +28,13 @@ function mostrarMensagemPasse(texto, tipo = 'info', permitirTentarNovamente = fa
     }
 }
 
-function definirCarregamento(ativo) {
+function definirCarregamento(ativo, preservarLista = false) {
     const lista = document.getElementById('lista-recompensas');
     const coleta = document.getElementById('btn-coletar-tudo');
     const premium = document.getElementById('btn-comprar-premium');
     if (coleta) coleta.disabled = ativo || !dadosPasseAtual;
     if (premium && ativo) premium.disabled = true;
-    if (ativo && lista) {
+    if (ativo && lista && !preservarLista) {
         lista.replaceChildren();
         const loading = document.createElement('div');
         loading.className = 'pass-loading';
@@ -44,9 +44,10 @@ function definirCarregamento(ativo) {
     }
 }
 
-async function carregarPasse() {
+async function carregarPasse(opcoes = {}) {
+    const preservarLista = Boolean(opcoes?.preservarLista);
     dadosPasseAtual = null;
-    definirCarregamento(true);
+    definirCarregamento(true, preservarLista);
     mostrarMensagemPasse('');
 
     try {
@@ -71,7 +72,7 @@ async function carregarPasse() {
     } catch (erro) {
         console.error('Falha ao carregar o Passe:', erro);
         const lista = document.getElementById('lista-recompensas');
-        if (lista) {
+        if (lista && !preservarLista) {
             lista.replaceChildren();
             const estado = document.createElement('div');
             estado.className = 'pass-empty-state';
@@ -284,7 +285,7 @@ async function resgatarPremio(nivel, tipo) {
         const { response, data } = await enviarAcaoPasse('/api/passe/resgatar', { nivel, tipo });
         if (!response.ok || data.status !== 'success') throw new Error(data.message || 'Não foi possível resgatar a recompensa.');
         alertaPasseEldora('Recompensa resgatada', data.message, true, data.recompensas);
-        await carregarPasse();
+        await carregarPasse({ preservarLista: true });
     } catch (erro) {
         alertaPasseEldora('Não foi possível resgatar', erro.message || 'Falha de comunicação com o servidor.', false);
     } finally {
@@ -332,7 +333,7 @@ async function executarCompraPremium() {
         const { response, data } = await enviarAcaoPasse('/api/passe/comprar_premium', {});
         if (!response.ok || !data.sucesso) throw new Error(data.message || 'Não foi possível ativar o Premium.');
         alertaPasseEldora('Faixa Premium ativada', data.message, true);
-        await carregarPasse();
+        await carregarPasse({ preservarLista: true });
     } catch (erro) {
         alertaPasseEldora('Compra não concluída', erro.message || 'Falha de comunicação com o servidor.', false);
     } finally {
@@ -428,7 +429,7 @@ async function coletarTudoLiberado() {
         const { response, data } = await enviarAcaoPasse('/api/passe/coletar_tudo', {});
         if (!response.ok || !['success', 'info'].includes(data.status)) throw new Error(data.message || 'Não foi possível coletar as recompensas.');
         alertaPasseEldora(data.status === 'success' ? 'Recompensas coletadas' : 'Tudo em dia', data.message, data.status !== 'error', data.recompensas);
-        await carregarPasse();
+        await carregarPasse({ preservarLista: true });
     } catch (erro) {
         alertaPasseEldora('Coleta não concluída', erro.message || 'Falha de comunicação com o servidor.', false);
     } finally {
