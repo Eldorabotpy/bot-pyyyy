@@ -885,7 +885,11 @@ button:focus-visible {
 }
 
 .btn-passe-continuar {
-    width: 100%;
+    align-self: center;
+    flex: 0 0 auto;
+    width: min(100%, 168px);
+    min-height: 36px;
+    padding-inline: 18px;
 }
 
 @media (min-width: 1024px) {
