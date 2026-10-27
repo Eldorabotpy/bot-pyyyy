@@ -202,16 +202,21 @@ class MapaScene extends Phaser.Scene {
                 tiles_campos_linho_construcao: 'campos_linho_construcao.png',
                 tiles_campos_linho_grama_estradas: 'campos_linho_grama_estradas.png',
                 tiles_campos_linho_bosque_lilas: 'campos_linho_bosque_lilas.png',
-                tiles_campos_linho_vegetacao_rara: 'campos_linho_vegetacao_rara.png',
-                tiles_moinho_helices_animacao_5quadros: 'moinho_helices_animacao_5quadros.png'
+                tiles_campos_linho_vegetacao_rara: 'campos_linho_vegetacao_rara.png'
             };
 
             Object.entries(tilesetsCamposLinho).forEach(([chave, arquivo]) => {
                 this.load.image(
                     chave,
-                    `/static/images/tilesets/${arquivo}?v=9977`
+                    `/static/images/tilesets/${arquivo}?v=9979`
                 );
             });
+
+            this.load.spritesheet(
+                'moinho_helices_animacao_5quadros',
+                '/static/images/tilesets/moinho_helices_animacao_5quadros.png?v=9979',
+                { frameWidth: 192, frameHeight: 192 }
+            );
         }
         if (this.regiaoAtual === 'pedreira_granito') {
             this.load.image('tiles_pedreira', '/static/images/tilesets/pedreira.png');
@@ -512,8 +517,7 @@ class MapaScene extends Phaser.Scene {
                 campos_linho_linho: 'tiles_campos_linho_linho',
                 campos_linho_agua: 'tiles_campos_linho_agua',
                 campos_linho_construcao: 'tiles_campos_linho_construcao',
-                campos_linho_grama_estradas: 'tiles_campos_linho_grama_estradas',
-                moinho_helices_animacao_5quadros: 'tiles_moinho_helices_animacao_5quadros'
+                campos_linho_grama_estradas: 'tiles_campos_linho_grama_estradas'
             };
 
             map.tilesets.forEach(tileset => {
@@ -521,6 +525,9 @@ class MapaScene extends Phaser.Scene {
                 const chaveTextura = texturasPorNome[nomeTileset];
 
                 if (!chaveTextura) {
+                    if (nomeTileset === 'moinho_helices_animacao_5quadros') {
+                        return;
+                    }
                     // O tileset de árvores já foi associado pelo fluxo comum.
                     // portal_anim não é usado por nenhuma camada deste mapa.
                     if (nomeTileset !== 'arvores' && nomeTileset !== 'portal_anim') {
@@ -642,7 +649,7 @@ class MapaScene extends Phaser.Scene {
             'tiles_campos_linho_linho',
             'tiles_campos_linho_agua',
             'tiles_campos_linho_construcao',
-            'tiles_moinho_helices_animacao_5quadros'
+            'moinho_helices_animacao_5quadros'
         ].forEach(chave => {
 
             if (this.textures.exists(chave)) {
@@ -1936,10 +1943,6 @@ class MapaScene extends Phaser.Scene {
             {
                 nome: 'efeitos_superiores',
                 profundidade: 21
-            },
-            {
-                nome: 'Moinho',
-                profundidade: 22
             }
         ];
 
@@ -1956,47 +1959,6 @@ class MapaScene extends Phaser.Scene {
                 0
             ).setDepth(camada.profundidade);
 
-            // O Phaser 3.60 não reproduz as animações declaradas no TMJ.
-            // A camada Moinho contém somente hélices; percorremos os GIDs
-            // do tileset (cinco quadros de 125 ms) para manter o alinhamento
-            // e o depth que o Tiled definiu para cada moinho.
-            if (
-                this.regiaoAtual === 'campos_linho' &&
-                camada.nome === 'Moinho' &&
-                this.textures.exists('tiles_moinho_helices_animacao_5quadros')
-            ) {
-                const tilesetMoinho = map.tilesets.find(
-                    tileset => tileset.name === 'moinho_helices_animacao_5quadros'
-                );
-                const primeiroGid = Number(tilesetMoinho?.firstgid || 16006);
-                const celulasMoinho = [];
-
-                camadaCriada.forEachTile(tile => {
-                    if (tile && tile.index >= 0) celulasMoinho.push(tile);
-                }, this, 0, 0, map.width, map.height);
-
-                if (celulasMoinho.length) {
-                    let quadroMoinho = 0;
-                    this.time.addEvent({
-                        delay: 125,
-                        loop: true,
-                        callback: () => {
-                            quadroMoinho = (quadroMoinho + 1) % 5;
-                            celulasMoinho.forEach(tile => {
-                                tile.index = primeiroGid + quadroMoinho;
-                            });
-                        }
-                    });
-                    console.info(
-                        `[Campos de Linho] Animação das hélices ativa: ${celulasMoinho.length} moinho(s), 8 quadros/s.`
-                    );
-                } else {
-                    console.warn(
-                        '[Campos de Linho] Camada Moinho carregada sem tiles para animar.'
-                    );
-                }
-            }
-
             // Quatro tiles duplicados da estátua antiga estavam em uma camada
             // acima do jogador; também são removidos para evitar sobreposição.
             if (
@@ -2012,6 +1974,60 @@ class MapaScene extends Phaser.Scene {
                 }
             }
         });
+
+        // As hélices ficam em uma camada de objetos do Tiled para guardar a
+        // posição em pixels. O ponto do objeto é o centro do sprite (192×192).
+        if (
+            this.regiaoAtual === 'campos_linho' &&
+            this.textures.exists('moinho_helices_animacao_5quadros')
+        ) {
+            const camadaObjetosMoinho = map.getObjectLayer('Moinho');
+            const objetosMoinho = camadaObjetosMoinho?.objects || [];
+            const chaveAnimacaoMoinho = 'moinho_helices_girando';
+
+            if (objetosMoinho.length) {
+                if (!this.anims.exists(chaveAnimacaoMoinho)) {
+                    this.anims.create({
+                        key: chaveAnimacaoMoinho,
+                        frames: this.anims.generateFrameNumbers(
+                            'moinho_helices_animacao_5quadros',
+                            { start: 0, end: 4 }
+                        ),
+                        frameRate: 8,
+                        repeat: -1
+                    });
+                }
+
+                objetosMoinho.forEach(objeto => {
+                    if (objeto.visible === false || !objeto.gid) return;
+
+                    const helice = this.add.sprite(
+                        objeto.x,
+                        objeto.y,
+                        'moinho_helices_animacao_5quadros',
+                        0
+                    )
+                        .setOrigin(0.5, 0.5)
+                        .setDepth(22);
+
+                    if (objeto.width && objeto.height) {
+                        helice.setDisplaySize(objeto.width, objeto.height);
+                    }
+                    if (objeto.rotation) {
+                        helice.setRotation(Phaser.Math.DegToRad(objeto.rotation));
+                    }
+                    helice.play(chaveAnimacaoMoinho);
+                });
+
+                console.info(
+                    `[Campos de Linho] Hélices de ${objetosMoinho.length} moinho(s) animando como objetos do Tiled.`
+                );
+            } else {
+                console.warn(
+                    '[Campos de Linho] Camada de objetos Moinho sem hélices.'
+                );
+            }
+        }
     
         if (map.getLayer('Camada de Colisoes')) {
 
