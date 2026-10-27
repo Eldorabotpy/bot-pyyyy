@@ -1,6 +1,6 @@
 (() => {
     const inTelegram=!!window.Telegram?.WebApp?.initData;
-    let status=null,busy=false,googleLoaded=false,googleReady=false,screen=inTelegram?'login':'google';
+    let status=null,busy=false,googleLoaded=false,googleReady=false,screen='login';
     const box=document.getElementById('portal-identidade');
     const linksTrigger=document.getElementById('portal-links-trigger');
     const linksDrawer=document.getElementById('portal-links-drawer');
@@ -192,7 +192,7 @@
         document.getElementById('portal-auth-state').textContent=create&&inTelegram
             ?'Isso cria uma nova conta-mestre. Se seus personagens estão em uma conta antiga, entre nela com usuário e senha e vincule o Telegram em Conta Eldora.'
             :create
-                ?'Isso cria uma nova conta-mestre. Se seus personagens estão em uma conta antiga, entre nela com usuário e senha e vincule o Google em Conta Eldora. Não crie outra conta para tentar recuperar personagens.'
+                ?'Para criar uma conta nova, continue com uma conta Google ainda não vinculada. Se já tem conta ou personagens, entre com senha e vincule o Google nas configurações da conta.'
                 :'Use a identidade já vinculada à sua conta Eldora. Se aparecer “não vinculada”, entre primeiro com usuário e senha para conectar o Google à conta que guarda seus personagens.';
         const telegramButton=document.getElementById('portal-telegram');
         const telegramHint=document.getElementById('portal-telegram-hint');
@@ -291,6 +291,6 @@
     window.portalAuthReady=window.portalRefresh().then(data=>{
         document.getElementById('tela-registro-conta').style.display='none';
         if(data.authenticated)window.portalAccept(data);
-        else window.portalScreen(inTelegram?'login':'google');
+        else window.portalScreen('login');
     }).catch(error=>note(error.message));
 })();
