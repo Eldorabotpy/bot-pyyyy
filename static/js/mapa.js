@@ -202,13 +202,14 @@ class MapaScene extends Phaser.Scene {
                 tiles_campos_linho_construcao: 'campos_linho_construcao.png',
                 tiles_campos_linho_grama_estradas: 'campos_linho_grama_estradas.png',
                 tiles_campos_linho_bosque_lilas: 'campos_linho_bosque_lilas.png',
-                tiles_campos_linho_vegetacao_rara: 'campos_linho_vegetacao_rara.png'
+                tiles_campos_linho_vegetacao_rara: 'campos_linho_vegetacao_rara.png',
+                tiles_moinho_helices_animacao_5quadros: 'moinho_helices_animacao_5quadros.png'
             };
 
             Object.entries(tilesetsCamposLinho).forEach(([chave, arquivo]) => {
                 this.load.image(
                     chave,
-                    `/static/images/tilesets/${arquivo}?v=9975`
+                    `/static/images/tilesets/${arquivo}?v=9977`
                 );
             });
         }
@@ -511,7 +512,8 @@ class MapaScene extends Phaser.Scene {
                 campos_linho_linho: 'tiles_campos_linho_linho',
                 campos_linho_agua: 'tiles_campos_linho_agua',
                 campos_linho_construcao: 'tiles_campos_linho_construcao',
-                campos_linho_grama_estradas: 'tiles_campos_linho_grama_estradas'
+                campos_linho_grama_estradas: 'tiles_campos_linho_grama_estradas',
+                moinho_helices_animacao_5quadros: 'tiles_moinho_helices_animacao_5quadros'
             };
 
             map.tilesets.forEach(tileset => {
@@ -639,7 +641,8 @@ class MapaScene extends Phaser.Scene {
             'tiles_pedreira',
             'tiles_campos_linho_linho',
             'tiles_campos_linho_agua',
-            'tiles_campos_linho_construcao'
+            'tiles_campos_linho_construcao',
+            'tiles_moinho_helices_animacao_5quadros'
         ].forEach(chave => {
 
             if (this.textures.exists(chave)) {
@@ -1952,6 +1955,47 @@ class MapaScene extends Phaser.Scene {
                 0,
                 0
             ).setDepth(camada.profundidade);
+
+            // O Phaser 3.60 não reproduz as animações declaradas no TMJ.
+            // A camada Moinho contém somente hélices; percorremos os GIDs
+            // do tileset (cinco quadros de 125 ms) para manter o alinhamento
+            // e o depth que o Tiled definiu para cada moinho.
+            if (
+                this.regiaoAtual === 'campos_linho' &&
+                camada.nome === 'Moinho' &&
+                this.textures.exists('tiles_moinho_helices_animacao_5quadros')
+            ) {
+                const tilesetMoinho = map.tilesets.find(
+                    tileset => tileset.name === 'moinho_helices_animacao_5quadros'
+                );
+                const primeiroGid = Number(tilesetMoinho?.firstgid || 16006);
+                const celulasMoinho = [];
+
+                camadaCriada.forEachTile(tile => {
+                    if (tile && tile.index >= 0) celulasMoinho.push(tile);
+                }, this, 0, 0, map.width, map.height);
+
+                if (celulasMoinho.length) {
+                    let quadroMoinho = 0;
+                    this.time.addEvent({
+                        delay: 125,
+                        loop: true,
+                        callback: () => {
+                            quadroMoinho = (quadroMoinho + 1) % 5;
+                            celulasMoinho.forEach(tile => {
+                                tile.index = primeiroGid + quadroMoinho;
+                            });
+                        }
+                    });
+                    console.info(
+                        `[Campos de Linho] Animação das hélices ativa: ${celulasMoinho.length} moinho(s), 8 quadros/s.`
+                    );
+                } else {
+                    console.warn(
+                        '[Campos de Linho] Camada Moinho carregada sem tiles para animar.'
+                    );
+                }
+            }
 
             // Quatro tiles duplicados da estátua antiga estavam em uma camada
             // acima do jogador; também são removidos para evitar sobreposição.
