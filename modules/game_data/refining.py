@@ -66,6 +66,15 @@ REFINING_RECIPES = {
     # ======================
     # Joalheria / Lapidação
     # ======================
+    "ref_gema_lapidada_comum": {
+        "display_name": "Lapidação de Gema Comum",
+        "profession": ["joalheiro"],
+        "level_req": 1,
+        "time_seconds": 5 * 60,
+        "inputs": {"gema_bruta": 1},
+        "outputs": {"gema_lapidada_comum": 1},
+        "xp_gain": 5
+    },
     "ref_gema_polida": {
         "display_name": " Gema Polida",
         "profession": ["joalheiro", ],
@@ -325,7 +334,7 @@ REFINING_RECIPES = {
         "profession": ["alfaiate", "curtidor"],
         "level_req": 3,
         "time_seconds": 5 * 60,
-        "inputs": {"linho": 4, "fibra_vegetal": 2},
+        "inputs": {"linho": 6},
         "outputs": {"corda_de_linho": 1},
         "xp_gain": 8
     },

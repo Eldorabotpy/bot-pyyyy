@@ -932,7 +932,6 @@ MONSTERS_DATA = {
             "file_id_name": "espantalho_vivo_media",
             "gold_drop": 1,
             "loot_table": [
-                {"item_id": "palha_amaldicoada", "drop_chance": 30},
                 {"item_id": "pano_simples", "drop_chance": 35}
             ],
         },
@@ -961,7 +960,8 @@ MONSTERS_DATA = {
             "gold_drop": 1,
             "loot_table": [
                 {"item_id": "linho", "drop_chance": 35},
-                {"item_id": "pano_simples", "drop_chance": 35}
+                {"item_id": "pano_simples", "drop_chance": 35},
+                {"item_id": "teia_de_aranha_gigante", "drop_chance": 20}
             ],
         },
         {
@@ -1074,8 +1074,10 @@ MONSTERS_DATA = {
             "gold_drop": 1,
             "file_id_name": "wyvern_filhote_media",
             "loot_table": [
-              
-                {"item_id": "gema_bruta", "drop_chance": 20}
+                {"item_id": "gema_bruta", "drop_chance": 20},
+                {"item_id": "escama_de_dragao", "drop_chance": 18},
+                {"item_id": "coracao_de_dragao", "drop_chance": 6},
+                {"item_id": "essencia_vital", "drop_chance": 3}
             ],
         },
         {
@@ -1129,7 +1131,7 @@ MONSTERS_DATA = {
             "xp_reward": 22, "gold_drop": 1, "ambush_chance": 0.0,
             "file_id_name": "slime_ferrugem_media",
             "loot_table": [
-                {"item_id": "minerio_estanho", "drop_chance": 6},
+                {"item_id": "minerio_de_estanho", "drop_chance": 6},
                 
             ],
         },
@@ -1232,7 +1234,7 @@ MONSTERS_DATA = {
             "hp": 378, "attack": 44, "defense": 30, "initiative": 38, "luck": 9,
             "xp_reward": 24, "gold_drop": 1, "ambush_chance": 0.9,
             "loot_table": [
-                {"item_id": "escama_incandescente", "drop_chance": 28},
+                {"item_id": "escama_de_salamandra", "drop_chance": 28},
                 {"item_id": "essencia_de_fogo", "drop_chance": 30}
             ],
             "file_id_name": "salamandra_fogo_media",
@@ -1310,8 +1312,8 @@ MONSTERS_DATA = {
             "hp": 555, "attack": 48, "defense": 55, "initiative": 54, "luck": 66,
             "xp_reward": 26, "gold_drop": 15,
             "loot_table": [
-                {"item_id": "oleo_mineral"},
-                #{"item_id": "", "drop_chance": 6}
+                {"item_id": "oleo_mineral", "drop_chance": 12},
+                {"item_id": "pele_de_lagarto", "drop_chance": 30}
             ],
             "media_key": "crocodilo_mutante_media"
         }

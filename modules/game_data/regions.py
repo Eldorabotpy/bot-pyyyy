@@ -66,6 +66,8 @@ def get_region_profile(region_id: str) -> dict:
 
 # modules/game_data/regions.py (VERSÃO UNIFICADA E CORRIGIDA)
 
+# Em gather_table, weight é peso relativo entre os materiais liberados pelo
+# nível da profissão e tier da ferramenta; a coleta sorteia um resultado.
 REGIONS_DATA = {
     'reino_eldora': {
         'display_name': '𝐑𝐞𝐢𝐧𝐨 𝐝𝐞 𝐄𝐥𝐝𝐨𝐫𝐚',
@@ -93,12 +95,17 @@ REGIONS_DATA = {
 
     'gather_table': {
         'lenhador': [
-            {'item': 'madeira',             'min_level': 1,  'weight': 70},
-            {'item': 'madeira_de_carvalho', 'min_level': 5,  'weight': 20},
-            {'item': 'seiva_de_ent',        'min_level': 5,  'weight': 6},
-            {'item': 'madeira_rara',        'min_level': 9,  'weight': 8},
-            {'item': 'madeira_mogno',       'min_level': 15, 'weight': 2},
-            {'item': 'tronco_antigo',       'min_level': 20, 'weight': 1},
+            {'item': 'madeira',             'min_level': 1,  'min_tool_tier': 1, 'weight': 70, 'min_qty': 1, 'max_qty': 3},
+            {'item': 'madeira_de_carvalho', 'min_level': 5,  'min_tool_tier': 2, 'weight': 20, 'min_qty': 1, 'max_qty': 2},
+            {'item': 'casca_rigida',        'min_level': 5,  'min_tool_tier': 2, 'weight': 10, 'min_qty': 1, 'max_qty': 1},
+            {'item': 'seiva_de_ent',        'min_level': 5,  'min_tool_tier': 2, 'weight': 6,  'min_qty': 1, 'max_qty': 2},
+            {'item': 'madeira_rara',        'min_level': 9,  'min_tool_tier': 3, 'weight': 8,  'min_qty': 1, 'max_qty': 1},
+            {'item': 'ambar_seiva',         'min_level': 10, 'min_tool_tier': 3, 'weight': 4,  'min_qty': 1, 'max_qty': 1},
+            {'item': 'madeira_mogno',       'min_level': 15, 'min_tool_tier': 3, 'weight': 2,  'min_qty': 1, 'max_qty': 2},
+            {'item': 'madeira_elfica',      'min_level': 20, 'min_tool_tier': 4, 'weight': 3,  'min_qty': 1, 'max_qty': 1},
+            {'item': 'semente_encantada',   'min_level': 20, 'min_tool_tier': 4, 'weight': 2,  'min_qty': 1, 'max_qty': 1},
+            {'item': 'tronco_antigo',       'min_level': 20, 'min_tool_tier': 5, 'weight': 1,  'min_qty': 1, 'max_qty': 1},
+            {'item': 'raiz_do_mundo',       'min_level': 50, 'min_tool_tier': 5, 'weight': 0.5, 'min_qty': 1, 'max_qty': 1},
 
         ]
     },
@@ -113,16 +120,12 @@ REGIONS_DATA = {
 
     'gather_table': {
         'minerador': [
-            # Base absoluta
-            {'item': 'pedra',               'min_level': 1,  'weight': 65},
-
-            # Combustível essencial para refino
-            {'item': 'carvao',              'min_level': 20,  'weight': 15},  # ref_aco / ref_ferro
-
-            
-
-            # Raro de suporte (mid game)
-            {'item': 'pedra_vulcanica',     'min_level': 50, 'weight': 3},   # ref_ligas especiais
+            {'item': 'pedra',               'min_level': 1,  'min_tool_tier': 1, 'weight': 65, 'min_qty': 1, 'max_qty': 3},
+            {'item': 'minerio_de_cobre',    'min_level': 1,  'min_tool_tier': 1, 'weight': 15, 'min_qty': 1, 'max_qty': 2},
+            {'item': 'minerio_de_estanho',  'min_level': 5,  'min_tool_tier': 1, 'weight': 10, 'min_qty': 1, 'max_qty': 2},
+            {'item': 'carvao',              'min_level': 10, 'min_tool_tier': 2, 'weight': 15, 'min_qty': 2, 'max_qty': 5},
+            {'item': 'gema_bruta',          'min_level': 10, 'min_tool_tier': 2, 'weight': 10, 'min_qty': 1, 'max_qty': 1},
+            {'item': 'pedra_vulcanica',     'min_level': 30, 'min_tool_tier': 3, 'weight': 3,  'min_qty': 1, 'max_qty': 1},
         ]
     },
 },
@@ -136,17 +139,17 @@ REGIONS_DATA = {
 
     'gather_table': {
         'colhedor': [
-            # Base
-            {'item': 'linho',               'min_level': 1,  'weight': 70},
-
-            # Qualidade melhor de fibra
-            {'item': 'linho_fino',          'min_level': 10,  'weight': 20},  # ref_fio_linho_fino / ref_tecido_fino
-
-            # Reagente natural
-            {'item': 'fibra_resistente',    'min_level': 20, 'weight': 8},   # reforço têxtil
-
-            # Material raro têxtil
-            {'item': 'fibra_sedosa',        'min_level': 30, 'weight': 2},   # tecidos avançados
+            {'item': 'linho',               'min_level': 1,  'min_tool_tier': 1, 'weight': 70, 'min_qty': 1, 'max_qty': 3},
+            {'item': 'linho_fino',          'min_level': 10, 'min_tool_tier': 2, 'weight': 20, 'min_qty': 1, 'max_qty': 2},
+            {'item': 'erva_cura',           'min_level': 10, 'min_tool_tier': 2, 'weight': 15, 'min_qty': 1, 'max_qty': 3},
+            {'item': 'cogumelo_azul',       'min_level': 10, 'min_tool_tier': 2, 'weight': 10, 'min_qty': 1, 'max_qty': 2},
+            {'item': 'raiz_sangrenta',      'min_level': 15, 'min_tool_tier': 2, 'weight': 5,  'min_qty': 1, 'max_qty': 1},
+            {'item': 'fibra_resistente',    'min_level': 20, 'min_tool_tier': 2, 'weight': 8,  'min_qty': 1, 'max_qty': 2},
+            {'item': 'flor_da_lua',         'min_level': 20, 'min_tool_tier': 3, 'weight': 12, 'min_qty': 1, 'max_qty': 2},
+            {'item': 'semente_encantada',   'min_level': 25, 'min_tool_tier': 3, 'weight': 3,  'min_qty': 1, 'max_qty': 1},
+            {'item': 'fibra_sedosa',        'min_level': 30, 'min_tool_tier': 3, 'weight': 2,  'min_qty': 1, 'max_qty': 1},
+            {'item': 'raiz_solar',          'min_level': 35, 'min_tool_tier': 4, 'weight': 2,  'min_qty': 1, 'max_qty': 1},
+            {'item': 'fruta_imortalidade',  'min_level': 50, 'min_tool_tier': 5, 'weight': 1,  'min_qty': 1, 'max_qty': 1},
         ]
     },
 },
@@ -162,18 +165,20 @@ REGIONS_DATA = {
     'gather_table': {
         'esfolador': [
             # Base absoluta
-            {'item': 'pena',               'min_level': 1,  'weight': 55},
+            {'item': 'pena',               'min_level': 1,  'min_tool_tier': 1, 'weight': 55, 'min_qty': 2, 'max_qty': 4},
+            {'item': 'pano_simples',       'min_level': 1,  'min_tool_tier': 1, 'weight': 10, 'min_qty': 1, 'max_qty': 2},
 
             # Partes comuns de criaturas aéreas
-            {'item': 'pena_grande',        'min_level': 10,  'weight': 20},  # reforços leves / flechas
-            {'item': 'asa_de_morcego',     'min_level': 20,  'weight': 15},  # reagente curtume/alquimia
+            {'item': 'pena_grande',        'min_level': 10, 'min_tool_tier': 2, 'weight': 20, 'min_qty': 1, 'max_qty': 2},
+            {'item': 'asa_de_morcego',     'min_level': 20, 'min_tool_tier': 3, 'weight': 15, 'min_qty': 1, 'max_qty': 2},
 
             # Couros e partes mais valiosas
-            {'item': 'couro_de_grifo',     'min_level': 30, 'weight': 7},   # armaduras leves raras
-            {'item': 'garras_de_grifo',    'min_level': 40, 'weight': 2},   # receitas especiais
+            {'item': 'couro_de_grifo',     'min_level': 30, 'min_tool_tier': 4, 'weight': 7, 'min_qty': 1, 'max_qty': 1},
+            {'item': 'garras_de_grifo',    'min_level': 40, 'min_tool_tier': 4, 'weight': 2, 'min_qty': 1, 'max_qty': 1},
+            {'item': 'couro_dragao',       'min_level': 45, 'min_tool_tier': 5, 'weight': 2, 'min_qty': 1, 'max_qty': 1},
 
             # Raro / épico
-            {'item': 'pluma_celestial',    'min_level': 50, 'weight': 1},   # encantamentos / épico
+            {'item': 'pluma_celestial',    'min_level': 50, 'min_tool_tier': 5, 'weight': 1, 'min_qty': 1, 'max_qty': 1},
         ]
     },
 },
@@ -182,23 +187,23 @@ REGIONS_DATA = {
     'display_name': '𝐌𝐢𝐧𝐚 𝐝𝐞 𝐅𝐞𝐫𝐫𝐨',
     'emoji': '⛏️',
     'description': "Uma rede de túneis escuros e profundos, rica em veios de minério de ferro. O perigo espreita em cada sombra, mas a recompensa para os mineiros corajosos é grande.",
-    'resource': 'ferro',
+    'resource': 'minerio_de_ferro',
     'file_id_name': 'regiao_mina_ferro',
 
     'gather_table': {
         'minerador': [
-            # Base absoluta
-            {'item': 'minerio_de_ferro',   'min_level': 1,  'weight': 60},
-
-            # Liga inicial
-            {'item': 'minerio_de_estanho', 'min_level': 10,  'weight': 12},  # ref_bronze
-
-            # Minérios nobres
-            {'item': 'minerio_de_prata',   'min_level': 20, 'weight': 7},   # ref_prata_pura
-            {'item': 'minerio_de_ouro',    'min_level': 38, 'weight': 2},   # ref_barra_ouro
-
-            # Material especial (late game)
-            {'item': 'pedra_vulcanica',    'min_level': 50, 'weight': 3},   # ligas especiais
+            {'item': 'minerio_de_ferro',   'min_level': 1,  'min_tool_tier': 2, 'weight': 60, 'min_qty': 1, 'max_qty': 3},
+            {'item': 'minerio_de_estanho', 'min_level': 10, 'min_tool_tier': 1, 'weight': 12, 'min_qty': 1, 'max_qty': 2},
+            {'item': 'gema_bruta',         'min_level': 10, 'min_tool_tier': 2, 'weight': 10, 'min_qty': 1, 'max_qty': 1},
+            {'item': 'minerio_de_prata',   'min_level': 20, 'min_tool_tier': 3, 'weight': 7,  'min_qty': 1, 'max_qty': 2},
+            {'item': 'minerio_de_ouro',    'min_level': 38, 'min_tool_tier': 3, 'weight': 2,  'min_qty': 1, 'max_qty': 1},
+            {'item': 'cristal_bruto',      'min_level': 25, 'min_tool_tier': 3, 'weight': 20, 'min_qty': 1, 'max_qty': 2},
+            {'item': 'cristal_mana',       'min_level': 40, 'min_tool_tier': 4, 'weight': 15, 'min_qty': 1, 'max_qty': 2},
+            {'item': 'nucleo_de_energia_instavel', 'min_level': 45, 'min_tool_tier': 4, 'weight': 5, 'min_qty': 1, 'max_qty': 1},
+            {'item': 'minerio_de_mithril', 'min_level': 45, 'min_tool_tier': 4, 'weight': 5, 'min_qty': 1, 'max_qty': 2},
+            {'item': 'pedra_vulcanica',    'min_level': 50, 'min_tool_tier': 4, 'weight': 3,  'min_qty': 1, 'max_qty': 1},
+            {'item': 'obsidiana_ancestral','min_level': 50, 'min_tool_tier': 5, 'weight': 20, 'min_qty': 1, 'max_qty': 1},
+            {'item': 'minerio_de_adamantio','min_level': 50, 'min_tool_tier': 5, 'weight': 2, 'min_qty': 1, 'max_qty': 1},
         ]
     },
 },
@@ -215,18 +220,16 @@ REGIONS_DATA = {
     'gather_table': {
         # ⛏️ Minerador / Fundição avançada
         'minerador': [
-            {'item': 'pedra_vulcanica',     'min_level': 15, 'weight': 40},
-            {'item': 'escoria_metalica',    'min_level': 12, 'weight': 25},  # subproduto refino
-            {'item': 'fragmento_de_magma',  'min_level': 18, 'weight': 20},  # ligas especiais
-            {'item': 'nucleo_igneo',        'min_level': 25, 'weight': 5},   # épico
+            {'item': 'pedra_vulcanica',     'min_level': 15, 'min_tool_tier': 3, 'weight': 40, 'min_qty': 1, 'max_qty': 1},
+            {'item': 'escoria_metalica',    'min_level': 12, 'min_tool_tier': 2, 'weight': 25, 'min_qty': 1, 'max_qty': 2},
+            {'item': 'fragmento_de_magma',  'min_level': 18, 'min_tool_tier': 4, 'weight': 20, 'min_qty': 1, 'max_qty': 1},
+            {'item': 'nucleo_igneo',        'min_level': 25, 'min_tool_tier': 5, 'weight': 5,  'min_qty': 1, 'max_qty': 1},
         ],
 
         # 🧪 Alquimista (essências ígneas)
         'alquimista': [
-            {'item': 'essencia_de_fogo',    'min_level': 12, 'weight': 35},
-            {'item': 'cinzas_elementais',   'min_level': 10, 'weight': 30},
-            {'item': 'fragmento_de_magma',  'min_level': 18, 'weight': 15},
-            {'item': 'nucleo_igneo',        'min_level': 25, 'weight': 5},
+            {'item': 'essencia_de_fogo',    'min_level': 12, 'min_tool_tier': 3, 'weight': 35, 'min_qty': 1, 'max_qty': 1},
+            {'item': 'cinzas_elementais',   'min_level': 10, 'min_tool_tier': 2, 'weight': 30, 'min_qty': 1, 'max_qty': 2},
         ],
     },
 },
@@ -242,18 +245,18 @@ REGIONS_DATA = {
     'gather_table': {
         'alquimista': [
             # Base (sempre cai algo útil)
-            {'item': 'sangue',              'min_level': 1,  'weight': 55},
+            {'item': 'sangue',              'min_level': 1,  'min_tool_tier': 1, 'weight': 55, 'min_qty': 1, 'max_qty': 3},
 
             # Componentes comuns de alquimia
-            {'item': 'esporo_de_cogumelo',  'min_level': 10,  'weight': 18},
-            {'item': 'lodo_toxico',         'min_level': 20,  'weight': 15},
+            {'item': 'esporo_de_cogumelo',  'min_level': 10, 'min_tool_tier': 2, 'weight': 18, 'min_qty': 1, 'max_qty': 3},
+            {'item': 'lodo_toxico',         'min_level': 20, 'min_tool_tier': 3, 'weight': 15, 'min_qty': 1, 'max_qty': 1},
 
             # Componentes de refino / avançados
-            {'item': 'ectoplasma',          'min_level': 30, 'weight': 8},
-            {'item': 'sangue_regenerativo', 'min_level': 40, 'weight': 3},
+            {'item': 'ectoplasma',          'min_level': 30, 'min_tool_tier': 4, 'weight': 8, 'min_qty': 1, 'max_qty': 2},
+            {'item': 'sangue_regenerativo', 'min_level': 40, 'min_tool_tier': 4, 'weight': 3, 'min_qty': 1, 'max_qty': 1},
 
             # Raro / épico (pântano maldito tem que ter “pico”)
-            {'item': 'essencia_sombra',     'min_level': 50, 'weight': 1},
+            {'item': 'essencia_sombra',     'min_level': 50, 'min_tool_tier': 5, 'weight': 1, 'min_qty': 1, 'max_qty': 1},
         ]
     },
 },
@@ -271,7 +274,14 @@ REGIONS_DATA = {
         "display_name": "𝐃𝐞𝐬𝐞𝐫𝐭𝐨 𝐀𝐧𝐜𝐞𝐬𝐭𝐫𝐚𝐥",
         "emoji": '🏜️',
         'description': "Um vasto deserto de areias douradas, pontilhado por ruínas de uma civilização há muito esquecida. Segredos e perigos ancestrais aguardam sob o sol escaldante.",
-        'resource': None,
+        'resource': 'poeira_magica',
+        'gather_table': {
+            'alquimista': [
+                {'item': 'agua_pura',     'min_level': 1,  'min_tool_tier': 1, 'weight': 80, 'min_qty': 1, 'max_qty': 3},
+                {'item': 'poeira_magica', 'min_level': 1,  'min_tool_tier': 1, 'weight': 20, 'min_qty': 1, 'max_qty': 1},
+                {'item': 'luz_estelar',   'min_level': 50, 'min_tool_tier': 5, 'weight': 5,  'min_qty': 1, 'max_qty': 1},
+            ]
+        },
         "level_range": (30, 60),
     },
 }

@@ -44,7 +44,7 @@ RECIPES: Dict[str, Dict[str, Any]] = {
         "time_seconds": 2400,
         "xp_gain": 150,
         "inputs": {"pele_de_troll": 8, "ectoplasma": 8, "nucleo_de_forja": 1},
-        "result_base_id": "couraça_sombra_assassino",
+        "result_base_id": "couraca_sombra_assassino",
         "unique": True,
         "class_req": ["assassino"],
         "affix_pools_to_use": ["assassino", "geral"],

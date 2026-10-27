@@ -1078,12 +1078,16 @@ def coletar_recurso():
     from flask import request, jsonify
     from bson import ObjectId
     from modules.player.core import users_collection
+    from modules.player.inventory import can_add_bundle, try_add_item_to_inventory
+    from modules.game_data.regions import REGIONS_DATA
+    import copy
+    import random
 
     try:
-        data = request.json
+        data = request.get_json(silent=True) or {}
         user_id = data.get('user_id')
-        recurso_tipo = data.get('recurso_tipo') 
-        acao = data.get('acao', 'coletar') 
+        recurso_tipo = str(data.get('recurso_tipo') or '').strip().lower()
+        acao = data.get('acao', 'coletar')
         
         if not user_id or not recurso_tipo:
             return jsonify({"success": False, "error": "Dados inválidos."}), 400
@@ -1091,118 +1095,193 @@ def coletar_recurso():
         player = users_collection.find_one({"_id": ObjectId(user_id)})
         if not player:
             return jsonify({"success": False, "error": "Herói não encontrado."}), 404
-        my_inv = player.get("inventory", {})
-
         from modules import profession_engine
 
-        recursos_validos = {'madeira', 'pedra', 'ferro', 'minerio_de_ferro', 'linho', 'pena', 'sangue'}
-        if recurso_tipo not in recursos_validos:
-            return jsonify({"success": False, "error": "Recurso de coleta inválido."}), 400
         if acao not in {'verificar', 'coletar'}:
             return jsonify({"success": False, "error": "Ação de coleta inválida."}), 400
 
-        # Usa a instância equipada, nunca a primeira ferramenta da mochila.
         preparo = profession_engine.validate_and_prepare_gather(player, recurso_tipo)
         if not preparo.get("ok"):
             return jsonify({"success": False, "error": preparo.get("error")}), 400
-        ferramenta_usada_id = preparo["tool_uid"]
-        item_ferramenta = preparo["tool_inst"]
-        prof_exigida = preparo["profession"]
-        atual, maximo = profession_engine._repair_durability(item_ferramenta, preparo["tool_info"])
 
-        # Se for só verificação, pára aqui
-        if acao == 'verificar':
-            return jsonify({"success": True})
+        ultima_posicao = player.get('last_pos') or {}
+        regiao_salva = ultima_posicao.get('regiao') if isinstance(ultima_posicao, dict) else None
+        regiao_id = str(data.get('regiao') or regiao_salva or '').strip()
+        regiao = REGIONS_DATA.get(regiao_id)
+        if not regiao:
+            return jsonify({"success": False, "error": "Não foi possível identificar a região da coleta."}), 400
 
-        # ==========================================
-        # COMEÇA A COLETA REAL (COM BÔNUS DE NÍVEL!)
-        # ==========================================
-        prof_atual = player.get("profession", {})
-        learned = player.get("learned_professions", {})
-        
-        prof_alvo = learned.get(prof_exigida)
+        prof_exigida = preparo['profession']
+        tabela_regional = (regiao.get('gather_table') or {}).get(prof_exigida) or []
+        if not tabela_regional:
+            return jsonify({"success": False, "error": "Não há pontos de coleta para essa profissão nesta região."}), 400
+
+        prof_atual = player.get("profession", {}) or {}
+        if not isinstance(prof_atual, dict):
+            prof_atual = {}
+        learned = player.get("learned_professions", {}) or {}
+        if isinstance(learned, dict):
+            prof_alvo = learned.get(prof_exigida)
+        elif isinstance(learned, list):
+            prof_alvo = next((
+                item for item in learned
+                if isinstance(item, dict)
+                and (item.get('key') or item.get('type') or item.get('profession')) == prof_exigida
+            ), None)
+        else:
+            prof_alvo = None
+        if not isinstance(prof_alvo, dict):
+            prof_alvo = None
         if not prof_alvo and prof_atual.get("key") == prof_exigida:
             prof_alvo = prof_atual
-            
-        level_atual = int(prof_alvo.get("level", 1)) if prof_alvo else 1
-        
-        # BÔNUS 1: +1 Item a cada 10 Níveis
-        quantidade = 1 + (level_atual // 10)
-        
-        # BÔNUS 2: Chance de Crítico de Coleta (0.5% por nível = 25% no lvl 50)
-        import random
-        if random.random() < (level_atual * 0.005):
-            quantidade *= 2 # Pega o dobro!
+        try:
+            level_atual = max(1, int((prof_alvo or {}).get("level", 1) or 1))
+        except (TypeError, ValueError):
+            level_atual = 1
 
-        item_no_banco = my_inv.get(recurso_tipo, {})
-        qtd_atual = item_no_banco.get("quantity", 0) if isinstance(item_no_banco, dict) else int(item_no_banco or 0)
-        nova_qtd = qtd_atual + quantidade
+        tool_info = preparo.get('tool_info') or {}
+        try:
+            tool_tier = max(1, int(tool_info.get('tier', 1) or 1))
+        except (TypeError, ValueError):
+            tool_tier = 1
 
-        # 📉 Diminui 1 de durabilidade da ferramenta
-        nova_durabilidade = [max(0, atual - 1), maximo]
-        item_ferramenta["durability"] = nova_durabilidade
+        from modules import game_data
+        opcoes = []
+        for linha in tabela_regional:
+            try:
+                nivel_minimo = max(1, int(linha.get('min_level', 1) or 1))
+                tier_minimo = max(1, int(linha.get('min_tool_tier', 1) or 1))
+                peso = float(linha.get('weight', 0) or 0)
+            except (TypeError, ValueError):
+                continue
+            item_id = str(linha.get('item') or '').strip()
+            if (
+                item_id
+                and item_id in game_data.ITEMS_DATA
+                and peso > 0
+                and level_atual >= nivel_minimo
+                and tool_tier >= tier_minimo
+            ):
+                opcoes.append(linha)
 
-        # CALCULA XP DA PROFISSÃO
-        # ==========================================
-        # 2. XP PARA A PROFISSÃO CORRETA (MULTI-PROFISSÃO)
-        # ==========================================
-        xp_ganho = 10
-        subiu_nivel = False
-        
-        learned = player.get("learned_professions", {})
-        prof_ativa = player.get("profession", {})
-        
-        # Pega os dados da profissão certa (seja da lista de aprendidas ou da ativa)
-        prof_alvo = learned.get(prof_exigida)
+        if not opcoes:
+            return jsonify({
+                "success": False,
+                "error": "Seu nível de profissão ou ferramenta ainda não libera materiais nesta região."
+            }), 400
+
+        # A verificação não consome durabilidade, estoque nem materiais.
+        if acao == 'verificar':
+            return jsonify({"success": True, "regiao": regiao_id, "profissao": prof_exigida})
+
+        # Cada linha elegível representa uma chance relativa. Uma coleta sorteia
+        # um único material; peso 70 tem o dobro da chance de peso 35.
+        linha_escolhida = random.choices(
+            opcoes,
+            weights=[float(linha.get('weight', 0) or 0) for linha in opcoes],
+            k=1
+        )[0]
+        item_id = str(linha_escolhida['item'])
+        try:
+            quantidade = random.randint(
+                max(1, int(linha_escolhida.get('min_qty', 1) or 1)),
+                max(1, int(linha_escolhida.get('max_qty', 1) or 1)),
+            )
+        except (TypeError, ValueError):
+            quantidade = 1
+
+        # Bônus de profissão já existente: +1 por dez níveis e chance crítica.
+        quantidade *= 1 + (level_atual // 10)
+        if random.random() < min(0.25, level_atual * 0.005):
+            quantidade *= 2
+
+        jogador_atualizado = copy.deepcopy(player)
+        recompensa = [{"item_id": item_id, "quantity": quantidade}]
+        pode_adicionar, motivo, _ = can_add_bundle(jogador_atualizado, recompensa)
+        if not pode_adicionar:
+            return jsonify({"success": False, "error": motivo}), 400
+        if not try_add_item_to_inventory(jogador_atualizado, item_id, quantidade):
+            return jsonify({"success": False, "error": "Não foi possível guardar o material na mochila."}), 400
+
+        ferramenta_usada_id = preparo["tool_uid"]
+        inventario_atualizado = jogador_atualizado.get('inventory') or {}
+        item_ferramenta = inventario_atualizado.get(ferramenta_usada_id)
+        if not isinstance(item_ferramenta, dict):
+            return jsonify({"success": False, "error": "A ferramenta equipada não está mais na mochila."}), 409
+        atual, maximo = profession_engine._repair_durability(item_ferramenta, tool_info)
+        item_ferramenta["durability"] = [max(0, atual - 1), maximo]
+
+        # Ganha XP somente depois que a recompensa couber na mochila.
+        learned = jogador_atualizado.get("learned_professions", {}) or {}
+        prof_ativa = jogador_atualizado.get("profession", {}) or {}
+        if not isinstance(prof_ativa, dict):
+            prof_ativa = {}
+        if isinstance(learned, dict):
+            prof_alvo = learned.get(prof_exigida)
+        elif isinstance(learned, list):
+            prof_alvo = next((
+                item for item in learned
+                if isinstance(item, dict)
+                and (item.get('key') or item.get('type') or item.get('profession')) == prof_exigida
+            ), None)
+        else:
+            prof_alvo = None
+        if not isinstance(prof_alvo, dict):
+            prof_alvo = None
         if not prof_alvo and prof_ativa.get("key") == prof_exigida:
             prof_alvo = prof_ativa
-            
+
+        xp_ganho = 10
+        subiu_nivel = False
         if prof_alvo:
-            xp_atual = int(prof_alvo.get("xp", 0))
-            level_atual = int(prof_alvo.get("level", 1))
+            try:
+                xp_atual = int(prof_alvo.get("xp", 0) or 0)
+                nivel_profissao = max(1, int(prof_alvo.get("level", 1) or 1))
+            except (TypeError, ValueError):
+                xp_atual, nivel_profissao = 0, 1
             novo_xp = xp_atual + xp_ganho
-            xp_necessario = 40 + (25 * (level_atual - 1)) + (8 * ((level_atual - 1) ** 2))
-            
+            xp_necessario = 40 + (25 * (nivel_profissao - 1)) + (8 * ((nivel_profissao - 1) ** 2))
             while novo_xp >= xp_necessario:
-                level_atual += 1
+                nivel_profissao += 1
                 novo_xp -= xp_necessario
                 subiu_nivel = True
-                xp_necessario = 40 + (25 * (level_atual - 1)) + (8 * ((level_atual - 1) ** 2))
-            
-            prof_alvo["level"] = level_atual
+                xp_necessario = 40 + (25 * (nivel_profissao - 1)) + (8 * ((nivel_profissao - 1) ** 2))
+            prof_alvo["level"] = nivel_profissao
             prof_alvo["xp"] = int(novo_xp)
-            
-            learned[prof_exigida] = prof_alvo # Atualiza na lista geral
+            if isinstance(learned, dict):
+                learned[prof_exigida] = prof_alvo
             if prof_ativa.get("key") == prof_exigida:
-                prof_ativa = prof_alvo # Atualiza a interface se for a ativa
+                prof_ativa = prof_alvo
 
-        # SALVA NO BANCO DE DADOS
-        update_query = {
-            "$set": {
-                f"inventory.{recurso_tipo}": {
-                    "base_id": recurso_tipo,
-                    "name": recurso_tipo.replace('_', ' ').title(), # Para ficar 'Minerio De Ferro' em vez de 'minerio_de_ferro'
-                    "type": "material",                
-                    "quantity": nova_qtd,
-                    "icon": f"{recurso_tipo}.png",     
-                    "imagem": f"{recurso_tipo}.png"    
-                },
-                f"inventory.{ferramenta_usada_id}": item_ferramenta,
-                "learned_professions": learned,  # 👈 Salva a lista de conhecimentos
-                "profession": prof_ativa         # 👈 Salva a do perfil
-            }
-        }
+        users_collection.update_one(
+            {"_id": ObjectId(user_id)},
+            {"$set": {
+                "inventory": inventario_atualizado,
+                "learned_professions": learned,
+                "profession": prof_ativa,
+            }}
+        )
 
-        users_collection.update_one({"_id": ObjectId(user_id)}, update_query)
+        try:
+            import asyncio
+            from modules.player.core import clear_player_cache
+            asyncio.run(clear_player_cache(user_id))
+        except Exception:
+            pass
 
-        mensagem_extra = " (Level UP!)" if subiu_nivel else ""
+        item_nome = game_data.get_display_name(item_id)
+        if subiu_nivel:
+            item_nome = f"{item_nome} (Profissão subiu de nível!)"
 
         return jsonify({
-            "success": True, 
+            "success": True,
             "quantidade": quantidade,
-            "item_nome": f"{recurso_tipo.replace('_', ' ').title()}{mensagem_extra}" # Fica mais bonito na UI
+            "item_nome": item_nome,
+            "recompensas": [{"item_id": item_id, "item_nome": game_data.get_display_name(item_id), "quantidade": quantidade}],
+            "regiao": regiao_id,
+            "profissao": prof_exigida,
         })
-        
+
     except Exception as e:
         print(f"Erro na Coleta: {e}")
         return jsonify({"success": False, "error": str(e)}), 500

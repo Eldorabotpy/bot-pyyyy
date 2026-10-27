@@ -2885,11 +2885,64 @@ class MapaScene extends Phaser.Scene {
 
                 const mapaProfissao = {
                     'madeira': 'lenhador',
+                    'madeira_de_carvalho': 'lenhador',
+                    'casca_rigida': 'lenhador',
+                    'seiva_de_ent': 'lenhador',
+                    'ambar_seiva': 'lenhador',
+                    'madeira_rara': 'lenhador',
+                    'madeira_mogno': 'lenhador',
+                    'madeira_elfica': 'lenhador',
+                    'tronco_antigo': 'lenhador',
+                    'raiz_do_mundo': 'lenhador',
                     'pedra': 'minerador',
+                    'ferro': 'minerador',
                     'minerio_de_ferro': 'minerador',
+                    'minerio_de_cobre': 'minerador',
+                    'minerio_de_estanho': 'minerador',
+                    'minerio_de_prata': 'minerador',
+                    'minerio_de_ouro': 'minerador',
+                    'minerio_de_mithril': 'minerador',
+                    'minerio_de_adamantio': 'minerador',
+                    'carvao': 'minerador',
+                    'gema_bruta': 'minerador',
+                    'cristal_bruto': 'minerador',
+                    'cristal_mana': 'minerador',
+                    'nucleo_de_energia_instavel': 'minerador',
+                    'pedra_vulcanica': 'minerador',
+                    'obsidiana_ancestral': 'minerador',
+                    'escoria_metalica': 'minerador',
+                    'fragmento_de_magma': 'minerador',
+                    'nucleo_igneo': 'minerador',
                     'linho': 'colhedor',
+                    'linho_fino': 'colhedor',
+                    'erva_cura': 'colhedor',
+                    'cogumelo_azul': 'colhedor',
+                    'raiz_sangrenta': 'colhedor',
+                    'fibra_resistente': 'colhedor',
+                    'fibra_sedosa': 'colhedor',
+                    'flor_da_lua': 'colhedor',
+                    'semente_encantada': 'colhedor',
+                    'raiz_solar': 'colhedor',
+                    'fruta_imortalidade': 'colhedor',
                     'pena': 'esfolador',
-                    'sangue': 'alquimista'
+                    'pano_simples': 'esfolador',
+                    'pena_grande': 'esfolador',
+                    'asa_de_morcego': 'esfolador',
+                    'couro_de_grifo': 'esfolador',
+                    'garras_de_grifo': 'esfolador',
+                    'couro_dragao': 'esfolador',
+                    'pluma_celestial': 'esfolador',
+                    'sangue': 'alquimista',
+                    'poeira_magica': 'alquimista',
+                    'agua_pura': 'alquimista',
+                    'esporo_de_cogumelo': 'alquimista',
+                    'lodo_toxico': 'alquimista',
+                    'ectoplasma': 'alquimista',
+                    'sangue_regenerativo': 'alquimista',
+                    'essencia_sombra': 'alquimista',
+                    'essencia_de_fogo': 'alquimista',
+                    'cinzas_elementais': 'alquimista',
+                    'luz_estelar': 'alquimista'
                 };
 
                 const profExigida = normalizarProfissaoColetaMapa(mapaProfissao[recurso.tipo]);
@@ -2923,7 +2976,7 @@ class MapaScene extends Phaser.Scene {
                     const res = await fetch('/api/personagem/coletar', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ user_id: charId, recurso_tipo: recurso.tipo, acao: 'verificar' }) 
+                        body: JSON.stringify({ user_id: charId, recurso_tipo: recurso.tipo, regiao: this.regiaoAtual, acao: 'verificar' })
                     });
                     
                     const data = await res.json();
@@ -2992,7 +3045,7 @@ class MapaScene extends Phaser.Scene {
                                 fillBar.fillRoundedRect(-23, -2, progresso.valor, 4, 2); 
                             }
                         },
-                        onComplete: () => {
+                        onComplete: async () => {
                             // ❌ TIRA O BRILHO DOURADO QUANDO TERMINA A COLETA ❌
                             if (recurso.fxGlow) { recurso.preFX.remove(recurso.fxGlow); recurso.fxGlow = null; }
                             recurso.clearTint();
@@ -3004,12 +3057,12 @@ class MapaScene extends Phaser.Scene {
                             pulsoTexto.stop();
                             uiContainer.destroy(); 
                             
+                            const coletaConfirmada = await this.coletarRecursoAPI(recurso);
                             this.player.isGathering = false;
-                            
+                            if (!coletaConfirmada) return;
+
                             recurso.estoque -= 1;
                             recurso.label.setText(`${nomeExibicao} (${recurso.estoque}/50)`);
-                            
-                            this.coletarRecursoAPI(recurso);
 
                             if (recurso.estoque <= 0) {
                                 recurso.setVisible(false);
@@ -3038,31 +3091,23 @@ class MapaScene extends Phaser.Scene {
         // 👇 DISTRIBUIÇÃO LÓGICA PELAS REGIÕES 👇
         // Substitua os números (X, Y) pelas coordenadas reais do seu Tiled!
         if (this.regiaoAtual === 'pradaria_inicial') {
-            // Pradaria: Local do Grom (Iniciantes)
-            spawnRecurso('pedra_1', 'pedra', '🪨 Rocha', 'item_pedra', 10, 15);
-            spawnRecurso('pedra_2', 'pedra', '🪨 Rocha', 'item_pedra', 45, 10);
-            spawnRecurso('linho_1', 'linho', '🌿 Linho', 'item_linho', 20, 30);
-            spawnRecurso('linho_2', 'linho', '🌿 Linho', 'item_linho', 22, 32);
-            spawnRecurso('arvore_1', 'madeira', '🌳 Árvore', 'item_arvore', 2, 26);
-            spawnRecurso('arvore_1', 'madeira', '🌳 Árvore', 'item_arvore', 5, 36);
-            spawnRecurso('ninho_1', 'pena', '🪶 Ninho de Harpia', 'item_pena', 28, 20);
+            // A Pradaria é área de início, sem nós de coleta.
         }
         else if (this.regiaoAtual === 'floresta_sombria') {
-            // Floresta: Local do Sylas (Mais perigoso)
+            // Madeira fica na região florestal; minério e sangue foram para suas regiões próprias.
             spawnRecurso('arvore_2', 'madeira', '🌳 Carvalho Ancestral', 'item_arvore', 20, 18);
             spawnRecurso('arvore_3', 'madeira', '🌳 Carvalho Ancestral', 'item_arvore', 28, 25);
-            spawnRecurso('veio_ferro_1', 'minerio_de_ferro', '🪨 Veio de Ferro', 'item_ferro', 35, 10);
-            spawnRecurso('poca_sangue_1', 'sangue', '🩸 Poça Sombria', 'item_sangue', 32, 22);
-        
         }
         else if (this.regiaoAtual === 'pedreira_granito') {
-            // Pontos no centro das clareiras, afastados das paredes e colisões.
+            // Pedra fica na pedreira; ferro e sangue foram para Mina e Pântano.
             spawnRecurso('pedra_2', 'pedra', '🪨 Rocha', 'item_pedra', 46, 14);
-            spawnRecurso('veio_ferro_granito_1', 'minerio_de_ferro', '🪨 Veio de Ferro', 'item_ferro', 22, 6);
-            spawnRecurso('veio_ferro_granito_2', 'minerio_de_ferro', '🪨 Veio de Ferro', 'item_ferro', 10, 14);
-            spawnRecurso('veio_ferro_granito_3', 'minerio_de_ferro', '🪨 Veio de Ferro', 'item_ferro', 33, 8);
-            spawnRecurso('poca_sangue_1', 'sangue', '🩸 Poça Sombria', 'item_sangue', 31, 19);
-        
+        }
+        else if (this.regiaoAtual === 'campos_linho') {
+            // Os quatro nós ficam sobre os canteiros desenhados no TMJ dos Campos de Linho.
+            spawnRecurso('linho_canteiro_1', 'linho', '🌾 Linho', 'item_linho', 12, 4);
+            spawnRecurso('linho_canteiro_2', 'linho', '🌾 Linho', 'item_linho', 48, 4);
+            spawnRecurso('linho_canteiro_3', 'linho', '🌾 Linho', 'item_linho', 44, 40);
+            spawnRecurso('linho_canteiro_4', 'linho', '🌾 Linho', 'item_linho', 10, 45);
         }
         // Nota: capital_eldora não tem recursos para manter a cidade limpa.
 
@@ -3076,14 +3121,25 @@ class MapaScene extends Phaser.Scene {
                 const res = await fetch('/api/personagem/coletar', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ user_id: charId, recurso_tipo: recurso.tipo, recurso_id: recurso.id })
+                    body: JSON.stringify({
+                        user_id: charId,
+                        recurso_tipo: recurso.tipo,
+                        recurso_id: recurso.id,
+                        regiao: this.regiaoAtual,
+                        acao: 'coletar'
+                    })
                 });
                 
                 const data = await res.json();
                 
                 if (data.success) {
-                    // Efeito de texto subindo (+1 Madeira)
-                    let floatText = this.add.text(recurso.x, recurso.y - 40, `+${data.quantidade} ${data.item_nome}`, {
+                    const recompensas = Array.isArray(data.recompensas) && data.recompensas.length
+                        ? data.recompensas
+                        : [{ quantidade: data.quantidade, item_nome: data.item_nome }];
+                    const textoRecompensas = recompensas
+                        .map(item => `+${item.quantidade} ${item.item_nome}`)
+                        .join('\n');
+                    let floatText = this.add.text(recurso.x, recurso.y - 40, textoRecompensas, {
                         fontSize: '14px', color: '#2ecc71', stroke: '#000', strokeThickness: 4, fontStyle: 'bold'
                     }).setOrigin(0.5).setDepth(100);
                     
@@ -3095,12 +3151,16 @@ class MapaScene extends Phaser.Scene {
                     
                     // 🔥 APAGAMOS AQUI O CÓDIGO VELHO QUE FAZIA A ÁRVORE SUMIR!
                     // Agora a árvore só vai sumir quando o recurso.estoque chegar a 0 lá no spawnRecurso!
+                    return true;
 
                 } else {
                     if (window.alertaEldora) window.alertaEldora("Falha na Coleta", data.error, "erro");
+                    return false;
                 }
             } catch (e) {
                 console.error(e);
+                if (window.alertaEldora) window.alertaEldora("Falha na Coleta", "Não foi possível confirmar a recompensa. Tente novamente.", "erro");
+                return false;
             }
         };
     }

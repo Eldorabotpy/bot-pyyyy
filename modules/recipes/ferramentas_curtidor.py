@@ -47,7 +47,7 @@ RECIPES: Dict[str, Dict[str, Any]] = {
         "required_tool_type": "ferreiro",
         "required_tool_tier": 3,
         "level_req": 63,
-        "materials": {"mithril": 18, "madeira": 12, "nucleo_de_forja": 1},
+        "materials": {"barra_de_mithril": 18, "madeira": 12, "nucleo_de_forja": 1},
         "result_base_id": "ferramentas_curtidor_t4",
         "xp_gain": 64
     },
@@ -58,7 +58,7 @@ RECIPES: Dict[str, Dict[str, Any]] = {
         "required_tool_type": "ferreiro",
         "required_tool_tier": 4,
         "level_req": 88,
-        "materials": {"adamantio": 20, "madeira": 14, "nucleo_de_forja": 1},
+        "materials": {"barra_de_adamantio": 20, "madeira": 14, "nucleo_de_forja": 1},
         "result_base_id": "ferramentas_curtidor_t5",
         "xp_gain": 90
     },

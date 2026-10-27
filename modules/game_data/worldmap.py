@@ -65,12 +65,12 @@ REGIONS_DATA = {
     'campos_linho':     {'display_name': 'Campos de Linho',      'resource': 'linho', 'emoji': '🌾', 'file_id_name': 'regiao_campos_linho'},
     'pico_grifo':       {'display_name': 'Pico do Grifo',        'resource': 'pena',  'emoji': '🦅', 'file_id_name': 'regiao_pico_grifo', 'ambush_chance': 0.25},
     'mina_ferro':       {'display_name': 'Mina de Ferro',        'resource': 'minerio_de_ferro', 'emoji': '⛏️', 'file_id_name': 'regiao_mina_ferro'},
-    'forja_abandonada': {'display_name': 'Forja Abandonada',     'resource': 'minerio_de_prata',    'emoji': '🔥', 'file_id_name': 'regiao_forja_abandonada'},
+    'forja_abandonada': {'display_name': 'Forja Abandonada',     'resource': None,    'emoji': '🔥', 'file_id_name': 'regiao_forja_abandonada'},
     'pantano_maldito':  {'display_name': 'Pântano Maldito',      'resource': 'sangue','emoji': '🩸', 'file_id_name': 'regiao_pantano_maldito', 'ambush_chance': 0.30},
     
     # --- NOVAS REGIÕES ADICIONADAS ---
-    'pradaria_inicial': {'display_name': 'Pradaria Inicial',     'resource': 'trigo', 'emoji': '🌱', 'file_id_name': 'regiao_pradaria_inicial'},
-    'picos_gelados':    {'display_name': 'Picos Gelados',        'resource': 'gelo',  'emoji': '❄️', 'file_id_name': 'regiao_picos_gelados', 'travel_cost': 2},
+    'pradaria_inicial': {'display_name': 'Pradaria Inicial',     'resource': None, 'emoji': '🌱', 'file_id_name': 'regiao_pradaria_inicial'},
+    'picos_gelados':    {'display_name': 'Picos Gelados',        'resource': None,  'emoji': '❄️', 'file_id_name': 'regiao_picos_gelados', 'travel_cost': 2},
     
     # AQUI FICA O SEU NPC DE RUNAS:
     'deserto_ancestral':{

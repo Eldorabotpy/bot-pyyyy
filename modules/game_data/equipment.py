@@ -178,7 +178,7 @@ ITEM_DATABASE = {
 
     "adaga_sombra_assassino":      {"slot": "arma",     "nome_exibicao": "Adaga da Sombra","image_url": "https://github.com/sua-imagem-da-mascara.png"},
     "mascara_sombra_assassino":    {"slot": "elmo",     "nome_exibicao": "Máscara da Sombra","image_url": "https://github.com/sua-imagem-da-mascara.png"},
-    "couraça_sombra_assassino":    {"slot": "armadura", "nome_exibicao": "Couraça da Sombra","image_url": "https://github.com/sua-imagem-da-mascara.png"},
+    "couraca_sombra_assassino":    {"slot": "armadura", "nome_exibicao": "Couraça da Sombra","image_url": "https://github.com/sua-imagem-da-mascara.png"},
     "calcas_sombra_assassino":     {"slot": "calca",    "nome_exibicao": "Calças da Sombra","image_url": "https://github.com/sua-imagem-da-mascara.png"},
     "botas_sombra_assassino":      {"slot": "botas",    "nome_exibicao": "Botas da Sombra","image_url": "https://github.com/sua-imagem-da-mascara.png"},
     "luvas_sombra_assassino":      {"slot": "luvas",    "nome_exibicao": "Luvas da Sombra","image_url": "https://github.com/sua-imagem-da-mascara.png"},
