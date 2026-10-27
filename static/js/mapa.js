@@ -1933,6 +1933,10 @@ class MapaScene extends Phaser.Scene {
             {
                 nome: 'efeitos_superiores',
                 profundidade: 21
+            },
+            {
+                nome: 'Moinho',
+                profundidade: 22
             }
         ];
 
