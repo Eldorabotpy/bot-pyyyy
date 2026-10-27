@@ -1,6 +1,6 @@
 (() => {
-    let status=null,busy=false,googleLoaded=false,screen='login';
     const inTelegram=!!window.Telegram?.WebApp?.initData;
+    let status=null,busy=false,googleLoaded=false,googleReady=false,screen=inTelegram?'login':'google';
     const box=document.getElementById('portal-identidade');
     const linksTrigger=document.getElementById('portal-links-trigger');
     const linksDrawer=document.getElementById('portal-links-drawer');
@@ -14,6 +14,15 @@
     const googleHome=document.getElementById('portal-google-home');
     const telegramButton=document.getElementById('portal-telegram');
     const telegramHome=document.getElementById('portal-telegram-home');
+    function renderGoogleButton(){
+        const target=document.getElementById('portal-google');
+        if(!googleReady||inTelegram||!target||!target.getClientRects().length)return;
+        const mode=document.getElementById('portal-auth-mode').value;
+        if(status?.authenticated&&status.google_linked&&mode!=='replace')return;
+        if(!status?.authenticated&&!['google','create'].includes(screen))return;
+        target.replaceChildren();
+        google.accounts.id.renderButton(target,{type:'standard',theme:'outline',size:'large',text:!status?.authenticated&&screen==='create'?'signup_with':'signin_with',width:240});
+    }
     function setLinksMenu(open,returnFocus=true){
         linksDrawer.hidden=!open;
         linksOverlay.hidden=!open;
@@ -130,12 +139,19 @@
             googleLoaded=true;
             const script=document.createElement('script');script.src='https://accounts.google.com/gsi/client';script.async=true;
             script.onload=()=>{
-                google.accounts.id.initialize({client_id:status.google_client_id,callback:r=>authenticate('google',{credential:r.credential})});
-                google.accounts.id.renderButton(document.getElementById('portal-google'),{type:'standard',theme:'outline',size:'large',text:'signin_with',width:240});
+                try{
+                    google.accounts.id.initialize({client_id:status.google_client_id,callback:r=>authenticate('google',{credential:r.credential})});
+                    googleReady=true;
+                    renderGoogleButton();
+                }catch(error){
+                    googleLoaded=false;
+                    googleNote.textContent='Não foi possível preparar o acesso com Google. Atualize a página e tente novamente.';
+                }
             };
-            script.onerror=()=>{googleLoaded=false;note('Não foi possível carregar o Google. Tente novamente.');};
+            script.onerror=()=>{googleLoaded=false;googleNote.textContent='Não foi possível carregar o acesso do Google. Verifique a conexão e atualize a página.';};
             document.head.appendChild(script);
         }
+        renderGoogleButton();
         return status;
     };
     async function authenticate(provider,credentials){
@@ -185,6 +201,7 @@
         telegramHint.hidden=!(inTelegram&&!status?.authenticated);
         telegramHint.textContent=create?'Depois de preencher usuário e senha, confirme a criação pelo Telegram.':'Entre automaticamente com a identidade Telegram deste aplicativo.';
         document.querySelectorAll('#portal-entry-tabs button').forEach((el,index)=>el.setAttribute('aria-pressed',String(index===1?create:next==='login')));
+        requestAnimationFrame(renderGoogleButton);
     };
     document.getElementById('telegram-save-credentials').onclick=async()=>{
         if(busy)return;
@@ -225,6 +242,7 @@
         document.getElementById('portal-auth-mode').value='replace';
         document.getElementById('portal-google').hidden=inTelegram;
         document.getElementById('portal-google-note').textContent='Clique no botão Google para trocar o vínculo desta conta-mestre. Os personagens permanecem aqui.';
+        requestAnimationFrame(renderGoogleButton);
     };
     document.getElementById('portal-replace-telegram').onclick=async()=>{
         if(!status?.fresh_auth){note('Saia e entre novamente por senha ou Google antes de trocar o Telegram.');return;}
