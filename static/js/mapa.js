@@ -194,7 +194,7 @@ class MapaScene extends Phaser.Scene {
         this.load.image('tiles_grama', '/static/images/tilesets/grama reino.png');
         this.load.image('tiles_casas', '/static/images/tilesets/casas.png'); 
         this.load.image('tiles_hpg', '/static/images/tilesets/HPGLobbyTileset.png');
-        this.load.image('tiles_arvores', '/static/images/tilesets/arvores.png');
+        this.load.image('tiles_arvores', '/static/images/tilesets/arvores.png?v=8c21cc3');
         if (this.regiaoAtual === 'campos_linho') {
             const tilesetsCamposLinho = {
                 tiles_campos_linho_linho: 'campos_linho_linho.png',
