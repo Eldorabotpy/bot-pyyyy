@@ -2270,10 +2270,72 @@ class MapaScene extends Phaser.Scene {
                     return { x, y };
                 };
                 const adicionarCorpo = (x, y, largura, altura) => {
-                    if (largura <= 0 || altura <= 0) return;
+                    if (largura <= 0 || altura <= 0) return null;
                     const zona = this.add.zone(x + largura / 2, y + altura / 2, largura, altura);
                     corposTiles.add(zona);
                     zona.body.setSize(largura, altura).updateFromGameObject();
+                    return zona.body;
+                };
+
+                // Tiles colocados como objetos (portal e estátua animada) não
+                // aparecem em layer.data. Suas formas usam o tamanho original
+                // do tileset e precisam acompanhar a escala do sprite no mapa.
+                this.adicionarColisaoDeObjetoTile = (gidOriginal, x, y, largura, altura, ativo = true) => {
+                    const gid = gidOriginal & 0x1fffffff;
+                    const formas = formasPorGid.get(gid);
+                    const tileset = dadosTiled.tilesets.find(item =>
+                        gid >= item.firstgid && gid < item.firstgid + item.tilecount
+                    );
+                    if (!formas || !tileset || largura <= 0 || altura <= 0) return [];
+
+                    const escalaX = largura / Number(tileset.tilewidth);
+                    const escalaY = altura / Number(tileset.tileheight);
+                    const corpos = [];
+                    formas.forEach(forma => {
+                        if (forma.visible === false) return;
+                        const rad = Phaser.Math.DegToRad(Number(forma.rotation || 0));
+                        const cos = Math.cos(rad);
+                        const sin = Math.sin(rad);
+                        const polygon = Array.isArray(forma.polygon);
+                        const pontosLocais = polygon
+                            ? forma.polygon
+                            : [{ x: 0, y: 0 }, { x: Number(forma.width || 0), y: 0 },
+                                { x: Number(forma.width || 0), y: Number(forma.height || 0) },
+                                { x: 0, y: Number(forma.height || 0) }];
+                        const pontos = pontosLocais.map(ponto => ({
+                            x: x + (Number(forma.x || 0) + ponto.x * cos - ponto.y * sin) * escalaX,
+                            y: y + (Number(forma.y || 0) + ponto.x * sin + ponto.y * cos) * escalaY
+                        }));
+                        if (pontos.length < 2) return;
+
+                        const registrar = (minX, minY, maxX, maxY) => {
+                            const corpo = adicionarCorpo(minX, minY, maxX - minX, maxY - minY);
+                            if (corpo) {
+                                corpo.enable = ativo;
+                                corpos.push(corpo);
+                            }
+                        };
+                        if (polygon) {
+                            pontos.forEach((ponto, indice) => {
+                                const proximo = pontos[(indice + 1) % pontos.length];
+                                const margem = 3;
+                                registrar(
+                                    Math.min(ponto.x, proximo.x) - margem,
+                                    Math.min(ponto.y, proximo.y) - margem,
+                                    Math.max(ponto.x, proximo.x) + margem,
+                                    Math.max(ponto.y, proximo.y) + margem
+                                );
+                            });
+                        } else {
+                            registrar(
+                                Math.min(...pontos.map(ponto => ponto.x)),
+                                Math.min(...pontos.map(ponto => ponto.y)),
+                                Math.max(...pontos.map(ponto => ponto.x)),
+                                Math.max(...pontos.map(ponto => ponto.y))
+                            );
+                        }
+                    });
+                    return corpos;
                 };
 
                 dadosTiled.layers
@@ -2336,6 +2398,18 @@ class MapaScene extends Phaser.Scene {
                             });
                         });
                     });
+
+                const portais = map.getObjectLayer('Portais');
+                (portais?.objects || []).forEach(objeto => {
+                    if (!objeto.gid || objeto.visible === false) return;
+                    this.adicionarColisaoDeObjetoTile(
+                        objeto.gid,
+                        Number(objeto.x),
+                        Number(objeto.y) - Number(objeto.height),
+                        Number(objeto.width),
+                        Number(objeto.height)
+                    );
+                });
 
                 if (corposTiles.getLength() > 0) {
                     this.physics.add.collider(this.player, corposTiles);

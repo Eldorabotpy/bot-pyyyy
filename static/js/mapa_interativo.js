@@ -98,6 +98,8 @@ class MapaInterativo {
 
         objRef.ativacaoSolicitada = false;
         objRef.transicaoEstatua = true;
+        objRef.colisoesCristal?.forEach(corpo => { corpo.enable = false; });
+        objRef.colisoesEstatua?.forEach(corpo => { corpo.enable = true; });
         objRef.botao.bloqueado = true;
         objRef.botao.setVisible(false);
         objRef.spriteEstatua
@@ -134,6 +136,8 @@ class MapaInterativo {
         if (!objRef?.eEstatuaPedroca || !objRef.estatuaTransformada) return;
 
         objRef.transicaoEstatua = true;
+        objRef.colisoesEstatua?.forEach(corpo => { corpo.enable = false; });
+        objRef.colisoesCristal?.forEach(corpo => { corpo.enable = true; });
         objRef.botao.bloqueado = true;
         objRef.botao.setVisible(false);
         objRef.spriteEstatua
@@ -212,6 +216,8 @@ class MapaInterativo {
                     : null;
                 let cristalEstatua = null;
                 let spriteEstatua = null;
+                let colisoesCristal = [];
+                let colisoesEstatua = [];
                 let xInteracao = obj.x;
                 let yInteracao = obj.y;
                 let botaoX = obj.icone_x ?? (obj.x + 16);
@@ -262,6 +268,29 @@ class MapaInterativo {
 
                     cristalEstatua.setDepth(calcularProfundidade(cristalEstatua));
                     spriteEstatua.setDepth(calcularProfundidade(spriteEstatua));
+
+                    if (typeof this.scene.adicionarColisaoDeObjetoTile === 'function') {
+                        const gidCristal = this.scene.tilemap.tilesets.find(
+                            tileset => tileset.name === 'cristal_mana_rotacao'
+                        )?.firstgid;
+                        const gidEstatua = this.scene.tilemap.tilesets.find(
+                            tileset => tileset.name === 'estatua_ergue_teclado'
+                        )?.firstgid;
+                        const origemX = xEstatua - larguraReferencia / 2;
+                        const origemY = baseYEstatua - alturaReferencia;
+                        if (gidCristal) {
+                            colisoesCristal = this.scene.adicionarColisaoDeObjetoTile(
+                                gidCristal, origemX, origemY,
+                                larguraReferencia, alturaReferencia
+                            );
+                        }
+                        if (gidEstatua) {
+                            colisoesEstatua = this.scene.adicionarColisaoDeObjetoTile(
+                                gidEstatua, origemX, origemY,
+                                larguraReferencia, alturaReferencia, false
+                            );
+                        }
+                    }
 
                     cristalEstatua.play('estatua_pedroca_cristal_idle');
                 }
@@ -399,6 +428,8 @@ class MapaInterativo {
                     botao: botao,
                     cristalEstatua,
                     spriteEstatua,
+                    colisoesCristal,
+                    colisoesEstatua,
                     eEstatuaPedroca,
                     transicaoEstatua: false,
                     estatuaTransformada: false,
