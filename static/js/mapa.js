@@ -2248,16 +2248,18 @@ class MapaScene extends Phaser.Scene {
         if (this.regiaoAtual === 'capital_eldora') {
             const entradaTilemap = this.cache.tilemap.get(this.regiaoAtual);
             const dadosTiled = entradaTilemap && entradaTilemap.data;
-            const tilesetCasas = dadosTiled && dadosTiled.tilesets.find(
-                tileset => tileset.name === 'casas'
-            );
-
-            if (tilesetCasas) {
-                const formasPorTile = new Map(
-                    (tilesetCasas.tiles || [])
-                        .filter(tile => tile.objectgroup && tile.objectgroup.objects)
-                        .map(tile => [tile.id, tile.objectgroup.objects])
-                );
+            if (dadosTiled && Array.isArray(dadosTiled.tilesets)) {
+                // O Tiled guarda cada forma pelo id local do seu tileset.
+                // Convertemos para gid global para incluir casas e grama reino.
+                const formasPorGid = new Map();
+                dadosTiled.tilesets.forEach(tileset => {
+                    (tileset.tiles || []).forEach(tile => {
+                        const formas = tile.objectgroup && tile.objectgroup.objects;
+                        if (Array.isArray(formas) && formas.length > 0) {
+                            formasPorGid.set(Number(tileset.firstgid) + Number(tile.id), formas);
+                        }
+                    });
+                });
                 const corposTiles = this.physics.add.staticGroup();
                 const larguraTile = Number(dadosTiled.tilewidth);
                 const alturaTile = Number(dadosTiled.tileheight);
@@ -2281,7 +2283,7 @@ class MapaScene extends Phaser.Scene {
                         const deslocamentoY = Number(layer.offsety || 0) + Number(layer.y || 0) * alturaTile;
                         layer.data.forEach((gidOriginal, indice) => {
                             const gid = gidOriginal & 0x1fffffff;
-                            const formas = formasPorTile.get(gid - tilesetCasas.firstgid);
+                            const formas = formasPorGid.get(gid);
                             if (!formas) return;
 
                             const origemX = (indice % layer.width) * larguraTile + deslocamentoX;
