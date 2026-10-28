@@ -445,6 +445,26 @@ class MapaScene extends Phaser.Scene {
         // Disponibiliza os objetos de referência do Tiled para sistemas como
         // MapaInterativo, que posicionam elementos animados sobre o mapa.
         this.tilemap = map;
+
+        // Na Capital, a camada de objetos marca as áreas em que árvores,
+        // arbustos e muralhas devem ficar à frente dos personagens.
+        // A camada de colisão é independente e continua bloqueando só
+        // onde o Tiled define uma hitbox.
+        const camadaAcimaObjetos = this.regiaoAtual === 'capital_eldora'
+            ? map.getObjectLayer('Acima do Jogador')
+            : null;
+        this.zonasAcimaJogador = camadaAcimaObjetos?.visible === false
+            ? []
+            : (camadaAcimaObjetos?.objects || [])
+                .filter(obj => obj.visible !== false &&
+                    Number.isFinite(Number(obj.x)) &&
+                    Number.isFinite(Number(obj.y)) &&
+                    Number(obj.width) > 0 &&
+                    Number(obj.height) > 0)
+                .map(obj => new Phaser.Geom.Rectangle(
+                    Number(obj.x), Number(obj.y),
+                    Number(obj.width), Number(obj.height)
+                ));
         
         let todosTilesets = [];
 
@@ -799,6 +819,14 @@ class MapaScene extends Phaser.Scene {
                 if (
                     l === 'Casas' ||
                     l === 'casas'
+                ) {
+                    profundidade = 10;
+                }
+
+                if (
+                    this.regiaoAtual === 'capital_eldora' &&
+                    this.zonasAcimaJogador.length > 0 &&
+                    (l === 'Muralha' || l === 'Decoracao')
                 ) {
                     profundidade = 10;
                 }
@@ -3287,6 +3315,14 @@ class MapaScene extends Phaser.Scene {
         const alturaVisual = Number(ator.displayHeight) || 0;
         const basePes = Number(ator.y || 0) + alturaVisual * (1 - origemY);
         const posicaoNormalizada = Phaser.Math.Clamp(basePes / alturaMundo, 0, 1);
+
+        if (this.zonasAcimaJogador?.some(zona =>
+            Phaser.Geom.Rectangle.Contains(zona, Number(ator.x || 0), basePes)
+        )) {
+            // Atrás das camadas de casas, muralha e decoração (depth 10),
+            // mas ainda à frente do chão e das ruas (depth 0).
+            return 9 + posicaoNormalizada * 0.9;
+        }
 
         // Mantém jogador, pets e mobs acima das camadas comuns, mas abaixo
         // de "Acima do Jogador" (depth 20), que deve cobrir os atores.
