@@ -221,6 +221,9 @@ class MapaScene extends Phaser.Scene {
         if (this.regiaoAtual === 'pedreira_granito') {
             this.load.image('tiles_pedreira', '/static/images/tilesets/pedreira.png');
         }
+        if (this.regiaoAtual === 'pico_grifo') {
+            this.load.image('tiles_pico_grifo_base', '/static/images/tilesets/pico_do_grifo_base.png');
+        }
 
         if (this.regiaoAtual === 'capital_eldora') {
             this.load.image(
@@ -512,6 +515,12 @@ class MapaScene extends Phaser.Scene {
             );
         }
 
+        if (this.regiaoAtual === 'pico_grifo' && map.tilesets.some(t => t.name === 'chao')) {
+            todosTilesets.push(
+                map.addTilesetImage('chao', 'tiles_pico_grifo_base')
+            );
+        }
+
         if (this.regiaoAtual === 'campos_linho') {
             const texturasPorNome = {
                 campos_linho_linho: 'tiles_campos_linho_linho',
@@ -646,6 +655,7 @@ class MapaScene extends Phaser.Scene {
             'tiles_hpg',
             'tiles_arvores',
             'tiles_pedreira',
+            'tiles_pico_grifo_base',
             'tiles_campos_linho_linho',
             'tiles_campos_linho_agua',
             'tiles_campos_linho_construcao',
@@ -666,7 +676,9 @@ class MapaScene extends Phaser.Scene {
         // ==========================================
         // 🗺️ CAMADAS BAIXAS DOS MAPAS
         // ==========================================
-        const camadasBaixas = this.regiaoAtual === 'campos_linho'
+        const camadasBaixas = this.regiaoAtual === 'pico_grifo'
+            ? ['Chao', 'Chao2', 'Arvores', 'Arvores2', 'Decoracao']
+            : this.regiaoAtual === 'campos_linho'
             ? [
                 'chao1',
                 'Chao1',
