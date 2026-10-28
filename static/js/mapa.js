@@ -223,6 +223,8 @@ class MapaScene extends Phaser.Scene {
         }
         if (this.regiaoAtual === 'pico_grifo') {
             this.load.image('tiles_pico_grifo_base', '/static/images/tilesets/pico_do_grifo_base.png');
+            this.load.image('pico_grifo_pinheiros', '/static/images/tilesets/pico_do_grifo_pinheiros.png');
+            this.load.image('pico_grifo_rochas', '/static/images/tilesets/pico_do_grifo_rochas.png');
         }
 
         if (this.regiaoAtual === 'capital_eldora') {
@@ -728,6 +730,19 @@ class MapaScene extends Phaser.Scene {
             [
                 { chave: 'tiles_campos_linho_bosque_lilas', profundidade: 1 },
                 { chave: 'tiles_campos_linho_vegetacao_rara', profundidade: 2 }
+            ].forEach(({ chave, profundidade }) => {
+                if (!this.textures.exists(chave)) return;
+
+                this.add.image(0, 0, chave)
+                    .setOrigin(0, 0)
+                    .setDepth(profundidade);
+            });
+        }
+
+        if (this.regiaoAtual === 'pico_grifo') {
+            [
+                { chave: 'pico_grifo_rochas', profundidade: 1 },
+                { chave: 'pico_grifo_pinheiros', profundidade: 2 }
             ].forEach(({ chave, profundidade }) => {
                 if (!this.textures.exists(chave)) return;
 
