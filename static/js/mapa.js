@@ -2242,6 +2242,105 @@ class MapaScene extends Phaser.Scene {
             });
         }
 
+        // O editor de colisões de blocos do Tiled grava as formas no tileset,
+        // não na camada de objetos "colisao". Criamos corpos com o tamanho real
+        // dessas formas; setCollisionFromCollisionGroup bloquearia o tile inteiro.
+        if (this.regiaoAtual === 'capital_eldora') {
+            const entradaTilemap = this.cache.tilemap.get(this.regiaoAtual);
+            const dadosTiled = entradaTilemap && entradaTilemap.data;
+            const tilesetCasas = dadosTiled && dadosTiled.tilesets.find(
+                tileset => tileset.name === 'casas'
+            );
+
+            if (tilesetCasas) {
+                const formasPorTile = new Map(
+                    (tilesetCasas.tiles || [])
+                        .filter(tile => tile.objectgroup && tile.objectgroup.objects)
+                        .map(tile => [tile.id, tile.objectgroup.objects])
+                );
+                const corposTiles = this.physics.add.staticGroup();
+                const larguraTile = Number(dadosTiled.tilewidth);
+                const alturaTile = Number(dadosTiled.tileheight);
+                const transformarPonto = (x, y, flags) => {
+                    if (flags & 0x20000000) [x, y] = [y, x];
+                    if (flags & 0x80000000) x = larguraTile - x;
+                    if (flags & 0x40000000) y = alturaTile - y;
+                    return { x, y };
+                };
+                const adicionarCorpo = (x, y, largura, altura) => {
+                    if (largura <= 0 || altura <= 0) return;
+                    const zona = this.add.zone(x + largura / 2, y + altura / 2, largura, altura);
+                    corposTiles.add(zona);
+                    zona.body.setSize(largura, altura).updateFromGameObject();
+                };
+
+                dadosTiled.layers
+                    .filter(layer => layer.type === 'tilelayer' && Array.isArray(layer.data))
+                    .forEach(layer => {
+                        const deslocamentoX = Number(layer.offsetx || 0) + Number(layer.x || 0) * larguraTile;
+                        const deslocamentoY = Number(layer.offsety || 0) + Number(layer.y || 0) * alturaTile;
+                        layer.data.forEach((gidOriginal, indice) => {
+                            const gid = gidOriginal & 0x1fffffff;
+                            const formas = formasPorTile.get(gid - tilesetCasas.firstgid);
+                            if (!formas) return;
+
+                            const origemX = (indice % layer.width) * larguraTile + deslocamentoX;
+                            const origemY = Math.floor(indice / layer.width) * alturaTile + deslocamentoY;
+                            const flags = gidOriginal >>> 0;
+                            formas.forEach(forma => {
+                                if (forma.visible === false) return;
+                                const rad = Phaser.Math.DegToRad(Number(forma.rotation || 0));
+                                const cos = Math.cos(rad);
+                                const sin = Math.sin(rad);
+                                let pontos;
+                                if (Array.isArray(forma.polygon)) {
+                                    pontos = forma.polygon.map(ponto => ({
+                                        x: Number(ponto.x || 0), y: Number(ponto.y || 0)
+                                    }));
+                                } else {
+                                    const w = Number(forma.width || 0);
+                                    const h = Number(forma.height || 0);
+                                    pontos = [{ x: 0, y: 0 }, { x: w, y: 0 },
+                                        { x: w, y: h }, { x: 0, y: h }];
+                                }
+                                pontos = pontos.map(ponto => {
+                                    const x = Number(forma.x || 0) + ponto.x * cos - ponto.y * sin;
+                                    const y = Number(forma.y || 0) + ponto.x * sin + ponto.y * cos;
+                                    const transformado = transformarPonto(x, y, flags);
+                                    return { x: origemX + transformado.x, y: origemY + transformado.y };
+                                });
+                                if (pontos.length < 2) return;
+
+                                // Polígonos delimitam as bordas; retângulos usam
+                                // sua área exata (ou a caixa externa se girados).
+                                if (Array.isArray(forma.polygon)) {
+                                    pontos.forEach((ponto, pos) => {
+                                        const proximo = pontos[(pos + 1) % pontos.length];
+                                        const margem = 3;
+                                        adicionarCorpo(
+                                            Math.min(ponto.x, proximo.x) - margem,
+                                            Math.min(ponto.y, proximo.y) - margem,
+                                            Math.abs(ponto.x - proximo.x) + 2 * margem,
+                                            Math.abs(ponto.y - proximo.y) + 2 * margem
+                                        );
+                                    });
+                                } else {
+                                    const xs = pontos.map(ponto => ponto.x);
+                                    const ys = pontos.map(ponto => ponto.y);
+                                    const x = Math.min(...xs);
+                                    const y = Math.min(...ys);
+                                    adicionarCorpo(x, y, Math.max(...xs) - x, Math.max(...ys) - y);
+                                }
+                            });
+                        });
+                    });
+
+                if (corposTiles.getLength() > 0) {
+                    this.physics.add.collider(this.player, corposTiles);
+                }
+            }
+        }
+
         this.target = new Phaser.Math.Vector2();
         
         try {
