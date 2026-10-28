@@ -283,17 +283,13 @@ class MapaInterativo {
                         }
                     }
 
-                    // A base visível do pedestal termina antes do rodapé
-                    // transparente do frame. A profundidade deve usar essa
-                    // borda: ao passar por baixo, o jogador fica na frente.
-                    const baseColisao = Math.max(
-                        ...colisoesCristal.map(corpo => corpo.bottom),
-                        ...colisoesEstatua.map(corpo => corpo.bottom),
-                        baseYEstatua - alturaReferencia * 0.1
-                    );
+                    // A colisão controla o caminho, mas a ordem visual precisa
+                    // de uma linha própria no meio do pedestal. Assim, aumentar
+                    // a hitbox no Tiled não faz a estátua cobrir o jogador.
+                    const linhaProfundidade = baseYEstatua - alturaReferencia * 0.24;
                     const profundidadeEstatua = typeof this.scene.calcularProfundidadeAtor === 'function'
                         ? this.scene.calcularProfundidadeAtor({
-                            x: xEstatua, y: baseColisao, originY: 1, displayHeight: 0
+                            x: xEstatua, y: linhaProfundidade, originY: 1, displayHeight: 0
                         })
                         : 14;
                     cristalEstatua.setDepth(profundidadeEstatua);
