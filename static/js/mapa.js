@@ -461,12 +461,9 @@ class MapaScene extends Phaser.Scene {
                     Number.isFinite(Number(obj.y)) &&
                     Number(obj.width) > 0 &&
                     Number(obj.height) > 0)
-                .map(obj => Object.assign(
-                    new Phaser.Geom.Rectangle(
-                        Number(obj.x), Number(obj.y),
-                        Number(obj.width), Number(obj.height)
-                    ),
-                    { nome: String(obj.name || '').toLowerCase() }
+                .map(obj => new Phaser.Geom.Rectangle(
+                    Number(obj.x), Number(obj.y),
+                    Number(obj.width), Number(obj.height)
                 ));
         
         let todosTilesets = [];
@@ -3494,13 +3491,9 @@ class MapaScene extends Phaser.Scene {
         const basePes = Number(ator.y || 0) + alturaVisual * (1 - origemY);
         const posicaoNormalizada = Phaser.Math.Clamp(basePes / alturaMundo, 0, 1);
 
-        if (this.zonasAcimaJogador?.some(zona => {
-            const x = Number(ator.x || 0);
-            // Moitas pequenas ocupam um tile; quando o personagem está sobre
-            // elas, seus pés podem já estar abaixo do retângulo do Tiled.
-            const y = zona.nome === 'arbusto' ? Number(ator.y || 0) : basePes;
-            return Phaser.Geom.Rectangle.Contains(zona, x, y);
-        })) {
+        if (this.zonasAcimaJogador?.some(zona =>
+            Phaser.Geom.Rectangle.Contains(zona, Number(ator.x || 0), basePes)
+        )) {
             // Atrás das camadas de casas, muralha e decoração (depth 10),
             // mas ainda à frente do chão e das ruas (depth 0).
             return 9 + posicaoNormalizada * 0.9;
