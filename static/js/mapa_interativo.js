@@ -289,12 +289,6 @@ class MapaInterativo {
                     // de uma linha própria no meio do pedestal. Assim, aumentar
                     // a hitbox no Tiled não faz a estátua cobrir o jogador.
                     const linhaProfundidade = baseYEstatua - alturaReferencia * 0.24;
-                    this.scene.zonaEstatuaPedestal = {
-                        x: xEstatua,
-                        largura: larguraReferencia,
-                        linha: linhaProfundidade,
-                        baseY: baseYEstatua
-                    };
                     const profundidadeEstatua = typeof this.scene.calcularProfundidadeAtor === 'function'
                         ? this.scene.calcularProfundidadeAtor({
                             x: xEstatua, y: linhaProfundidade, originY: 1, displayHeight: 0

@@ -3493,13 +3493,7 @@ class MapaScene extends Phaser.Scene {
         const basePes = Number(ator.y || 0) + alturaVisual * (1 - origemY);
         const posicaoNormalizada = Phaser.Math.Clamp(basePes / alturaMundo, 0, 1);
 
-        const pedestal = this.zonaEstatuaPedestal;
-        const emFrenteAoPedestal = pedestal &&
-            Math.abs(Number(ator.x || 0) - pedestal.x) <= pedestal.largura / 2 + 16 &&
-            basePes >= pedestal.linha &&
-            basePes <= pedestal.baseY + 64;
-
-        if (!emFrenteAoPedestal && this.zonasAcimaJogador?.some(zona =>
+        if (this.zonasAcimaJogador?.some(zona =>
             Phaser.Geom.Rectangle.Contains(zona, Number(ator.x || 0), basePes)
         )) {
             // Atrás das camadas de casas, muralha e decoração (depth 10),
