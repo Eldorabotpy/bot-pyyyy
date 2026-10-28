@@ -727,6 +727,7 @@ class MapaScene extends Phaser.Scene {
             'Piso',
             'grama',
 
+            'Arvores Frente',
             'Casas',
             'Paredes',
             'Muralha',
@@ -818,7 +819,8 @@ class MapaScene extends Phaser.Scene {
 
                 if (
                     l === 'Casas' ||
-                    l === 'casas'
+                    l === 'casas' ||
+                    (this.regiaoAtual === 'capital_eldora' && l === 'Arvores Frente')
                 ) {
                     profundidade = 10;
                 }
@@ -3491,7 +3493,13 @@ class MapaScene extends Phaser.Scene {
         const basePes = Number(ator.y || 0) + alturaVisual * (1 - origemY);
         const posicaoNormalizada = Phaser.Math.Clamp(basePes / alturaMundo, 0, 1);
 
-        if (this.zonasAcimaJogador?.some(zona =>
+        const pedestal = this.zonaEstatuaPedestal;
+        const emFrenteAoPedestal = pedestal &&
+            Math.abs(Number(ator.x || 0) - pedestal.x) <= pedestal.largura / 2 + 16 &&
+            basePes >= pedestal.linha &&
+            basePes <= pedestal.baseY + 64;
+
+        if (!emFrenteAoPedestal && this.zonasAcimaJogador?.some(zona =>
             Phaser.Geom.Rectangle.Contains(zona, Number(ator.x || 0), basePes)
         )) {
             // Atrás das camadas de casas, muralha e decoração (depth 10),

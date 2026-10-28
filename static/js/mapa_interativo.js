@@ -226,7 +226,9 @@ class MapaInterativo {
                 if (eEstatuaPedroca) {
                     const larguraReferencia = Number(referenciaEstatua?.width) || 128;
                     const alturaReferencia = Number(referenciaEstatua?.height) || (256 * 2 / 3);
-                    const xEstatua = Number(referenciaEstatua?.x) || obj.x;
+                    const xEstatua = referenciaEstatua
+                        ? Number(referenciaEstatua.x) + (referenciaEstatua.gid ? larguraReferencia / 2 : 0)
+                        : obj.x;
                     const baseYEstatua = Number(referenciaEstatua?.y) || (obj.y + 128);
                     const escalaX = larguraReferencia / 192;
                     const escalaY = alturaReferencia / 256;
@@ -287,6 +289,12 @@ class MapaInterativo {
                     // de uma linha própria no meio do pedestal. Assim, aumentar
                     // a hitbox no Tiled não faz a estátua cobrir o jogador.
                     const linhaProfundidade = baseYEstatua - alturaReferencia * 0.24;
+                    this.scene.zonaEstatuaPedestal = {
+                        x: xEstatua,
+                        largura: larguraReferencia,
+                        linha: linhaProfundidade,
+                        baseY: baseYEstatua
+                    };
                     const profundidadeEstatua = typeof this.scene.calcularProfundidadeAtor === 'function'
                         ? this.scene.calcularProfundidadeAtor({
                             x: xEstatua, y: linhaProfundidade, originY: 1, displayHeight: 0
