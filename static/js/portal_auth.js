@@ -4,8 +4,14 @@
     const googleHandoffMode=googleHandoffState==='1';
     const googleHandoffReturn=googleHandoffState==='return';
     const googleHandoffError=googleHandoffState==='error';
+    const queryHandoffToken=new URLSearchParams(window.location.search).get('google_handoff_token')||'';
     const handoffParams=new URLSearchParams(window.location.hash.slice(1));
     const handoffToken=handoffParams.get('google_handoff')||'';
+    if(queryHandoffToken){
+        const cleanUrl=new URL(window.location.href);
+        cleanUrl.searchParams.delete('google_handoff_token');
+        history.replaceState(null,'',cleanUrl.pathname+cleanUrl.search+cleanUrl.hash);
+    }
     if(handoffToken)history.replaceState(null,'',window.location.pathname+window.location.search);
     let status=null,busy=false,googleLoaded=false,googleReady=false,screen='login';
     const box=document.getElementById('portal-identidade');
@@ -316,10 +322,10 @@
     try{localStorage.removeItem('eldora_contas_salvas');}catch(_){}
     window.portalAuthReady=window.portalRefresh().then(async data=>{
         document.getElementById('tela-registro-conta').style.display='none';
-        if(handoffToken||googleHandoffReturn){
+        if(handoffToken||queryHandoffToken||googleHandoffReturn){
             try{
                 const payload={init_data:window.Telegram?.WebApp?.initData||''};
-                if(handoffToken)payload.token=handoffToken;
+                if(handoffToken||queryHandoffToken)payload.token=handoffToken||queryHandoffToken;
                 const result=await post('/api/auth/telegram-google-handoff',payload);
                 const refreshed=await window.portalRefresh();
                 window.portalAccept(result);

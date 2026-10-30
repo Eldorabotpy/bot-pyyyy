@@ -174,6 +174,7 @@ def start_session(account, remember=True, auth_method='unknown'):
         if revoke:
             revoke(previous_account_id)
     session.pop('portal_pending_identity', None)
+    session.pop('portal_pending_google_handoff_hash', None)
     session.pop('portal_character', None)
     session['portal_account'] = str(account['_id'])
     session['portal_session_version'] = int(account.get('session_version', 0))
@@ -210,14 +211,6 @@ def create_telegram_google_handoff(account):
         'expires_at': datetime.now(timezone.utc) + timedelta(minutes=10),
     })
     return f'https://t.me/{bot_username}?start=eldora_{token}'
-
-
-def stage_telegram_google_handoff(token):
-    """Keep only the hashed handoff in the session before redirecting to a clean URL."""
-    if not isinstance(token, str) or not re.fullmatch(r'[A-Za-z0-9_-]{43}', token):
-        return False
-    session['portal_pending_google_handoff_hash'] = hashlib.sha256(token.encode()).hexdigest()
-    return True
 
 
 def claim_telegram_google_handoff(token, telegram_user_id):

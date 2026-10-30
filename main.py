@@ -11,7 +11,7 @@ except ImportError:
     ZoneInfo = None
 from threading import Thread, Lock
 from uuid import uuid4
-from flask import Flask, render_template, jsonify, request, session, redirect
+from flask import Flask, render_template, jsonify, request, session
 from flask.json.provider import DefaultJSONProvider
 from flask_socketio import SocketIO, emit
 from bson import ObjectId, errors
@@ -122,7 +122,7 @@ client = MongoClient(
 
 # --- REGISTRO DOS BLUEPRINTS ---
 app.register_blueprint(webapp_bp)
-from modules.portal_auth import portal_auth_bp, stage_telegram_google_handoff
+from modules.portal_auth import portal_auth_bp
 from datetime import timedelta
 app.register_blueprint(portal_auth_bp)
 app.config.update(SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE='Lax',
@@ -265,15 +265,10 @@ def home():
 @app.route('/login')
 def pagina_login():
     handoff_token = request.args.get('google_handoff_token')
-    if handoff_token is not None:
-        destination = '/login?google_handoff=return' if stage_telegram_google_handoff(handoff_token) else '/login?google_handoff=error'
-        response = redirect(destination, code=303)
+    response = app.make_response(render_template('login.html'))
+    if handoff_token is not None or request.args.get('google_handoff') in ('return', 'error'):
         response.headers['Cache-Control'] = 'no-store'
         response.headers['Referrer-Policy'] = 'no-referrer'
-        return response
-    response = app.make_response(render_template('login.html'))
-    if request.args.get('google_handoff') == 'return':
-        response.headers['Cache-Control'] = 'no-store'
     return response
 
 
