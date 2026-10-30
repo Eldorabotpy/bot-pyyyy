@@ -1,6 +1,9 @@
 (() => {
     const inTelegram=!!window.Telegram?.WebApp?.initData;
-    const googleHandoffMode=new URLSearchParams(window.location.search).get('google_handoff')==='1';
+    const googleHandoffState=new URLSearchParams(window.location.search).get('google_handoff')||'';
+    const googleHandoffMode=googleHandoffState==='1';
+    const googleHandoffReturn=googleHandoffState==='return';
+    const googleHandoffError=googleHandoffState==='error';
     const handoffParams=new URLSearchParams(window.location.hash.slice(1));
     const handoffToken=handoffParams.get('google_handoff')||'';
     if(handoffToken)history.replaceState(null,'',window.location.pathname+window.location.search);
@@ -313,19 +316,26 @@
     try{localStorage.removeItem('eldora_contas_salvas');}catch(_){}
     window.portalAuthReady=window.portalRefresh().then(async data=>{
         document.getElementById('tela-registro-conta').style.display='none';
-        if(handoffToken){
+        if(handoffToken||googleHandoffReturn){
             try{
-                const result=await post('/api/auth/telegram-google-handoff',{token:handoffToken,init_data:window.Telegram?.WebApp?.initData||''});
+                const payload={init_data:window.Telegram?.WebApp?.initData||''};
+                if(handoffToken)payload.token=handoffToken;
+                const result=await post('/api/auth/telegram-google-handoff',payload);
                 const refreshed=await window.portalRefresh();
                 window.portalAccept(result);
                 if(!(result.personagens||[]).length)window.mostrarCriacao();
                 note('Conta Google conectada. Escolha seu personagem.');
                 return refreshed;
             }catch(error){
-                window.portalScreen('login');
+                window.portalScreen('google');
                 document.getElementById('portal-auth-message').textContent=error.message;
                 return data;
             }
+        }
+        if(googleHandoffError){
+            window.portalScreen('google');
+            document.getElementById('portal-auth-message').textContent='O retorno ao Telegram não foi validado. Inicie novamente a entrada com Google.';
+            return data;
         }
         if(data.authenticated&&googleHandoffMode&&data.google_linked){
             try{

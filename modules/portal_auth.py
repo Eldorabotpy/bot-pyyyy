@@ -212,6 +212,14 @@ def create_telegram_google_handoff(account):
     return f'https://t.me/{bot_username}?start=eldora_{token}'
 
 
+def stage_telegram_google_handoff(token):
+    """Keep only the hashed handoff in the session before redirecting to a clean URL."""
+    if not isinstance(token, str) or not re.fullmatch(r'[A-Za-z0-9_-]{43}', token):
+        return False
+    session['portal_pending_google_handoff_hash'] = hashlib.sha256(token.encode()).hexdigest()
+    return True
+
+
 def claim_telegram_google_handoff(token, telegram_user_id):
     """Bind a handoff to the Telegram user who opened the bot deep link."""
     if not isinstance(token, str) or not re.fullmatch(r'[A-Za-z0-9_-]{43}', token):
@@ -232,12 +240,19 @@ def consume_telegram_google_handoff(token, telegram_user_id):
     """Atomically consume a browser-to-Mini-App bridge token."""
     if not isinstance(token, str) or not re.fullmatch(r'[A-Za-z0-9_-]{43}', token):
         return None
+    return consume_telegram_google_handoff_hash(hashlib.sha256(token.encode()).hexdigest(), telegram_user_id)
+
+
+def consume_telegram_google_handoff_hash(token_hash, telegram_user_id):
+    """Consume the staged handoff using the signed Telegram user identity."""
+    if not isinstance(token_hash, str) or not re.fullmatch(r'[a-f0-9]{64}', token_hash):
+        return None
     if type(telegram_user_id) is not int or telegram_user_id <= 0:
         return None
     from modules.player.core import db
     col = db['portal_telegram_google_handoffs']
     record = col.find_one_and_delete({
-        'token_hash': hashlib.sha256(token.encode()).hexdigest(),
+        'token_hash': token_hash,
         'expires_at': {'$gt': datetime.now(timezone.utc)},
         'telegram_id': telegram_user_id,
     })
@@ -381,7 +396,11 @@ def exchange_telegram_google_handoff():
         data = request.get_json(silent=True) or {}
         from config import TELEGRAM_TOKEN
         telegram_user_id = verify_telegram(str(data.get('init_data', '')), TELEGRAM_TOKEN)
-        account = consume_telegram_google_handoff(data.get('token'), telegram_user_id)
+        if data.get('token'):
+            account = consume_telegram_google_handoff(data.get('token'), telegram_user_id)
+        else:
+            token_hash = session.pop('portal_pending_google_handoff_hash', None)
+            account = consume_telegram_google_handoff_hash(token_hash, telegram_user_id)
         if not account:
             return jsonify(erro='Este acesso expirou ou já foi usado. Volte ao bot e repita a entrada com Google.'), 410
         start_session(account, auth_method='google')

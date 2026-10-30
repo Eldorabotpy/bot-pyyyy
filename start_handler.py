@@ -28,7 +28,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "Este acesso expirou ou já foi confirmado por outra conta. Volte ao jogo e repita a entrada com Google."
             )
             return
-        handoff_url = f"{url_do_jogo}/login#google_handoff={handoff_match.group(1)}"
+        handoff_url = f"{url_do_jogo}/login?google_handoff_token={handoff_match.group(1)}"
         keyboard = [[InlineKeyboardButton(
             "🎮 VOLTAR AO JOGO",
             web_app=WebAppInfo(url=handoff_url),
