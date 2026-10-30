@@ -40,7 +40,9 @@ Conta nova: confirma Google (navegador) ou Telegram (Mini App), recebe identific
 
 Conta Google sem senha: depois de entrar, pode configurar usuário e senha como acesso alternativo. A criação ou troca exige uma autenticação recente; quem entrou por senha também confirma a senha atual. Contas antigas já vinculadas ao Google continuam aceitando a senha previamente cadastrada.
 
-Dentro do Telegram não carrega Google Identity Services. Entrar com usuário e senha não vincula automaticamente a identidade Telegram; o login nativo só entra na conta que já pertence àquele Telegram verificado. Nunca adota telegram_id legado sem essa prova. Contas já vinculadas ao Google usam Google no navegador ou a identidade Telegram previamente vinculada; não une contas automaticamente.
+O Mini App não executa Google Identity Services dentro do WebView. Para entrar com uma conta Google já vinculada, o botão abre o navegador seguro; após a validação, um código aleatório de uso único e validade de 10 minutos retorna pelo bot e cria a sessão no Mini App. O código é armazenado como hash, associado ao usuário Telegram que iniciou o retorno e consumido atomicamente após validar o `initData` assinado. Se o Google ainda não estiver vinculado, o login retorna erro e não cria nem une contas. Entrar com usuário e senha não vincula automaticamente a identidade Telegram; o login nativo só entra na conta que já pertence àquele Telegram verificado. Nunca adota telegram_id legado sem essa prova.
+
+O retorno usa `TELEGRAM_BOT_USERNAME` (padrão `Eldora_rpg_bot`) e exige que o handler `/start` do bot esteja publicado junto com as rotas e o JavaScript do portal. Depois da autenticação Google, a pessoa toca em “Voltar ao jogo” na mensagem do bot para abrir o Mini App na conta correta.
 
 O painel de acessos mostra os provedores vinculados. Para remover um provedor, a sessão precisa ter sido autenticada recentemente por outro método que continuará ativo; o último método de entrada nunca pode ser removido. Trocar Google/Telegram também exige outro método e a prova da nova identidade. Encerrar sessões de outros dispositivos incrementa a versão da conta e desconecta os sockets ativos.
 

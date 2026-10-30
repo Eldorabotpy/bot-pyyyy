@@ -6,7 +6,7 @@ import os
 import re
 import secrets
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from urllib.parse import parse_qsl
 from bson import ObjectId
 from flask import Blueprint, current_app, jsonify, request, session
@@ -194,6 +194,58 @@ def account_payload(account):
     return {'sucesso': True, 'username': account['username'], 'login_alias': account.get('login_alias'), 'personagens': characters, 'csrf': session['portal_csrf'], 'has_password': has_password, 'display_name': account.get('login_alias',account['username']), 'google_linked': google_linked, 'telegram_linked': telegram_linked, 'can_unlink_google': has_password or telegram_linked, 'can_unlink_telegram': has_password or google_linked, 'auth_method': session.get('portal_auth_method', 'unknown'), 'fresh_auth': time.time()-session.get('portal_login_at', 0) <= 600}
 
 
+def create_telegram_google_handoff(account):
+    """Issue a short-lived, one-use bridge from browser Google auth to the Mini App."""
+    from modules.player.core import db
+    bot_username = os.getenv('TELEGRAM_BOT_USERNAME', 'Eldora_rpg_bot').strip().lstrip('@')
+    if not re.fullmatch(r'[A-Za-z0-9_]{5,32}', bot_username):
+        raise ValueError('Bot Telegram não configurado para retornar ao jogo.')
+    token = secrets.token_urlsafe(32)
+    col = db['portal_telegram_google_handoffs']
+    col.create_index('token_hash', unique=True)
+    col.create_index('expires_at', expireAfterSeconds=0)
+    col.insert_one({
+        'token_hash': hashlib.sha256(token.encode()).hexdigest(),
+        'account_id': account['_id'],
+        'expires_at': datetime.now(timezone.utc) + timedelta(minutes=10),
+    })
+    return f'https://t.me/{bot_username}?start=eldora_{token}'
+
+
+def claim_telegram_google_handoff(token, telegram_user_id):
+    """Bind a handoff to the Telegram user who opened the bot deep link."""
+    if not isinstance(token, str) or not re.fullmatch(r'[A-Za-z0-9_-]{43}', token):
+        return False
+    if type(telegram_user_id) is not int or telegram_user_id <= 0:
+        return False
+    from modules.player.core import db
+    col = db['portal_telegram_google_handoffs']
+    record = col.find_one_and_update({
+        'token_hash': hashlib.sha256(token.encode()).hexdigest(),
+        'expires_at': {'$gt': datetime.now(timezone.utc)},
+        '$or': [{'telegram_id': {'$exists': False}}, {'telegram_id': telegram_user_id}],
+    }, {'$set': {'telegram_id': telegram_user_id}}, return_document=ReturnDocument.AFTER)
+    return bool(record)
+
+
+def consume_telegram_google_handoff(token, telegram_user_id):
+    """Atomically consume a browser-to-Mini-App bridge token."""
+    if not isinstance(token, str) or not re.fullmatch(r'[A-Za-z0-9_-]{43}', token):
+        return None
+    if type(telegram_user_id) is not int or telegram_user_id <= 0:
+        return None
+    from modules.player.core import db
+    col = db['portal_telegram_google_handoffs']
+    record = col.find_one_and_delete({
+        'token_hash': hashlib.sha256(token.encode()).hexdigest(),
+        'expires_at': {'$gt': datetime.now(timezone.utc)},
+        'telegram_id': telegram_user_id,
+    })
+    if not record:
+        return None
+    return accounts().find_one({'_id': record['account_id'], 'google_sub': {'$type': 'string'}})
+
+
 def verify_telegram(raw, token, now=None):
     pairs = parse_qsl(raw, keep_blank_values=True)
     data = dict(pairs)
@@ -252,6 +304,9 @@ def provider_login(provider):
         mode = data.get('mode', 'login')
         if mode not in ('login','create','link','replace'):
             raise ValueError('Ação inválida.')
+        return_to_telegram = data.get('return_to_telegram') is True
+        if return_to_telegram and (provider != 'google' or mode != 'login'):
+            raise ValueError('Retorno ao Telegram disponível apenas para entrar com Google.')
         account = current_account() if mode in ('link','replace') else None
         if mode in ('link','replace') and (not account or time.time()-session.get('portal_login_at',0)>600):
             return jsonify(erro='Entre novamente na conta existente antes de vincular.'), 401
@@ -303,7 +358,10 @@ def provider_login(provider):
                 return jsonify(erro='Este Google ainda não está vinculado a uma conta-mestre. Se você já tem personagens, entre na conta existente com usuário e senha ou Telegram e vincule o Google em Conta Eldora. Não crie outra conta para recuperar seus personagens.'), 409
             return jsonify(erro='Este Telegram ainda não está vinculado a uma conta-mestre. Se você já tem personagens, entre na conta existente e vincule o Telegram em Conta Eldora.'), 409
         start_session(account, auth_method=provider)
-        return jsonify(account_payload(account))
+        payload = account_payload(account)
+        if return_to_telegram:
+            payload['telegram_deep_link'] = create_telegram_google_handoff(account)
+        return jsonify(payload)
     except ImportError:
         return jsonify(erro='Dependência de login não instalada no servidor.'), 503
     except AccountInputError as exc:
@@ -313,6 +371,42 @@ def provider_login(provider):
     except (ValueError, TypeError, KeyError):
         # Detalhes de tokens ou credenciais nunca são devolvidos ao navegador.
         return jsonify(erro='Não foi possível validar ou vincular. Entre novamente; confira se a identidade já pertence a outra conta.'), 400
+
+
+@portal_auth_bp.post('/api/auth/telegram-google-handoff')
+def exchange_telegram_google_handoff():
+    try:
+        require_csrf()
+        limit_attempts()
+        data = request.get_json(silent=True) or {}
+        from config import TELEGRAM_TOKEN
+        telegram_user_id = verify_telegram(str(data.get('init_data', '')), TELEGRAM_TOKEN)
+        account = consume_telegram_google_handoff(data.get('token'), telegram_user_id)
+        if not account:
+            return jsonify(erro='Este acesso expirou ou já foi usado. Volte ao bot e repita a entrada com Google.'), 410
+        start_session(account, auth_method='google')
+        response = jsonify(account_payload(account))
+        response.headers['Cache-Control'] = 'no-store'
+        return response
+    except ValueError as exc:
+        return jsonify(erro=str(exc)), 403
+
+
+@portal_auth_bp.post('/api/auth/telegram-google-handoff/issue')
+def issue_telegram_google_handoff():
+    try:
+        require_csrf()
+        limit_attempts()
+        account = current_account()
+        if not account:
+            return jsonify(erro='Entre novamente com Google para voltar ao Telegram.'), 401
+        if not account.get('google_sub'):
+            return jsonify(erro='Esta conta ainda não tem Google vinculado.'), 409
+        response = jsonify(telegram_deep_link=create_telegram_google_handoff(account))
+        response.headers['Cache-Control'] = 'no-store'
+        return response
+    except ValueError as exc:
+        return jsonify(erro=str(exc)), 403
 
 
 def telegram_credentials(data, col, exclude_account_id=None):

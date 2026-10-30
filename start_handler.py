@@ -1,4 +1,5 @@
 import logging
+import re
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from telegram.ext import ContextTypes, CommandHandler
 
@@ -10,6 +11,33 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # ⚠️ ATENÇÃO: Atualize este link com o seu Cloudflare atual! (precisa ter https://)
     url_do_jogo = "https://eldora-rpg.modappmania.workers.dev"
+
+    payload = context.args[0] if context.args else ""
+    handoff_match = re.fullmatch(r"eldora_([A-Za-z0-9_-]{43})", payload)
+    if handoff_match:
+        from modules.portal_auth import claim_telegram_google_handoff
+        telegram_user = update.effective_user
+        claimed = (
+            update.effective_chat
+            and update.effective_chat.type == "private"
+            and telegram_user
+            and claim_telegram_google_handoff(handoff_match.group(1), telegram_user.id)
+        )
+        if not claimed:
+            await update.message.reply_text(
+                "Este acesso expirou ou já foi confirmado por outra conta. Volte ao jogo e repita a entrada com Google."
+            )
+            return
+        handoff_url = f"{url_do_jogo}/login#google_handoff={handoff_match.group(1)}"
+        keyboard = [[InlineKeyboardButton(
+            "🎮 VOLTAR AO JOGO",
+            web_app=WebAppInfo(url=handoff_url),
+        )]]
+        await update.message.reply_text(
+            "✅ Google confirmado. Toque abaixo para entrar no Eldora com sua conta.",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+        )
+        return
 
     keyboard = [
         [

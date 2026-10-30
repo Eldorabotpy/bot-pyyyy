@@ -1,5 +1,9 @@
 (() => {
     const inTelegram=!!window.Telegram?.WebApp?.initData;
+    const googleHandoffMode=new URLSearchParams(window.location.search).get('google_handoff')==='1';
+    const handoffParams=new URLSearchParams(window.location.hash.slice(1));
+    const handoffToken=handoffParams.get('google_handoff')||'';
+    if(handoffToken)history.replaceState(null,'',window.location.pathname+window.location.search);
     let status=null,busy=false,googleLoaded=false,googleReady=false,screen='login';
     const box=document.getElementById('portal-identidade');
     const linksTrigger=document.getElementById('portal-links-trigger');
@@ -12,6 +16,7 @@
     const accountSettingsSlot=document.getElementById('portal-account-settings-slot');
     const googleControls=document.getElementById('portal-google-controls');
     const googleHome=document.getElementById('portal-google-home');
+    const googleExternalButton=document.getElementById('portal-google-external');
     const telegramButton=document.getElementById('portal-telegram');
     const telegramHome=document.getElementById('portal-telegram-home');
     function renderGoogleButton(){
@@ -128,9 +133,12 @@
             ?(inTelegram
                 ?'O Google ainda não está vinculado a esta conta-mestre. Abra o Eldora no navegador e entre nesta mesma conta para conectar o Google; seus personagens permanecem aqui.'
                 :'O Google ainda não está vinculado a esta conta-mestre. Selecione sua conta Google abaixo para vinculá-la a esta conta; seus personagens permanecem aqui.')
-            :(inTelegram||status.google_client_id)?'':'Login Google aguardando configuração. Contas existentes podem entrar com senha; novas contas podem ser criadas pelo Telegram.';
+            :inTelegram
+                ?(status.google_client_id?'Entre com o Google já vinculado. A confirmação abre o navegador; depois toque em “Voltar ao jogo” na mensagem do bot.':'Login Google ainda não configurado no servidor.')
+                :status.google_client_id?'':'Login Google aguardando configuração. Contas existentes podem entrar com senha; novas contas podem ser criadas pelo Telegram.';
         const providerMode=document.getElementById('portal-auth-mode').value;
         document.getElementById('portal-google').hidden=inTelegram||!!(status.authenticated&&status.google_linked&&providerMode!=='replace');
+        googleExternalButton.hidden=!(inTelegram&&!status.authenticated&&!!status.google_client_id&&screen==='google');
         if(status.authenticated&&status.google_linked&&providerMode==='replace'){
             googleNote.classList.remove('portal-link-hint');
             document.getElementById('portal-google-note').textContent='Clique no botão Google para confirmar a nova conta. Os personagens continuam nesta conta Eldora.';
@@ -162,9 +170,15 @@
             credentials.password=document.getElementById('telegram-password').value;
             if(!/^[a-zA-Z0-9_]{3,24}$/.test(credentials.username)||credentials.username.toLowerCase().startsWith('eldora_')||credentials.password.length<6||credentials.password!==document.getElementById('telegram-password-confirm').value){note('Use um usuário de 3 a 24 caracteres (sem o prefixo reservado eldora_) e confirme uma senha de pelo menos 6 caracteres.');return;}
         }
+        const returnToTelegram=googleHandoffMode&&provider==='google'&&mode==='login'&&!inTelegram;
         busy=true;note('Validando identidade…');
         try{
-            const result=await post('/api/auth/'+provider,{mode,...credentials});
+            const result=await post('/api/auth/'+provider,{mode,...credentials,return_to_telegram:returnToTelegram});
+            if(returnToTelegram&&result.telegram_deep_link){
+                note('Google confirmado. Voltando ao Telegram…');
+                window.location.assign(result.telegram_deep_link);
+                return;
+            }
             document.getElementById('telegram-password').value='';document.getElementById('telegram-password-confirm').value='';
             const refreshed=await window.portalRefresh();
             if(mode==='link'){
@@ -188,14 +202,17 @@
         document.getElementById('portal-auth-mode').value=create?'create':'login';
         document.getElementById('portal-account-actions').hidden=true;
         box.hidden=!provider;box.open=true;
-        document.getElementById('portal-account-summary').textContent=create?(inTelegram?'Criar conta pelo Telegram':'Criar conta com Google'):(inTelegram?'Entrar pelo Telegram':'Entrar com Google');
+        document.getElementById('portal-account-summary').textContent=create?(inTelegram?'Criar conta pelo Telegram':'Criar conta com Google'):(inTelegram?'Entrar com Google ou Telegram':'Entrar com Google');
         document.getElementById('portal-auth-state').textContent=create&&inTelegram
             ?'Isso cria uma nova conta-mestre. Se seus personagens estão em uma conta antiga, entre nela com usuário e senha e vincule o Telegram em Conta Eldora.'
             :create
                 ?'Para criar uma conta nova, continue com uma conta Google ainda não vinculada. Se já tem conta ou personagens, entre com senha e vincule o Google nas configurações da conta.'
-                :'Use a identidade já vinculada à sua conta Eldora. Se aparecer “não vinculada”, entre primeiro com usuário e senha para conectar o Google à conta que guarda seus personagens.';
+                :inTelegram
+                    ?'Entre com o Google já vinculado. A confirmação acontece no navegador; depois toque em “Voltar ao jogo” na mensagem do bot.'
+                    :'Use a identidade já vinculada à sua conta Eldora. Se aparecer “não vinculada”, entre na conta que guarda seus personagens e conecte o Google em Conta Eldora.';
         const telegramButton=document.getElementById('portal-telegram');
         const telegramHint=document.getElementById('portal-telegram-hint');
+        googleExternalButton.hidden=!(inTelegram&&!status?.authenticated&&!!status?.google_client_id&&next==='google');
         telegramButton.hidden=!(inTelegram&&!status?.authenticated);
         telegramButton.textContent=create?'Criar conta pelo Telegram':'Entrar com Telegram';
         telegramHint.hidden=!(inTelegram&&!status?.authenticated);
@@ -253,6 +270,12 @@
         document.getElementById('portal-account-security-note').textContent='Toque em “Confirmar nova conta Telegram” para validar a identidade que substituirá o vínculo.';
     };
     document.getElementById('portal-telegram').onclick=()=>authenticate('telegram',{init_data:window.Telegram?.WebApp?.initData||''});
+    googleExternalButton.onclick=()=>{
+        const url=new URL('/login?google_handoff=1',window.location.origin).href;
+        const webApp=window.Telegram?.WebApp;
+        if(typeof webApp?.openLink==='function')webApp.openLink(url);
+        else note('Abra esta página no navegador para entrar com Google e retornar ao Telegram.');
+    };
     linksTrigger.onclick=()=>setLinksMenu(true);
     document.getElementById('portal-links-close').onclick=()=>setLinksMenu(false);
     linksOverlay.onclick=()=>setLinksMenu(false);
@@ -288,9 +311,37 @@
     window.portalSelect=id=>post('/api/auth/select',{character_id:id});
     // Remove cópias antigas de senhas, preservando os dados dos personagens no servidor.
     try{localStorage.removeItem('eldora_contas_salvas');}catch(_){}
-    window.portalAuthReady=window.portalRefresh().then(data=>{
+    window.portalAuthReady=window.portalRefresh().then(async data=>{
         document.getElementById('tela-registro-conta').style.display='none';
-        if(data.authenticated)window.portalAccept(data);
-        else window.portalScreen('login');
+        if(handoffToken){
+            try{
+                const result=await post('/api/auth/telegram-google-handoff',{token:handoffToken,init_data:window.Telegram?.WebApp?.initData||''});
+                const refreshed=await window.portalRefresh();
+                window.portalAccept(result);
+                if(!(result.personagens||[]).length)window.mostrarCriacao();
+                note('Conta Google conectada. Escolha seu personagem.');
+                return refreshed;
+            }catch(error){
+                window.portalScreen('login');
+                document.getElementById('portal-auth-message').textContent=error.message;
+                return data;
+            }
+        }
+        if(data.authenticated&&googleHandoffMode&&data.google_linked){
+            try{
+                const result=await post('/api/auth/telegram-google-handoff/issue',{});
+                window.location.assign(result.telegram_deep_link);
+                return data;
+            }catch(error){
+                window.portalAccept(data);
+                window.mostrarAviso('Não foi possível voltar ao Telegram',error.message);
+                return data;
+            }
+        }
+        if(data.authenticated){
+            window.portalAccept(data);
+            if(googleHandoffMode)window.mostrarAviso('Google não vinculado','Entre nesta conta com Google depois de vincular essa identidade em Conta Eldora.');
+        }else window.portalScreen(googleHandoffMode?'google':'login');
+        return data;
     }).catch(error=>note(error.message));
 })();

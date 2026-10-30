@@ -184,6 +184,7 @@
         #portal-identidade .btn-new{width:100%;height:auto;min-height:44px;padding:10px 12px;background:#20344a;border:1px solid #4d6681;border-radius:8px;color:#e5edf8;font:600 13px Arial,sans-serif;text-transform:none;white-space:normal}
         #portal-identidade #portal-logout{background:#38262e;border-color:#8a5962;color:#f6dfe2}
         #portal-google{min-width:0;max-width:100%;overflow:hidden}
+        #portal-google-external{width:100%;margin-top:8px}
         #tela-login{padding-top:4px}
         @media(max-width:360px){.login-box{padding:20px 14px}body{padding:12px 8px}}
     </style>
@@ -238,7 +239,7 @@
                     <p id="telegram-credentials-message" role="status"></p>
                 </section>
                 <select hidden id="portal-auth-mode" aria-label="Entrar, criar ou vincular conta" style="width:100%;min-height:44px;margin-bottom:12px"><option value="login">Entrar em conta vinculada</option></select>
-                <div id="portal-google-home"><div id="portal-google-controls"><p id="portal-google-note"></p><div id="portal-google" style="display:flex;justify-content:center"></div></div></div>
+                <div id="portal-google-home"><div id="portal-google-controls"><p id="portal-google-note"></p><div id="portal-google" style="display:flex;justify-content:center"></div><button id="portal-google-external" type="button" class="btn-new" hidden>Entrar com Google</button></div></div>
                 <div id="portal-auth-message" role="status" aria-live="polite"></div>
             </div></details></div>
             <div id="portal-telegram-home"><p id="portal-telegram-hint" class="portal-divider" hidden></p><button id="portal-telegram" type="button" class="btn-new" hidden>Continuar com Telegram</button></div>
@@ -621,6 +622,6 @@
         // A inicialização das telas pertence ao portal_auth.js.
     </script>
 <script src="/static/js/portal_controls.js?v=2"></script>
-<script src="/static/js/portal_auth.js?v=22"></script>
+<script src="/static/js/portal_auth.js?v=23"></script>
 </body>
 </html>
