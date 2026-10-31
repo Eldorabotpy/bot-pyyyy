@@ -326,7 +326,15 @@
     window.portalSelect=id=>post('/api/auth/select',{character_id:id});
     // Remove cópias antigas de senhas, preservando os dados dos personagens no servidor.
     try{localStorage.removeItem('eldora_contas_salvas');}catch(_){}
-    window.portalAuthReady=window.portalRefresh().then(async data=>{
+    window.portalAuthReady=(async()=>{
+        for(let attempt=0;attempt<3;attempt++){
+            try{return await window.portalRefresh();}
+            catch(error){
+                if(attempt===2)throw error;
+                await new Promise(resolve=>setTimeout(resolve,400*(attempt+1)));
+            }
+        }
+    })().then(async data=>{
         document.getElementById('tela-registro-conta').style.display='none';
         if(handoffToken||queryHandoffToken||googleHandoffReturn){
             try{
@@ -365,5 +373,8 @@
             if(googleHandoffMode)window.mostrarAviso('Google não vinculado','Entre nesta conta com Google depois de vincular essa identidade em Conta Eldora.');
         }else window.portalScreen(googleHandoffMode?'google':'login');
         return data;
-    }).catch(error=>note(error.message));
+    }).catch(error=>{
+        window.portalScreen('login');
+        document.getElementById('portal-auth-message').textContent=error.message;
+    });
 })();
