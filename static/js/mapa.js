@@ -195,6 +195,9 @@ class MapaScene extends Phaser.Scene {
         this.load.image('tiles_casas', '/static/images/tilesets/casas.png'); 
         this.load.image('tiles_hpg', '/static/images/tilesets/HPGLobbyTileset.png');
         this.load.image('tiles_arvores', '/static/images/tilesets/arvores.png?v=8c21cc3');
+        if (this.regiaoAtual === 'pradaria_inicial') {
+            this.load.image('tiles_pradaria', '/static/images/tilesets/pradaria.png');
+        }
         if (this.regiaoAtual === 'campos_linho') {
             const tilesetsCamposLinho = {
                 tiles_campos_linho_linho: 'campos_linho_linho.png',
@@ -450,8 +453,13 @@ class MapaScene extends Phaser.Scene {
         // arbustos e muralhas devem ficar à frente dos personagens.
         // A camada de colisão é independente e continua bloqueando só
         // onde o Tiled define uma hitbox.
-        const camadaAcimaObjetos = this.regiaoAtual === 'capital_eldora'
-            ? map.getObjectLayer('Acima do Jogador')
+        const nomeCamadaAcima = this.regiaoAtual === 'capital_eldora'
+            ? 'Acima do Jogador'
+            : this.regiaoAtual === 'pradaria_inicial'
+                ? 'Acimado jogador'
+                : null;
+        const camadaAcimaObjetos = nomeCamadaAcima
+            ? map.getObjectLayer(nomeCamadaAcima)
             : null;
         this.zonasAcimaJogador = camadaAcimaObjetos?.visible === false
             ? []
@@ -532,6 +540,12 @@ class MapaScene extends Phaser.Scene {
         if (map.tilesets.some(t => t.name === 'arvores')) {
             todosTilesets.push(
                 map.addTilesetImage('arvores', 'tiles_arvores')
+            );
+        }
+
+        if (this.regiaoAtual === 'pradaria_inicial' && map.tilesets.some(t => t.name === 'pradaria')) {
+            todosTilesets.push(
+                map.addTilesetImage('pradaria', 'tiles_pradaria')
             );
         }
 
@@ -696,7 +710,12 @@ class MapaScene extends Phaser.Scene {
         // ==========================================
         // 🗺️ CAMADAS BAIXAS DOS MAPAS
         // ==========================================
-        const camadasBaixas = this.regiaoAtual === 'pico_grifo'
+        const camadasBaixas = this.regiaoAtual === 'pradaria_inicial'
+            ? [
+                'chao', 'estradas', 'estrada2', 'casas', 'moinho',
+                'rio', 'ponte', 'arvores', 'arvores2', 'arvores3'
+            ]
+            : this.regiaoAtual === 'pico_grifo'
             ? ['Chao', 'Chao2', 'Arvores', 'Arvores2', 'Decoracao']
             : this.regiaoAtual === 'campos_linho'
             ? [
@@ -821,6 +840,13 @@ class MapaScene extends Phaser.Scene {
                     l === 'Casas' ||
                     l === 'casas' ||
                     (this.regiaoAtual === 'capital_eldora' && l === 'Arvores Frente')
+                ) {
+                    profundidade = 10;
+                }
+
+                if (
+                    this.regiaoAtual === 'pradaria_inicial' &&
+                    (l === 'moinho' || l === 'arvores' || l === 'arvores2' || l === 'arvores3')
                 ) {
                     profundidade = 10;
                 }
@@ -2247,7 +2273,7 @@ class MapaScene extends Phaser.Scene {
         // O editor de colisões de blocos do Tiled grava as formas no tileset,
         // não na camada de objetos "colisao". Criamos corpos com o tamanho real
         // dessas formas; setCollisionFromCollisionGroup bloquearia o tile inteiro.
-        if (this.regiaoAtual === 'capital_eldora') {
+        if (this.regiaoAtual === 'capital_eldora' || this.regiaoAtual === 'pradaria_inicial') {
             const entradaTilemap = this.cache.tilemap.get(this.regiaoAtual);
             const dadosTiled = entradaTilemap && entradaTilemap.data;
             if (dadosTiled && Array.isArray(dadosTiled.tilesets)) {
