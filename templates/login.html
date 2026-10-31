@@ -449,14 +449,11 @@
                 
                 if (data.sucesso) {
 
-                    await window.portalRefresh();
                     contaAtiva = data.username || user;
 
                     lembrarUsuario(user, document.getElementById("login-salvar-conta")?.checked === true);
-                    document.getElementById('tela-login').style.display = 'none';
-                    
-                    // Vai para a etapa 2: Mostrar os personagens
-                    buscarPersonagens(data.personagens || []); 
+                    window.portalShowAccount(data);
+                    try { await window.portalRefresh(); } catch (error) { console.warn('Não foi possível atualizar os vínculos da conta:', error); }
                 } else {
                     mostrarAviso("ACESSO NEGADO", "❌ " + data.erro);
                     btn.innerText = "ACESSAR CONTA"; btn.disabled = false;
@@ -622,6 +619,6 @@
         // A inicialização das telas pertence ao portal_auth.js.
     </script>
 <script src="/static/js/portal_controls.js?v=2"></script>
-<script src="/static/js/portal_auth.js?v=25"></script>
+<script src="/static/js/portal_auth.js?v=26"></script>
 </body>
 </html>

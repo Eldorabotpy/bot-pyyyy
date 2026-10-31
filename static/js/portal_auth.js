@@ -72,6 +72,11 @@
         document.getElementById(status?.authenticated?'portal-links-message':'portal-auth-message').textContent=text;
     };
     window.portalAuthHeaders=()=>({'Content-Type':'application/json','X-Eldora-CSRF':status?.csrf||''});
+    window.portalShowAccount=data=>{
+        status={...(status||{}),...data,authenticated:true};
+        window.portalAccept(data);
+        if(!(data.personagens||[]).length)window.mostrarCriacao();
+    };
     async function post(path,data){
         const response=await fetch(path,{method:'POST',headers:window.portalAuthHeaders(),body:JSON.stringify(data)});
         const result=await response.json();
@@ -83,6 +88,7 @@
         if(!response.ok)throw new Error('Não foi possível verificar sua sessão.');
         const wasAuthenticated=!!status?.authenticated;
         status=await response.json();
+        try{
         if(status.authenticated&&!wasAuthenticated)box.open=false;
         document.getElementById('telegram-credentials').hidden=!status.authenticated;
         document.getElementById('telegram-save-credentials').hidden=!status.authenticated;
@@ -169,6 +175,7 @@
             document.head.appendChild(script);
         }
         renderGoogleButton();
+        }catch(error){console.warn('Não foi possível atualizar os controles da conta:',error);}
         return status;
     };
     async function authenticate(provider,credentials){
@@ -189,13 +196,12 @@
                 return;
             }
             document.getElementById('telegram-password').value='';document.getElementById('telegram-password-confirm').value='';
-            const refreshed=await window.portalRefresh();
             if(mode==='link'){
-                const linked=provider==='google'?refreshed.google_linked:refreshed.telegram_linked;
+                const linked=provider==='google'?result.google_linked:result.telegram_linked;
                 if(!linked)throw new Error('O servidor não confirmou o vínculo. Esta conta continua sem o provedor; tente novamente.');
             }
-            window.portalAccept(result);
-            if(!(result.personagens||[]).length)window.mostrarCriacao();
+            window.portalShowAccount(result);
+            try{await window.portalRefresh();}catch(error){console.warn('Não foi possível atualizar os vínculos da conta:',error);}
             note(mode==='link'?'Vinculação concluída. Seus personagens continuam na mesma conta.':'Conta conectada. Escolha seu personagem.');
         }catch(error){note(error.message);}finally{busy=false;}
     }
@@ -327,9 +333,9 @@
                 const payload={init_data:window.Telegram?.WebApp?.initData||''};
                 if(handoffToken||queryHandoffToken)payload.token=handoffToken||queryHandoffToken;
                 const result=await post('/api/auth/telegram-google-handoff',payload);
-                const refreshed=await window.portalRefresh();
-                window.portalAccept(result);
-                if(!(result.personagens||[]).length)window.mostrarCriacao();
+                window.portalShowAccount(result);
+                let refreshed=result;
+                try{refreshed=await window.portalRefresh();}catch(error){console.warn('Não foi possível atualizar os vínculos da conta:',error);}
                 note('Conta Google conectada. Escolha seu personagem.');
                 return refreshed;
             }catch(error){

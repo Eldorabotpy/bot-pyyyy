@@ -266,8 +266,8 @@ def home():
 def pagina_login():
     handoff_token = request.args.get('google_handoff_token')
     response = app.make_response(render_template('login.html'))
+    response.headers['Cache-Control'] = 'no-store'
     if handoff_token is not None or request.args.get('google_handoff') in ('return', 'error'):
-        response.headers['Cache-Control'] = 'no-store'
         response.headers['Referrer-Policy'] = 'no-referrer'
     return response
 
