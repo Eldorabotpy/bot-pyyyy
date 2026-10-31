@@ -72,25 +72,31 @@
         document.getElementById(status?.authenticated?'portal-links-message':'portal-auth-message').textContent=text;
     };
     window.portalAuthHeaders=()=>({'Content-Type':'application/json','X-Eldora-CSRF':status?.csrf||''});
-    window.portalShowAccount=data=>{
-        status={...(status||{}),...data,authenticated:true};
-        window.portalAccept(data);
-        if(!(data.personagens||[]).length)window.mostrarCriacao();
-    };
     async function post(path,data){
-        const response=await fetch(path,{method:'POST',headers:window.portalAuthHeaders(),body:JSON.stringify(data)});
-        const result=await response.json();
-        if(!response.ok||result.erro)throw new Error(result.erro||'Não foi possível entrar.');
+        let response;
+        try{response=await fetch(path,{method:'POST',headers:window.portalAuthHeaders(),body:JSON.stringify(data)});}
+        catch(_){throw new Error('Não foi possível conectar ao servidor. Tente novamente.');}
+        let result;
+        try{result=await response.json();}
+        catch(_){throw new Error('O servidor não respondeu corretamente. Tente novamente.');}
+        if(!result||typeof result!=='object'||Array.isArray(result))throw new Error('O servidor não respondeu corretamente. Tente novamente.');
+        if(!response.ok||result.erro||result.sucesso===false){
+            throw new Error(response.status<500&&typeof result.erro==='string'?result.erro:'Não foi possível concluir o acesso. Tente novamente.');
+        }
         return result;
     }
+    window.portalPost=post;
     window.portalRefresh=async()=>{
         const response=await fetch('/api/auth/status',{cache:'no-store'});
         if(!response.ok)throw new Error('Não foi possível verificar sua sessão.');
-        const wasAuthenticated=!!status?.authenticated;
-        status=await response.json();
-        if(status.authenticated)window.portalAccept(status);
+        try{status=await response.json();}
+        catch(_){throw new Error('Não foi possível ler sua sessão. Tente novamente.');}
+        if(status.authenticated){
+            window.portalAccept(status);
+            if(!(status.personagens||[]).length)window.mostrarCriacao();
+        }
         try{
-        if(status.authenticated&&!wasAuthenticated)box.open=false;
+        if(status.authenticated)box.open=false;
         document.getElementById('telegram-credentials').hidden=!status.authenticated;
         document.getElementById('telegram-save-credentials').hidden=!status.authenticated;
         document.getElementById('telegram-save-credentials').disabled=!status.fresh_auth;
@@ -179,6 +185,15 @@
         }catch(error){console.warn('Não foi possível atualizar os controles da conta:',error);}
         return status;
     };
+    window.portalReconcile=async()=>{
+        for(let attempt=0;attempt<3;attempt++){
+            try{return await window.portalRefresh();}
+            catch(error){
+                if(attempt===2)throw error;
+                await new Promise(resolve=>setTimeout(resolve,400*(attempt+1)));
+            }
+        }
+    };
     async function authenticate(provider,credentials){
         if(busy)return;
         const mode=document.getElementById('portal-auth-mode').value;
@@ -190,21 +205,27 @@
         const returnToTelegram=googleHandoffMode&&provider==='google'&&mode==='login'&&!inTelegram;
         busy=true;note('Validando identidade…');
         try{
-            const result=await post('/api/auth/'+provider,{mode,...credentials,return_to_telegram:returnToTelegram});
-            if(returnToTelegram&&result.telegram_deep_link){
-                note('Google confirmado. Voltando ao Telegram…');
-                window.location.assign(result.telegram_deep_link);
-                return;
+            let result,authError,refreshed;
+            try{result=await post('/api/auth/'+provider,{mode,...credentials,return_to_telegram:returnToTelegram});}
+            catch(error){authError=error;}
+            try{refreshed=await window.portalReconcile();}
+            catch(error){if(!authError)authError=error;}
+            if(!refreshed?.authenticated){note(authError?.message||'Não foi possível confirmar sua sessão. Tente novamente.');return;}
+            if(returnToTelegram){
+                try{
+                    const deepLink=result?.telegram_deep_link||(await post('/api/auth/telegram-google-handoff/issue',{})).telegram_deep_link;
+                    if(!deepLink)throw new Error('Não foi possível voltar ao Telegram. Tente novamente.');
+                    window.location.assign(deepLink);
+                    return;
+                }catch(error){note(error.message);return;}
             }
             document.getElementById('telegram-password').value='';document.getElementById('telegram-password-confirm').value='';
-            if(mode==='link'){
-                const linked=provider==='google'?result.google_linked:result.telegram_linked;
-                if(!linked)throw new Error('O servidor não confirmou o vínculo. Esta conta continua sem o provedor; tente novamente.');
+            if(mode==='link'&&!refreshed[provider==='google'?'google_linked':'telegram_linked']){
+                note(authError?.message||'O servidor não confirmou o vínculo. Tente novamente.');
+                return;
             }
-            window.portalShowAccount(result);
-            try{await window.portalRefresh();}catch(error){console.warn('Não foi possível atualizar os vínculos da conta:',error);}
-            note(mode==='link'?'Vinculação concluída. Seus personagens continuam na mesma conta.':'Conta conectada. Escolha seu personagem.');
-        }catch(error){note(error.message);}finally{busy=false;}
+            note(authError?.message||(mode==='link'?'Vinculação concluída. Seus personagens continuam na mesma conta.':'Conta conectada. Escolha seu personagem.'));
+        }finally{busy=false;}
     }
     window.portalScreen=next=>{
         screen=next;
@@ -327,31 +348,23 @@
     window.portalSelect=id=>post('/api/auth/select',{character_id:id});
     // Remove cópias antigas de senhas, preservando os dados dos personagens no servidor.
     try{localStorage.removeItem('eldora_contas_salvas');}catch(_){}
-    window.portalAuthReady=(async()=>{
-        for(let attempt=0;attempt<3;attempt++){
-            try{return await window.portalRefresh();}
-            catch(error){
-                if(attempt===2)throw error;
-                await new Promise(resolve=>setTimeout(resolve,400*(attempt+1)));
-            }
-        }
-    })().then(async data=>{
+    window.portalAuthReady=window.portalReconcile().then(async data=>{
         document.getElementById('tela-registro-conta').style.display='none';
         if(handoffToken||queryHandoffToken||googleHandoffReturn){
-            try{
-                const payload={init_data:window.Telegram?.WebApp?.initData||''};
-                if(handoffToken||queryHandoffToken)payload.token=handoffToken||queryHandoffToken;
-                const result=await post('/api/auth/telegram-google-handoff',payload);
-                window.portalShowAccount(result);
-                let refreshed=result;
-                try{refreshed=await window.portalRefresh();}catch(error){console.warn('Não foi possível atualizar os vínculos da conta:',error);}
-                note('Conta Google conectada. Escolha seu personagem.');
+            const payload={init_data:window.Telegram?.WebApp?.initData||''};
+            if(handoffToken||queryHandoffToken)payload.token=handoffToken||queryHandoffToken;
+            let handoffError,refreshed;
+            try{await post('/api/auth/telegram-google-handoff',payload);}
+            catch(error){handoffError=error;}
+            try{refreshed=await window.portalReconcile();}
+            catch(error){if(!handoffError)handoffError=error;}
+            if(refreshed?.authenticated){
+                note(handoffError?.message||'Conta Google conectada. Escolha seu personagem.');
                 return refreshed;
-            }catch(error){
-                window.portalScreen('google');
-                document.getElementById('portal-auth-message').textContent=error.message;
-                return data;
             }
+            window.portalScreen('google');
+            document.getElementById('portal-auth-message').textContent=handoffError?.message||'Não foi possível confirmar sua sessão. Tente novamente.';
+            return refreshed||data;
         }
         if(googleHandoffError){
             window.portalScreen('google');
@@ -364,7 +377,6 @@
                 window.location.assign(result.telegram_deep_link);
                 return data;
             }catch(error){
-                window.portalAccept(data);
                 window.mostrarAviso('Não foi possível voltar ao Telegram',error.message);
                 return data;
             }

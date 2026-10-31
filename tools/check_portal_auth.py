@@ -4,6 +4,8 @@ import hashlib
 import hmac
 import importlib.util
 import json
+import shutil
+import subprocess
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -208,4 +210,35 @@ for remember in (False,True):
         response=scope['api_login_conta']()
         assert response.json['sucesso'] is True and session.permanent==remember
 assert 'telegram_verified_id' not in old
-print('OK: assinatura Telegram, expiração, CSRF, cadastro, sessão, vínculo, identidade duplicada, propriedade do personagem e saída.')
+
+# A resposta do handoff pode falhar depois de start_session. O GET seguinte
+# deve encontrar a sessão, enquanto o código de uso único já foi consumido.
+handoff_uses=[]
+def consume_once(token, telegram_id):
+    handoff_uses.append((token, telegram_id))
+    return accounts.docs[1] if len(handoff_uses)==1 else None
+auth.consume_telegram_google_handoff=consume_once
+auth.verify_telegram=lambda raw,token:84
+original_payload=auth.account_payload
+original_logging=app.logger.disabled
+with client.session_transaction() as sess:
+    sess.clear();sess['portal_csrf']='handoff-csrf'
+try:
+    app.logger.disabled=True
+    auth.account_payload=lambda account: (_ for _ in ()).throw(RuntimeError('simulated response failure'))
+    response=client.post('/api/auth/telegram-google-handoff',headers={'X-Eldora-CSRF':'handoff-csrf'},json={'init_data':'verified','token':'single-use-test'})
+    assert response.status_code==500
+finally:
+    auth.account_payload=original_payload
+    app.logger.disabled=original_logging
+recovered=client.get('/api/auth/status').json
+assert recovered['authenticated'] is True and recovered['username']==accounts.docs[1]['username']
+assert client.post('/api/auth/telegram-google-handoff',headers={'X-Eldora-CSRF':recovered['csrf']},json={'init_data':'verified','token':'single-use-test'}).status_code==410
+assert len(handoff_uses)==2
+
+node=shutil.which('node')
+if node:
+    subprocess.run([node,str(root/'tools/check_portal_auth_client.js')],check=True,cwd=root)
+else:
+    print('SKIP: frontend portal checks require Node.js.')
+print('OK: assinatura Telegram, expiração, CSRF, cadastro, sessão, vínculo, handoff de uso único, propriedade do personagem e saída.')
