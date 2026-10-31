@@ -1873,8 +1873,8 @@
                  "type":"referencia_visual",
                  "visible":true,
                  "width":128,
-                 "x":960.333333333333,
-                 "y":991.666666666667
+                 "x":896,
+                 "y":992
                 }],
          "opacity":1,
          "type":"objectgroup",
