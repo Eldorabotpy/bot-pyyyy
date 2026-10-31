@@ -88,6 +88,7 @@
         if(!response.ok)throw new Error('Não foi possível verificar sua sessão.');
         const wasAuthenticated=!!status?.authenticated;
         status=await response.json();
+        if(status.authenticated)window.portalAccept(status);
         try{
         if(status.authenticated&&!wasAuthenticated)box.open=false;
         document.getElementById('telegram-credentials').hidden=!status.authenticated;
@@ -369,7 +370,6 @@
             }
         }
         if(data.authenticated){
-            window.portalAccept(data);
             if(googleHandoffMode)window.mostrarAviso('Google não vinculado','Entre nesta conta com Google depois de vincular essa identidade em Conta Eldora.');
         }else window.portalScreen(googleHandoffMode?'google':'login');
         return data;
