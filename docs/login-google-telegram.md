@@ -24,7 +24,7 @@ FLASK_SECRET_KEY continua obrigatória e deve ser secreta e estável. Cookies Ht
 
 Esta alteração precisa do backend, templates e JS juntos, além das novas dependências. Sem GOOGLE_CLIENT_ID, o botão Google fica indisponível: contas antigas usam senha e contas novas precisam do Telegram validado. Cadastros novos pelo navegador sem Telegram dependem da configuração do Google.
 
-`venv/Scripts/python.exe tools/check_portal_auth.py` testa isoladamente assinatura Telegram, expiração, CSRF, propriedade e migração de personagem, cadastro, senha alternativa, login por senha após vincular Google, troca/remoção de provedor, revogação de sessão e conflitos. Não acessa Mongo nem contas reais. Ainda falta testar com o Client ID real, Google em navegador e Telegram WebApp real (inclusive restrições de popup/webview).
+`venv/Scripts/python.exe tools/check_portal_auth.py` testa isoladamente assinatura Telegram, expiração, CSRF, propriedade e migração de personagem, cadastro, senha alternativa, login por senha após vincular Google, troca/remoção de provedor, revogação de sessão e conflitos. Com Node.js disponível, também executa os testes simulados de reconciliação do handoff e resposta não JSON do proxy. Não acessa Mongo nem contas reais. Ainda falta testar com o Client ID real, Google em navegador e Telegram WebApp real (inclusive restrições de popup/webview).
 
 ## Limites e próxima etapa
 
