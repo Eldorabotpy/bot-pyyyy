@@ -1524,7 +1524,7 @@ class MotorCacada {
         if (sprite.corruptionAura && sprite.corruptionAura.active) return;
 
         const ehBoss = mobData.is_boss === true || mobData.boss === true || mobData.dungeon_boss === true;
-        const tamanho = ehBoss ? 148 : 62;
+        const tamanho = ehBoss ? 112 : 46;
         const aura = this.scene.add.ellipse(
             sprite.x,
             sprite.y,
@@ -1563,8 +1563,8 @@ class MotorCacada {
         try {
             // ==========================================
             // 👹 TAMANHO DOS MOBS NO MAPA
-            // Mob normal = 48x48
-            // Boss       = 128x128
+            // Mob normal = 36x36
+            // Boss       = 96x96
             // ==========================================
 
             const ehBoss =
@@ -1572,7 +1572,7 @@ class MotorCacada {
                 mobData.boss === true ||
                 String(mobData.tipo || '').toLowerCase() === 'boss';
 
-            const tamanhoMob = ehBoss ? 128 : 48;
+            const tamanhoMob = ehBoss ? 96 : 36;
             const dadosProfundidade = {
                 x: mobData.x,
                 y: mobData.y,
@@ -1651,7 +1651,7 @@ class MotorCacada {
             // ==========================================
             // 🏹 SETA FLUTUANTE (Substitui o Texto)
             // ==========================================
-            const offsetSeta = ehBoss ? 75 : 30;
+            const offsetSeta = ehBoss ? 57 : 23;
 
             sprite.indicadorAlvo = this.scene.add.text(
                 mobData.x,
@@ -1679,7 +1679,15 @@ class MotorCacada {
             // 👇 MÁGICA DA HITBOX E TRAVA DE DISTÂNCIA 👇
             // ==========================================
             sprite.setInteractive({ useHandCursor: true });
-            sprite.input.hitArea.setTo(0, 0, sprite.width || 48, sprite.height || 48);
+            const tamanhoToque = Math.max(44, tamanhoMob);
+            const larguraToque = tamanhoToque / sprite.scaleX;
+            const alturaToque = tamanhoToque / sprite.scaleY;
+            sprite.input.hitArea.setTo(
+                (sprite.width - larguraToque) / 2,
+                (sprite.height - alturaToque) / 2,
+                larguraToque,
+                alturaToque
+            );
             
             sprite.on('pointerdown', () => {
                 
@@ -1734,7 +1742,7 @@ class MotorCacada {
 
             // ==========================================
             // ANIMAÇÃO DE POP-IN
-            // Mantém corretamente 48x48 ou 128x128
+            // Mantém corretamente 36x36 ou 96x96
             // ==========================================
 
             // Guarda a escala que o setDisplaySize calculou
