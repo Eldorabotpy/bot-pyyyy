@@ -181,7 +181,7 @@ socketio = SocketIO(
     engineio_logger=False
 )
 conexoes_mapa = {}
-url_do_jogo = "https://163-176-44-198.sslip.io"
+url_do_jogo = "https://eldora-rpg.modappmania.workers.dev"
 
 db = client["eldora_bot"]
 chat_collection = db["chat_historico"]
