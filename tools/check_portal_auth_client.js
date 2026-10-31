@@ -119,9 +119,36 @@ async function providerUsesStatusPayload() {
     assert.equal(page.element('tela-selecao').style.display, 'block');
 }
 
-Promise.allSettled([handoffResponseLost(), nonJsonProxyResponse(), providerUsesStatusPayload()]).then(results => {
+async function passwordResponseLost() {
+    const html = fs.readFileSync(path.join(__dirname, '..', 'templates/login.html'), 'utf8');
+    const start = html.indexOf('window.realizarLogin = async function()');
+    const end = html.indexOf('\n        };', start) + '\n        };'.length;
+    assert.ok(start >= 0 && end > start);
+    const fields = new Map([
+        ['login-username', {value: 'test_account'}],
+        ['login-password', {value: 'test-only-password'}],
+        ['login-salvar-conta', {checked: true}],
+        ['btn-logar', {innerText: '', disabled: false}],
+    ]);
+    let refreshes = 0, alerts = 0;
+    const window = {
+        portalAuthReady: Promise.resolve(),
+        portalPost: async () => {throw new Error('O servidor não respondeu corretamente. Tente novamente.');},
+        portalReconcile: async () => {refreshes++;return account;},
+    };
+    vm.runInNewContext(html.slice(start,end), {
+        window, document: {getElementById: id => fields.get(id)},
+        lembrarUsuario() {}, mostrarAviso() {alerts++;},
+    });
+    await window.realizarLogin();
+    assert.equal(refreshes, 1, 'Password login must check the session after a lost response');
+    assert.equal(alerts, 0, 'An authenticated account must not show an access error');
+    assert.equal(fields.get('btn-logar').disabled, false);
+}
+
+Promise.allSettled([handoffResponseLost(), nonJsonProxyResponse(), providerUsesStatusPayload(), passwordResponseLost()]).then(results => {
     const failures = results.filter(result => result.status === 'rejected');
     failures.forEach(result => console.error(result.reason));
     if (failures.length) process.exitCode = 1;
-    else console.log('OK: handoff reconciles session and non-JSON response stays user friendly.');
+    else console.log('OK: handoff, provider and password login reconcile sessions; non-JSON response stays user friendly.');
 });
