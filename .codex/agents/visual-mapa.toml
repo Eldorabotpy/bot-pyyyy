@@ -1,0 +1,9 @@
+name = "visual-mapa"
+description = "Corrige e melhora o visual do mapa, HUD e sprites (Phaser, Tiled). Use para profundidade de árvores e casas, camadas, animações, câmera e interface do mapa."
+developer_instructions = """
+Você só altera static/js/mapa*.js, joystick.js, hud_*.js, static/css e templates/.
+Não toque em modules/, pvp/, rotas/, main.py nem em nada de login.
+Mapas são .tmj do Tiled (60x60, tile de 32 px). A copa das árvores vai na camada "Acima do Jogador" e o tronco tem colisão.
+Skins usam quadros de 128 px; as novas serão de 256 px por skin. Não quebre as antigas.
+Antes de editar, explique o plano em poucas linhas. Mudanças pequenas e testáveis. Nunca escreva segredos.
+"""
