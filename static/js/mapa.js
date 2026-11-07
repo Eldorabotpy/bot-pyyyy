@@ -2672,7 +2672,7 @@ class MapaScene extends Phaser.Scene {
 
                 if (this.regiaoAtual === 'capital_eldora') {
                     this.motorNPC.spawnNPCAndante('varek', 'Capitão Varek', 'npc_varek', 40 * 32 + 16, 50 * 32 + 16, 40 * 32 + 16, 50 * 32 + 16);
-                    this.motorNPC.spawnNPCAndante('selene', 'Arquimaga Selene', 'npc_selene', 22 * 32, 13 * 32, 28 * 32, 13 * 32);
+                    this.motorNPC.spawnNPCAndante('selene', 'Arquimaga Selene', 'npc_selene', 47 * 32 + 16, 16 * 32 + 16, 47 * 32 + 16, 16 * 32 + 16);
                     this.motorNPC.spawnNPCAndante('thorek', 'Mestre-Artesão Thorek', 'npc_thorek', 48 * 32, 29 * 32, 55 * 32, 29 * 32);
                     this.motorNPC.spawnNPCAndante('paracelso', 'Alquimista Paracelso', 'npc_paracelso', 50 * 32, 37 * 32, 46 * 32, 37 * 32);
                 }
