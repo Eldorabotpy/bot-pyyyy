@@ -508,6 +508,20 @@ class MapaScene extends Phaser.Scene {
         // MapaInterativo, que posicionam elementos animados sobre o mapa.
         this.tilemap = map;
 
+        const marcadoresCapital = map.getObjectLayer('Zonas de Profundidade')?.objects || [];
+        const obterMarcadorCapital = nome => marcadoresCapital.find(obj =>
+            String(obj.name || '').trim().toLowerCase() === nome
+        );
+        const pontoMarcadorCapital = (nome, fracaoX, fracaoY, fallback) => {
+            const obj = obterMarcadorCapital(nome);
+            if (!obj) return fallback;
+            return {
+                x: Number(obj.x) + Number(obj.width) * fracaoX,
+                y: Number(obj.y) + Number(obj.height) * fracaoY,
+                bottom: Number(obj.y) + Number(obj.height)
+            };
+        };
+
         // Na Capital, esta camada de objetos marca as zonas de profundidade.
         // O nome antigo continua aceito enquanto o mapa é renomeado no Tiled.
         // A camada de arte "Acima do Jogador" é uma tile layer independente.
@@ -1063,9 +1077,10 @@ class MapaScene extends Phaser.Scene {
         // ÍCONE DA LOJA DE SKINS (SÓ NA CAPITAL)
         // ==========================================
         if (this.regiaoAtual === 'capital_eldora') {
-            // Ícone da loja no ponto marcado no Tiled (tile 51,18).
-            const lojaSkinsX = 51 * 32 + 16;
-            const lojaSkinsY = 18 * 32 + 16;
+            // Posiciona o emblema no marcador da construção no Tiled.
+            const lojaSkins = pontoMarcadorCapital('loja skin', 0.5, 0.8, { x: 370, y: 1200 });
+            const lojaSkinsX = lojaSkins.x;
+            const lojaSkinsY = lojaSkins.y;
             const haloLojaSkins = this.add.circle(lojaSkinsX, lojaSkinsY, 24, 0xb45cff, 0.24)
                 .setDepth(29)
                 .setBlendMode(Phaser.BlendModes.ADD);
@@ -1208,11 +1223,11 @@ class MapaScene extends Phaser.Scene {
         // ⚖️ NOVA LOJA: MERCADO DO AVENTUREIRO (ENTRE PLAYERS)
         // ==========================================
         if (this.regiaoAtual === 'capital_eldora') {
-            // Centro do vão da porta, conferido pelas colisões da camada Tiled.
-            let casaMercadoX = 35 * 32 + 19;
-            let casaMercadoY = 18 * 32;
-            // Ponto caminhável imediatamente diante da porta, fora da colisão do Tiled.
-            const aproximacaoMercado = { x: casaMercadoX, y: 600 };
+            const mercado = pontoMarcadorCapital('mercado', 0.5, 0.8, { x: 1920, y: 1207, bottom: 1257 });
+            const casaMercadoX = mercado.x;
+            const casaMercadoY = mercado.y;
+            // Aproximação abaixo da fachada e das colisões da construção.
+            const aproximacaoMercado = { x: mercado.x, y: mercado.bottom + 48 };
 
             // Selo e letreiro ficam alinhados sobre o centro da entrada.
             const identificadorMercado = this.criarIdentificadorMercado(casaMercadoX, casaMercadoY);
@@ -1263,11 +1278,10 @@ class MapaScene extends Phaser.Scene {
             // 📍 POSIÇÃO REAL NO MAPA
             // ==========================================
 
-            const guildaTileX = 6;
-            const guildaTileY = 5;
-
-            const guildaX = guildaTileX * 32;
-            const guildaY = guildaTileY * 32;
+            // Âncora no centro da fachada da guilda, conforme a colisão no Tiled.
+            const guildaX = 256;
+            const guildaY = 186;
+            const aproximacaoGuilda = { x: guildaX, y: 300 };
 
 
             // ==========================================
@@ -1276,7 +1290,7 @@ class MapaScene extends Phaser.Scene {
 
             let iconeGuilda = this.add.image(
                 guildaX,
-                guildaY - 45,
+                guildaY,
                 'icone_guilda'
             )
             .setDepth(30)
@@ -1293,7 +1307,7 @@ class MapaScene extends Phaser.Scene {
             this.tweens.add({
                 targets: iconeGuilda,
 
-                y: guildaY - 52,
+                y: guildaY - 7,
 
                 duration: 700,
 
@@ -1311,7 +1325,7 @@ class MapaScene extends Phaser.Scene {
 
             this.criarPlaquinhaNome(
                 guildaX,
-                guildaY - 5,
+                guildaY + 42,
                 'Guilda dos Aventureiros'
             );
 
@@ -1347,8 +1361,8 @@ class MapaScene extends Phaser.Scene {
                         Phaser.Math.Distance.Between(
                             this.player.x,
                             this.player.y,
-                            guildaX,
-                            guildaY
+                            aproximacaoGuilda.x,
+                            aproximacaoGuilda.y
                         );
 
 
@@ -1359,8 +1373,8 @@ class MapaScene extends Phaser.Scene {
                     if (distancia > 110) {
 
                         this.target.set(
-                            guildaX,
-                            guildaY
+                            aproximacaoGuilda.x,
+                            aproximacaoGuilda.y
                         );
 
                         this.isMoving = true;
@@ -1618,14 +1632,10 @@ class MapaScene extends Phaser.Scene {
             'capital_eldora'
         ) {
 
-            const clanTileX = 54;
-            const clanTileY = 33;
-
-            const clanX =
-                clanTileX * 32;
-
-            const clanY =
-                clanTileY * 32;
+            const sedeCla = pontoMarcadorCapital('sede do cla', 0.5, 0.63, { x: 2978, y: 2036, bottom: 2161 });
+            const clanX = sedeCla.x;
+            const clanY = sedeCla.y;
+            const aproximacaoCla = { x: sedeCla.x, y: sedeCla.bottom + 64 };
 
 
             // ==========================================
@@ -1673,7 +1683,7 @@ class MapaScene extends Phaser.Scene {
 
                             this.criarPlaquinhaNome(
                                 clanX,
-                                clanY - 15,
+                                clanY - 28,
                                 'Casa dos Clãs'
                             );
 
@@ -1729,7 +1739,7 @@ class MapaScene extends Phaser.Scene {
 
                         this.criarPlaquinhaNome(
                             clanX,
-                            clanY - 15,
+                            clanY - 28,
                             nomeExibicao
                         );
 
@@ -1776,7 +1786,7 @@ class MapaScene extends Phaser.Scene {
                                 const iconeCla =
                                     this.add.image(
                                         clanX,
-                                        clanY - 70,
+                                        clanY - 72,
                                         textureKey
                                     )
                                     .setDepth(31)
@@ -1835,8 +1845,8 @@ class MapaScene extends Phaser.Scene {
                                             Phaser.Math.Distance.Between(
                                                 this.player.x,
                                                 this.player.y,
-                                                clanX,
-                                                clanY
+                                                aproximacaoCla.x,
+                                                aproximacaoCla.y
                                             );
 
 
@@ -1850,8 +1860,8 @@ class MapaScene extends Phaser.Scene {
                                         ) {
 
                                             this.target.set(
-                                                clanX,
-                                                clanY
+                                                aproximacaoCla.x,
+                                                aproximacaoCla.y
                                             );
 
                                             this.isMoving =
@@ -2945,8 +2955,8 @@ class MapaScene extends Phaser.Scene {
         // ⚒️ FORJA DO THOREK (SÓ NA CAPITAL)
         // ==========================================
         if (this.regiaoAtual === 'capital_eldora') {
-            // Mantive as tuas coordenadas e aumentei o tamanho para 64x64 para clicar melhor
-            let forjaThorek = this.physics.add.sprite(53 * 32, 27 * 32, 'item_forja').setDepth(20).setDisplaySize(64, 64);
+            const marcadorForja = pontoMarcadorCapital('forja', 0.5, 0.9, { x: 1374, y: 1858 });
+            let forjaThorek = this.physics.add.sprite(marcadorForja.x, marcadorForja.y, 'item_forja').setDepth(20).setDisplaySize(64, 64);
             
             // Textinho flutuante em cima da forja
             this.add.text(forjaThorek.x, forjaThorek.y - 35, 'Forja', {
@@ -2985,9 +2995,9 @@ class MapaScene extends Phaser.Scene {
         // 🔥 FORNALHA DE REFINO (SÓ NA CAPITAL)
         // ==========================================
         if (this.regiaoAtual === 'capital_eldora') {
-            // Coloquei a fornalha um pouco mais para a esquerda (X: 47, Y: 27) para não encavalar com a Forja (X: 53)
-            const fornalhaRefinoX = 45 * 32;
-            const fornalhaRefinoY = 36 * 32;
+            const marcadorRefino = pontoMarcadorCapital('refino', 0.5, 0.9, { x: 1792, y: 2112 });
+            const fornalhaRefinoX = marcadorRefino.x;
+            const fornalhaRefinoY = marcadorRefino.y;
             const haloRefino = this.add.circle(fornalhaRefinoX, fornalhaRefinoY, 24, 0xa10cf7, 0.2)
                 .setDepth(19)
                 .setBlendMode(Phaser.BlendModes.ADD);
