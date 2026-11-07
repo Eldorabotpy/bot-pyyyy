@@ -5,11 +5,12 @@ import asyncio
 from datetime import datetime, timezone
 from pymongo import MongoClient
 from bson import ObjectId
+from config import MONGO_CONNECTION_STRING
 
 logger = logging.getLogger(__name__)
 
 # Conexão direta e blindada para garantir que as sessões sempre funcionem
-MONGO_STR = "mongodb+srv://eldora-cluster:pb060987@cluster0.4iqgjaf.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+MONGO_STR = MONGO_CONNECTION_STRING
 
 try:
     client = MongoClient(MONGO_STR, tlsCAFile=certifi.where())

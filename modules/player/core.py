@@ -8,13 +8,14 @@ import time
 from typing import Optional, Dict, Any, Union
 from bson import ObjectId
 from pymongo import MongoClient
+from config import MONGO_CONNECTION_STRING
 
 logger = logging.getLogger(__name__)
 
 # ==============================================================================
 # 1. CONEXÃO MONGODB
 # ==============================================================================
-MONGO_STR = "mongodb+srv://eldora-cluster:pb060987@cluster0.4iqgjaf.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+MONGO_STR = MONGO_CONNECTION_STRING
 users_collection = None    # Novo (ObjectId)
 players_collection = None  # Antigo (Int ID) - Apenas para Migração
 
