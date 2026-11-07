@@ -645,26 +645,12 @@ window.iniciarCacadaApp = async function(spawnId, opcoesGrupo = {}) {
         document.getElementById('arena-box').style.backgroundSize = 'contain';
         document.getElementById('arena-box').style.backgroundPosition = 'center';
         document.getElementById('arena-box').style.backgroundRepeat = 'no-repeat';
-        // Bosque depois da muralha: usar novo PNG na Pradaria Inicial quando disponível.
-        // Até o arquivo ser publicado em static-img, manter o cenário antigo (sem tela vazia).
-        const arenaBoxElemento = document.getElementById('arena-box');
-        const requisicaoFundo = (window.__eldoraRequisicaoFundo = (window.__eldoraRequisicaoFundo || 0) + 1);
-        arenaBoxElemento.classList.remove('arena-bosque-muralha');
-        if (est.regiao === 'pradaria_inicial') {
-            const urlBosque = `${LINK_FUNDOS}bosque_depois_muralha.png`;
-            const imagemBosque = new Image();
-            imagemBosque.onload = () => {
-                if (window.__eldoraRequisicaoFundo !== requisicaoFundo) return;
-                arenaBoxElemento.style.backgroundImage = `url('${urlBosque}')`;
-                arenaBoxElemento.classList.add('arena-bosque-muralha');
-            };
-            imagemBosque.onerror = () => {
-                if (window.__eldoraRequisicaoFundo === requisicaoFundo) {
-                    console.info('[COMBATE] Fundo novo do bosque ainda não encontrado; usando pradaria.png.');
-                }
-            };
-            imagemBosque.src = urlBosque;
-        }
+        // A arena nova usa o fundo capital.png da região capital_eldora.
+        // O arquivo de imagem pode ser substituído sem mudar o caminho no código.
+        document.getElementById('arena-box').classList.toggle(
+            'arena-bosque-muralha',
+            est.regiao === 'capital_eldora'
+        );
         document.getElementById('hud-nome-mob').innerText = est.mob_nome;
         document.getElementById('hud-lvl-mob').innerText = `LV.${est.monster_level || '??'}`;
         document.getElementById('hud-lvl-player').innerText = `LV.${est.player_level || '??'}`;
