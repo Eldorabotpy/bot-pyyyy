@@ -10,6 +10,21 @@ const ANIMACOES_PARADAS_ESPECIAIS = {
 };
 window.ANIMACOES_PARADAS_ESPECIAIS = ANIMACOES_PARADAS_ESPECIAIS;
 
+const PERFIS_SPRITE_PERSONAGEM = {
+    guerreiro_guardiao_eldora_m: {
+        larguraQuadro: 256,
+        alturaQuadro: 256,
+        larguraVisual: 48,
+        alturaVisual: 48,
+        caminho: '/static/assets/personagens/guerreiro_guardiao_eldora_m/caminhada.png',
+        texturaRepouso: 'repouso_guerreiro_guardiao_eldora_m',
+        caminhoRepouso: '/static/assets/personagens/guerreiro_guardiao_eldora_m/parado.png',
+        linhas: { up: 0, left: 1, down: 2, right: 3 },
+        hitbox: { largura: 108, altura: 80, offsetX: 74, offsetY: 160 }
+    }
+};
+window.PERFIS_SPRITE_PERSONAGEM = PERFIS_SPRITE_PERSONAGEM;
+
 class MapaScene extends Phaser.Scene {
     constructor() {
         super('MapaScene');
@@ -24,6 +39,8 @@ class MapaScene extends Phaser.Scene {
         this.timerPoseParadaEspecial = null;
         this.mercadoRealPendente = null;
         this.mercadoRealSelo = null;
+        this.cacheProfundidadeAtores = new WeakMap();
+        this.ultimaAtualizacaoProfundidade = 0;
 
         // ==========================================
         // 🏰 EVENTOS DE DUNGEON
@@ -184,17 +201,35 @@ class MapaScene extends Phaser.Scene {
         });
         if (!this.cache.tilemap.exists(this.regiaoAtual)) {
 
+            // O TMJ original da Capital continua sendo a fonte editável do Tiled.
+            // O jogo usa a versão compactada gerada pelo script de build.
+            const arquivoMapa = this.regiaoAtual === 'capital_eldora'
+                ? '/static/regions/generated/capital_eldora.runtime.tmj'
+                : `/static/regions/${this.regiaoAtual}.tmj`;
             this.load.tilemapTiledJSON(
                 this.regiaoAtual,
-                `/static/regions/${this.regiaoAtual}.tmj?v=${Date.now()}`
+                `${arquivoMapa}?v=${Date.now()}`
             );
 
         }
         
-        this.load.image('tiles_grama', '/static/images/tilesets/grama reino.png');
-        this.load.image('tiles_casas', '/static/images/tilesets/casas.png'); 
-        this.load.image('tiles_hpg', '/static/images/tilesets/HPGLobbyTileset.png');
-        this.load.image('tiles_arvores', '/static/images/tilesets/arvores.png?v=8c21cc3');
+        // Carrega apenas os tilesets compartilhados exigidos pela região atual.
+        // Evita baixar casas, árvores e imagens de outros mapas sem necessidade.
+        if (['floresta_sombria', 'pedreira_granito'].includes(this.regiaoAtual)) {
+            this.load.image('tiles_grama', '/static/images/tilesets/grama reino.png');
+        }
+        if (this.regiaoAtual === 'floresta_sombria') {
+            this.load.image('tiles_hpg', '/static/images/tilesets/HPGLobbyTileset.png');
+        }
+        if (['campos_linho', 'floresta_sombria', 'pedreira_granito', 'pico_grifo'].includes(this.regiaoAtual)) {
+            this.load.image('tiles_arvores', '/static/images/tilesets/arvores.png?v=8c21cc3');
+        }
+        if (this.regiaoAtual === 'capital_eldora') {
+            this.load.image(
+                'tiles_capital_eldora',
+                `/static/images/regions/capital_eldora/tilesets/generated/capital_eldora_compact.png?v=${Date.now()}`
+            );
+        }
         if (this.regiaoAtual === 'pradaria_inicial') {
             this.load.image('tiles_pradaria', '/static/images/tilesets/pradaria.png');
         }
@@ -253,23 +288,24 @@ class MapaScene extends Phaser.Scene {
             }
         }
 
-        // ==========================================
-        // 🏰 TILESETS DA DUNGEON 01
-        // ==========================================
-        this.load.image(
-            'tiles_dungeon_base',
-            '/static/images/tilesets/dungeon1.png'
-        );
+        // A arte da dungeon só é necessária dentro dela. Evita baixar cerca
+        // de 14 MB de imagens durante o carregamento da Capital e das regiões.
+        if (this.regiaoAtual === 'dungeon_01') {
+            this.load.image(
+                'tiles_dungeon_base',
+                '/static/images/tilesets/dungeon1.png'
+            );
 
-        this.load.image(
-            'tiles_dungeon_paredes',
-            '/static/images/tilesets/dungeon_1_paredes.png'
-        );
+            this.load.image(
+                'tiles_dungeon_paredes',
+                '/static/images/tilesets/dungeon_1_paredes.png'
+            );
 
-        this.load.image(
-            'tiles_dungeon_chao',
-            '/static/images/tilesets/dungeon_1_chao.png'
-        );
+            this.load.image(
+                'tiles_dungeon_chao',
+                '/static/images/tilesets/dungeon_1_chao.png'
+            );
+        }
 
         // ==========================================
         // 💡 EVENTOS VISUAIS DA DUNGEON 01
@@ -310,22 +346,45 @@ class MapaScene extends Phaser.Scene {
         // 👇 A MÁGICA CONTRA O CACHE DO GITHUB 👇
         const cacheBuster = `?v=${new Date().getTime()}`;
         
-        // Adicionamos o cacheBuster no final das imagens
-        let pathSkin = `${GITHUB_ASSETS}classes/${nomeSkin}.png${cacheBuster}`;
-        
-        let fWidth = 128; 
-        let fHeight = 128;
+        const perfilSprite = PERFIS_SPRITE_PERSONAGEM[nomeSkin] || null;
+        // Skins antigas continuam usando folhas 128×128 do catálogo remoto.
+        let pathSkin = perfilSprite
+            ? perfilSprite.caminho
+            : `${GITHUB_ASSETS}classes/${nomeSkin}.png${cacheBuster}`;
+        let fWidth = perfilSprite?.larguraQuadro || 128;
+        let fHeight = perfilSprite?.alturaQuadro || 128;
 
         let generoCurtoFallback = (genero === 'feminino') ? 'f' : 'm';
         const pathFallback = `${GITHUB_ASSETS}classes/aventureiro_${generoCurtoFallback}.png${cacheBuster}`;
         
         this.load.once('loaderror', (fileObj) => {
             if (fileObj.key === this.skinAtiva) {
-                window.avisoEldora(`🚨 ALERTA DO MAPA 🚨\n\nA skin não carregou porque o arquivo não foi encontrado no GitHub!\n\nO mapa tentou baixar:\n${fileObj.url}\n\nVerifique se o nome do arquivo lá é exatamente esse.`);
+                if (perfilSprite) {
+                    console.warn(`A skin ${nomeSkin} não carregou; o mapa usará o aventureiro como fallback.`);
+                } else {
+                    window.avisoEldora(`🚨 ALERTA DO MAPA 🚨\n\nA skin não carregou porque o arquivo não foi encontrado no GitHub!\n\nO mapa tentou baixar:\n${fileObj.url}\n\nVerifique se o nome do arquivo lá é exatamente esse.`);
+                }
             }
         });
 
+        if (perfilSprite) {
+            this.skinPerfilFalhou = false;
+            const chavesDoPerfil = new Set([nomeSkin, perfilSprite.texturaRepouso]);
+            const registrarFalhaPerfil = (fileObj) => {
+                if (chavesDoPerfil.has(fileObj.key)) this.skinPerfilFalhou = true;
+            };
+            this.load.on('loaderror', registrarFalhaPerfil);
+            this.load.once('complete', () => this.load.off('loaderror', registrarFalhaPerfil));
+        }
+
         this.load.spritesheet(this.skinAtiva, pathSkin, { frameWidth: fWidth, frameHeight: fHeight });
+
+        if (perfilSprite) {
+            this.load.spritesheet(perfilSprite.texturaRepouso, perfilSprite.caminhoRepouso, {
+                frameWidth: perfilSprite.larguraQuadro,
+                frameHeight: perfilSprite.alturaQuadro
+            });
+        }
 
         const animacaoParada = ANIMACOES_PARADAS_ESPECIAIS[nomeSkin];
         if (animacaoParada) {
@@ -351,7 +410,7 @@ class MapaScene extends Phaser.Scene {
 
             this.load.spritesheet(
                 'portal_regiao',
-                '/static/images/tilesets/portal_anim.png',
+                '/static/images/shared/portais/portal_anim.png',
                 {
                     frameWidth: 416,
                     frameHeight: 512
@@ -449,22 +508,27 @@ class MapaScene extends Phaser.Scene {
         // MapaInterativo, que posicionam elementos animados sobre o mapa.
         this.tilemap = map;
 
-        // Na Capital, a camada de objetos marca as áreas em que árvores,
-        // arbustos e muralhas devem ficar à frente dos personagens.
-        // A camada de colisão é independente e continua bloqueando só
-        // onde o Tiled define uma hitbox.
-        const nomeCamadaAcima = this.regiaoAtual === 'capital_eldora'
-            ? 'Acima do Jogador'
+        // Na Capital, esta camada de objetos marca as zonas de profundidade.
+        // O nome antigo continua aceito enquanto o mapa é renomeado no Tiled.
+        // A camada de arte "Acima do Jogador" é uma tile layer independente.
+        const nomeCamadaZonaProfundidade = this.regiaoAtual === 'capital_eldora'
+            ? 'Zonas de Profundidade'
             : this.regiaoAtual === 'pradaria_inicial'
                 ? 'Acimado jogador'
                 : null;
-        const camadaAcimaObjetos = nomeCamadaAcima
-            ? map.getObjectLayer(nomeCamadaAcima)
+        const camadaZonaProfundidade = nomeCamadaZonaProfundidade
+            ? map.getObjectLayer(nomeCamadaZonaProfundidade) ||
+                (this.regiaoAtual === 'capital_eldora'
+                    ? map.getObjectLayer('Acima do Jogador')
+                    : null)
             : null;
-        this.zonasAcimaJogador = camadaAcimaObjetos?.visible === false
+        // Na Capital, visibilidade de camada/objeto só controla os guias no
+        // editor. As zonas continuam ativas mesmo quando o usuário as oculta.
+        const usarZonasMesmoOcultas = this.regiaoAtual === 'capital_eldora';
+        this.zonasAcimaJogador = !usarZonasMesmoOcultas && camadaZonaProfundidade?.visible === false
             ? []
-            : (camadaAcimaObjetos?.objects || [])
-                .filter(obj => obj.visible !== false &&
+            : (camadaZonaProfundidade?.objects || [])
+                .filter(obj => (usarZonasMesmoOcultas || obj.visible !== false) &&
                     Number.isFinite(Number(obj.x)) &&
                     Number.isFinite(Number(obj.y)) &&
                     Number(obj.width) > 0 &&
@@ -473,6 +537,37 @@ class MapaScene extends Phaser.Scene {
                     Number(obj.x), Number(obj.y),
                     Number(obj.width), Number(obj.height)
                 ));
+
+        // A altura do mapa não muda durante a cena; guardamos uma vez para
+        // não consultar limites da física e da câmera para cada ator/quadro.
+        this.alturaMundoProfundidade = Math.max(Number(map.heightInPixels) || 0, 1);
+
+        // Divide as áreas de sobreposição em células. Cada ator consulta só
+        // as áreas próximas, preservando o teste geométrico original.
+        this.tamanhoCelulaZonaAcima = 128;
+        this.colunasIndiceZonaAcima = Math.max(
+            1,
+            Math.floor((Number(map.widthInPixels) || 0) / this.tamanhoCelulaZonaAcima) + 1
+        );
+        this.indiceZonasAcimaJogador = new Map();
+        this.zonasAcimaJogador.forEach(zona => {
+            const colunaInicial = Math.floor(zona.x / this.tamanhoCelulaZonaAcima);
+            const colunaFinal = Math.floor(zona.right / this.tamanhoCelulaZonaAcima);
+            const linhaInicial = Math.floor(zona.y / this.tamanhoCelulaZonaAcima);
+            const linhaFinal = Math.floor(zona.bottom / this.tamanhoCelulaZonaAcima);
+
+            for (let linha = linhaInicial; linha <= linhaFinal; linha++) {
+                for (let coluna = colunaInicial; coluna <= colunaFinal; coluna++) {
+                    const chave = linha * this.colunasIndiceZonaAcima + coluna;
+                    let zonasDaCelula = this.indiceZonasAcimaJogador.get(chave);
+                    if (!zonasDaCelula) {
+                        zonasDaCelula = [];
+                        this.indiceZonasAcimaJogador.set(chave, zonasDaCelula);
+                    }
+                    zonasDaCelula.push(zona);
+                }
+            }
+        });
         
         let todosTilesets = [];
 
@@ -543,6 +638,14 @@ class MapaScene extends Phaser.Scene {
             );
         }
 
+        if (
+            this.regiaoAtual === 'capital_eldora' &&
+            map.tilesets.some(t => t.name === 'capital eldora')
+        ) {
+            todosTilesets.push(
+                map.addTilesetImage('capital eldora', 'tiles_capital_eldora')
+            );
+        }
         if (this.regiaoAtual === 'pradaria_inicial' && map.tilesets.some(t => t.name === 'pradaria')) {
             todosTilesets.push(
                 map.addTilesetImage('pradaria', 'tiles_pradaria')
@@ -731,6 +834,9 @@ class MapaScene extends Phaser.Scene {
                 'Campos linho agua',
                 'Decoracao'
             ]
+            : this.regiaoAtual === 'capital_eldora'
+            ? map.layers.map(layer => layer.name)
+                .filter(name => !['Acima do Jogador', 'acima do jogador', 'efeitos_superiores'].includes(name))
             : [
             // DUNGEON
             'fundo',
@@ -829,6 +935,12 @@ class MapaScene extends Phaser.Scene {
             // ==========================================
             // 🌍 MAPAS NORMAIS
             // ==========================================
+            else if (this.regiaoAtual === 'capital_eldora') {
+                // As árvores têm arte inteira, incluindo tronco e copa.
+                // Participam das zonas: ator atrás em 9.x, à frente em 12+.
+                // Casas e escadas de base continuam abaixo dos atores.
+                profundidade = ['arvores', 'Arvores Frente', 'Muralha'].includes(l) ? 10 : 0;
+            }
             else {
 
                 // Mantém o comportamento antigo.
@@ -838,8 +950,8 @@ class MapaScene extends Phaser.Scene {
 
                 if (
                     l === 'Casas' ||
-                    l === 'casas' ||
-                    (this.regiaoAtual === 'capital_eldora' && l === 'Arvores Frente')
+                    l === 'Casas2' ||
+                    l === 'casas'
                 ) {
                     profundidade = 10;
                 }
@@ -859,6 +971,8 @@ class MapaScene extends Phaser.Scene {
                     profundidade = 10;
                 }
 
+
+
             }
 
             const camadaCriada = map.createLayer(
@@ -868,21 +982,6 @@ class MapaScene extends Phaser.Scene {
                 0
             ).setDepth(profundidade);
 
-            // A arte antiga da estátua é composta por 4×4 tiles na camada
-            // Casas. A versão animada substitui esse bloco quando os sprites
-            // carregam; se algum asset falhar, a estátua antiga permanece.
-            if (
-                this.regiaoAtual === 'capital_eldora' &&
-                l === 'Casas' &&
-                this.textures.exists('estatua_pedroca_cristal') &&
-                this.textures.exists('estatua_pedroca_despertar')
-            ) {
-                for (let y = 27; y <= 30; y++) {
-                    for (let x = 28; x <= 31; x++) {
-                        camadaCriada.removeTileAt(x, y, true, false);
-                    }
-                }
-            }
         });
 
 
@@ -914,32 +1013,49 @@ class MapaScene extends Phaser.Scene {
             map.heightInPixels
         );
     
-        const skinFinal = this.textures.exists(this.skinAtiva) ? this.skinAtiva : 'aventureiro_base';
+        const perfilSolicitado = PERFIS_SPRITE_PERSONAGEM[this.skinAtiva];
+        const perfilCompleto = !perfilSolicitado || (
+            !this.skinPerfilFalhou && this.textures.exists(perfilSolicitado.texturaRepouso)
+        );
+        const skinFinal = this.textures.exists(this.skinAtiva) && perfilCompleto
+            ? this.skinAtiva
+            : 'aventureiro_base';
         this.skinBaseAtual = skinFinal;
+        this.perfilSpriteAtual = PERFIS_SPRITE_PERSONAGEM[skinFinal] || null;
         this.player = this.physics.add.sprite(27 * 32, 29 * 32, skinFinal);
         this.player
             .setCollideWorldBounds(true)
             .setDepth(this.calcularProfundidadeAtor(this.player));
 
         // Reduz visualmente qualquer sprite para o tamanho final do mapa
-        this.player.setDisplaySize(48, 48);
+        this.player.setDisplaySize(
+            this.perfilSpriteAtual?.larguraVisual || 48,
+            this.perfilSpriteAtual?.alturaVisual || 48
+        );
 
         // ==========================================
         // 🚶 HITBOX REAL NOS PÉS DO PERSONAGEM
         // ==========================================
 
-        // O sprite original possui frame 128x128,
-        // mas é exibido no mapa como 48x48.
-        // Por isso a hitbox precisa usar as medidas
-        // correspondentes ao frame original.
-
+        // A hitbox permanece em pixels da cartela original e é escalada junto
+        // com o sprite. Skins novas podem declarar dimensões próprias.
+        const hitboxSkin = this.perfilSpriteAtual?.hitbox || {
+            largura: 54, altura: 40, offsetX: 37, offsetY: 80
+        };
         this.player.body
-            .setSize(54, 40)
-            .setOffset(37, 80);   
+            .setSize(hitboxSkin.largura, hitboxSkin.altura)
+            .setOffset(hitboxSkin.offsetX, hitboxSkin.offsetY);
+        this.criarSombraDeContatoPersonagem();
         
-        try { this.gerarAnimacoes(skinFinal); } catch(e) { console.error("Erro nas animações", e); }
+        try {
+            this.gerarAnimacoes(skinFinal);
+            if (this.perfilSpriteAtual) {
+                this.aplicarAnimacaoRepouso(this.player, skinFinal, this.direcaoParadaEspecial);
+            }
+        } catch(e) { console.error("Erro nas animações", e); }
     
-        this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
+        // Acompanhamento direto: não acumula atraso quando o FPS cai no celular.
+        this.cameras.main.startFollow(this.player, true, 1, 1);
         this.cameras.main.setBounds(0, 0, map.widthInPixels, map.heightInPixels);
         this.cameras.main.setRoundPixels(true);
         
@@ -2002,7 +2118,10 @@ class MapaScene extends Phaser.Scene {
         const camadasAltas = [
             {
                 nome: 'Acima do Jogador',
-                profundidade: 20
+                // Na Capital, esta arte participa da ordenação dinâmica:
+                // o ator fica à frente fora da zona (depth 12+) e atrás
+                // dentro dela (depth 9.x). Depth 20 seria sempre superior.
+                profundidade: this.regiaoAtual === 'capital_eldora' ? 11 : 20
             },
             {
                 nome: 'acima do jogador',
@@ -2027,20 +2146,6 @@ class MapaScene extends Phaser.Scene {
                 0
             ).setDepth(camada.profundidade);
 
-            // Quatro tiles duplicados da estátua antiga estavam em uma camada
-            // acima do jogador; também são removidos para evitar sobreposição.
-            if (
-                this.regiaoAtual === 'capital_eldora' &&
-                camada.nome === 'Acima do Jogador' &&
-                this.textures.exists('estatua_pedroca_cristal') &&
-                this.textures.exists('estatua_pedroca_despertar')
-            ) {
-                for (let y = 27; y <= 28; y++) {
-                    for (let x = 29; x <= 30; x++) {
-                        camadaCriada.removeTileAt(x, y, true, false);
-                    }
-                }
-            }
         });
 
         // As hélices ficam em uma camada de objetos do Tiled para guardar a
@@ -2120,12 +2225,15 @@ class MapaScene extends Phaser.Scene {
         // 🏰 COLISÕES POR OBJETOS — DUNGEONS
         // ==========================================
         const camadaColisaoObjetos =
-            map.getObjectLayer('colisao');
+            map.getObjectLayer('colisao') || map.getObjectLayer('Colisao');
 
         if (
             camadaColisaoObjetos &&
             Array.isArray(camadaColisaoObjetos.objects)
         ) {
+
+            const grupoColisoesObjetos = this.regiaoAtual === 'capital_eldora'
+                ? this.physics.add.staticGroup() : null;
 
             const adicionarHitboxEstatica = (x, y, largura, altura) => {
                 if (largura <= 0 || altura <= 0) {
@@ -2139,8 +2247,12 @@ class MapaScene extends Phaser.Scene {
                     altura
                 );
 
-                this.physics.add.existing(hitbox, true);
-                this.physics.add.collider(this.player, hitbox);
+                if (grupoColisoesObjetos) {
+                    grupoColisoesObjetos.add(hitbox);
+                } else {
+                    this.physics.add.existing(hitbox, true);
+                    this.physics.add.collider(this.player, hitbox);
+                }
             };
 
             // Arcade Physics trabalha com caixas alinhadas aos eixos. Para
@@ -2268,6 +2380,9 @@ class MapaScene extends Phaser.Scene {
                     rotacao
                 );
             });
+            if (grupoColisoesObjetos && grupoColisoesObjetos.getLength() > 0) {
+                this.physics.add.collider(this.player, grupoColisoesObjetos);
+            }
         }
 
         // O editor de colisões de blocos do Tiled grava as formas no tileset,
@@ -2366,6 +2481,18 @@ class MapaScene extends Phaser.Scene {
                     return corpos;
                 };
 
+                // Somente colisões estáticas dos tiles são deduplicadas.
+                // Portal e estátua mantêm corpos independentes para ativação.
+                const colisoesTilesUnicas = new Set();
+                const adicionarCorpoTile = (x, y, largura, altura) => {
+                    if (this.regiaoAtual === 'capital_eldora') {
+                        const chave = JSON.stringify([x, y, largura, altura]);
+                        if (colisoesTilesUnicas.has(chave)) return;
+                        colisoesTilesUnicas.add(chave);
+                    }
+                    return adicionarCorpo(x, y, largura, altura);
+                };
+
                 dadosTiled.layers
                     .filter(layer => layer.type === 'tilelayer' && Array.isArray(layer.data))
                     .forEach(layer => {
@@ -2409,7 +2536,7 @@ class MapaScene extends Phaser.Scene {
                                     pontos.forEach((ponto, pos) => {
                                         const proximo = pontos[(pos + 1) % pontos.length];
                                         const margem = 3;
-                                        adicionarCorpo(
+                                        adicionarCorpoTile(
                                             Math.min(ponto.x, proximo.x) - margem,
                                             Math.min(ponto.y, proximo.y) - margem,
                                             Math.abs(ponto.x - proximo.x) + 2 * margem,
@@ -2421,7 +2548,7 @@ class MapaScene extends Phaser.Scene {
                                     const ys = pontos.map(ponto => ponto.y);
                                     const x = Math.min(...xs);
                                     const y = Math.min(...ys);
-                                    adicionarCorpo(x, y, Math.max(...xs) - x, Math.max(...ys) - y);
+                                    adicionarCorpoTile(x, y, Math.max(...xs) - x, Math.max(...ys) - y);
                                 }
                             });
                         });
@@ -3506,31 +3633,94 @@ class MapaScene extends Phaser.Scene {
         }, 300);
     }
     
+    criarSombraDeContatoPersonagem() {
+        if (!this.player?.active || this.sombraPersonagem?.active) return;
+
+        const larguraVisual = Number(this.player.displayWidth) || 48;
+        const alturaVisual = Number(this.player.displayHeight) || 48;
+        const origemY = Number.isFinite(this.player.originY) ? this.player.originY : 0.5;
+        const basePes = Number.isFinite(this.player.body?.bottom)
+            ? this.player.body.bottom
+            : this.player.y + alturaVisual * (1 - origemY);
+        this.sombraPersonagem = this.add.ellipse(
+            this.player.x,
+            basePes + 1,
+            Math.max(28, larguraVisual * 0.84),
+            Math.max(5, alturaVisual * 0.11),
+            0x151a12,
+            0.22
+        ).setDepth(this.player.depth - 0.01);
+    }
+
+    atualizarSombraDeContatoPersonagem() {
+        if (!this.player?.active || !this.sombraPersonagem?.active) return;
+
+        const alturaVisual = Number(this.player.displayHeight) || 48;
+        const origemY = Number.isFinite(this.player.originY) ? this.player.originY : 0.5;
+        const basePes = Number.isFinite(this.player.body?.bottom)
+            ? this.player.body.bottom
+            : this.player.y + alturaVisual * (1 - origemY);
+        const xSombra = this.player.x;
+        const ySombra = basePes + 1;
+        if (this.sombraPersonagem.x !== xSombra || this.sombraPersonagem.y !== ySombra) {
+            this.sombraPersonagem.setPosition(xSombra, ySombra);
+        }
+
+        const profundidadeSombra = this.player.depth - 0.01;
+        if (this.sombraPersonagem.depth !== profundidadeSombra) {
+            this.sombraPersonagem.setDepth(profundidadeSombra);
+        }
+    }
+
     calcularProfundidadeAtor(ator) {
         if (!ator) return 12;
 
-        const alturaMundo = Math.max(
+        const xAtor = Number(ator.x || 0);
+        const yAtor = Number(ator.y || 0);
+        const origemY = Number.isFinite(ator.originY) ? ator.originY : 0.5;
+        const alturaVisual = Number(ator.displayHeight) || 0;
+        const profundidadeAnterior = this.cacheProfundidadeAtores?.get(ator);
+        if (
+            profundidadeAnterior &&
+            profundidadeAnterior.x === xAtor &&
+            profundidadeAnterior.y === yAtor &&
+            profundidadeAnterior.origemY === origemY &&
+            profundidadeAnterior.alturaVisual === alturaVisual
+        ) {
+            return profundidadeAnterior.depth;
+        }
+
+        const alturaMundo = this.alturaMundoProfundidade || Math.max(
             Number(this.physics?.world?.bounds?.height) || 0,
             Number(this.cameras?.main?.getBounds?.().height) || 0,
             1
         );
-        const origemY = Number.isFinite(ator.originY) ? ator.originY : 0.5;
-        const alturaVisual = Number(ator.displayHeight) || 0;
-        const basePes = Number(ator.y || 0) + alturaVisual * (1 - origemY);
+        const basePes = yAtor + alturaVisual * (1 - origemY);
         const posicaoNormalizada = Phaser.Math.Clamp(basePes / alturaMundo, 0, 1);
+        const coluna = Math.floor(xAtor / this.tamanhoCelulaZonaAcima);
+        const linha = Math.floor(basePes / this.tamanhoCelulaZonaAcima);
+        const dentroDoIndice = coluna >= 0 && coluna < this.colunasIndiceZonaAcima && linha >= 0;
+        const zonasCandidatas = dentroDoIndice
+            ? (this.indiceZonasAcimaJogador.get(
+                linha * this.colunasIndiceZonaAcima + coluna
+            ) || [])
+            : [];
 
-        if (this.zonasAcimaJogador?.some(zona =>
-            Phaser.Geom.Rectangle.Contains(zona, Number(ator.x || 0), basePes)
-        )) {
-            // Atrás das camadas de casas, muralha e decoração (depth 10),
-            // mas ainda à frente do chão e das ruas (depth 0).
-            return 9 + posicaoNormalizada * 0.9;
-        }
+        const estaAtrasDaCamada = zonasCandidatas.some(zona =>
+            Phaser.Geom.Rectangle.Contains(zona, xAtor, basePes)
+        );
+        const profundidade = estaAtrasDaCamada
+            ? 9 + posicaoNormalizada * 0.9
+            : 12 + posicaoNormalizada * 6;
 
-        // Mantém jogador, pets e mobs acima das camadas comuns, mas abaixo
-        // de "Acima do Jogador" (depth 20), que deve cobrir os atores.
-        // A posição dos pés mantém a ordenação top-down entre os atores.
-        return 12 + posicaoNormalizada * 6;
+        this.cacheProfundidadeAtores?.set(ator, {
+            x: xAtor,
+            y: yAtor,
+            origemY,
+            alturaVisual,
+            depth: profundidade
+        });
+        return profundidade;
     }
 
     calcularProfundidadeMob(mob) {
@@ -3540,16 +3730,27 @@ class MapaScene extends Phaser.Scene {
     atualizarProfundidadeAtores() {
         const atualizar = ator => {
             if (!ator?.active) return;
-            ator.setDepth(this.calcularProfundidadeAtor(ator));
+            const profundidade = this.calcularProfundidadeAtor(ator);
+            if (ator.depth !== profundidade) {
+                ator.setDepth(profundidade);
+            }
         };
 
         atualizar(this.player);
 
         const mobs = this.motorCacada?.mobsNoMapa?.getChildren?.() || [];
         mobs.forEach(mob => {
-            if (mob?.active) mob.setDepth(this.calcularProfundidadeMob(mob));
+            if (mob?.active) {
+                const profundidade = this.calcularProfundidadeMob(mob);
+                if (mob.depth !== profundidade) {
+                    mob.setDepth(profundidade);
+                }
+            }
             if (mob?.corruptionAura?.active) {
-                mob.corruptionAura.setDepth(mob.depth - 0.01);
+                const profundidadeAura = mob.depth - 0.01;
+                if (mob.corruptionAura.depth !== profundidadeAura) {
+                    mob.corruptionAura.setDepth(profundidadeAura);
+                }
             }
         });
 
@@ -3602,7 +3803,7 @@ class MapaScene extends Phaser.Scene {
         }
     }
 
-    update(time) {
+    update(time, delta) {
 
         // ==========================================
         // 🖼️ PRIMEIRO FRAME DO NOVO MAPA
@@ -3658,13 +3859,20 @@ class MapaScene extends Phaser.Scene {
             return;
         }
 
-        this.atualizarProfundidadeAtores();
+        // Atualiza a sombra em cada quadro e ordena atores a 25 Hz.
+        this.atualizarSombraDeContatoPersonagem();
+        if (time - this.ultimaAtualizacaoProfundidade >= 40) {
+            this.ultimaAtualizacaoProfundidade = time;
+            this.atualizarProfundidadeAtores();
+        }
 
         if (this.playerNameText) {
             this.playerNameText.setPosition(Math.floor(this.player.x), Math.floor(this.player.y - 37));
         }
     
-        if (this.interativo) {
+        if (this.interativo && (this.regiaoAtual !== 'capital_eldora' ||
+            time >= (this.proximaVerificacaoInterativa || 0))) {
+            this.proximaVerificacaoInterativa = time + 100;
             this.interativo.verificarProximidade(this.player);
         }
 
@@ -3720,10 +3928,7 @@ class MapaScene extends Phaser.Scene {
 
         // Novo analógico real: movimento livre em qualquer direção.
         const joyVector = window.joyVector || null;
-        const usandoAnalogico =
-            joyVector &&
-            joyVector.active &&
-            Math.sqrt((joyVector.x * joyVector.x) + (joyVector.y * joyVector.y)) > 0.08;
+        const usandoAnalogico = Boolean(joyVector?.active);
 
         if (usandoAnalogico) {
             moveX = joyVector.x;
@@ -3752,32 +3957,43 @@ class MapaScene extends Phaser.Scene {
             this.isMoving = false; 
             this.target.copy(this.player);
             
-            const velocidadeBase = 150; 
-            const vector = new Phaser.Math.Vector2(moveX, moveY);
+            const velocidadeBase = usandoAnalogico ? 120 : 150;
+            const magnitudeMovimento = Math.sqrt((moveX * moveX) + (moveY * moveY));
+            let intensidadeAnalogico = 1;
 
-            if (vector.length() > 1) {
-                vector.normalize();
+            if (usandoAnalogico) {
+                if (magnitudeMovimento > 0) {
+                    moveX /= magnitudeMovimento;
+                    moveY /= magnitudeMovimento;
+                }
+
+                // Resposta progressiva: movimentos pequenos do dedo são suaves.
+                // Analógico limitado a 120 px/s; teclado permanece em 150 px/s.
+                const zonaMorta = 0.08;
+                const intensidadeNormalizada = Phaser.Math.Clamp(
+                    (Number(joyVector.intensity || 0) - zonaMorta) / (1 - zonaMorta),
+                    0,
+                    1
+                );
+                intensidadeAnalogico = Math.pow(intensidadeNormalizada, 1.5);
+            } else if (magnitudeMovimento > 1) {
+                moveX /= magnitudeMovimento;
+                moveY /= magnitudeMovimento;
             }
-
-            const intensidadeAnalogico = usandoAnalogico
-                ? Math.max(0.35, Math.min(1, Number(joyVector.intensity || vector.length())))
-                : 1;
             
             this.player.setVelocity(
-                vector.x * velocidadeBase * intensidadeAnalogico,
-                vector.y * velocidadeBase * intensidadeAnalogico
+                moveX * velocidadeBase * intensidadeAnalogico,
+                moveY * velocidadeBase * intensidadeAnalogico
             );
             
             // Animações enquanto anda no analógico/teclado
             try {
-                let chave = '_' + this.player.texture.key;
-                if (Math.abs(moveX) > Math.abs(moveY)) { 
-                    this.direcaoParadaEspecial = moveX > 0 ? 'right' : 'left';
-                    this.player.anims.play(this.direcaoParadaEspecial + chave, true);
-                } else { 
-                    this.direcaoParadaEspecial = moveY > 0 ? 'down' : 'up';
-                    this.player.anims.play(this.direcaoParadaEspecial + chave, true);
-                }
+                this.aplicarAnimacaoMovimento(
+                    this.player,
+                    this.skinBaseAtual || this.skinAtiva,
+                    this.player.body.velocity.x,
+                    this.player.body.velocity.y
+                );
             } catch(e) {}
             
         } else {
@@ -3786,42 +4002,50 @@ class MapaScene extends Phaser.Scene {
             // ====================================================
             if (this.isMoving) {
                 let dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, this.target.x, this.target.y);
-            
-                if (dist < 5) {
+
+                const vxReal = this.player.body.velocity.x;
+                const vyReal = this.player.body.velocity.y;
+                const deltaSeguro = Number.isFinite(delta) && delta > 0
+                    ? Math.min(delta, 250)
+                    : 16.67;
+                const toleranciaChegada = Math.max(
+                    6,
+                    Math.min(40, Math.hypot(vxReal, vyReal) * deltaSeguro / 1000 + 2)
+                );
+
+                // Em quadros lentos o personagem pode cruzar o alvo entre duas
+                // atualizações. A tolerância acompanha a distância percorrida
+                // naquele quadro e evita inverter a direção perto do destino.
+                if (dist <= toleranciaChegada) {
+                    this.pararPersonagem();
+                } else if (Math.abs(vxReal) < 5 && Math.abs(vyReal) < 5) {
                     this.pararPersonagem();
                 } else {
-                    const vxReal = this.player.body.velocity.x;
-                    const vyReal = this.player.body.velocity.y;
+                    this.physics.moveToObject(this.player, this.target, 150);
 
-                    if (Math.abs(vxReal) < 5 && Math.abs(vyReal) < 5) {
-                        this.pararPersonagem();
-                    } else {
-                        this.physics.moveToObject(this.player, this.target, 150);
+                    const vxNovo = this.player.body.velocity.x;
+                    const vyNovo = this.player.body.velocity.y;
 
-                        const vxNovo = this.player.body.velocity.x;
-                        const vyNovo = this.player.body.velocity.y;
-
-                        try {
-                            this.cancelarAnimacaoParadaEspecial();
-                            this.inicioParadoEspecial = null;
-                            let chave = '_' + this.player.texture.key;
-                            if (Math.abs(vxNovo) > Math.abs(vyNovo)) { 
-                                this.direcaoParadaEspecial = vxNovo > 0 ? 'right' : 'left';
-                                this.player.anims.play(this.direcaoParadaEspecial + chave, true);
-                            } else { 
-                                this.direcaoParadaEspecial = vyNovo > 0 ? 'down' : 'up';
-                                this.player.anims.play(this.direcaoParadaEspecial + chave, true);
-                            }
-                        } catch(e) {}
-                    }
+                    try {
+                        this.cancelarAnimacaoParadaEspecial();
+                        this.inicioParadoEspecial = null;
+                        this.aplicarAnimacaoMovimento(
+                            this.player,
+                            this.skinBaseAtual || this.skinAtiva,
+                            vxNovo,
+                            vyNovo
+                        );
+                    } catch(e) {}
                 }
             } else {
                 this.player.setVelocity(0, 0);
                 if (!this.atualizarAnimacaoParadaEspecial(time)) {
                     try {
-                        this.player.anims.stop();
-                        this.player.setTexture(this.skinBaseAtual || this.skinAtiva);
-                        this.player.setFrame(1);
+                        this.aplicarAnimacaoRepouso(
+                            this.player,
+                            this.skinBaseAtual || this.skinAtiva,
+                            this.direcaoParadaEspecial
+                        );
                     } catch(e) {}
                 }
             }
@@ -4807,11 +5031,10 @@ class MapaScene extends Phaser.Scene {
         }
 
 
-        const mapaContexto =
-            this.make.tilemap({
-                key:
-                    this.regiaoAtual
-            });
+        // Reutiliza o mapa criado em create(): reconstruí-lo aqui recriava
+        // todas as células de todas as camadas a cada quadro, mesmo parado.
+        const mapaContexto = this.tilemap;
+        if (!mapaContexto) return;
 
 
         const camadaTransicoes =
@@ -5226,8 +5449,14 @@ class MapaScene extends Phaser.Scene {
     pararPersonagem() {
         this.player.body.stop();
         this.isMoving = false;
-        this.player.anims.stop();
-        this.player.setFrame(1);
+        const skinVisivel = this.skinBaseAtual || this.skinAtiva;
+        if (PERFIS_SPRITE_PERSONAGEM[skinVisivel]) {
+            this.aplicarAnimacaoRepouso(this.player, skinVisivel, this.direcaoParadaEspecial);
+        } else {
+            // Mantém a pose de parada das folhas antigas exatamente como antes.
+            this.player.anims.stop();
+            this.player.setFrame(1);
+        }
 
         localStorage.setItem("eldora_lastX", Math.round(this.player.x));
         localStorage.setItem("eldora_lastY", Math.round(this.player.y));
@@ -5255,6 +5484,33 @@ class MapaScene extends Phaser.Scene {
     }
 
     gerarAnimacoes(skin) {
+        const perfil = PERFIS_SPRITE_PERSONAGEM[skin];
+        if (perfil) {
+            if (!this.textures.exists(skin) || !this.textures.exists(perfil.texturaRepouso)) return;
+            for (const [direcao, linha] of Object.entries(perfil.linhas)) {
+                const inicio = linha * 4;
+                const movimento = `movimento_${skin}_${direcao}`;
+                const repouso = `repouso_${skin}_${direcao}`;
+                if (!this.anims.exists(movimento)) {
+                    this.anims.create({
+                        key: movimento,
+                        frames: this.anims.generateFrameNumbers(skin, { start: inicio, end: inicio + 3 }),
+                        frameRate: 10,
+                        repeat: -1
+                    });
+                }
+                if (!this.anims.exists(repouso)) {
+                    this.anims.create({
+                        key: repouso,
+                        frames: this.anims.generateFrameNumbers(perfil.texturaRepouso, { start: inicio, end: inicio + 3 }),
+                        frameRate: 5,
+                        repeat: -1
+                    });
+                }
+            }
+            return;
+        }
+
         if (!this.anims.exists('down_' + skin)) {
             this.anims.create({ key: 'down_' + skin, frames: this.anims.generateFrameNumbers(skin, { start: 0, end: 2 }), frameRate: 10, repeat: -1 });
             this.anims.create({ key: 'left_' + skin, frames: this.anims.generateFrameNumbers(skin, { start: 3, end: 5 }), frameRate: 10, repeat: -1 });
@@ -5262,6 +5518,44 @@ class MapaScene extends Phaser.Scene {
             this.anims.create({ key: 'up_' + skin, frames: this.anims.generateFrameNumbers(skin, { start: 9, end: 11 }), frameRate: 10, repeat: -1 });
         }
         this.criarAnimacoesParadaEspecial(skin);
+    }
+
+    chaveAnimacaoMovimento(skin, direcao) {
+        return PERFIS_SPRITE_PERSONAGEM[skin]
+            ? `movimento_${skin}_${direcao}`
+            : `${direcao}_${skin}`;
+    }
+
+    aplicarAnimacaoMovimento(sprite, skin, velocidadeX, velocidadeY) {
+        if (!sprite || (Math.abs(velocidadeX) < 0.01 && Math.abs(velocidadeY) < 0.01)) return false;
+        const direcao = Math.abs(velocidadeX) > Math.abs(velocidadeY)
+            ? (velocidadeX > 0 ? 'right' : 'left')
+            : (velocidadeY > 0 ? 'down' : 'up');
+        sprite.direcaoParadaEspecial = direcao;
+        if (sprite === this.player) this.direcaoParadaEspecial = direcao;
+        this.gerarAnimacoes(skin);
+        const chave = this.chaveAnimacaoMovimento(skin, direcao);
+        if (!this.anims.exists(chave)) return false;
+        if (sprite.texture?.key !== skin) sprite.setTexture(skin);
+        sprite.anims.play(chave, true);
+        return true;
+    }
+
+    aplicarAnimacaoRepouso(sprite, skin, direcao = 'down') {
+        if (!sprite) return false;
+        const perfil = PERFIS_SPRITE_PERSONAGEM[skin];
+        if (perfil) {
+            this.gerarAnimacoes(skin);
+            const chaveRepouso = `repouso_${skin}_${direcao}`;
+            if (this.anims.exists(chaveRepouso)) {
+                sprite.anims.play(chaveRepouso, true);
+                return true;
+            }
+        }
+        sprite.anims.stop();
+        sprite.setTexture(skin);
+        sprite.setFrame(1);
+        return false;
     }
 
     criarAnimacoesParadaEspecial(skin) {

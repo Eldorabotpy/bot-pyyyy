@@ -144,14 +144,20 @@ function iniciarAnalogicoEldora() {
 
     function calcularMovimento(pointerEvent) {
         const rect = container.getBoundingClientRect();
+        const larguraBase = container.offsetWidth || rect.width;
+        const alturaBase = container.offsetHeight || rect.height;
+        const escalaX = rect.width / larguraBase || 1;
+        const escalaY = rect.height / alturaBase || 1;
 
         const centroX = rect.left + (rect.width / 2);
         const centroY = rect.top + (rect.height / 2);
 
-        let dx = pointerEvent.clientX - centroX;
-        let dy = pointerEvent.clientY - centroY;
+        // Converte pixels da tela para pixels locais do controle. Assim o
+        // botão acompanha o dedo mesmo quando o jogador muda o tamanho do HUD.
+        let dx = (pointerEvent.clientX - centroX) / escalaX;
+        let dy = (pointerEvent.clientY - centroY) / escalaY;
 
-        const raioMaximo = Math.min(rect.width, rect.height) * 0.33;
+        const raioMaximo = Math.min(larguraBase, alturaBase) * 0.33;
         const distancia = Math.sqrt((dx * dx) + (dy * dy));
 
         if (distancia > raioMaximo) {

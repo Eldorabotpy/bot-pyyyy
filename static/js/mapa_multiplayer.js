@@ -751,10 +751,12 @@ class MotorMultiplayer {
                         // Preserve o timer e a animação se for apenas uma repetição
                         // da mesma posição.
                         if (!outro.animacaoParadaEspecialAtiva && !outro.animacaoParadaTimer) {
-                            outro.anims.stop();
-                            outro.setTexture(outro.skinBaseKey || outro.texture.key);
-                            outro.setFrame(1);
-                            this.agendarParadaEspecialRemota(outro);
+                            const repousoAplicado = this.scene.aplicarAnimacaoRepouso(
+                                outro,
+                                outro.skinBaseKey || outro.texture.key,
+                                outro.direcaoParadaEspecial || 'down'
+                            );
+                            if (!repousoAplicado) this.agendarParadaEspecialRemota(outro);
                         }
                         return; 
                     }
@@ -770,11 +772,8 @@ class MotorMultiplayer {
                     // A textura pode estar temporariamente na folha de idle especial.
                     // As animações de deslocamento sempre pertencem à folha base.
                     let skinDele = outro.skinBaseKey || outro.texture.key;
-                    outro.setTexture(skinDele);
-                    this.scene.gerarAnimacoes(skinDele); 
-                    
                     try { 
-                        outro.anims.play(animacao + '_' + skinDele, true); 
+                        this.scene.aplicarAnimacaoMovimento(outro, skinDele, dx, dy);
                     } catch(e){}
                     
                     outro.movimentoTween = this.scene.tweens.add({ 
@@ -783,10 +782,12 @@ class MotorMultiplayer {
                         y: info.y, 
                         duration: duracaoTempo, 
                         onComplete: () => {
-                            outro.anims.stop();
-                            outro.setTexture(outro.skinBaseKey || outro.texture.key);
-                            outro.setFrame(1);
-                            this.agendarParadaEspecialRemota(outro);
+                            const repousoAplicado = this.scene.aplicarAnimacaoRepouso(
+                                outro,
+                                outro.skinBaseKey || outro.texture.key,
+                                outro.direcaoParadaEspecial || animacao
+                            );
+                            if (!repousoAplicado) this.agendarParadaEspecialRemota(outro);
                         }
                     });
                     
@@ -1334,60 +1335,9 @@ class MotorMultiplayer {
         // Usa o nosso Faxineiro para limpar o velho sem congelar o jogo!
         this.removerOutroJogador(id);
 
-        let skinDesejada = info.skin || 'aventureiro_base';
-        let skinAtual = skinDesejada;
-        const arquivoSkin = window.resolverArquivoSkinGenero(skinDesejada);
-
-        const linkNuvem =
-            "https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/classes/";
-
-        // ==========================================
-        // 👥 CARREGA SKIN DO OUTRO JOGADOR
-        // ==========================================
-        if (!this.scene.textures.exists(skinDesejada)) {
-
-            this.scene.load.spritesheet(
-                skinDesejada,
-                `${linkNuvem}${arquivoSkin}.png`,
-                {
-                    frameWidth: 128,
-                    frameHeight: 128
-                }
-            );
-
-            this.scene.load.once(
-                `filecomplete-spritesheet-${skinDesejada}`,
-                () => {
-
-                    this.scene.outrosJogadores.getChildren().forEach(o => {
-
-                        if (o.playerId === id) {
-
-                            o.setTexture(skinDesejada);
-                            o.setFrame(1);
-
-                            // Mesmo tamanho visual do jogador principal
-                            o.setDisplaySize(48, 48);
-
-                            // Cria animações dos 12 frames
-                            try {
-                                this.scene.gerarAnimacoes(skinDesejada);
-                            } catch (e) {
-                                console.warn(
-                                    "Erro ao gerar animações do jogador remoto:",
-                                    e
-                                );
-                            }
-                        }
-                    });
-                }
-            );
-
-            this.scene.load.start();
-
-            // Usa aventureiro temporariamente enquanto baixa a skin
-            skinAtual = 'aventureiro_base';
-        }
+        const skinDesejada = info.skin || 'aventureiro_base';
+        const recursosProntos = this.recursosSkinDisponiveis(skinDesejada);
+        const skinAtual = recursosProntos ? skinDesejada : 'aventureiro_base';
 
         // ==========================================
         // 👤 CRIA O OUTRO JOGADOR
@@ -1408,7 +1358,8 @@ class MotorMultiplayer {
         );
 
         outro.playerId = id;
-        outro.skinBaseKey = skinDesejada;
+        outro.skinBaseKey = skinAtual;
+        outro.skinDesejadaKey = skinDesejada;
         outro.direcaoParadaEspecial = 'down';
         outro.indiceParadaEspecial = 0;
 
@@ -1444,62 +1395,135 @@ class MotorMultiplayer {
 
         this.scene.outrosJogadores.add(outro);
 
-        if (window.ANIMACOES_PARADAS_ESPECIAIS?.[skinDesejada]) {
-            this.scene.garantirFolhaAnimacaoParadaEspecial(skinDesejada, () => {
-                if (outro.active) this.agendarParadaEspecialRemota(outro);
+        if (recursosProntos) {
+            this.aplicarSkinRemota(outro, skinDesejada);
+        } else {
+            this.carregarRecursosSkin(skinDesejada,
+                () => this.aplicarSkinRemota(outro, skinDesejada),
+                () => console.warn(`Não foi possível carregar a skin remota ${skinDesejada}; mantendo o aventureiro temporário.`)
+            );
+        }
+    }
+
+    recursosSkinDisponiveis(skin) {
+        const perfil = window.PERFIS_SPRITE_PERSONAGEM?.[skin];
+        return this.scene.textures.exists(skin) && (
+            !perfil || this.scene.textures.exists(perfil.texturaRepouso)
+        );
+    }
+
+    carregarRecursosSkin(skin, aoCarregar, aoFalhar) {
+        const fila = this.scene.filaCarregamentoSkinsMapa ||= Object.create(null);
+        if (fila[skin]) {
+            fila[skin].callbacks.push({ aoCarregar, aoFalhar });
+            return;
+        }
+        if (this.recursosSkinDisponiveis(skin)) {
+            aoCarregar?.();
+            return;
+        }
+
+        const perfil = window.PERFIS_SPRITE_PERSONAGEM?.[skin];
+        const arquivoSkin = window.resolverArquivoSkinGenero(skin);
+        const linkNuvem = 'https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/classes/';
+        const recursos = [{
+            key: skin,
+            url: perfil?.caminho || `${linkNuvem}${arquivoSkin}.png`,
+            frameWidth: perfil?.larguraQuadro || 128,
+            frameHeight: perfil?.alturaQuadro || 128
+        }];
+        if (perfil) {
+            recursos.push({
+                key: perfil.texturaRepouso,
+                url: perfil.caminhoRepouso,
+                frameWidth: perfil.larguraQuadro,
+                frameHeight: perfil.alturaQuadro
             });
+        }
+        const pendentes = recursos.filter(recurso => !this.scene.textures.exists(recurso.key));
+        const estado = { callbacks: [{ aoCarregar, aoFalhar }], resolvido: false };
+        fila[skin] = estado;
+
+        const finalizar = sucesso => {
+            if (estado.resolvido) return;
+            estado.resolvido = true;
+            this.scene.load.off('loaderror', aoErro);
+            delete fila[skin];
+            estado.callbacks.forEach(callback => {
+                if (sucesso) callback.aoCarregar?.();
+                else callback.aoFalhar?.();
+            });
+        };
+        const aoErro = file => {
+            if (pendentes.some(recurso => recurso.key === file.key)) finalizar(false);
+        };
+        this.scene.load.on('loaderror', aoErro);
+
+        let restante = pendentes.length;
+        for (const recurso of pendentes) {
+            this.scene.load.once(`filecomplete-spritesheet-${recurso.key}`, () => {
+                restante -= 1;
+                if (restante <= 0) finalizar(true);
+            });
+            this.scene.load.spritesheet(recurso.key, recurso.url, {
+                frameWidth: recurso.frameWidth,
+                frameHeight: recurso.frameHeight
+            });
+        }
+        this.scene.load.once('complete', () => {
+            if (!estado.resolvido) finalizar(this.recursosSkinDisponiveis(skin));
+        });
+        this.scene.load.start();
+    }
+
+    aplicarSkinRemota(jogador, skin) {
+        if (!jogador?.active || jogador.skinDesejadaKey !== skin) return;
+        jogador.skinCarregando = null;
+        jogador.skinBaseKey = skin;
+        jogador.setTexture(skin);
+        const perfil = window.PERFIS_SPRITE_PERSONAGEM?.[skin];
+        jogador.setDisplaySize(perfil?.larguraVisual || 48, perfil?.alturaVisual || 48);
+        try {
+            this.scene.gerarAnimacoes(skin);
+            const direcao = jogador.direcaoParadaEspecial || 'down';
+            if (jogador.movimentoTween?.isPlaying()) {
+                const vetor = { up: [0, -1], left: [-1, 0], down: [0, 1], right: [1, 0] }[direcao];
+                this.scene.aplicarAnimacaoMovimento(jogador, skin, vetor[0], vetor[1]);
+            } else if (!this.scene.aplicarAnimacaoRepouso(jogador, skin, direcao)) {
+                if (window.ANIMACOES_PARADAS_ESPECIAIS?.[skin]) {
+                    this.scene.garantirFolhaAnimacaoParadaEspecial(skin, () => {
+                        if (jogador.active && jogador.skinBaseKey === skin) {
+                            this.agendarParadaEspecialRemota(jogador);
+                        }
+                    });
+                } else {
+                    this.agendarParadaEspecialRemota(jogador);
+                }
+            }
+        } catch (erro) {
+            console.warn('Erro ao preparar animações da skin remota:', erro);
         }
     }
 
     atualizarSkinOutroJogador(jogador, skin) {
         const skinDesejada = String(skin).trim().toLowerCase();
         if (!skinDesejada || !jogador?.active) return;
-        const arquivoSkin = window.resolverArquivoSkinGenero(skinDesejada);
 
         this.cancelarParadaEspecialRemota(jogador);
         jogador.movimentoTween?.stop();
         jogador.textoTween?.stop();
-        jogador.skinBaseKey = skinDesejada;
+        jogador.skinDesejadaKey = skinDesejada;
         jogador.skinCarregando = skinDesejada;
-
-        const aplicar = () => {
-            if (!jogador.active || jogador.skinBaseKey !== skinDesejada) return;
-            jogador.skinCarregando = null;
-            jogador.anims.stop();
-            jogador.setTexture(skinDesejada);
-            jogador.setFrame(1);
-            try {
-                this.scene.gerarAnimacoes(skinDesejada);
-            } catch (erro) {
-                console.warn('Erro ao preparar animações da skin remota:', erro);
-            }
-
-            if (window.ANIMACOES_PARADAS_ESPECIAIS?.[skinDesejada]) {
-                this.scene.garantirFolhaAnimacaoParadaEspecial(skinDesejada, () => {
-                    if (jogador.active && jogador.skinBaseKey === skinDesejada) {
-                        this.agendarParadaEspecialRemota(jogador);
-                    }
-                });
-            }
-        };
-
-        if (this.scene.textures.exists(skinDesejada)) {
+        const aplicar = () => this.aplicarSkinRemota(jogador, skinDesejada);
+        if (this.recursosSkinDisponiveis(skinDesejada)) {
             aplicar();
             return;
         }
-
-        const linkNuvem = 'https://raw.githubusercontent.com/Eldorabotpy/static-img/main/assets/classes/';
-        this.scene.load.spritesheet(skinDesejada, `${linkNuvem}${arquivoSkin}.png`, {
-            frameWidth: 128,
-            frameHeight: 128
-        });
-        this.scene.load.once(`filecomplete-spritesheet-${skinDesejada}`, aplicar);
-        this.scene.load.once('loaderror', (file) => {
-            if (file.key !== skinDesejada || !jogador.active || jogador.skinBaseKey !== skinDesejada) return;
+        this.carregarRecursosSkin(skinDesejada, aplicar, () => {
+            if (!jogador.active || jogador.skinDesejadaKey !== skinDesejada) return;
             jogador.skinCarregando = null;
-            console.warn(`Não foi possível carregar a skin remota ${skinDesejada}: ${file.url}`);
+            console.warn(`Não foi possível carregar a skin remota ${skinDesejada}; mantendo a aparência atual.`);
         });
-        this.scene.load.start();
     }
 
     cancelarParadaEspecialRemota(jogador) {

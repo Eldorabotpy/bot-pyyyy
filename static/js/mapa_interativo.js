@@ -205,7 +205,15 @@ class MapaInterativo {
                     && regiao === 'capital_eldora'
                     && this.scene.textures.exists('estatua_pedroca_cristal')
                     && this.scene.textures.exists('estatua_pedroca_despertar');
-                const referenciaEstatua = eEstatuaPedroca
+                const referenciaCristalTiled = eEstatuaPedroca
+                    ? this.scene.tilemap
+                        ?.getObjectLayer('Cristal de mana')
+                        ?.objects
+                        ?.find(referencia =>
+                            Number(referencia.gid) > 0
+                        )
+                    : null;
+                const referenciaEstatua = referenciaCristalTiled || (eEstatuaPedroca
                     ? this.scene.tilemap
                         ?.getObjectLayer('Referencia da Estatua do Criador')
                         ?.objects
@@ -213,13 +221,23 @@ class MapaInterativo {
                             referencia.type === 'referencia_visual' ||
                             referencia.name === 'Cristal e pedestal (referencia visual)'
                         )
-                    : null;
+                    : null) || (eEstatuaPedroca
+                    ? this.scene.tilemap
+                        ?.getObjectLayer('Acima do Jogador')
+                        ?.objects
+                        ?.find(referencia =>
+                            Number(referencia.gid) > 0 &&
+                            String(referencia.name || '').trim().toLowerCase() === 'cristal'
+                        )
+                    : null);
                 let cristalEstatua = null;
                 let spriteEstatua = null;
                 let colisoesCristal = [];
                 let colisoesEstatua = [];
                 let xInteracao = obj.x;
                 let yInteracao = obj.y;
+                let larguraZonaInteracao = 32;
+                let alturaZonaInteracao = 32;
                 let botaoX = obj.icone_x ?? (obj.x + 16);
                 let botaoY = obj.icone_y ?? (obj.y - 15);
 
@@ -227,19 +245,30 @@ class MapaInterativo {
                     const larguraReferencia = Number(referenciaEstatua?.width) || 128;
                     const alturaReferencia = Number(referenciaEstatua?.height) || (256 * 2 / 3);
                     const xEstatua = referenciaEstatua
-                        ? Number(referenciaEstatua.x) + (referenciaEstatua.gid ? larguraReferencia / 2 : 0)
+                        ? Number(referenciaEstatua.x) + (referenciaEstatua.gid && !referenciaCristalTiled ? larguraReferencia / 2 : 0)
                         : obj.x;
                     const baseYEstatua = Number(referenciaEstatua?.y) || (obj.y + 128);
                     const escalaX = larguraReferencia / 192;
                     const escalaY = alturaReferencia / 256;
 
                     if (referenciaEstatua) {
-                        // Mantém o ponto de interação no mesmo lugar relativo
-                        // à arte, mesmo quando ela for movida ou redimensionada no Tiled.
-                        xInteracao = xEstatua;
-                        yInteracao = baseYEstatua - alturaReferencia * 0.75;
-                        botaoX += xInteracao - obj.x;
-                        botaoY += yInteracao - obj.y;
+                        if (referenciaCristalTiled) {
+                            // O tileset usa alinhamento inferior central; x/y já são a âncora.
+                            // A interação fica no bloco 2×1 indicado junto ao cristal.
+                            const tamanhoTile = 32;
+                            xInteracao = Math.floor(Number(referenciaEstatua.x) / tamanhoTile) * tamanhoTile;
+                            yInteracao = Math.floor(Number(referenciaEstatua.y) / tamanhoTile) * tamanhoTile;
+                            larguraZonaInteracao = tamanhoTile * 2;
+                            alturaZonaInteracao = tamanhoTile;
+                            botaoX = xEstatua;
+                            botaoY = baseYEstatua - alturaReferencia - 28;
+                        } else {
+                            // Compatibilidade com mapas antigos que usam um objeto chamado "cristal".
+                            xInteracao = xEstatua;
+                            yInteracao = baseYEstatua - alturaReferencia * 0.32;
+                            botaoX += xInteracao - obj.x;
+                            botaoY += yInteracao - obj.y;
+                        }
                     }
 
                     cristalEstatua = this.scene.add.sprite(
@@ -303,7 +332,12 @@ class MapaInterativo {
                 // ==========================================
                 // 1. ZONA INVISÍVEL DE CLIQUE
                 // ==========================================
-                const zona = this.scene.add.zone(xInteracao, yInteracao, 32, 32)
+                const zona = this.scene.add.zone(
+                    xInteracao,
+                    yInteracao,
+                    larguraZonaInteracao,
+                    alturaZonaInteracao
+                )
                     .setOrigin(0, 0)
                     .setInteractive()
                     .setDepth(50);

@@ -112,7 +112,8 @@
 }
 #sprite-mob {
     position: absolute !important;
-    bottom: 120px !important; 
+    bottom: 104px !important;
+    right: 22px !important;
     z-index: 5;
 }
 
