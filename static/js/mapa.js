@@ -2671,7 +2671,7 @@ class MapaScene extends Phaser.Scene {
                 // ==========================================
 
                 if (this.regiaoAtual === 'capital_eldora') {
-                    this.motorNPC.spawnNPCAndante('varek', 'Capitão Varek', 'npc_varek', 15 * 32, 29 * 32, 21 * 32, 28 * 32);
+                    this.motorNPC.spawnNPCAndante('varek', 'Capitão Varek', 'npc_varek', 40 * 32 + 16, 50 * 32 + 16, 40 * 32 + 16, 50 * 32 + 16);
                     this.motorNPC.spawnNPCAndante('selene', 'Arquimaga Selene', 'npc_selene', 22 * 32, 13 * 32, 28 * 32, 13 * 32);
                     this.motorNPC.spawnNPCAndante('thorek', 'Mestre-Artesão Thorek', 'npc_thorek', 48 * 32, 29 * 32, 55 * 32, 29 * 32);
                     this.motorNPC.spawnNPCAndante('paracelso', 'Alquimista Paracelso', 'npc_paracelso', 50 * 32, 37 * 32, 46 * 32, 37 * 32);
@@ -6111,10 +6111,14 @@ window.animarDespertarClasse = function(nomeDaClasse, callbackFinal) {
             });
         }
 
-        let magia = cena.add.sprite(cena.player.x, cena.player.y + 40, 'efeito_despertar')
-            .setDepth(cena.player.depth +1) 
-            .setOrigin(0.5, 1) 
-            .setAlpha(0.7) 
+        const selene = cena.motorNPC?.npcs?.selene;
+        const magiaX = selene?.active ? selene.x : cena.player.x;
+        const magiaY = selene?.active ? selene.y + 24 : cena.player.y + 40;
+        const magiaDepth = selene?.active ? selene.depth + 1 : cena.player.depth + 1;
+
+        let magia = cena.add.sprite(magiaX, magiaY, 'efeito_despertar')
+            .setDepth(magiaDepth)
+            .setOrigin(0.5, 1).setAlpha(0.7) 
             .setBlendMode(Phaser.BlendModes.ADD); 
 
         magia.play('anim_efeito_despertar');
