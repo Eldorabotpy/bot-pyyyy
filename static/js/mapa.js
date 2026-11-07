@@ -1161,8 +1161,22 @@ class MapaScene extends Phaser.Scene {
         }
 
         if (this.regiaoAtual === 'capital_eldora') {
-            // 👇 AQUI: Trocamos 'aventureiro_m' por 'npc_merlin' 👇
-            let npcMercador = this.add.sprite(432, 1136, 'npc_merlin'); 
+            // Posiciona o Merlin pelo marcador da banca no Tiled, para o NPC
+            // acompanhar a posição que foi marcada dentro da tenda.
+            const objetosZonaMercado = (
+                map.getObjectLayer('Zonas de Profundidade') ||
+                map.getObjectLayer('Acima do Jogador')
+            )?.objects || [];
+            const zonaMercadoMerlin = objetosZonaMercado.find(obj =>
+                String(obj.name || '').trim().toLowerCase() === 'merc merlin'
+            );
+            const posicaoMerlin = zonaMercadoMerlin
+                ? {
+                    x: Number(zonaMercadoMerlin.x) + Number(zonaMercadoMerlin.width) / 2,
+                    y: Number(zonaMercadoMerlin.y) + Number(zonaMercadoMerlin.height) / 2,
+                }
+                : { x: 785, y: 1815 };
+            let npcMercador = this.add.sprite(posicaoMerlin.x, posicaoMerlin.y, 'npc_merlin');
             
             // 👇 Removi o setTint(0xf1c40f) para o novo sprite aparecer nas cores reais dele! 👇
             npcMercador.setDepth(5); 
