@@ -1699,12 +1699,13 @@ def api_mapa_objetos(regiao_id):
             "capital_eldora": [
                 {
                     "id": "entrada_coliseu_pvp",
-                    # Área central do portão marcada no Tiled (2x1), tile (10,55).
-                    "x": 10 * 32,
+                    # Clique na parte esquerda do vão, marcado no Tiled (tile 9,55).
+                    "x": 9 * 32,
                     "y": 55 * 32,
-                    # Emblema centralizado horizontalmente sobre a entrada.
-                    "icone_x": 11 * 32,
-                    "icone_y": 55 * 32 - 28,
+                    # O botão do ícone tem deslocamento interno de -18 px; assim,
+                    # seu centro fica no eixo da porta, à frente do escudo dourado.
+                    "icone_x": 10 * 32,
+                    "icone_y": 55 * 32 + 34,
                     "texto_botao": "⚔️",
                     "acao": "abrir_coliseu_pvp",
                     "mensagem": "",
