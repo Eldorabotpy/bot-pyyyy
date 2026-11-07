@@ -1173,7 +1173,7 @@ class MapaScene extends Phaser.Scene {
             const posicaoMerlin = zonaMercadoMerlin
                 ? {
                     x: Number(zonaMercadoMerlin.x) + Number(zonaMercadoMerlin.width) / 2,
-                    y: Number(zonaMercadoMerlin.y) + Number(zonaMercadoMerlin.height) / 2,
+                    y: Number(zonaMercadoMerlin.y) + Number(zonaMercadoMerlin.height) * 0.85,
                 }
                 : { x: 785, y: 1815 };
             let npcMercador = this.add.sprite(posicaoMerlin.x, posicaoMerlin.y, 'npc_merlin');
