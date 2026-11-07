@@ -604,7 +604,7 @@
                  "y":878.666666666667
                 }, 
                 {
-                 "height":64,
+                 "height":48,
                  "id":75,
                  "name":"Entrada Pico do Grifo",
                  "opacity":1,
@@ -1609,7 +1609,7 @@
         {
          "columns":5,
          "firstgid":16001,
-         "image":"..\/images\/tilesets\/portal_anim.png",
+         "image":"..\/images\/shared\/portais\/portal_anim.png",
          "imageheight":512,
          "imagewidth":2080,
          "margin":0,
