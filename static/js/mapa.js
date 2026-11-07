@@ -76,10 +76,9 @@ class MapaScene extends Phaser.Scene {
         if (this.portalSombrio?.eventId === String(event.id)) return;
         this.removerPortalSombrio();
 
-        // Fica ao lado do portal de região já existente na Capital,
-        // mantendo o caminho livre e sem sobrepor o objeto original.
-        const x = 48.5 * 32;
-        const y = 11.5 * 32;
+        // Posição marcada no Tiled para a Fenda Sombria (tile 47,34).
+        const x = 1510;
+        const y = 1093;
         const portal = this.add.container(x, y).setDepth(y + 8);
         portal.eventId = String(event.id);
 
