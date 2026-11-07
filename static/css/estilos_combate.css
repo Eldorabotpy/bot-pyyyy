@@ -305,6 +305,18 @@
     width: auto !important;
 }
 
+/* Posicionamento específico do Bosque Depois da Muralha (fundo 4:3). */
+#tela-combate-global #arena-box.arena-bosque-muralha #sprite-player {
+    bottom: 15% !important;
+    left: 2% !important;
+}
+#tela-combate-global #arena-box.arena-bosque-muralha #sprite-mob {
+    bottom: 39% !important;
+    right: 10% !important;
+    height: 75px !important;
+    width: auto !important;
+}
+
 /* Combate: arena flexível e painel legível em telas pequenas. */
 body.combate-aberto #btn-painel-gm { display:none !important; pointer-events:none !important; }
 #tela-combate-global { overscroll-behavior:contain; isolation:isolate; }
