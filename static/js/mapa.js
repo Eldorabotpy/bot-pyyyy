@@ -2105,9 +2105,10 @@ class MapaScene extends Phaser.Scene {
         }
         else if (this.isRespawn) {
 
+            // Ressurge na área marcada em frente à igreja no Tiled (tile 95,14).
             this.player.setPosition(
-                55 * 32,
-                13 * 32
+                95 * 32 + 16,
+                14 * 32 + 16
             );
 
         }  
@@ -5756,9 +5757,9 @@ class MapaScene extends Phaser.Scene {
         // 🛡️ TRAVA DE SEGURANÇA: Impede que a função rode se o jogador já estiver morto
         if (!this.player || this.isDead) return;
 
-        // Coordenadas de Resgate (Catedral de Eldora)
-        const resgateX = 55 * 32;
-        const resgateY = 13 * 32;
+        // Centro da área marcada em frente à igreja no Tiled (tile 95,14).
+        const resgateX = 95 * 32 + 16;
+        const resgateY = 14 * 32 + 16;
 
         // 🛑 PARADA IMEDIATA DE MOVIMENTO E FÍSICA
         this.isDead = true; // Ativa a trava de input imediatamente
