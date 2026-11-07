@@ -299,6 +299,12 @@
     display: none; /* Esconde completamente a linha 2 para garantir a limpeza */
 }
 
+/* Ajuste visual do mob no combate principal (bosque e demais regiões). */
+#tela-combate-global #arena-box #sprite-mob {
+    height: 75px !important;
+    width: auto !important;
+}
+
 /* Combate: arena flexível e painel legível em telas pequenas. */
 body.combate-aberto #btn-painel-gm { display:none !important; pointer-events:none !important; }
 #tela-combate-global { overscroll-behavior:contain; isolation:isolate; }
