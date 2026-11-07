@@ -1173,13 +1173,13 @@ class MapaScene extends Phaser.Scene {
             const posicaoMerlin = zonaMercadoMerlin
                 ? {
                     x: Number(zonaMercadoMerlin.x) + Number(zonaMercadoMerlin.width) / 2,
-                    y: Number(zonaMercadoMerlin.y) + Number(zonaMercadoMerlin.height) * 0.85,
+                    y: Number(zonaMercadoMerlin.y) + Number(zonaMercadoMerlin.height) * 0.73,
                 }
                 : { x: 785, y: 1815 };
             let npcMercador = this.add.sprite(posicaoMerlin.x, posicaoMerlin.y, 'npc_merlin');
             
             // 👇 Removi o setTint(0xf1c40f) para o novo sprite aparecer nas cores reais dele! 👇
-            npcMercador.setDepth(this.calcularProfundidadeAtor(npcMercador)); 
+            npcMercador.setDepth(5); 
             npcMercador.setFrame(1); 
             
             this.criarPlaquinhaNome(npcMercador.x, npcMercador.y - 20, '𝐌𝐞𝐫𝐥𝐢𝐧');
