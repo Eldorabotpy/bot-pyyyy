@@ -2669,7 +2669,7 @@
                 }],
          "opacity":1,
          "type":"objectgroup",
-         "visible":true,
+         "visible":false,
          "x":0,
          "y":0
         }, 
@@ -3784,6 +3784,42 @@
                  "width":147.999966666666,
                  "x":3013.33335,
                  "y":2092.00016666667
+                }, 
+                {
+                 "height":98.6663333333334,
+                 "id":803,
+                 "name":"igreja  parede 1",
+                 "opacity":1,
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":121.333333333333,
+                 "x":2980,
+                 "y":283.3335
+                }, 
+                {
+                 "height":79.9996333333333,
+                 "id":806,
+                 "name":"igreja  parede 2",
+                 "opacity":1,
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":54.6663333333331,
+                 "x":2927.3335,
+                 "y":284.000183333333
+                }, 
+                {
+                 "height":79.9996,
+                 "id":807,
+                 "name":"igreja  parede 3",
+                 "opacity":1,
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":54.6663,
+                 "x":3102.00018333333,
+                 "y":285.333533333333
                 }],
          "opacity":1,
          "type":"objectgroup",
@@ -3792,7 +3828,7 @@
          "y":0
         }],
  "nextlayerid":40,
- "nextobjectid":803,
+ "nextobjectid":808,
  "orientation":"orthogonal",
  "renderorder":"right-down",
  "tiledversion":"1.12.2",
@@ -5692,23 +5728,249 @@
                     }
                 }, 
                 {
-                 "id":3541,
+                 "id":3467,
                  "objectgroup":
                     {
                      "draworder":"index",
+                     "id":2,
                      "name":"",
                      "objects":[
                             {
-                             "height":10.9090909090909,
+                             "height":14.9090909090909,
                              "id":1,
                              "name":"colisao",
                              "opacity":1,
                              "rotation":0,
                              "type":"",
                              "visible":true,
-                             "width":9.63636363636364,
-                             "x":11.6363636363636,
-                             "y":19.8181818181818
+                             "width":26.7272727272727,
+                             "x":5.09090909090909,
+                             "y":9.81818181818182
+                            }, 
+                            {
+                             "height":8.18181818181818,
+                             "id":2,
+                             "name":"colisao",
+                             "opacity":1,
+                             "rotation":0,
+                             "type":"",
+                             "visible":true,
+                             "width":19.0909090909091,
+                             "x":12.7272727272727,
+                             "y":24.1818181818182
+                            }],
+                     "opacity":1,
+                     "type":"objectgroup",
+                     "visible":true,
+                     "x":0,
+                     "y":0
+                    }
+                }, 
+                {
+                 "id":3474,
+                 "objectgroup":
+                    {
+                     "draworder":"index",
+                     "id":2,
+                     "name":"",
+                     "objects":[
+                            {
+                             "height":26.3636363636364,
+                             "id":1,
+                             "name":"colisao",
+                             "opacity":1,
+                             "rotation":0,
+                             "type":"",
+                             "visible":true,
+                             "width":26.7272727272727,
+                             "x":0.363636363636364,
+                             "y":0.545454545454545
+                            }],
+                     "opacity":1,
+                     "type":"objectgroup",
+                     "visible":true,
+                     "x":0,
+                     "y":0
+                    }
+                }, 
+                {
+                 "id":3540,
+                 "objectgroup":
+                    {
+                     "draworder":"index",
+                     "id":2,
+                     "name":"",
+                     "objects":[
+                            {
+                             "height":12.1818181818182,
+                             "id":1,
+                             "name":"colisao",
+                             "opacity":1,
+                             "rotation":0,
+                             "type":"",
+                             "visible":true,
+                             "width":16.5454545454545,
+                             "x":8.90909090909091,
+                             "y":17.6363636363636
+                            }],
+                     "opacity":1,
+                     "type":"objectgroup",
+                     "visible":true,
+                     "x":0,
+                     "y":0
+                    }
+                }, 
+                {
+                 "id":3541,
+                 "objectgroup":
+                    {
+                     "draworder":"index",
+                     "id":2,
+                     "name":"",
+                     "objects":[
+                            {
+                             "height":13.6363636363636,
+                             "id":1,
+                             "name":"colisao",
+                             "opacity":1,
+                             "rotation":0,
+                             "type":"",
+                             "visible":true,
+                             "width":17.8181818181818,
+                             "x":7.45454545454542,
+                             "y":17.0909090909091
+                            }],
+                     "opacity":1,
+                     "type":"objectgroup",
+                     "visible":true,
+                     "x":0,
+                     "y":0
+                    }
+                }, 
+                {
+                 "id":3577,
+                 "objectgroup":
+                    {
+                     "draworder":"index",
+                     "id":2,
+                     "name":"",
+                     "objects":[
+                            {
+                             "height":6,
+                             "id":1,
+                             "name":"colisao",
+                             "opacity":1,
+                             "rotation":0,
+                             "type":"",
+                             "visible":true,
+                             "width":32,
+                             "x":-0.181818181818182,
+                             "y":0.181818181818182
+                            }, 
+                            {
+                             "height":7.81818181818182,
+                             "id":2,
+                             "name":"colisao",
+                             "opacity":1,
+                             "rotation":0,
+                             "type":"",
+                             "visible":true,
+                             "width":15.0909090909091,
+                             "x":16.5454545454545,
+                             "y":6.18181818181818
+                            }],
+                     "opacity":1,
+                     "type":"objectgroup",
+                     "visible":true,
+                     "x":0,
+                     "y":0
+                    }
+                }, 
+                {
+                 "id":3578,
+                 "objectgroup":
+                    {
+                     "draworder":"index",
+                     "id":2,
+                     "name":"",
+                     "objects":[
+                            {
+                             "height":21.2727272727273,
+                             "id":1,
+                             "name":"colisao",
+                             "opacity":1,
+                             "rotation":0,
+                             "type":"",
+                             "visible":true,
+                             "width":31.4545454545455,
+                             "x":0,
+                             "y":0.363636363636364
+                            }],
+                     "opacity":1,
+                     "type":"objectgroup",
+                     "visible":true,
+                     "x":0,
+                     "y":0
+                    }
+                }, 
+                {
+                 "id":3581,
+                 "objectgroup":
+                    {
+                     "draworder":"index",
+                     "id":2,
+                     "name":"",
+                     "objects":[
+                            {
+                             "height":24.7272727272727,
+                             "id":1,
+                             "name":"colisao",
+                             "opacity":1,
+                             "rotation":0,
+                             "type":"",
+                             "visible":true,
+                             "width":32.1818181818182,
+                             "x":-0.181818181818182,
+                             "y":0.181818181818182
+                            }],
+                     "opacity":1,
+                     "type":"objectgroup",
+                     "visible":true,
+                     "x":0,
+                     "y":0
+                    }
+                }, 
+                {
+                 "id":3582,
+                 "objectgroup":
+                    {
+                     "draworder":"index",
+                     "id":2,
+                     "name":"",
+                     "objects":[
+                            {
+                             "height":6.72727272727273,
+                             "id":1,
+                             "name":"colisao",
+                             "opacity":1,
+                             "rotation":0,
+                             "type":"",
+                             "visible":true,
+                             "width":30.9090909090909,
+                             "x":0.545454545454545,
+                             "y":0
+                            }, 
+                            {
+                             "height":6.54545454545455,
+                             "id":2,
+                             "name":"colisao",
+                             "opacity":1,
+                             "rotation":0,
+                             "type":"",
+                             "visible":true,
+                             "width":17.2727272727273,
+                             "x":0.363636363636364,
+                             "y":6.54545454545455
                             }],
                      "opacity":1,
                      "type":"objectgroup",
@@ -6164,10 +6426,11 @@
                  "objectgroup":
                     {
                      "draworder":"index",
+                     "id":2,
                      "name":"",
                      "objects":[
                             {
-                             "height":13.6363636363636,
+                             "height":30.7272727272727,
                              "id":1,
                              "name":"colisao",
                              "opacity":1,
@@ -6176,7 +6439,7 @@
                              "visible":true,
                              "width":31.6363636363636,
                              "x":0.545454545454545,
-                             "y":17.0909090909091
+                             "y":-1.77635683940025e-14
                             }],
                      "opacity":1,
                      "type":"objectgroup",
@@ -6190,10 +6453,11 @@
                  "objectgroup":
                     {
                      "draworder":"index",
+                     "id":2,
                      "name":"",
                      "objects":[
                             {
-                             "height":12.1818181818182,
+                             "height":30.9090909090909,
                              "id":1,
                              "name":"colisao",
                              "opacity":1,
@@ -6202,7 +6466,7 @@
                              "visible":true,
                              "width":32.7272727272727,
                              "x":-0.545454545454545,
-                             "y":18.9090909090909
+                             "y":0.181818181818173
                             }],
                      "opacity":1,
                      "type":"objectgroup",
@@ -6216,10 +6480,11 @@
                  "objectgroup":
                     {
                      "draworder":"index",
+                     "id":2,
                      "name":"",
                      "objects":[
                             {
-                             "height":19.2727272727273,
+                             "height":30.5454545454546,
                              "id":1,
                              "name":"colisao",
                              "opacity":1,
@@ -6228,7 +6493,7 @@
                              "visible":true,
                              "width":32,
                              "x":0,
-                             "y":11.2727272727273
+                             "y":2.66453525910038e-14
                             }],
                      "opacity":1,
                      "type":"objectgroup",
@@ -6782,7 +7047,8 @@
                      "x":0,
                      "y":0
                     }
-                }, 
+                },
+            
                 {
                  "id":6562,
                  "objectgroup":
@@ -6964,8 +7230,7 @@
                      "x":0,
                      "y":0
                     }
-                },
-            
+                }, 
                 {
                  "id":6571,
                  "objectgroup":
@@ -9383,7 +9648,8 @@
                      "x":0,
                      "y":0
                     }
-                }, 
+                },
+            
                 {
                  "id":9941,
                  "objectgroup":
@@ -9565,8 +9831,7 @@
                      "x":0,
                      "y":0
                     }
-                },
-            
+                }, 
                 {
                  "id":10161,
                  "objectgroup":
