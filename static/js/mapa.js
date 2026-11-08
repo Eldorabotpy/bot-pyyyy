@@ -230,7 +230,7 @@ class MapaScene extends Phaser.Scene {
             );
         }
         if (this.regiaoAtual === 'pradaria_inicial') {
-            this.load.image('tiles_pradaria', '/static/images/tilesets/pradaria.png');
+            this.load.image('tiles_pradaria', '/static/images/regions/pradaria_inicial/tilesets/pradaria.png');
         }
         if (this.regiaoAtual === 'campos_linho') {
             const tilesetsCamposLinho = {
