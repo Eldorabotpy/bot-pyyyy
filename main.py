@@ -1648,6 +1648,7 @@ def handle_chat_message(dados):
             )
             if (
                 tradutor_ativo
+                and sid != player_sid
                 and idioma_destino != idioma_origem
             ):
                 pacote['traducao_pendente'] = True

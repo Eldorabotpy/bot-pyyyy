@@ -1,6 +1,6 @@
 # Tradução automática do chat da taverna
 
-O chat global mantém a mensagem original e solicita traduções ao MyMemory somente quando há destinatários conectados com idioma diferente do remetente. Mensagens repetidas podem ser reutilizadas do cache; a fila tem limite para evitar rajadas de chamadas.
+O chat global mantém a mensagem original e solicita traduções ao MyMemory somente para outros jogadores conectados que escolheram um idioma diferente da mensagem. Cada destinatário recebe a tradução para o próprio idioma; o remetente continua vendo o original. Mensagens repetidas podem ser reutilizadas do cache; a fila tem limite para evitar rajadas de chamadas.
 
 ## Serviço e limites
 
