@@ -1618,6 +1618,7 @@ def handle_chat_message(dados):
         
         from modules.chat_translation import (
             enfileirar_traducao,
+            detectar_idioma_mensagem,
             normalizar_idioma_chat,
             tradutor_chat_disponivel,
             texto_pode_ser_traduzido,
@@ -1626,6 +1627,7 @@ def handle_chat_message(dados):
         idioma_remetente = normalizar_idioma_chat(
             jogadores_online[player_sid].get('idioma_chat', 'pt')
         )
+        idioma_origem = detectar_idioma_mensagem(mensagem, idioma_remetente)
         traducoes_por_idioma = {}
         tradutor_ativo = (
             tradutor_chat_disponivel()
@@ -1647,7 +1649,7 @@ def handle_chat_message(dados):
             if (
                 tradutor_ativo
                 and sid != player_sid
-                and idioma_destino != idioma_remetente
+                and idioma_destino != idioma_origem
             ):
                 pacote['traducao_pendente'] = True
                 traducoes_por_idioma.setdefault(idioma_destino, []).append(sid)
@@ -1658,7 +1660,7 @@ def handle_chat_message(dados):
                 socketio,
                 id_mensagem,
                 mensagem,
-                idioma_remetente,
+                idioma_origem,
                 traducoes_por_idioma,
             )
             

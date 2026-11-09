@@ -1673,8 +1673,8 @@ window.inicializarIdiomaChat = function() {
         const seletor = document.createElement('select');
         seletor.id = 'seletor-idioma-chat';
         seletor.className = 'seletor-idioma-chat';
-        seletor.setAttribute('aria-label', 'Seu idioma no chat da taverna');
-        seletor.title = 'Escolha o idioma em que você escreve e quer receber as mensagens';
+        seletor.setAttribute('aria-label', 'Idioma das mensagens da taverna');
+        seletor.title = 'Escolha o idioma em que você quer ler o chat';
         seletor.innerHTML = '<option value="pt">🌐 PT</option><option value="es">🌐 ES</option><option value="en">🌐 EN</option>';
         seletor.value = window.obterIdiomaChat();
         seletor.addEventListener('change', () => {
