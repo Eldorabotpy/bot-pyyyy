@@ -1,4 +1,4 @@
-"""Helpers for optional, self-hosted translations in the global game chat."""
+"""Helpers for optional Azure Translator translations in the global game chat."""
 
 from functools import lru_cache
 import json
@@ -8,6 +8,7 @@ from queue import Full, Queue
 from threading import Lock
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
+from urllib.parse import urlencode
 
 
 IDIOMAS_CHAT = {"pt": "Português (Brasil)", "es": "Español", "en": "English"}
@@ -16,6 +17,7 @@ _FILA_TRADUCAO = Queue(maxsize=12)
 _TRAVA_TRADUTOR = Lock()
 _TRADUTOR_ATIVO = False
 _LOGGER = logging.getLogger(__name__)
+AZURE_TRANSLATOR_ENDPOINT = "https://api.cognitive.microsofttranslator.com/translate"
 
 
 def normalizar_idioma_chat(valor):
@@ -25,12 +27,15 @@ def normalizar_idioma_chat(valor):
     return idioma if idioma in IDIOMAS_CHAT else "pt"
 
 
-def obter_url_tradutor():
-    return str(os.getenv("ELDORA_CHAT_TRANSLATOR_URL", "")).strip()
+def obter_configuracao_tradutor():
+    chave = str(os.getenv("ELDORA_AZURE_TRANSLATOR_KEY", "")).strip()
+    regiao = str(os.getenv("ELDORA_AZURE_TRANSLATOR_REGION", "")).strip()
+    return chave, regiao
 
 
 def tradutor_chat_disponivel():
-    return bool(obter_url_tradutor())
+    chave, _regiao = obter_configuracao_tradutor()
+    return bool(chave)
 
 
 def texto_pode_ser_traduzido(texto):
@@ -38,43 +43,56 @@ def texto_pode_ser_traduzido(texto):
 
 
 @lru_cache(maxsize=512)
-def _traduzir_em_cache(url, texto, idioma_destino):
+def _traduzir_em_cache(chave, regiao, texto, idioma_destino):
     if not texto or len(texto) > LIMITE_CARACTERES_TRADUCAO:
         return None
 
-    payload = json.dumps({
-        "q": texto,
-        "source": "auto",
-        "target": idioma_destino,
-        "format": "text",
-    }).encode("utf-8")
+    query = urlencode({"api-version": "3.0", "to": idioma_destino})
+    payload = json.dumps([{"Text": texto}]).encode("utf-8")
+    headers = {
+        "Content-Type": "application/json; charset=UTF-8",
+        "Ocp-Apim-Subscription-Key": chave,
+    }
+    if regiao:
+        headers["Ocp-Apim-Subscription-Region"] = regiao
     request = Request(
-        url,
+        f"{AZURE_TRANSLATOR_ENDPOINT}?{query}",
         data=payload,
-        headers={"Content-Type": "application/json"},
+        headers=headers,
         method="POST",
     )
 
     try:
         with urlopen(request, timeout=4) as response:
             resultado = json.loads(response.read().decode("utf-8"))
-        if not isinstance(resultado, dict):
+        if not isinstance(resultado, list) or not resultado:
             return None
-        traduzido = resultado.get("translatedText")
+        traducoes = resultado[0].get("translations")
+        if not isinstance(traducoes, list) or not traducoes:
+            return None
+        traduzido = traducoes[0].get("text")
         if not isinstance(traduzido, str) or not traduzido.strip():
             return None
         return traduzido.strip()
-    except (HTTPError, URLError, TimeoutError, OSError, ValueError, TypeError):
+    except HTTPError as exc:
+        _LOGGER.warning("Azure Translator respondeu HTTP %s", exc.code)
+        return None
+    except (URLError, TimeoutError, OSError, ValueError, TypeError):
         return None
 
 
 def _processar_fila_traducao(socketio):
     while True:
         id_mensagem, texto, destinatarios_por_idioma = _FILA_TRADUCAO.get()
-        url = obter_url_tradutor()
+        chave, regiao = obter_configuracao_tradutor()
         try:
             for idioma_destino, destinatarios in destinatarios_por_idioma.items():
-                texto_traduzido = _traduzir_em_cache(url, texto, idioma_destino)
+                texto_traduzido = _traduzir_em_cache(
+                    chave,
+                    regiao,
+                    texto,
+                    idioma_destino,
+                )
                 evento = "chatTraducaoPronta" if texto_traduzido is not None else "chatTraducaoFalhou"
                 pacote = {"id": str(id_mensagem), "idioma": idioma_destino}
                 if texto_traduzido is not None:
@@ -100,7 +118,7 @@ def _processar_fila_traducao(socketio):
 def enfileirar_traducao(socketio, id_mensagem, texto, destinatarios_por_idioma):
     """Queue translations so bursts never start many model requests at once."""
     global _TRADUTOR_ATIVO
-    if not obter_url_tradutor():
+    if not tradutor_chat_disponivel():
         return False
 
     try:
