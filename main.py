@@ -1612,7 +1612,8 @@ def handle_chat_message(dados):
         pacote_global = {
             "remetente": remetente, "texto": mensagem,
             "alvo": "global", "data_envio": datetime.utcnow(),
-            "avatar": avatar_real 
+            "avatar": avatar_real,
+            "remetente_char_id": str(jogadores_online[player_sid].get('char_id') or ''),
         }
         mensagem_salva = chat_collection.insert_one(pacote_global)
         
@@ -2257,16 +2258,74 @@ def handle_entrar_regiao(data):
     
     cursor_chat_lido = obter_cursor_leitura_chat_global(char_id)
     hist_global = list(chat_collection.find({"alvo": "global"}).sort("data_envio", -1).limit(30))
+    from modules.chat_translation import (
+        detectar_idioma_mensagem,
+        enfileirar_traducao,
+        normalizar_idioma_chat,
+        tradutor_chat_disponivel,
+        texto_pode_ser_traduzido,
+    )
+    idioma_destino_chat = normalizar_idioma_chat(
+        jogadores_online[player_sid].get('idioma_chat', 'pt')
+    )
+    mensagens_historico = []
     for msg in reversed(hist_global):
-        emit('novaMensagemChat', {
-            "id": str(msg.get("_id", "")),
-            "remetente": msg["remetente"], 
-            "texto": msg["texto"], 
-            "tipo": msg.get("tipo", "global"), 
+        id_mensagem_historico = str(msg.get("_id", ""))
+        texto_historico = str(msg.get("texto", ""))
+        remetente_char_id = str(msg.get("remetente_char_id") or "")
+        eh_mensagem_propria = (
+            remetente_char_id == str(char_id)
+            if remetente_char_id
+            else msg.get("remetente") == jogadores_online[player_sid].get('nome')
+        )
+        idioma_origem_historico = (
+            normalizar_idioma_chat(msg.get('idioma_origem'))
+            if msg.get('idioma_origem')
+            else detectar_idioma_mensagem(texto_historico, idioma_destino_chat)
+        )
+        pacote_historico = {
+            "id": id_mensagem_historico,
+            "remetente": msg["remetente"],
+            "texto": texto_historico,
+            "tipo": msg.get("tipo", "global"),
             "historico": True,
             "nao_lida": mensagem_global_nao_lida(msg.get("_id"), cursor_chat_lido),
-            "avatar": msg.get("avatar", "") 
-        }, to=player_sid)
+            "avatar": msg.get("avatar", "")
+        }
+        traducao_historico = None
+        if (
+            not eh_mensagem_propria
+            and idioma_origem_historico != idioma_destino_chat
+            and tradutor_chat_disponivel()
+            and texto_pode_ser_traduzido(texto_historico)
+        ):
+            traducao_historico = (
+                id_mensagem_historico,
+                texto_historico,
+                idioma_origem_historico,
+            )
+        mensagens_historico.append((pacote_historico, traducao_historico))
+
+    # A fila é limitada; prioriza as mensagens mais recentes do histórico.
+    historico_para_traduzir = [
+        traducao
+        for _pacote, traducao in mensagens_historico
+        if traducao is not None
+    ][-12:]
+    ids_historico_pendentes = {traducao[0] for traducao in historico_para_traduzir}
+    for pacote_historico, traducao in mensagens_historico:
+        if traducao and traducao[0] in ids_historico_pendentes:
+            pacote_historico['traducao_pendente'] = True
+        emit('novaMensagemChat', pacote_historico, to=player_sid)
+
+    for id_mensagem, texto, idioma_origem in reversed(historico_para_traduzir):
+        enfileirar_traducao(
+            socketio,
+            id_mensagem,
+            texto,
+            idioma_origem,
+            {idioma_destino_chat: [player_sid]},
+        )
 
     # Carrega somente o histórico do clã do personagem atual.
     try:
