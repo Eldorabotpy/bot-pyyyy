@@ -1316,6 +1316,16 @@ _pet_distance_lock = Lock()
 _pet_distance_worker_guard = Lock()
 _pet_distance_worker_started = False
 
+@socketio.on('definirIdiomaChat')
+def handle_definir_idioma_chat(dados):
+    """Keep the chat display language on the active socket only."""
+    jogador = jogadores_online.get(request.sid)
+    if not jogador or not isinstance(dados, dict):
+        return
+
+    from modules.chat_translation import normalizar_idioma_chat
+    jogador['idioma_chat'] = normalizar_idioma_chat(dados.get('idioma'))
+
 
 def _flush_pet_movement(online):
     if not isinstance(online, dict):
@@ -1606,8 +1616,50 @@ def handle_chat_message(dados):
         }
         mensagem_salva = chat_collection.insert_one(pacote_global)
         
-        for sid in list(jogadores_online.keys()):
-            emit('novaMensagemChat', {"id": str(mensagem_salva.inserted_id), "remetente": remetente, "texto": mensagem, "tipo": "global", "avatar": avatar_real}, to=sid)
+        from modules.chat_translation import (
+            enfileirar_traducao,
+            normalizar_idioma_chat,
+            tradutor_chat_disponivel,
+            texto_pode_ser_traduzido,
+        )
+
+        idioma_remetente = normalizar_idioma_chat(
+            jogadores_online[player_sid].get('idioma_chat', 'pt')
+        )
+        traducoes_por_idioma = {}
+        tradutor_ativo = (
+            tradutor_chat_disponivel()
+            and texto_pode_ser_traduzido(mensagem)
+        )
+        id_mensagem = str(mensagem_salva.inserted_id)
+
+        for sid, info in list(jogadores_online.items()):
+            pacote = {
+                "id": id_mensagem,
+                "remetente": remetente,
+                "texto": mensagem,
+                "tipo": "global",
+                "avatar": avatar_real,
+            }
+            idioma_destino = normalizar_idioma_chat(
+                (info or {}).get('idioma_chat', 'pt')
+            )
+            if (
+                tradutor_ativo
+                and sid != player_sid
+                and idioma_destino != idioma_remetente
+            ):
+                pacote['traducao_pendente'] = True
+                traducoes_por_idioma.setdefault(idioma_destino, []).append(sid)
+            emit('novaMensagemChat', pacote, to=sid)
+
+        if traducoes_por_idioma:
+            enfileirar_traducao(
+                socketio,
+                id_mensagem,
+                mensagem,
+                traducoes_por_idioma,
+            )
             
     except Exception as e:
         print(f"🚨 ERRO GRAVE NO CHAT: {str(e)}")

@@ -492,6 +492,8 @@ class MotorMultiplayer {
     iniciarEscutas() {
         // 🛑 O ESCUDO ANTI-DUPLICAÇÃO: Limpa escutas antigas antes de criar novas!
         this.socket.off('novaMensagemChat');
+        this.socket.off('chatTraducaoPronta');
+        this.socket.off('chatTraducaoFalhou');
         this.socket.off('receberListaAmigos');
         this.socket.off('receberConviteAmizade');
         this.socket.off('receberConviteGrupo');
@@ -646,6 +648,7 @@ class MotorMultiplayer {
         this.socket.on('registroRegiaoConfirmado', (dados) => {
             clearTimeout(this.timeoutRegistroRegiao);
             if (dados?.total) window.totalJogadoresOnline = Number(dados.total);
+            window.sincronizarIdiomaChat?.();
             this.atualizarPilula();
         });
 
@@ -908,6 +911,45 @@ class MotorMultiplayer {
         });
 
         // 🌟 SISTEMA DE ABAS DO CHAT (GLOBAL vs GRUPO vs PRIVADO) 🌟
+        this.socket.on('chatTraducaoPronta', (dados = {}) => {
+            const mensagemId = String(dados.id || '');
+            const linha = Array.from(
+                document.querySelectorAll('#chat-box .chat-card-mensagem[data-message-id]')
+            ).find((elemento) => elemento.dataset.messageId === mensagemId);
+            if (!linha) {
+                window.traducoesChatPendentes = window.traducoesChatPendentes || new Map();
+                window.traducoesChatPendentes.set(mensagemId, dados);
+                return;
+            }
+
+            const original = linha.querySelector('.chat-texto-original');
+            const traduzido = linha.querySelector('.chat-texto-traduzido');
+            const botao = linha.querySelector('.chat-traducao-toggle');
+            if (!original || !traduzido || !botao) return;
+
+            traduzido.textContent = String(dados.texto || '');
+            traduzido.hidden = false;
+            original.hidden = true;
+            botao.disabled = false;
+            botao.title = 'Mostrar mensagem original';
+            botao.setAttribute('aria-label', 'Mostrar mensagem original');
+            botao.dataset.mostrando = 'traducao';
+            botao.textContent = '🔄';
+        });
+
+        this.socket.on('chatTraducaoFalhou', (dados = {}) => {
+            const mensagemId = String(dados.id || '');
+            const linha = Array.from(
+                document.querySelectorAll('#chat-box .chat-card-mensagem[data-message-id]')
+            ).find((elemento) => elemento.dataset.messageId === mensagemId);
+            if (!linha) {
+                window.traducoesChatFalhas = window.traducoesChatFalhas || new Set();
+                window.traducoesChatFalhas.add(mensagemId);
+                return;
+            }
+            linha.querySelector('.chat-traducao-toggle')?.remove();
+        });
+
         this.socket.on('novaMensagemChat', (msg) => {
             
             // 🛡️ O CADEADO DE PRIVACIDADE DO GRUPO (NOVO)
@@ -942,6 +984,8 @@ class MotorMultiplayer {
             Array.from(chatBox.children).forEach(child => { if(child.tagName === 'P') child.remove(); });
 
             const linha = document.createElement('div');
+            linha.classList.add('chat-card-mensagem');
+            if (msg.id) linha.dataset.messageId = String(msg.id);
             
             let canalDaMsg = msg.canal || 'global';
             if (!msg.canal) {
@@ -1043,7 +1087,13 @@ class MotorMultiplayer {
                                 <strong style="color: ${corNome}; font-size: 0.8em; text-transform: uppercase; letter-spacing: 0.5px;">${msg.remetente}</strong>
                                 <span style="font-size: 0.6em; color: ${bordaCor}; opacity: 0.7; letter-spacing: 0.5px; white-space: nowrap;">${prefixo}</span>
                             </div>
-                            <div style="${estiloTexto} font-size: 0.9em; word-wrap: break-word; line-height: 1.3;">${window.formatarTextoExpressoesChat(msg.texto)}</div>
+                            <div class="chat-traducao-linha">
+                                <div class="chat-texto-mensagem" style="${estiloTexto} font-size: 0.9em; word-wrap: break-word; line-height: 1.3;">
+                                    <div class="chat-texto-original">${window.formatarTextoExpressoesChat(msg.texto)}</div>
+                                    <div class="chat-texto-traduzido" hidden></div>
+                                </div>
+                                ${msg.traducao_pendente ? '<button type="button" class="chat-traducao-toggle" disabled title="Traduzindo a mensagem…" aria-label="Traduzindo a mensagem">…</button>' : ''}
+                            </div>
                         </div>
                     </div>
                 `;
@@ -1062,6 +1112,30 @@ class MotorMultiplayer {
                 box-shadow: 0 2px 4px rgba(0,0,0,0.2);
             `;
             linha.innerHTML = textoFormatado;
+
+            if (msg.traducao_pendente && msg.id) {
+                if (window.traducoesChatFalhas?.has(String(msg.id))) {
+                    window.traducoesChatFalhas.delete(String(msg.id));
+                    linha.querySelector('.chat-traducao-toggle')?.remove();
+                }
+                const traducaoSalva = window.traducoesChatPendentes?.get(String(msg.id));
+                if (traducaoSalva) {
+                    window.traducoesChatPendentes.delete(String(msg.id));
+                    const original = linha.querySelector('.chat-texto-original');
+                    const traduzido = linha.querySelector('.chat-texto-traduzido');
+                    const botao = linha.querySelector('.chat-traducao-toggle');
+                    if (original && traduzido && botao) {
+                        traduzido.textContent = String(traducaoSalva.texto || '');
+                        traduzido.hidden = false;
+                        original.hidden = true;
+                        botao.disabled = false;
+                        botao.title = 'Mostrar mensagem original';
+                        botao.setAttribute('aria-label', 'Mostrar mensagem original');
+                        botao.dataset.mostrando = 'traducao';
+                        botao.textContent = '🔄';
+                    }
+                }
+            }
 
             chatBox.appendChild(linha);
 
@@ -1576,6 +1650,71 @@ class MotorMultiplayer {
 // ==========================================
 // SISTEMA SOCIAL - CHAT PRIVADO INVISÍVEL
 // ==========================================
+window.obterIdiomaChat = function() {
+    const idiomasAceitos = ['pt', 'es', 'en'];
+    const salvo = String(localStorage.getItem('eldoraIdiomaChat') || 'pt').toLowerCase();
+    return idiomasAceitos.includes(salvo) ? salvo : 'pt';
+};
+
+window.sincronizarIdiomaChat = function() {
+    const idioma = window.obterIdiomaChat();
+    const seletor = document.getElementById('seletor-idioma-chat');
+    if (seletor) seletor.value = idioma;
+    if (window.eldoraSocket?.connected) {
+        window.eldoraSocket.emit('definirIdiomaChat', { idioma });
+    }
+};
+
+window.inicializarIdiomaChat = function() {
+    const cabecalho = document.querySelector('#hub-social .social-header');
+    if (!cabecalho) return;
+
+    if (!document.getElementById('seletor-idioma-chat')) {
+        const seletor = document.createElement('select');
+        seletor.id = 'seletor-idioma-chat';
+        seletor.className = 'seletor-idioma-chat';
+        seletor.setAttribute('aria-label', 'Idioma das mensagens da taverna');
+        seletor.title = 'Escolha o idioma em que você quer ler o chat';
+        seletor.innerHTML = '<option value="pt">🌐 PT</option><option value="es">🌐 ES</option><option value="en">🌐 EN</option>';
+        seletor.value = window.obterIdiomaChat();
+        seletor.addEventListener('change', () => {
+            const idioma = ['pt', 'es', 'en'].includes(seletor.value) ? seletor.value : 'pt';
+            localStorage.setItem('eldoraIdiomaChat', idioma);
+            window.sincronizarIdiomaChat();
+        });
+
+        const botaoFechar = cabecalho.querySelector('.btn-fechar-social');
+        cabecalho.insertBefore(seletor, botaoFechar || null);
+    }
+
+    if (!document.documentElement.dataset.chatTraducaoClick) {
+        document.documentElement.dataset.chatTraducaoClick = '1';
+        document.addEventListener('click', (event) => {
+            const botao = event.target.closest('.chat-traducao-toggle');
+            if (!botao || botao.disabled) return;
+            const linha = botao.closest('.chat-card-mensagem');
+            const original = linha?.querySelector('.chat-texto-original');
+            const traduzido = linha?.querySelector('.chat-texto-traduzido');
+            if (!original || !traduzido || traduzido.hidden) return;
+
+            const mostrarOriginal = !traduzido.hidden;
+            original.hidden = !mostrarOriginal;
+            traduzido.hidden = mostrarOriginal;
+            botao.dataset.mostrando = mostrarOriginal ? 'original' : 'traducao';
+            botao.title = mostrarOriginal ? 'Mostrar tradução' : 'Mostrar mensagem original';
+            botao.setAttribute('aria-label', botao.title);
+        });
+    }
+
+    window.sincronizarIdiomaChat();
+};
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', window.inicializarIdiomaChat, { once: true });
+} else {
+    window.inicializarIdiomaChat();
+}
+
 window.setAlvoSussurro = function(nome) {
     const inputArea = document.querySelector('.chat-input-area'); 
     const input = document.getElementById('input-chat');

@@ -639,6 +639,60 @@
     box-shadow: 0 12px 32px rgba(0, 0, 0, .55), inset 0 1px rgba(255, 255, 255, .06);
 }
 
+/* Preferência de idioma e alternância de tradução na Taverna. */
+#hub-social .social-header h2 {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+#hub-social .seletor-idioma-chat {
+    flex: 0 0 auto;
+    max-width: 92px;
+    height: 34px;
+    margin-left: 6px;
+    padding: 0 7px;
+    color: #f3d486;
+    background: #131d2a;
+    border: 1px solid rgba(224, 190, 112, .42);
+    border-radius: 8px;
+    font: 700 11px 'Segoe UI', sans-serif;
+}
+
+#hub-social .seletor-idioma-chat:focus-visible,
+#hub-social .chat-traducao-toggle:focus-visible {
+    outline: 2px solid #f3d486;
+    outline-offset: 2px;
+}
+
+#hub-social .chat-texto-original[hidden],
+#hub-social .chat-texto-traduzido[hidden] {
+    display: none;
+}
+
+#hub-social .chat-traducao-toggle {
+    align-self: flex-start;
+    flex: 0 0 28px;
+    width: 28px;
+    min-width: 28px;
+    height: 26px;
+    padding: 0;
+    color: #f3d486;
+    background: rgba(224, 190, 112, .1);
+    border: 1px solid rgba(224, 190, 112, .3);
+    border-radius: 7px;
+    cursor: pointer;
+}
+
+#hub-social .chat-traducao-toggle:disabled {
+    color: #9caabd;
+    cursor: wait;
+}
+
+#hub-social .chat-texto-traduzido {
+    color: #f3d486;
+    overflow-wrap: anywhere;
+}
+
 #hub-social .painel-expressoes-titulo {
     margin: 0 0 8px;
     color: #e9d6a5;
@@ -970,6 +1024,22 @@
 
 @media (prefers-reduced-motion: reduce) {
     #btn-chat-mapa .badge-central-eldora { animation: none; }
+}
+
+#hub-social .chat-traducao-linha {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+}
+
+#hub-social .chat-texto-mensagem {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+@media (max-width: 420px) {
+    #hub-social .social-header { gap: 6px; }
+    #hub-social .seletor-idioma-chat { max-width: 78px; margin-left: 0; }
 }
 
 #hub-social #chat-box.chat-historico {
