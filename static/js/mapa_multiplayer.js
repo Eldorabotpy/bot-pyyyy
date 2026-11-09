@@ -475,7 +475,7 @@ class MotorMultiplayer {
             return;
         }
         this.definirEstadoPilula('sincronizando', 'Validando...', 'Aguardando validação da conta e do personagem.');
-        this.socket.emit('entrarRegiao', { regiao: this.scene.regiaoAtual, x: this.scene.player.x, y: this.scene.player.y, nome: meuNome, skin: this.scene.skinResolvida || this.scene.skinAtiva, char_id: meuIdDoBanco });
+        this.socket.emit('entrarRegiao', { regiao: this.scene.regiaoAtual, x: this.scene.player.x, y: this.scene.player.y, nome: meuNome, skin: this.scene.skinResolvida || this.scene.skinAtiva, char_id: meuIdDoBanco, idioma_chat: window.obterIdiomaChat?.() || 'pt' });
         clearTimeout(this.timeoutRegistroRegiao);
         this.timeoutRegistroRegiao = setTimeout(() => {
             const contador = document.getElementById('online-counter');

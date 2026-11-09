@@ -2118,6 +2118,7 @@ def handle_entrar_regiao(data):
     except Exception:
         pet_incubating = False
 
+    from modules.chat_translation import normalizar_idioma_chat
     jogadores_online[player_sid] = {
         'id': player_sid,
         'account_id': str(session.get('portal_account') or ''),
@@ -2136,6 +2137,7 @@ def handle_entrar_regiao(data):
             'skin',
             'aventureiro_masculino'
         ),
+        'idioma_chat': normalizar_idioma_chat(data.get('idioma_chat', 'pt')),
         '_pet_incubating': pet_incubating,
         '_pet_distance': 0,
     }
