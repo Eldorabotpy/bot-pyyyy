@@ -1707,9 +1707,10 @@ window.inicializarIdiomaChat = function() {
             const linha = botao.closest('.chat-card-mensagem');
             const original = linha?.querySelector('.chat-texto-original');
             const traduzido = linha?.querySelector('.chat-texto-traduzido');
-            if (!original || !traduzido || traduzido.hidden) return;
+            if (!original || !traduzido) return;
 
-            const mostrarOriginal = !traduzido.hidden;
+
+            const mostrarOriginal = traduzido.hidden;
             original.hidden = !mostrarOriginal;
             traduzido.hidden = mostrarOriginal;
             botao.dataset.mostrando = mostrarOriginal ? 'original' : 'traducao';
