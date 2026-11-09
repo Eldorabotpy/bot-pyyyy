@@ -1658,6 +1658,7 @@ def handle_chat_message(dados):
                 socketio,
                 id_mensagem,
                 mensagem,
+                idioma_remetente,
                 traducoes_por_idioma,
             )
             
