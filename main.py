@@ -1459,6 +1459,14 @@ def handle_chat_message(dados):
 
         remetente = jogadores_online[player_sid]['nome']
         char_id = jogadores_online[player_sid]['char_id']
+        from modules.chat_translation import (
+            detectar_idioma_mensagem,
+            emitir_mensagem_traduzivel,
+            enfileirar_traducao,
+            normalizar_idioma_chat,
+            tradutor_chat_disponivel,
+            texto_pode_ser_traduzido,
+        )
         mensagem = dados.get('texto', '').strip()
         
         if not mensagem: return
@@ -1496,20 +1504,45 @@ def handle_chat_message(dados):
                     texto_real = partes[2].strip()
                     
             if nome_alvo and texto_real:
+                idioma_origem = detectar_idioma_mensagem(
+                    texto_real,
+                    normalizar_idioma_chat(
+                        jogadores_online[player_sid].get('idioma_chat', 'pt')
+                    ),
+                )
                 # Salva o Sussurro COM O AVATAR no banco
                 pacote_offline = {
                     "remetente": remetente, "destinatario": nome_alvo,
                     "texto": texto_real, "data_envio": datetime.utcnow(), "lida": False,
-                    "avatar": avatar_real 
+                    "avatar": avatar_real,
+                    "idioma_origem": idioma_origem,
+                    "remetente_char_id": str(char_id),
                 }
-                mensagens_offline_col.insert_one(pacote_offline)
+                mensagem_salva = mensagens_offline_col.insert_one(pacote_offline)
+                id_mensagem = str(mensagem_salva.inserted_id)
 
-                emit('novaMensagemChat', {"remetente": f"Para {nome_alvo}", "texto": texto_real, "tipo": "privado", "nome_puro": nome_alvo, "avatar": avatar_real}, to=player_sid)
+                emit('novaMensagemChat', {"id": id_mensagem, "remetente": f"Para {nome_alvo}", "texto": texto_real, "tipo": "privado", "nome_puro": nome_alvo, "avatar": avatar_real}, to=player_sid)
 
                 alvo_online = False
                 for sid, info in jogadores_online.items():
                     if info.get('nome') == nome_alvo:
-                        emit('novaMensagemChat', {"remetente": remetente, "texto": texto_real, "tipo": "privado", "nome_puro": remetente, "avatar": avatar_real}, to=sid)
+                        emitir_mensagem_traduzivel(
+                            socketio,
+                            jogadores_online,
+                            [sid],
+                            {
+                                "remetente": remetente,
+                                "texto": texto_real,
+                                "tipo": "privado",
+                                "canal": "amigos",
+                                "nome_puro": remetente,
+                                "avatar": avatar_real,
+                            },
+                            id_mensagem,
+                            texto_real,
+                            idioma_origem,
+                            sid_remetente=player_sid,
+                        )
                         alvo_online = True
                         break
                 
@@ -1534,16 +1567,43 @@ def handle_chat_message(dados):
             if texto_chat:
                 grupo = obter_grupo_do_jogador(char_id)
                 if grupo:
+                    idioma_origem = detectar_idioma_mensagem(
+                        texto_chat,
+                        normalizar_idioma_chat(
+                            jogadores_online[player_sid].get('idioma_chat', 'pt')
+                        ),
+                    )
+                    mensagem_grupo = chat_collection.insert_one({
+                        "remetente": remetente,
+                        "remetente_char_id": str(char_id),
+                        "texto": texto_chat,
+                        "alvo": "grupo",
+                        "group_id": str(grupo.get('_id') or ''),
+                        "idioma_origem": idioma_origem,
+                        "data_envio": datetime.utcnow(),
+                        "avatar": avatar_real,
+                    })
+                    destinatarios_grupo = []
                     for membro_id in grupo.get('membros', []):
                         for sid, info in jogadores_online.items():
                             if str(info['char_id']) == str(membro_id):
-                                emit('novaMensagemChat', {
-                                    "remetente": remetente,
-                                    "texto": texto_chat,
-                                    "tipo": "grupo",
-                                    "canal": "grupo",
-                                    "avatar": avatar_real,
-                                }, to=sid)
+                                destinatarios_grupo.append(sid)
+                    emitir_mensagem_traduzivel(
+                        socketio,
+                        jogadores_online,
+                        destinatarios_grupo,
+                        {
+                            "remetente": remetente,
+                            "texto": texto_chat,
+                            "tipo": "grupo",
+                            "canal": "grupo",
+                            "avatar": avatar_real,
+                        },
+                        str(mensagem_grupo.inserted_id),
+                        texto_chat,
+                        idioma_origem,
+                        sid_remetente=player_sid,
+                    )
                 else:
                     emit('novaMensagemChat', {
                         "remetente": "Sistema",
@@ -1588,22 +1648,37 @@ def handle_chat_message(dados):
 
             pacote_cla = {
                 "remetente": remetente,
+                "remetente_char_id": str(char_id),
                 "texto": texto_chat,
                 "alvo": "cla",
                 "clan_id": str(cla.get("_id")),
                 "tipo": "cla",
+                "idioma_origem": detectar_idioma_mensagem(
+                    texto_chat,
+                    normalizar_idioma_chat(
+                        jogadores_online[player_sid].get('idioma_chat', 'pt')
+                    ),
+                ),
                 "data_envio": datetime.utcnow(),
                 "avatar": avatar_real,
             }
-            chat_collection.insert_one(pacote_cla)
-            for sid in sids_online_do_cla(cla, jogadores_online):
-                emit('novaMensagemChat', {
+            mensagem_cla = chat_collection.insert_one(pacote_cla)
+            emitir_mensagem_traduzivel(
+                socketio,
+                jogadores_online,
+                sids_online_do_cla(cla, jogadores_online),
+                {
                     "remetente": remetente,
                     "texto": texto_chat,
                     "tipo": "cla",
                     "canal": "guilda",
                     "avatar": avatar_real,
-                }, to=sid)
+                },
+                str(mensagem_cla.inserted_id),
+                texto_chat,
+                pacote_cla['idioma_origem'],
+                sid_remetente=player_sid,
+            )
             return
 
         # 4. Texto comum é global; comandos desconhecidos nunca chegam aqui.
@@ -1617,14 +1692,6 @@ def handle_chat_message(dados):
         }
         mensagem_salva = chat_collection.insert_one(pacote_global)
         
-        from modules.chat_translation import (
-            enfileirar_traducao,
-            detectar_idioma_mensagem,
-            normalizar_idioma_chat,
-            tradutor_chat_disponivel,
-            texto_pode_ser_traduzido,
-        )
-
         idioma_remetente = normalizar_idioma_chat(
             jogadores_online[player_sid].get('idioma_chat', 'pt')
         )
@@ -2257,7 +2324,6 @@ def handle_entrar_regiao(data):
     nome_jogador = data.get('nome', 'Herói')
     
     cursor_chat_lido = obter_cursor_leitura_chat_global(char_id)
-    hist_global = list(chat_collection.find({"alvo": "global"}).sort("data_envio", -1).limit(30))
     from modules.chat_translation import (
         detectar_idioma_mensagem,
         enfileirar_traducao,
@@ -2269,63 +2335,69 @@ def handle_entrar_regiao(data):
         jogadores_online[player_sid].get('idioma_chat', 'pt')
     )
     mensagens_historico = []
+
+    def preparar_mensagem_historico(msg, pacote, propria=False):
+        texto = str(pacote.get('texto') or '')
+        origem_salva = msg.get('idioma_origem')
+        idioma_origem = (
+            normalizar_idioma_chat(origem_salva)
+            if origem_salva
+            else detectar_idioma_mensagem(texto, idioma_destino_chat)
+        )
+        traducao = None
+        if (
+            not propria
+            and idioma_origem != idioma_destino_chat
+            and tradutor_chat_disponivel()
+            and texto_pode_ser_traduzido(texto)
+        ):
+            traducao = (str(pacote['id']), texto, idioma_origem)
+        data_envio = msg.get('data_envio')
+        timestamp = data_envio.timestamp() if hasattr(data_envio, 'timestamp') else 0
+        mensagens_historico.append((pacote, traducao, timestamp))
+
+    hist_global = list(chat_collection.find({"alvo": "global"}).sort("data_envio", -1).limit(30))
     for msg in reversed(hist_global):
-        id_mensagem_historico = str(msg.get("_id", ""))
-        texto_historico = str(msg.get("texto", ""))
-        remetente_char_id = str(msg.get("remetente_char_id") or "")
-        eh_mensagem_propria = (
-            remetente_char_id == str(char_id)
-            if remetente_char_id
-            else msg.get("remetente") == jogadores_online[player_sid].get('nome')
+        remetente_id = str(msg.get('remetente_char_id') or '')
+        propria = (
+            remetente_id == str(char_id)
+            if remetente_id
+            else msg.get('remetente') == jogadores_online[player_sid].get('nome')
         )
-        idioma_origem_historico = (
-            normalizar_idioma_chat(msg.get('idioma_origem'))
-            if msg.get('idioma_origem')
-            else detectar_idioma_mensagem(texto_historico, idioma_destino_chat)
-        )
-        pacote_historico = {
-            "id": id_mensagem_historico,
-            "remetente": msg["remetente"],
-            "texto": texto_historico,
+        pacote = {
+            "id": str(msg.get("_id", "")),
+            "remetente": msg.get("remetente", "Herói"),
+            "texto": msg.get("texto", ""),
             "tipo": msg.get("tipo", "global"),
             "historico": True,
             "nao_lida": mensagem_global_nao_lida(msg.get("_id"), cursor_chat_lido),
-            "avatar": msg.get("avatar", "")
+            "avatar": msg.get("avatar", ""),
         }
-        traducao_historico = None
-        if (
-            not eh_mensagem_propria
-            and idioma_origem_historico != idioma_destino_chat
-            and tradutor_chat_disponivel()
-            and texto_pode_ser_traduzido(texto_historico)
-        ):
-            traducao_historico = (
-                id_mensagem_historico,
-                texto_historico,
-                idioma_origem_historico,
+        preparar_mensagem_historico(msg, pacote, propria)
+
+    # O grupo ativo vem do personagem autenticado, então o filtro limita o histórico aos membros.
+    if group_id:
+        hist_grupo = list(chat_collection.find({
+            "alvo": "grupo",
+            "group_id": str(group_id),
+        }).sort("data_envio", -1).limit(30))
+        for msg in reversed(hist_grupo):
+            remetente_id = str(msg.get('remetente_char_id') or '')
+            propria = (
+                remetente_id == str(char_id)
+                if remetente_id
+                else msg.get('remetente') == jogadores_online[player_sid].get('nome')
             )
-        mensagens_historico.append((pacote_historico, traducao_historico))
-
-    # A fila é limitada; prioriza as mensagens mais recentes do histórico.
-    historico_para_traduzir = [
-        traducao
-        for _pacote, traducao in mensagens_historico
-        if traducao is not None
-    ][-12:]
-    ids_historico_pendentes = {traducao[0] for traducao in historico_para_traduzir}
-    for pacote_historico, traducao in mensagens_historico:
-        if traducao and traducao[0] in ids_historico_pendentes:
-            pacote_historico['traducao_pendente'] = True
-        emit('novaMensagemChat', pacote_historico, to=player_sid)
-
-    for id_mensagem, texto, idioma_origem in reversed(historico_para_traduzir):
-        enfileirar_traducao(
-            socketio,
-            id_mensagem,
-            texto,
-            idioma_origem,
-            {idioma_destino_chat: [player_sid]},
-        )
+            pacote = {
+                "id": str(msg.get("_id", "")),
+                "remetente": msg.get("remetente", "Herói"),
+                "texto": msg.get("texto", ""),
+                "tipo": "grupo",
+                "canal": "grupo",
+                "historico": True,
+                "avatar": msg.get("avatar", ""),
+            }
+            preparar_mensagem_historico(msg, pacote, propria)
 
     # Carrega somente o histórico do clã do personagem atual.
     try:
@@ -2338,14 +2410,22 @@ def handle_entrar_regiao(data):
                 "clan_id": str(cla_atual.get("_id")),
             }).sort("data_envio", -1).limit(30))
             for msg in reversed(hist_cla):
-                emit('novaMensagemChat', {
+                remetente_id = str(msg.get('remetente_char_id') or '')
+                propria = (
+                    remetente_id == str(char_id)
+                    if remetente_id
+                    else msg.get('remetente') == jogadores_online[player_sid].get('nome')
+                )
+                pacote = {
+                    "id": str(msg.get("_id", "")),
                     "remetente": msg.get("remetente", "Herói"),
                     "texto": msg.get("texto", ""),
                     "tipo": "cla",
                     "canal": "guilda",
                     "historico": True,
                     "avatar": msg.get("avatar", ""),
-                }, to=player_sid)
+                }
+                preparar_mensagem_historico(msg, pacote, propria)
     except Exception:
         app.logger.exception("Falha ao carregar histórico do chat do clã")
         
@@ -2353,26 +2433,49 @@ def handle_entrar_regiao(data):
         "$or": [{"destinatario": nome_jogador}, {"remetente": nome_jogador}]
     }).sort("data_envio", -1).limit(30))
     
+
     for msg in reversed(hist_privado):
-        if msg["remetente"] == nome_jogador:
+        propria = msg.get("remetente") == jogadores_online[player_sid].get('nome')
+        if propria:
             rem_format = f"Para {msg['destinatario']}"
             nome_p = msg['destinatario']
             foi_lida = True
         else:
             rem_format = msg["remetente"]
             nome_p = msg["remetente"]
-            foi_lida = msg.get("lida", False) 
-            
-        emit('novaMensagemChat', {
-            "remetente": rem_format, 
-            "texto": msg["texto"], 
-            "tipo": "privado", 
+            foi_lida = msg.get("lida", False)
+        pacote = {
+            "id": str(msg.get("_id", "")),
+            "remetente": rem_format,
+            "texto": msg.get("texto", ""),
+            "tipo": "privado",
+            "canal": "amigos",
             "nome_puro": nome_p,
             "historico": True,
             "nao_lida": not foi_lida,
-            "avatar": msg.get("avatar", "") 
-        }, to=player_sid)
+            "avatar": msg.get("avatar", ""),
+        }
+        preparar_mensagem_historico(msg, pacote, propria)
 
+    historico_para_traduzir = sorted(
+        (item for item in mensagens_historico if item[1]),
+        key=lambda item: item[2],
+        reverse=True,
+    )[:12]
+    ids_historico_pendentes = {item[1][0] for item in historico_para_traduzir}
+    for pacote, traducao, _timestamp in mensagens_historico:
+        if traducao and traducao[0] in ids_historico_pendentes:
+            pacote['traducao_pendente'] = True
+        emit('novaMensagemChat', pacote, to=player_sid)
+
+    for _pacote, (id_mensagem, texto, idioma_origem), _timestamp in historico_para_traduzir:
+        enfileirar_traducao(
+            socketio,
+            id_mensagem,
+            texto,
+            idioma_origem,
+            {idioma_destino_chat: [player_sid]},
+        )
 @socketio.on('marcarChatGlobalLido')
 def handle_marcar_chat_global_lido(_dados=None):
     player_sid = request.sid

@@ -1012,7 +1012,13 @@ class MotorMultiplayer {
                                 <strong style="color: ${bordaCor}; font-size: 0.75em; text-transform: uppercase; letter-spacing: 1px;">${msg.remetente}</strong>
                                 <span style="font-size: 0.6em; color: ${bordaCor}; opacity: 0.8;">⚔️ GRUPO</span>
                             </div>
-                            <div style="color: #e2e8f0; font-size: 0.95em; line-height: 1.3;">${window.formatarTextoExpressoesChat(msg.texto)}</div>
+                            <div class="chat-traducao-linha">
+                                <div class="chat-texto-mensagem" style="flex: 1; min-width: 0; color: #e2e8f0; font-size: 0.95em; line-height: 1.3;">
+                                    <div class="chat-texto-original">${window.formatarTextoExpressoesChat(msg.texto)}</div>
+                                    <div class="chat-texto-traduzido" hidden></div>
+                                </div>
+                                ${msg.traducao_pendente ? '<button type="button" class="chat-traducao-toggle" disabled title="Traduzindo a mensagem…" aria-label="Traduzindo a mensagem">…</button>' : ''}
+                            </div>
                         </div>
                     </div>
                 `;
@@ -1039,7 +1045,13 @@ class MotorMultiplayer {
                                 <strong style="color: ${bordaCor}; font-size: 0.75em; text-transform: uppercase; letter-spacing: 1px;">${msg.remetente}</strong>
                                 <span style="font-size: 0.6em; color: ${bordaCor}; opacity: 0.8;">🛡️ CLÃ</span>
                             </div>
-                            <div style="color: #e8daef; font-size: 0.95em; line-height: 1.3;">${window.formatarTextoExpressoesChat(msg.texto)}</div>
+                            <div class="chat-traducao-linha">
+                                <div class="chat-texto-mensagem" style="flex: 1; min-width: 0; color: #e8daef; font-size: 0.95em; line-height: 1.3;">
+                                    <div class="chat-texto-original">${window.formatarTextoExpressoesChat(msg.texto)}</div>
+                                    <div class="chat-texto-traduzido" hidden></div>
+                                </div>
+                                ${msg.traducao_pendente ? '<button type="button" class="chat-traducao-toggle" disabled title="Traduzindo a mensagem…" aria-label="Traduzindo a mensagem">…</button>' : ''}
+                            </div>
                         </div>
                     </div>
                 `;

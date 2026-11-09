@@ -224,3 +224,48 @@ def enfileirar_traducao(
             _TRADUTOR_ATIVO = True
             socketio.start_background_task(_processar_fila_traducao, socketio)
     return True
+
+
+def emitir_mensagem_traduzivel(
+    socketio,
+    jogadores_online,
+    destinatarios,
+    pacote,
+    id_mensagem,
+    texto,
+    idioma_origem,
+    sid_remetente=None,
+):
+    """Emit a chat message and queue it only for recipients who need it."""
+    idioma_origem = normalizar_idioma_chat(idioma_origem)
+    id_mensagem = str(id_mensagem)
+    destinos_por_idioma = {}
+    pode_traduzir = (
+        tradutor_chat_disponivel()
+        and texto_pode_ser_traduzido(texto)
+    )
+
+    for sid in dict.fromkeys(destinatarios or []):
+        mensagem = dict(pacote or {})
+        mensagem['id'] = id_mensagem
+        idioma_destino = normalizar_idioma_chat(
+            (jogadores_online.get(sid) or {}).get('idioma_chat', 'pt')
+        )
+        if (
+            pode_traduzir
+            and sid != sid_remetente
+            and idioma_destino != idioma_origem
+        ):
+            mensagem['traducao_pendente'] = True
+            destinos_por_idioma.setdefault(idioma_destino, []).append(sid)
+        socketio.emit('novaMensagemChat', mensagem, to=sid)
+
+    if destinos_por_idioma:
+        enfileirar_traducao(
+            socketio,
+            id_mensagem,
+            texto,
+            idioma_origem,
+            destinos_por_idioma,
+        )
+    return destinos_por_idioma
